@@ -6,6 +6,6 @@ import org.springframework.stereotype.Component;
 @Component public class PerformanceTargetPermissionProvider implements ZsjosObjectPermissionProvider {
  @Resource private PerformanceTargetMapper mapper; @Resource private PerformanceAccess access;
  public String getBizType(){return "sales-performance-target";}
- public boolean hasPermission(Long id,String action,Long userId){try{var row=mapper.selectById(id);if(row==null)return false;access.targetObject(row.getScopeType(),row.getScopeId());if(!access.departmentAllowed(row.getDeptId()))return false;return "read".equals(action)||"update".equals(action)&&access.has("zsjos:sales-performance-target:update");}catch(cn.iocoder.yudao.framework.common.exception.ServiceException e){return false;}}
+ public boolean hasPermission(Long id,String action,Long userId){try{var row=mapper.selectById(id);if(row==null||!PerformanceDomain.current().equals(row.getBusinessDomain()))return false;if("read".equals(action)){access.targetReadObject(row);return true;}access.targetWriteObject(row.getScopeType(),row.getScopeId());if(!access.commandDepartmentAllowed(row.getDeptId()))return false;return "read".equals(action)||"update".equals(action)&&access.has("zsjos:sales-performance-target:update");}catch(cn.iocoder.yudao.framework.common.exception.ServiceException e){return false;}}
  public void check(Long id,String action,Long userId){if(!hasPermission(id,action,userId))throw PerformanceAccess.denied();}
 }

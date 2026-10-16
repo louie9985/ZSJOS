@@ -19,7 +19,7 @@ class PerformanceMapperTest {
     sql.execute("CREATE ALIAS JSON_UNQUOTE FOR 'cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SubordinateSalesDailyQueryTest.jsonUnquote'");
     sql.execute("CREATE TABLE zsjos_lead(id BIGINT,tenant_id BIGINT,deleted INT,lead_no VARCHAR,owner_user_id BIGINT,ownership_started_at TIMESTAMP,lead_category_label_snapshot VARCHAR,sales_stage_label_snapshot VARCHAR,current_assignment_history_id BIGINT,qualification_round_no INT)");
     sql.execute("INSERT INTO zsjos_lead VALUES (1,9,0,'LD-SQL',1,CURRENT_TIMESTAMP,'分类快照','阶段快照',1,1)");
-    sql.execute("CREATE TABLE zsjos_performance_attribution(fact_type VARCHAR,fact_id BIGINT,tenant_id BIGINT,deleted INT,dept_id BIGINT,center_id BIGINT,completed_at TIMESTAMP,outcome VARCHAR,assignment_id BIGINT)");
+    sql.execute("CREATE TABLE zsjos_performance_attribution(fact_type VARCHAR,fact_id BIGINT,tenant_id BIGINT,deleted INT,dept_id BIGINT,center_id BIGINT,completed_at TIMESTAMP,outcome VARCHAR,assignment_id BIGINT,business_domain VARCHAR,org_source VARCHAR)");
     for(String table:List.of("zsjos_lead_follow_up_record","zsjos_opportunity_follow_up_record")) {
      sql.execute("CREATE TABLE "+table+"(id BIGINT,tenant_id BIGINT,deleted INT,lead_id BIGINT,operator_user_id BIGINT,occurred_at TIMESTAMP,result_label_snapshot VARCHAR)");
      sql.execute("INSERT INTO "+table+" VALUES(1,9,0,1,1,CURRENT_TIMESTAMP,'意向'),(2,9,0,1,1,CURRENT_TIMESTAMP,'意向')");
@@ -28,7 +28,7 @@ class PerformanceMapperTest {
     sql.execute("INSERT INTO zsjos_business_event VALUES(9,0,'lead',1,'lead_follow_up_recorded','{\"generationSource\":\""+generationSource+"\",\"followUpRecordId\":1}')");
     sql.execute("CREATE TABLE zsjos_business_task(id BIGINT,tenant_id BIGINT,deleted INT,biz_id BIGINT,assignee_id BIGINT,create_time TIMESTAMP,due_at TIMESTAMP,completed_at TIMESTAMP,cancelled_at TIMESTAMP,idempotency_key VARCHAR,status VARCHAR,task_type VARCHAR,cancel_reason VARCHAR,payload VARCHAR)");
     sql.execute("INSERT INTO zsjos_business_task VALUES(1,9,0,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL,'lead-qualification:1:1','completed','lead_qualification',NULL,'{\"generationSource\":\""+generationSource+"\"}'),(2,9,0,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL,NULL,'reminder','pending','lead_follow_up_reminder',NULL,'{}')");
-    for(String type:List.of("FOLLOW_UP","OPPORTUNITY_FU","TASK"))for(int id=1;id<=2;id++)sql.execute("INSERT INTO zsjos_performance_attribution VALUES('"+type+"',"+id+",9,0,20,30,NULL,NULL,1)");
+    for(String type:List.of("FOLLOW_UP","OPPORTUNITY_FU","TASK"))for(int id=1;id<=2;id++)sql.execute("INSERT INTO zsjos_performance_attribution(fact_type,fact_id,tenant_id,deleted,dept_id,center_id,completed_at,outcome,assignment_id) VALUES('"+type+"',"+id+",9,0,20,30,NULL,NULL,1)");
    }
    var mapper=session.getMapper(PerformanceFactMapper.class);
    for(String scope:List.of("SELF","USER","DEPT","CENTER")) {

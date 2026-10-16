@@ -53,6 +53,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadAssignmentRuleMapper ruleMapper;
     @Resource private LeadAssignmentService assignmentService;
+    @Resource private LeadTeamTransferPolicy teamTransferPolicy;
     @Resource private PartnerLeadAssignmentService partnerAssignmentService;
     @Resource private LeadDispatchRedisRepository dispatchRedisRepository;
     @Resource private DictDataApi dictDataApi;
@@ -423,15 +424,33 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         return TransferAttemptResult.success();
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    public void transferEducation(Long leadId, Long targetUserId, Long operatorUserId, String reason, String idempotencyKey) {
+        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead);
+        teamTransferPolicy.requireTarget(lead, targetUserId, operatorUserId);
+        if (STATUS_SUSPENDED.equals(lead.getStatus()) || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
+            throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        }
+        doAdminTransfer(lead, targetUserId, operatorUserId, reason, idempotencyKey, OWNER_EDUCATION);
+    }
+
+    private void doAdminTransfer(LeadDO lead, Long salesUserId, Long operatorUserId, String reason, String idempotencyKey) {
+        doAdminTransfer(lead, salesUserId, operatorUserId, reason, idempotencyKey, OWNER_SALES);
+    }
+
     private void doAdminTransfer(LeadDO lead, Long salesUserId, Long operatorUserId, String reason,
-                                 String idempotencyKey) {
+                                 String idempotencyKey, String ownerIdentity) {
         Long leadId = lead.getId();
         LocalDateTime transferredAt = LocalDateTime.now();
         agingPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
         Long from = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getPendingAssigneeUserId();
         Long pendingAssigneeUserId = lead.getPendingAssigneeUserId();
         String fromAssignmentStatus = lead.getAssignmentStatus();
-        lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId); lead.setOwnerIdentity(OWNER_SALES);
+        lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId); lead.setOwnerIdentity(ownerIdentity);
         lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
         lead.setOwnershipStartedAt(transferredAt);
         lifecycleTaskService.cancelAssignmentTask(leadId, pendingAssigneeUserId,
@@ -440,7 +459,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lifecycleTaskService.cancelFollowUpReminders(leadId, transferredAt, reason);
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
         history.setLeadId(leadId); history.setActionType(ACTION_TRANSFER); history.setFromOwnerUserId(from);
-        history.setToOwnerUserId(salesUserId); history.setOwnerIdentitySnapshot(OWNER_SALES); history.setOperatorUserId(operatorUserId);
+        history.setToOwnerUserId(salesUserId); history.setOwnerIdentitySnapshot(ownerIdentity); history.setOperatorUserId(operatorUserId);
         history.setReason(reason);
         history.setOccurredAt(transferredAt); historyMapper.insert(history);
         lead.setCurrentAssignmentHistoryId(history.getId());

@@ -90,12 +90,13 @@ export const subordinateLeads = (
   params: Record<string, unknown>
 ): Promise<WorkbenchListResult> =>
   request.get({ url: `/zsjos/subordinate-sales/${id}/leads`, params })
-export const subordinateTransferCandidates = (): Promise<Array<{ id: number; nickname: string }>> =>
-  request.get({ url: '/zsjos/subordinate-sales/transfer-candidates' })
-export const batchTransferSubordinateLeads = (data: Record<string, unknown>) =>
+export const subordinateTransferCandidates = (leadId?: number): Promise<Array<{ id: number; nickname: string }>> =>
+  request.get({ url: '/zsjos/subordinate-sales/transfer-candidates', params: { leadId } })
+export type SubordinateBatchResult = { successCount: number; failureCount: number; items: Array<{leadId: number; leadNo?: string; success: boolean; code: string; message: string}> }
+export const batchTransferSubordinateLeads = (data: Record<string, unknown>): Promise<SubordinateBatchResult> =>
   request.post({ url: '/zsjos/subordinate-sales/leads/batch-transfer', data })
-export const batchReleaseSubordinateLeads = (data: Record<string, unknown>) =>
-  request.post({ url: '/zsjos/subordinate-sales/leads/batch-public-sea', data })
+export const batchReleaseSubordinateLeads = (data: Record<string, unknown>): Promise<SubordinateBatchResult> =>
+  request.post({ url: '/zsjos/subordinate-sales/leads/batch-release-public-sea', data })
 
 export interface RepurchaseCustomerIdentity { customerName: string; customerMobile?: string; customerWechatId?: string }
 export interface RepurchaseCustomerCheck {
@@ -106,3 +107,6 @@ export const checkRepurchaseCustomer = (data: RepurchaseCustomerIdentity): Promi
   request.post({ url: '/zsjos/sales-order/repurchase/check-customer', data, preserveBusinessError: true })
 export const createCustomerRepurchase = (data: Record<string, unknown> & { order: SalesOrderSubmission }) =>
   request.post({ url: '/zsjos/sales-order/repurchase', data, preserveBusinessError: true })
+
+export const subordinateBatchTransferCandidates = (leadIds: number[]): Promise<Array<{id: number; nickname: string}>> =>
+  request.get({ url: '/zsjos/subordinate-sales/batch-transfer-candidates', params: {leadIds: leadIds.join(',')} })

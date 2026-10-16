@@ -2834,6 +2834,12 @@ export type SubordinateCategoryCount = {
   configured: boolean;
 };
 export type SubordinateSales = {
+  deptId?: number;
+  departmentName?: string;
+  postNames?: string[];
+  salesDispatchSupported?: boolean;
+  educationOwnershipSupported?: boolean;
+  orderCreationSupported?: boolean;
   userId: number;
   name: string;
   avatar?: string;
@@ -5616,6 +5622,7 @@ export const api = {
       pageSize: number;
       keyword?: string;
       status?: string;
+      recycledOnly?: boolean;
       advancedFilter?: AdvancedFilterGroup;
     },
   ) =>
@@ -5640,10 +5647,12 @@ export const api = {
         params,
       }),
     ),
-  subordinateTransferCandidates: async () =>
+  subordinateTransferCandidates: async (leadId?: number) =>
     unwrap<AssignmentUser[]>(
-      await http.get("/zsjos/subordinate-sales/transfer-candidates"),
+      await http.get("/zsjos/subordinate-sales/transfer-candidates", { params: { leadId } }),
     ),
+  subordinateBatchTransferCandidates: async (leadIds: number[]) => unwrap<AssignmentUser[]>(
+    await http.get('/zsjos/subordinate-sales/batch-transfer-candidates', { params: { leadIds: leadIds.join(',') } })),
   updateSubordinateAccountStatus: async (
     salesUserId: number,
     status: number,
@@ -5675,23 +5684,27 @@ export const api = {
     targetUserId: number,
     reason: string,
     idempotencyKey: string,
+    version?: number,
   ) =>
     unwrap<boolean>(
       await http.post(`/zsjos/subordinate-sales/leads/${id}/transfer`, {
         targetUserId,
         reason,
         idempotencyKey,
+        version,
       }),
     ),
   supervisorRestoreLead: async (
     id: number,
     reason: string,
     idempotencyKey: string,
+    version?: number,
   ) =>
     unwrap<boolean>(
       await http.post(`/zsjos/subordinate-sales/leads/${id}/restore`, {
         reason,
         idempotencyKey,
+        version,
       }),
     ),
   supervisorRecycleLead: async (

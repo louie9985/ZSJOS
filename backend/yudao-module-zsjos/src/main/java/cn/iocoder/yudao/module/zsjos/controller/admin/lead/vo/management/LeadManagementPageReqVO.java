@@ -32,6 +32,8 @@ public class LeadManagementPageReqVO extends PageParam {
     private String keyword;
     private String status;
     private String assignmentStatus;
+    private Boolean recycledOnly;
+    private Long recycleSourceOwnerUserId;
 
     @Pattern(regexp = "submitter|owner|management", message = "客资收件箱视角不正确")
     private String audience;

@@ -7851,6 +7851,7 @@ VALUES ('作品目的','zsjos_content_purpose',0,'ZSJOS 内容审核作品目的
 -- Sales performance (V276): empty tenant-owned tables.
 CREATE TABLE IF NOT EXISTS zsjos_performance_org (
  id bigint NOT NULL AUTO_INCREMENT,
+ business_domain varchar(16) NOT NULL DEFAULT 'sales',
  dept_id bigint NOT NULL, center_id bigint NOT NULL, kind varchar(16) NOT NULL, version int NOT NULL DEFAULT 0,
   creator varchar(64) NOT NULL DEFAULT '',
   create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -7863,6 +7864,7 @@ CREATE TABLE IF NOT EXISTS zsjos_performance_org (
 
 CREATE TABLE IF NOT EXISTS zsjos_performance_target (
  id bigint NOT NULL AUTO_INCREMENT,
+ business_domain varchar(16) NOT NULL DEFAULT 'sales',
  scope_type varchar(16) NOT NULL, scope_id bigint NOT NULL, dept_id bigint NULL, center_id bigint NULL, period_type varchar(16) NOT NULL, period_start date NOT NULL, floor_amount decimal(18,2) NULL, sprint_amount decimal(18,2) NULL, manual bit(1) NOT NULL DEFAULT b'0', reason varchar(500) NOT NULL, version int NOT NULL DEFAULT 0,
   creator varchar(64) NOT NULL DEFAULT '',
   create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -7870,7 +7872,7 @@ CREATE TABLE IF NOT EXISTS zsjos_performance_target (
   update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted bit(1) NOT NULL DEFAULT b'0',
   tenant_id bigint NOT NULL DEFAULT 0,
- PRIMARY KEY(id), UNIQUE KEY uk_target(tenant_id,scope_type,scope_id,period_type,period_start,deleted), KEY idx_target_dept(tenant_id,dept_id,period_type,period_start)
+ PRIMARY KEY(id), UNIQUE KEY uk_target(tenant_id,business_domain,scope_type,scope_id,period_type,period_start,deleted), KEY idx_target_dept(tenant_id,dept_id,period_type,period_start)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS zsjos_performance_revision (
@@ -7886,6 +7888,7 @@ CREATE TABLE IF NOT EXISTS zsjos_performance_revision (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS zsjos_performance_attribution (
+ business_domain varchar(16) NULL DEFAULT NULL COMMENT '事实发生时业务域，未知不推定',
  id bigint NOT NULL AUTO_INCREMENT,
  outcome varchar(32) NULL, completed_at datetime NULL, fact_type varchar(16) NOT NULL, fact_id bigint NOT NULL, user_id bigint NULL, user_name varchar(100) NULL, dept_id bigint NULL, dept_name varchar(100) NULL, center_id bigint NULL, center_name varchar(100) NULL, lead_id bigint NULL, assignment_id bigint NULL, received_at datetime NULL, org_source varchar(16) NULL, source_group varchar(32) NULL, channel_code varchar(100) NULL, channel_label varchar(255) NULL,
   creator varchar(64) NOT NULL DEFAULT '',

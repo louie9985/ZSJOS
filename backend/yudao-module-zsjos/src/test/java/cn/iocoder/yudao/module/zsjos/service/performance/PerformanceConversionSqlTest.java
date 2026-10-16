@@ -45,6 +45,9 @@ class PerformanceConversionSqlTest {
     sql.execute("ALTER TABLE zsjos_lead ADD current_assignment_history_id BIGINT");
     sql.execute("UPDATE zsjos_lead SET current_assignment_history_id=(SELECT MAX(h.id) FROM zsjos_lead_assignment_history h WHERE h.lead_id=zsjos_lead.id)");
     sql.execute("UPDATE zsjos_lead SET owner_user_id=2 WHERE id=3");
+    sql.execute("ALTER TABLE zsjos_performance_attribution ADD business_domain VARCHAR DEFAULT 'sales'");
+    sql.execute("ALTER TABLE zsjos_performance_attribution ADD org_source VARCHAR DEFAULT 'frozen'");
+    sql.execute("CREATE TABLE zsjos_performance_org(tenant_id BIGINT,deleted INT,dept_id BIGINT,business_domain VARCHAR,create_time TIMESTAMP,update_time TIMESTAMP)");
    }
    TenantContextHolder.setTenantId(9L);
    var access=mock(PerformanceAccess.class);when(access.has(anyString())).thenReturn(true);when(access.historicalRowAllowed(any(),any())).thenReturn(true);
@@ -61,7 +64,7 @@ class PerformanceConversionSqlTest {
     assertEquals("往期接收有效期内成交",actual.stream().filter(x->x.id()==2L).findFirst().orElseThrow().label());
     if(!scope.equals("USER")) assertEquals(LocalDate.of(2025,1,8).atStartOfDay(),actual.stream().filter(x->x.id()==3L).findFirst().orElseThrow().occurredAt());
    }
-   var query=new PerformanceDetailQuery().setTenant(9L).setType("DEPT").setId(10L).setAllDepartments(true)
+   var query=new PerformanceDetailQuery().setBusinessDomain("sales").setTenant(9L).setType("DEPT").setId(10L).setAllDepartments(true)
      .setStart(LocalDate.of(2025,1,1).atStartOfDay()).setEnd(LocalDate.of(2025,2,1).atStartOfDay())
      .setConversionLeadIds(java.util.stream.LongStream.rangeClosed(1,8).boxed().collect(java.util.stream.Collectors.toSet()));
    var mapper=session.getMapper(PerformanceDetailMapper.class);
@@ -95,7 +98,7 @@ class PerformanceConversionSqlTest {
    try(var sql=session.getConnection().createStatement()) {
     sql.execute("INSERT INTO zsjos_lead_assignment_history VALUES(11,9,0,3,1,'2025-02-01','transfer')");
     sql.execute("UPDATE zsjos_lead SET owner_user_id=1,current_assignment_history_id=11 WHERE id=3");
-    sql.execute("INSERT INTO zsjos_performance_attribution VALUES(111,'ASSIGNMENT',11,9,0,1,'snapshot','2025-02-01',11,'inbound','channel','channel',10,20)");
+    sql.execute("INSERT INTO zsjos_performance_attribution(id,fact_type,fact_id,tenant_id,deleted,user_id,user_name,received_at,assignment_id,source_group,channel_label,channel_code,dept_id,center_id) VALUES(111,'ASSIGNMENT',11,9,0,1,'snapshot','2025-02-01',11,'inbound','channel','channel',10,20)");
    }
    session.clearCache();query.setId(10L);
    assertFalse(PerformanceConversion.population(new PerformancePeriods.Window("month","",query.getStart(),query.getEnd()),mapper.conversionOrders(query),mapper.conversionReceipts(query)).containsKey(3L));

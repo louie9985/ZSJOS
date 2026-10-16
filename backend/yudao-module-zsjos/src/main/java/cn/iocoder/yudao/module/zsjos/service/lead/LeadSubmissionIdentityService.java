@@ -51,6 +51,14 @@ public class LeadSubmissionIdentityService {
         }
     }
 
+    public Set<Long> getEligibleEducationOwners(List<AdminUserRespDTO> users) {
+        if(users.isEmpty())return Set.of();
+        Set<Long> departments=users.stream().map(AdminUserRespDTO::getDeptId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long,DeptRespDTO> deptMap=departments.isEmpty()?Map.of():deptApi.getDeptMap(departments);
+        Set<Long> disabled=personnelStateService.getDisabledUserIds(users.stream().map(AdminUserRespDTO::getId).toList());
+        return users.stream().filter(user -> isValidInternalUser(user,deptMap,disabled)).map(AdminUserRespDTO::getId).collect(Collectors.toSet());
+    }
+
     public boolean isEligibleEducationOwner(Long userId) {
         if (userId == null) return false;
         AdminUserRespDTO user = adminUserApi.getUser(userId);

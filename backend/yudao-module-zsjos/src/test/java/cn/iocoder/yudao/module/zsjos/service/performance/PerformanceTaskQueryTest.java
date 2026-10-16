@@ -32,7 +32,7 @@ class PerformanceTaskQueryTest {
                 sql.execute("CREATE ALIAS JSON_UNQUOTE FOR 'cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SubordinateSalesDailyQueryTest.jsonUnquote'");
                 sql.execute("CREATE TABLE zsjos_lead(id BIGINT,tenant_id BIGINT,deleted INT,lead_no VARCHAR,owner_user_id BIGINT,ownership_started_at TIMESTAMP,lead_category_label_snapshot VARCHAR,sales_stage_label_snapshot VARCHAR,current_assignment_history_id BIGINT,qualification_round_no INT)");
                 sql.execute("INSERT INTO zsjos_lead VALUES(1,9,0,'LD-QUERY',1,CURRENT_TIMESTAMP,'snapshot','stage',7,1)");
-                sql.execute("CREATE TABLE zsjos_performance_attribution(fact_type VARCHAR,fact_id BIGINT,tenant_id BIGINT,deleted INT,dept_id BIGINT,center_id BIGINT,completed_at TIMESTAMP,outcome VARCHAR,assignment_id BIGINT)");
+                sql.execute("CREATE TABLE zsjos_performance_attribution(fact_type VARCHAR,fact_id BIGINT,tenant_id BIGINT,deleted INT,dept_id BIGINT,center_id BIGINT,completed_at TIMESTAMP,outcome VARCHAR,assignment_id BIGINT,business_domain VARCHAR,org_source VARCHAR)");
                 sql.execute("CREATE TABLE zsjos_business_task(id BIGINT,tenant_id BIGINT,deleted INT,biz_id BIGINT,assignee_id BIGINT,create_time TIMESTAMP,due_at TIMESTAMP,completed_at TIMESTAMP,cancelled_at TIMESTAMP,idempotency_key VARCHAR,status VARCHAR,task_type VARCHAR,cancel_reason VARCHAR,payload VARCHAR)");
                 for (int id = 1; id <= 9; id++) {
                     sql.execute("INSERT INTO zsjos_business_task VALUES(" + id + "," + (id == 5 ? 99 : 9) + ","
@@ -40,7 +40,7 @@ class PerformanceTaskQueryTest {
                             + ",CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,NULL,NULL,'lead-qualification:1:1','pending','"
                             + (id == 7 ? "unrelated" : "lead_qualification") + "',NULL,'{}')");
                 }
-                sql.execute("INSERT INTO zsjos_performance_attribution VALUES"
+                sql.execute("INSERT INTO zsjos_performance_attribution(fact_type,fact_id,tenant_id,deleted,dept_id,center_id,completed_at,outcome,assignment_id) VALUES"
                         + "('QUALIFICATION',1,9,0,20,30,NULL,'pending',7),"
                         + "('TASK',1,9,0,20,30,NULL,'completed',7),"
                         + "('ORDER',2,9,0,20,30,NULL,NULL,7),"
@@ -51,6 +51,10 @@ class PerformanceTaskQueryTest {
                         + "('TASK',7,9,0,20,30,NULL,NULL,7),"
                         + "('TASK',8,9,0,20,30,NULL,NULL,7),"
                         + "('TASK',9,9,0,21,31,NULL,NULL,7)");
+            }
+            try(var sql=session.getConnection().createStatement()){
+                sql.execute("UPDATE zsjos_performance_attribution SET business_domain='sales',org_source='frozen'");
+                sql.execute("CREATE TABLE zsjos_performance_org(tenant_id BIGINT,deleted INT,dept_id BIGINT,business_domain VARCHAR,create_time TIMESTAMP,update_time TIMESTAMP)");
             }
             var mapper = session.getMapper(PerformanceFactMapper.class);
             long id = "DEPT".equals(scope) ? 20L : "CENTER".equals(scope) ? 30L : 1L;
@@ -71,9 +75,9 @@ class PerformanceTaskQueryTest {
             var pages = session.getMapper(cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceDetailMapper.class);
             var now = java.time.LocalDateTime.now().plusDays(1);
             var query = new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceDetailQuery()
-                    .setTenant(9L).setType(scope).setId(id).setAllDepartments(true).setMissingDepartment(personal)
+                    .setBusinessDomain("sales").setTenant(9L).setType(scope).setId(id).setAllDepartments(true).setMissingDepartment(personal)
                     .setDepartments(java.util.Set.of()).setMetric("qualification").setNow(now).setSize(1);
-            var expected = rows.stream().filter(x -> Boolean.TRUE.equals(x.getCurrentQualification()))
+            var expected = rows.stream().filter(x -> x.getDeptId()!=null && Boolean.TRUE.equals(x.getCurrentQualification()))
                     .sorted(java.util.Comparator.comparing(PerformanceFact::getId)).map(PerformanceFact::getId).toList();
             assertEquals(expected.size(), pages.count(query));
             var paged = new java.util.ArrayList<Long>();

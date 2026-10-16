@@ -23,6 +23,12 @@ public final class PerformanceVO {
   private boolean calendar;
   private boolean cumulative;
  }
+ @Data public static class UnclassifiedQuery {
+  private Long userId;
+  @Min(1) private Integer pageNo=1;
+  @Min(1) @Max(100) private Integer pageSize=20;
+ }
+ public record UnclassifiedDetail(Detail fact,String attributionReason,Long historicalDepartmentId) {}
  public record Organization(Long deptId,Long centerId,String kind) {}
  public record Revision(Long id,String reason,String before,String after,String operatorName,LocalDateTime at) {}
  public record Node(String key,String parentKey,String title,String scopeType,Long scopeId,boolean selectable) {}

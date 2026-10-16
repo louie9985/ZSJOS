@@ -52,6 +52,8 @@ public class LeadComplaintService {
     @Resource private LeadIdentityMaskingService identityMaskingService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private FileApi fileApi;
+    @Resource private LeadObjectPermissionService permissionService;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @Transactional(rollbackFor = Exception.class)
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交投诉", target="complaint-create", id=0, actor=1, actorType="ADMIN")
@@ -102,7 +104,10 @@ public class LeadComplaintService {
     }
 
     public PageResult<LeadComplaintRespVO> page(LeadComplaintPageReqVO req) {
-        PageResult<LeadComplaintDO> page = complaintMapper.selectPage(req);
+        Long reader = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
+        Set<Long> managed = permissionService.getManagedUserIds(reader);
+        PageResult<LeadComplaintDO> page = permissionApi.hasTenantReadAllAccess(reader)
+                ? complaintMapper.selectPage(req) : complaintMapper.selectManagedPage(req, managed);
         Set<Long> leadIds = page.getList().stream().map(LeadComplaintDO::getLeadId).collect(Collectors.toSet());
         Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
                 .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
@@ -146,9 +151,14 @@ public class LeadComplaintService {
 
     @Transactional(rollbackFor = Exception.class)
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="投诉处理结果", target="complaint", id=0, actor=1, actorType="ADMIN")
+    @ZsjosPermission(bizType = "lead-complaint", bizId = "#id", action = "handle")
     public void decide(Long id, Long handler, LeadComplaintDecisionReqVO req) {
         LeadComplaintDO replay = complaintMapper.selectByDecisionKey(req.getIdempotencyKey());
-        if (replay != null) return;
+        if (replay != null) {
+            if (!Objects.equals(replay.getId(), id) || !Objects.equals(replay.getHandlerUserId(), handler)) throw exception(LEAD_PERMISSION_DENIED);
+            checkManagedComplaint(replay, handler);
+            return;
+        }
         if (!Set.of("founded", "unfounded").contains(req.getResult())) {
             throw exception(LEAD_COMPLAINT_RESULT_INVALID);
         }
@@ -156,6 +166,7 @@ public class LeadComplaintService {
                 attachments(req.getEvidenceFileIds()), handler);
         LeadComplaintDO row = complaintMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
         if (row == null) throw exception(LEAD_COMPLAINT_NOT_EXISTS);
+        checkManagedComplaint(row, handler);
         if (!"pending".equals(row.getStatus())) throw exception(LEAD_COMPLAINT_ALREADY_HANDLED);
         LocalDateTime now = LocalDateTime.now();
         row.setStatus("handled");
@@ -177,6 +188,17 @@ public class LeadComplaintService {
         context.put("complaint.handlerOpinion", row.getHandlerOpinion());
         notifyPublisher.publish(sceneCode, row.getLeadId(), "lead-complaint-" + row.getResult() + ":" + row.getId(),
                 handler, now, context);
+    }
+
+    public void checkManagedComplaint(LeadComplaintDO row, Long userId) {
+        if (permissionApi.hasTenantReadAllAccess(userId)) return;
+        Set<Long> managed = permissionService.getManagedUserIds(userId);
+        LeadDO lead = leadMapper.selectById(row.getLeadId());
+        boolean historical = row.getSalesUserId() != null && managed.contains(row.getSalesUserId());
+        boolean current = lead != null && lead.getOwnerUserId() != null && managed.contains(lead.getOwnerUserId());
+        if (!historical && !current) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
     }
 
     private List<LeadAttachmentReqVO> attachments(List<Long> ids) {

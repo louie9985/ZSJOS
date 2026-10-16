@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 @Data public class PerformanceFact {
  private Long ownerUserId; private Boolean currentQualification; private Boolean currentAssignment;
  private String generationSource;
+ private String kind; private String state; private String attributionReason;
  private String channelCode;
  private String sourceType; private Long sourceProviderUserId;
  private String submissionSourceType; private Boolean sourceProviderRecorded;

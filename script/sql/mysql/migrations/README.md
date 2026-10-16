@@ -1574,3 +1574,14 @@ replace the deployed order-snapshot V285.
 ## V316 — Content review account profile
 
 After Core V315, enrich missing tenant-1 approval profile fields from stored current account values/labels, with per-field provenance. Preserve nonempty snapshots and all workflow state. DML and both ledgers are transactional; replay is missing-only. Back up batches and ledgers; see [scope, recovery and verification](../../../../docs/operations/content-review-account-profile.md). No schema or permission changes.
+
+
+V320 renames canonical menu 6814 to 下属员工, retaining its route, component and permission. Requires the V036 menu and both version ledgers. Metadata-only, repeatable and failure-controlled; never writes role grants or business rows. Restore a label through System menu management when rollback is required.
+
+
+V321 adds independent delivery performance domain, target uniqueness and menu metadata. Existing sales target values and revisions are preserved. Reviewed tenant-1 organization IDs 1050/1051 are classified as delivery; no role grants or fact backfill. Isolated MySQL partial-DDL recovery, replay, prerequisite failure without ledgers and recovery verified. The source numbering gap was removed on 2026-10-15: exam export V320 -> V319, delivery domain V321 -> V320. Historical isolated verification used the old numbers; full fresh/upgrade acceptance under the new numbering remains unverified. Before migrating an existing database with old version records, review both schema ledgers and checksums; do not blindly replay or reconcile them.
+
+## V322 — Performance attribution domain review
+After the canonical delivery-domain schema (renumbered V320 or already-applied legacy V321), validate exact menu contracts, domain columns and full target uniqueness; add nullable attribution business_domain without historical backfill. Does not reconcile existing version/checksum drift or role grants. Partial DDL is retained and revalidated. Run tools/test_performance_attribution_review.py in retained synthetic databases. Full fresh-chain acceptance remains blocked by the unresolved legacy V321/renumber ledger mapping; this migration is not authorization to rewrite historical ledgers.
+
+2026-10-16 integration: main V318 exam and V319 rest-days retain their identities. Employee menu moved to V320; delivery domain restored to V321; review remains V322. Core source numbering is contiguous. Historical execution evidence above retains its dates; existing database ledger reconciliation remains separately reviewed.

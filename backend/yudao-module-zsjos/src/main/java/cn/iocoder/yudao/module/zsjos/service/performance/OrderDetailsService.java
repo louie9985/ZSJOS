@@ -19,7 +19,7 @@ public class OrderDetailsService {
             throw PerformanceAccess.invalid("下钻维度和条件必须同时提供");
         if (query.getKeyword() != null) query.setKeyword(query.getKeyword().strip());
         var q = new OrderDetailQuery();
-        q.setTenant(scope.getTenant()).setType(scope.getType()).setId(scope.getId())
+        q.setBusinessDomain(scope.getBusinessDomain()).setTenant(scope.getTenant()).setType(scope.getType()).setId(scope.getId())
             .setAllDepartments(scope.isAllDepartments()).setMissingDepartment(scope.isMissingDepartment()).setDepartments(scope.getDepartments())
             .setStart(window.start()).setEnd(window.end()).setDimension(query.getDimension()).setGroupKey(query.getGroupKey())
             .setSize(query.getPageSize()).setOffset((long) (query.getPageNo() - 1) * query.getPageSize());

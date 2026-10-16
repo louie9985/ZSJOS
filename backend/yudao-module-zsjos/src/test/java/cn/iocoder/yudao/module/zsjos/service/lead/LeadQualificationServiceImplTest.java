@@ -44,6 +44,7 @@ class LeadQualificationServiceImplTest {
     @Mock private LeadMapper leadMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;
+    @Mock private LeadTeamTransferPolicy teamTransferPolicy;
     @Mock private LeadAssignmentHistoryMapper historyMapper;
     @Mock private BusinessEventMapper eventMapper;
     @Mock private DictDataApi dictDataApi;
@@ -243,6 +244,7 @@ class LeadQualificationServiceImplTest {
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(eventMapper.selectByIdempotencyKey("lead-disposition:request-3")).thenReturn(null);
         LeadRestoreOwnerPolicy policy = new LeadRestoreOwnerPolicy();
+        org.springframework.test.util.ReflectionTestUtils.setField(policy, "teamTransferPolicy", new LeadTeamTransferPolicy());
         LeadSubmissionIdentityService identityService = mock(LeadSubmissionIdentityService.class);
         when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
         org.springframework.test.util.ReflectionTestUtils.setField(policy, "identityService", identityService);

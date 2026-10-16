@@ -12,6 +12,7 @@ public class SubordinateLeadActionReqVO {
     @NotBlank
     @Size(max = 40)
     private String idempotencyKey;
+    private Integer version;
     private Long targetUserId;
     private Long collaboratorUserId;
 }

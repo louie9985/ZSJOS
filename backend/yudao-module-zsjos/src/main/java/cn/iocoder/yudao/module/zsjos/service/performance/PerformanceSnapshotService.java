@@ -40,7 +40,7 @@ public class PerformanceSnapshotService {
   // 事后补写的历史快照由离线脚本显式标注 current，不得走本路径。
   row.setOrgSource("frozen");
   var user=userId==null?null:access.user(userId);
-  if(user!=null){row.setUserName(user.getNickname());row.setDeptId(user.getDeptId());var dept=access.dept(user.getDeptId());if(dept!=null)row.setDeptName(dept.getName());var m=access.mapping(user.getDeptId());if(m!=null){row.setCenterId(m.getCenterId());var c=access.dept(m.getCenterId());if(c!=null)row.setCenterName(c.getName());}}
+  if(user!=null){row.setUserName(user.getNickname());row.setDeptId(user.getDeptId());var dept=access.dept(user.getDeptId());if(dept!=null)row.setDeptName(dept.getName());var m=access.owningOrganization(user.getDeptId());if(m!=null){if(("sales".equals(m.getBusinessDomain())||"delivery".equals(m.getBusinessDomain())))row.setBusinessDomain(m.getBusinessDomain());row.setCenterId(m.getCenterId());var c=access.dept(m.getCenterId());if(c!=null)row.setCenterName(c.getName());}}
   if(lead!=null){row.setLeadId(lead.getId());row.setAssignmentId(lead.getCurrentAssignmentHistoryId());row.setReceivedAt(lead.getOwnershipStartedAt());row.setChannelCode(lead.getSourceChannelId());row.setChannelLabel(lead.getSourceChannelLabelSnapshot());row.setSourceGroup(sourceGroup(lead.getSourceType()));}
   else row.setSourceGroup("unknown");
   return row;

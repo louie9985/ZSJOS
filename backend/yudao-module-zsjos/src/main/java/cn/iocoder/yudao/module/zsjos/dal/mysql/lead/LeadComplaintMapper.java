@@ -8,6 +8,16 @@ import org.apache.ibatis.annotations.*;
 @Mapper public interface LeadComplaintMapper extends BaseMapperX<LeadComplaintDO> {
     default LeadComplaintDO selectByCreateKey(String key) { return selectOne(LeadComplaintDO::getCreateIdempotencyKey, key); }
     default LeadComplaintDO selectByDecisionKey(String key) { return selectOne(LeadComplaintDO::getDecisionIdempotencyKey, key); }
+    default PageResult<LeadComplaintDO> selectManagedPage(LeadComplaintPageReqVO req, java.util.Set<Long> users) {
+        if (users.isEmpty()) return new PageResult<>(java.util.List.of(), 0L);
+        String placeholders = java.util.stream.IntStream.range(0, users.size()).mapToObj(i -> "{" + i + "}").collect(java.util.stream.Collectors.joining(","));
+        return selectPage(req, new LambdaQueryWrapperX<LeadComplaintDO>()
+                .eqIfPresent(LeadComplaintDO::getStatus, req.getStatus())
+                .and(q -> {
+                    q.in(LeadComplaintDO::getSalesUserId, users).or().exists(
+                            "SELECT 1 FROM zsjos_lead l WHERE l.id=zsjos_lead_complaint.lead_id AND l.tenant_id=zsjos_lead_complaint.tenant_id AND l.deleted=0 AND l.owner_user_id IN (" + placeholders + ")", users.toArray());
+                }).orderByDesc(LeadComplaintDO::getUpdateTime).orderByDesc(LeadComplaintDO::getId));
+    }
     default PageResult<LeadComplaintDO> selectPage(LeadComplaintPageReqVO req) { return selectPage(req,
             new LambdaQueryWrapperX<LeadComplaintDO>().eqIfPresent(LeadComplaintDO::getStatus, req.getStatus())
                     .orderByDesc(LeadComplaintDO::getUpdateTime).orderByDesc(LeadComplaintDO::getId)); }

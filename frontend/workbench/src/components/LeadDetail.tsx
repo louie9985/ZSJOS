@@ -197,7 +197,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     if (!loadsCandidates) return
     setQualificationCandidatesLoading(true)
     try { setQualificationCandidates(managerMode || supervisorAction
-      ? await api.subordinateTransferCandidates()
+      ? await api.subordinateTransferCandidates(action === 'transfer' ? lead.id : undefined)
       : actions.has('OWNER_TRANSFER') ? await api.ownerTransferCandidates() : await api.leadTransferCandidates(lead.id)) }
     catch (error) { message.error(error instanceof Error ? error.message : '转派销售加载失败') }
     finally { setQualificationCandidatesLoading(false) }
@@ -216,8 +216,8 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     await runDisposition(async ({ idempotencyKey, complete }) => {
       const command = { reason: qualificationReason.trim(), idempotencyKey }
       if (supervisorAction) {
-        if (action === 'restore') await api.supervisorRestoreLead(lead.id, command.reason, idempotencyKey)
-        if (action === 'transfer') await api.supervisorTransferLead(lead.id, qualificationSalesUserId!, command.reason, idempotencyKey)
+        if (action === 'restore') await api.supervisorRestoreLead(lead.id, command.reason, idempotencyKey, lead.version)
+        if (action === 'transfer') await api.supervisorTransferLead(lead.id, qualificationSalesUserId!, command.reason, idempotencyKey, lead.version)
         if (action === 'recycle') await api.supervisorRecycleLead(lead.id, command.reason, idempotencyKey)
         if (action === 'release') await api.supervisorReleaseClaimPoolLead(lead.id, command.reason, idempotencyKey)
         if (action === 'releasePublicSea') await api.supervisorReleasePublicSeaLead(

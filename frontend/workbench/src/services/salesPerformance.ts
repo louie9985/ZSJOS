@@ -1,4 +1,5 @@
 import { http, unwrap } from './api'
+export type UnclassifiedDetail = { fact: Detail; attributionReason: string; historicalDepartmentId?: number }
 export type Scope = { scopeType: 'SELF' | 'USER' | 'DEPT' | 'CENTER'; scopeId?: number }
 export type Query = Scope & { start?: string; end?: string; grain?: 'day' | 'week' | 'month'; year?: number; dimension?: string; groupKey?: string; calendar?: boolean; cumulative?: boolean; metric?: string; periodKey?: string; pageNo?: number; pageSize?: number }
 export type OrgNode = Scope & { key: string; parentKey?: string; title: string; selectable: boolean }
@@ -25,8 +26,7 @@ export type OrderDetailResponse = { list: OrderDetailRow[]; total: number; asOf:
 export type ConversionRow = { leadId: number; leadNo: string | null; categoryKey: string; categoryLabel: string; channelKey: string; channelLabel: string; populationKind: string; receivedAt: string | null; converted: boolean; order: { id: number; number: string | null; submittedAt: string; amount: number; products: { key: string; ref: string | null; label: string; snapshot: string | null }[] } | null }
 export type ConversionResponse = { list: ConversionRow[]; total: number; asOf: string; start: string; end: string; summary: Pick<Metric, 'converted' | 'denominator' | 'rate' | 'sourceStatus' | 'sourceReviewCount'>; options: { conversionStatus: ConversionOption[]; populationKind: ConversionOption[]; categories: ConversionOption[]; channels: ConversionOption[]; products: ConversionOption[] } }
 export type HistoryMonth = { month: number; amount: number | null; previousAmount: number | null; start: string; end: string; previousStart: string; previousEnd: string; future: boolean }
-const BASE = '/zsjos/sales-performance'
-const TARGET = '/zsjos/sales-performance-target'
+
 const timestampFields = new Set(['start', 'end', 'asOf', 'attributionAvailableSince', 'occurredAt', 'submittedAt', 'at', 'receivedAt', 'dueAt', 'previousStart', 'previousEnd'])
 const timestampFormatter = new Intl.DateTimeFormat('en-GB', {
  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -50,7 +50,11 @@ async function get<T>(path: string, params?: object, signal?: AbortSignal): Prom
  const response = await http.get<unknown>(path, { params, signal })
  return normalizePerformanceDates(unwrap<unknown>(response)) as T
 }
-export const performanceApi = {
+export function createPerformanceApi(domain: 'sales' | 'delivery') {
+const BASE = `/zsjos/${domain}-performance`
+const TARGET = `/zsjos/${domain}-performance-target`
+return {
+ unclassifiedHistory: (pageNo: number, pageSize: number, signal?: AbortSignal, userId?: number) => get<{list: UnclassifiedDetail[]; total: number}>(`${BASE}/unclassified-history`, {pageNo, pageSize, userId}, signal),
  tree: (targets = false, signal?: AbortSignal) => get<OrgNode[]>(`${targets ? TARGET : BASE}/tree`, undefined, signal),
  overview: (query: Query, signal?: AbortSignal) => get<Overview>(`${BASE}/overview`, query, signal),
  analysis: (query: Query, signal?: AbortSignal) => get<Analysis>(`${BASE}/analysis`, query, signal),
@@ -69,6 +73,9 @@ export const performanceApi = {
  saveOrg: async (value: { deptId: number; centerId: number; kind: string }) => unwrap<boolean>(await http.put(`${TARGET}/organization`, value)),
  revisions: (id: number) => get<{ id: number; reason: string; before: string; after: string; operatorName: string; at: string }[]>(`${TARGET}/history`, { id })
 }
+}
+export const performanceApi = createPerformanceApi('sales')
+export const deliveryPerformanceApi = createPerformanceApi('delivery')
 export const money = (value?: number | null) => value == null ? '—' : new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value)
 export const percent = (value?: number | null) => value == null ? '—' : `${(value * 100).toFixed(2)}%`
 export function dateText(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` }

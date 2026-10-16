@@ -33,6 +33,7 @@ public final class SupervisorLeadActionPolicy {
     }
 
     public static boolean isAllowed(Action action, LeadDO lead) {
+        if (lead == null || lead.getClosedAt() != null) return false;
         return switch (action) {
             case TRANSFER -> Set.of(STATUS_SUBMITTED, STATUS_SUSPENDED, STATUS_VALID, STATUS_CONVERTED)
                     .contains(lead.getStatus())

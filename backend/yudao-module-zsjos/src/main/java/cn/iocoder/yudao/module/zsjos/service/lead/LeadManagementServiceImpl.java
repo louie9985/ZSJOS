@@ -78,6 +78,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource
     private LeadMapper leadMapper;
     @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
+    @Resource private LeadTeamTransferPolicy teamTransferPolicy;
     @Resource
     private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
     @Resource
@@ -217,8 +218,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         }
         reqVO.setAudience(INBOX_AUDIENCE_OWNER);
         reqVO.setRelationScope("owned");
-        reqVO.setOwnerUserId(ownerUserId);
-        PageResult<LeadDO> page = leadMapper.selectManagementPage(reqVO, ownerUserId,
+        boolean recycled = Boolean.TRUE.equals(reqVO.getRecycledOnly());
+        reqVO.setOwnerUserId(recycled ? null : ownerUserId);
+        reqVO.setRecycleSourceOwnerUserId(recycled ? ownerUserId : null);
+        if (recycled) reqVO.setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING);
+        PageResult<LeadDO> page = leadMapper.selectManagementPage(reqVO, recycled ? null : ownerUserId,
                 List.of(), null, advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
         if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
@@ -649,7 +653,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RECYCLE, true));
             }
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
-            actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
+            if (salesPoolAllowed(lead)) actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
         }
         addSupervisorActions(actions, lead, currentUserId);
         if (Objects.equals(currentUserId, lead.getOwnerUserId())
@@ -719,6 +723,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         return actions;
     }
 
+    private boolean salesPoolAllowed(LeadDO lead) {
+        try { return !teamTransferPolicy.isEducation(lead); }
+        catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) { return false; }
+    }
+
     private void addSupervisorActions(List<LeadManagementRespVO.ActionVO> actions, LeadDO lead,
                                       Long currentUserId) {
         if (currentUserId == null) return;
@@ -737,11 +746,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RECYCLE)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RECYCLE, true));
         }
-        if (SupervisorLeadActionPolicy.isAllowed(RELEASE_CLAIM_POOL, lead)
+        if (salesPoolAllowed(lead) && SupervisorLeadActionPolicy.isAllowed(RELEASE_CLAIM_POOL, lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_CLAIM_POOL)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_CLAIM_POOL, true));
         }
-        if (SupervisorLeadActionPolicy.isAllowed(RELEASE_PUBLIC_SEA, lead)
+        if (salesPoolAllowed(lead) && SupervisorLeadActionPolicy.isAllowed(RELEASE_PUBLIC_SEA, lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_PUBLIC_SEA)
                 && agingPoolService.canEnterManually(lead.getId())) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA, true));

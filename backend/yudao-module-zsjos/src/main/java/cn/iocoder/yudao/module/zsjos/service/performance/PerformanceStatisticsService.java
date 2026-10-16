@@ -27,7 +27,7 @@ public class PerformanceStatisticsService {
  private LocalDateTime now(){return LocalDateTime.now(clock);}
  private PerformanceReportQuery request(Query q,LocalDateTime n) {
   access.authorize(q,false);var scope=access.historicalScope(q);
-  var r=new PerformanceReportQuery();r.setTenant(tenant());r.setType(q.getScopeType());r.setId(q.getScopeId());
+  var r=new PerformanceReportQuery();r.setTenant(tenant());r.setBusinessDomain(PerformanceDomain.current());r.setType(q.getScopeType());r.setId(q.getScopeId());
   r.setAllDepartments(scope.allDepartments());r.setMissingDepartment(scope.missingDepartment());r.setDepartments(scope.departments());
   r.setNow(n);r.setToday(n.toLocalDate().atStartOfDay());r.setTomorrow(n.toLocalDate().plusDays(1).atStartOfDay());return r;
  }
@@ -113,13 +113,13 @@ public class PerformanceStatisticsService {
    for(var user:access.sales()){var mapping=orgs.get(user.getDeptId());if(mapping!=null&&q.getScopeId().equals("DEPT".equals(q.getScopeType())?mapping.getDeptId():mapping.getCenterId())&&(r.isAllDepartments()||r.getDepartments().contains(user.getDeptId())))members.add(user.getId());}
   }
   byUser.values().stream().map(PerformanceAggregate::getUserId).filter(Objects::nonNull).forEach(members::add);
-  var people=access.users(members).stream().filter(x->Objects.equals(x.getStatus(),0)).collect(Collectors.toMap(x->x.getId(),Function.identity()));members.retainAll(people.keySet());
+  var people=access.users(members).stream().collect(Collectors.toMap(x->x.getId(),Function.identity()));
   String period=targetPeriod(q,w,n);Set<Long> targetUsers=new HashSet<>(members);if(Set.of("SELF","USER").contains(q.getScopeType()))targetUsers.add(q.getScopeId());
   var targetBatch=period==null?null:targets.batch(List.of(new PerformanceTargetService.Period(period,w.start().toLocalDate())),targetUsers);
   var orderGroups=orders.stream().filter(x->x.getUserId()!=null).collect(Collectors.groupingBy(PerformanceFact::getUserId));
   var receiptGroups=receipts.stream().filter(x->x.getUserId()!=null).collect(Collectors.groupingBy(PerformanceFact::getUserId));
   List<Contribution> contributions=new ArrayList<>();
-  for(Long user:members){var personOrders=orderGroups.getOrDefault(user,List.of());var pop=new PerformanceConversion.Population(personOrders,receiptGroups.getOrDefault(user,List.of()));var actual=metric(w,amount(byUser,w,user.toString()),pop);String name=personOrders.stream().map(PerformanceFact::getUserName).filter(Objects::nonNull).findFirst().orElse(people.get(user).getNickname());var target=targetBatch==null?null:targetBatch.resolve("USER",user,period,w.start().toLocalDate());contributions.add(new Contribution(user,name,actual,target==null||!target.complete()?null:ratio(actual.amount(),target.floorAmount()),target==null||!target.complete()?null:ratio(actual.amount(),target.sprintAmount()),ratio(actual.amount(),averages.getFirst().amount())));}
+  for(Long user:members){var personOrders=orderGroups.getOrDefault(user,List.of());var pop=new PerformanceConversion.Population(personOrders,receiptGroups.getOrDefault(user,List.of()));var actual=metric(w,amount(byUser,w,user.toString()),pop);String name=personOrders.stream().map(PerformanceFact::getUserName).filter(Objects::nonNull).findFirst().orElse(people.containsKey(user)?people.get(user).getNickname():"历史人员");var target=targetBatch==null?null:targetBatch.resolve("USER",user,period,w.start().toLocalDate());contributions.add(new Contribution(user,name,actual,target==null||!target.complete()?null:ratio(actual.amount(),target.floorAmount()),target==null||!target.complete()?null:ratio(actual.amount(),target.sprintAmount()),ratio(actual.amount(),averages.getFirst().amount())));}
   var products=amounts(r,List.of(w),"product");var contributorSums=amounts(r,List.of(w),"contributor");
   var contributorGroups=aggregateGroups(contributorSums,w,false).stream().filter(g->members.stream().anyMatch(id->g.key().startsWith(id+"|"))).map(g->new Group(g.key(),g.label(),g.amount(),g.count(),ratio(g.amount(),averages.getFirst().amount()))).toList();
   return new Analysis(n,w.start().toLocalDate(),q.getEnd()==null?n.toLocalDate():q.getEnd(),averages,trend,aggregateGroups(sources,w,true),aggregateGroups(products,w,false),contributorGroups,contributions,averageTrends,targetBatch==null?null:targetBatch.resolve(q.getScopeType(),q.getScopeId(),period,w.start().toLocalDate()));
@@ -192,12 +192,23 @@ public class PerformanceStatisticsService {
   var n=now();var r=request(q,n);var w=reportRange(q,r,n);
   return orderDetailsService.read(q,r,w,n);
  }
+ public PageResult<UnclassifiedDetail> unclassified(UnclassifiedQuery q) {
+  Long subject=access.authorizeUnclassified(q.getUserId());
+  var request=new PerformanceDetailQuery().setTenant(tenant()).setType("USER").setId(subject)
+    .setUnclassified(true).setAllDepartments(true).setMissingDepartment(true)
+    .setOffset((long)(q.getPageNo()-1)*q.getPageSize()).setSize(q.getPageSize());
+  long total=detailQueries.unclassifiedCount(request);
+  if(request.getOffset()>=total)return new PageResult<>(List.of(),total);
+  return new PageResult<>(detailQueries.unclassifiedPage(request).stream().map(x->new UnclassifiedDetail(
+    new Detail(x.getId(),x.getNumber(),x.getKind(),x.getLabel(),x.getOccurredAt(),x.getAmount(),x.getState()),
+    x.getAttributionReason(),x.getDeptId())).toList(),total);
+ }
  public PageResult<Detail> details(Query q){
   if(!access.has("zsjos:sales-performance:detail"))throw PerformanceAccess.denied();
   access.authorize(q,false);
   var scope=access.historicalScope(q);
   var n=now();
-  var request=new PerformanceDetailQuery().setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
+  var request=new PerformanceDetailQuery().setBusinessDomain(PerformanceDomain.current()).setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
     .setAllDepartments(scope.allDepartments()).setMissingDepartment(scope.missingDepartment()).setDepartments(scope.departments());
   if(CurrentFollowUpSql.supports(q.getMetric()))request.setAssigneeIds(access.currentFollowUpAssignees(q));
   if(q.isCumulative()){
