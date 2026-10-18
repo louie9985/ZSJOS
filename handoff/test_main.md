@@ -2385,3 +2385,54 @@
 - Diff checks: resolution/handoff checks PASS. Full incoming diff retains five pre-existing EOF blank-line warnings in remote tests (LeadFollowUpResponsibilityTest.java, hrm-trial-browser.py, pms-attachments-browser.py, sales-performance-last-week-browser.py, service-subject-browser.py); no unrelated formatting edits. Build retains chunk-size warning.
 - Verification limits: no installed Python Playwright/Chrome for browser rerun; remote browser evidence is historical, not a new local acceptance. Backend/Admin runtime and full regression not rerun; one-sided incoming files are unchanged, feature-specific evidence and limitations remain in original handoffs. No SQL body/numbering edits, so no new database execution; full fresh/upgrade/live acceptance not claimed. Remote handoff records all-module fresh PMS V002 prerequisite failure and old-number database ledger/checksum review requirement. No silent ledger reconciliation.
 - Files: 436 incoming/resolved paths plus this test handoff; no additional source edits beyond overlap resolution. Integration: complete authorized local merge commit, no push, deployment, shared service or database changes. Remaining: live/browser and database rollout acceptance require their respective environments; none for source merge/numbering audit. Ownership released on merge completion.
+
+## Registration — test-v317-schema-sync-20261015
+- Environment test; owner Codex /root; branch main; worktree /opt/zsjos; base a88d8334. Target/integration: None.
+- Goal: synchronize V317 desired schema and fresh baseline; add post-migration schema verification.
+- Ownership: script/sql/mysql/schema/core.sql, 00-bootstrap-schema.sql, tools/test_registration_schema.py, tools/zsjos_db.py fresh assertion; docs/operations/registration-item-tasks.md; this record.
+- Non-goals: migration rewrite/renumber, business/permission/ledger writes, deployment, existing service changes, commits/push. Preserve existing frontend/workbench/tsconfig.tsbuildinfo.
+- Conflict resolved by V317 contract/handoff: per-item tasks replace old order uniqueness.
+- Verification: static/baseline checks; isolated MySQL initial/replay/partial/failure recovery and UTF-8 HEX; Core fresh chain/schema comparison; live metadata read-only. No business data copied.
+
+## Delivery — test-v317-schema-sync-20261015
+- Result: desired Core and fresh baseline now include V317 nullable item identity, per-item unique key and order lookup index; removed old order-level unique key. No migration/number/checksum edits. Fresh test now compares actual final schema against selected manifests.
+- Added isolated MySQL regression fixture (no business data) for baseline/V316 upgrade, replay, missing prerequisite, second-ledger failure rollback, partial DDL recovery and UTF-8 HEX. PASS on MySQL 8.
+- PASS: Core-only test_fresh using process-local manifest selection, 317 pending migrations through V318, verification SQL, actual final schema drift and non-empty bootstrap guard. Final generic manifest assertion is equivalent under that Core-only selection; all-module fresh not rerun (historical PMS prerequisite limitation remains separate).
+- PASS: static database check, 4 numbering tests, scoped diff check. Two baseline files byte-identical. Test containers removed by fixture cleanup.
+- Live read-only evidence: current test-server zsjos database all-module schema_drift returns []; V316/V317/V318 present in both ledgers; order_item_id comment HEX matches intended Chinese. No direct database correction needed because existing structure already matches V317. No business/permissions/ledger writes or service changes. Initial root auth probe used an absent env variable; corrected by using existing secret-file authentication without disclosing credentials.
+- Data WARN are unchanged and not classified wholesale as harmless: configured dictionaries may be nonempty; menus/templates/routes require current intent; identifier/contact/role duplication warnings need separately scoped data audit. No warnings suppressed.
+- Operational docs explain source scope, order/prerequisites, repeatability, historical status, rollback limitations and actual verification. No backend/frontend behavior changes, so runtime UI/API checks do not apply.
+- Preserved user tsconfig.tsbuildinfo modification. No commit/push. Source fix and relevant verification complete; ownership released.
+
+## Registration — test-conversion-history-compat-20261015
+- Owner /root; environment test from /etc/zsjos/agent-environment; branch main; worktree /opt/zsjos; base a88d8334; integration None.
+- Goal: repair conversion population loss when current assignment points to legacy other history; preserve transfer/recycle/return exclusions. No database writes or service restart authorized.
+- Ownership: PerformanceDetailSql.java; PerformanceConversionSqlTest.java; PerformanceConversionOwnershipMySqlTest.java; docs/api/sales-performance.md; this handoff. Preserve existing unrelated edits.
+- Verification: focused SQL/business regressions, read-only real MySQL exact population comparison and eight transferred exclusions, backend build. Runtime deployment requires separate explicit service authorization.
+
+## Delivery — test-conversion-history-compat-20261015 — 2026-10-15T13:26:53+08:00
+- Context: owner /root; test/main /opt/zsjos; HEAD unchanged a88d8334; integration None. User explicitly requested stopping/skipping tests and reporting the completed edit.
+- Result: conversion-only ownership query recognizes an explicit same-tenant, same-lead, nondeleted legacy other event as a non-receipt link and resolves the latest real ownership transition across all owners. Recycle/release and current-owner checks remain; other itself never becomes a receipt. Orders and receipts share this resolution. No business-data writes.
+- Files: PerformanceDetailSql.java; PerformanceConversionSqlTest.java; PerformanceConversionOwnershipMySqlTest.java; docs/api/sales-performance.md; this handoff. Added legacy recipient/null-recipient, recycle with stale owner, return-round cases and opt-in exact September set acceptance. Existing unrelated changes preserved.
+- Evidence: read-only target data confirms 214 current valid September inbound leads, 187 linked other histories, and latest real transitions matching current ownership for all 214. Original eight transferred leads still exist and none belongs to original owner. Scoped git diff --check passed.
+- Verification limits: tests did not run successfully. First attempt blocked by existing build output permissions; temporary source-copy attempt failed test compilation with missing framework web/XSS classes in other tests. Package attempt was cancelled to serialize shared build resources. Per latest user instruction no additional test/build attempts. Exact mapper population/rate and runtime/browser result remain unverified; 214 is acceptance target, not claimed runtime result.
+- No deployment, restart, database changes, commit or push. Source adjustment delivered; service requires subsequent authorized build/deployment/restart to become effective. Ownership released.
+
+## Scope continuation — 2026-10-15 — single-student responsibility transfer
+- Owner /root; environment test; branch main; worktree /opt/zsjos; base a88d8334ce136a638a6874d27c19de1164486e24; integration None. Reuse test-content-director-repair-20261013 workstream.
+- User explicitly authorizes one resolved student, service 882, accounts 101/102, target director 42/operator 44. No global personnel changes, historical decisions, BPM cancellation or deployment.
+- Ownership: script/sql/mysql/repairs/transfer_student_20261015.py; docs/operations/student-responsibility-transfer-20261015.md; this handoff. Preserve existing dirty edits.
+- Verify scoped private backup, same-engine temporary-table initial/repeat/failure rollback/partial recovery/stale refusal/compensating restore, full field/history equality, guarded transaction, committed readback and UTF-8 HEX. Pending positioning submission operator synchronized; completed actual reviewer preserved.
+
+## Delivery — 2026-10-15 — single-student responsibility transfer
+- /root; test/main /opt/zsjos; integration None. User-authorized service 882 transferred to director 42/operator 44 with both accounts 101/102.
+- 10 rows updated and 10 system audit events: service 1, accounts 2, group 1, plans 2, WAITING stages 2, card 1, pending student-confirm submission operator 1. Existing group/content operator 44 retained. Historical submission director and actual completed reviewer 59, completed content batch and interview untouched.
+- MySQL controlled initial/repeat/failure rollback/partial recovery/stale refusal/compensating restore passed; live guarded transaction, committed readback, repeat zero mutation, UTF-8 HEX and independent ownership check passed. Private evidence student-transfer-882-20261015-verified/applied under runtime backups.
+- Files: transfer_student_20261015.py; student-responsibility-transfer-20261015.md; this record. Existing dirty edits preserved. No BPM or permissions mutation, service restart/deploy or backend behavioral changes. Browser/full business command not performed. Complete; ownership released.
+
+## Registration — test-last-week-zero-targets-20261016
+- Owner /root; environment test from /etc/zsjos/agent-environment; main; worktree /opt/zsjos; base a88d8334ce136a638a6874d27c19de1164486e24; integration None.
+- Goal: user explicitly confirms three previously missing 2026-10-05 weekly targets, both amounts zero, test tenant 1 only. Non-goals: other targets, business statistics code, schema/seeds, permissions, deployment, commits.
+- Ownership: script/sql/mysql/repairs/backfill_week_targets_20261016.py; docs/operations/weekly-zero-targets-20261016.md; this handoff. Existing modifications preserved.
+- Dependencies: existing performance target/revision tables and authoritative current personnel/organization records; only accounts 294/309/529 and department 1021/center 1020, revalidated under transaction. System repair actor 0 explicitly documented; no impersonation.
+- Verification: MySQL 8 temporary-table initial/repeat/partial/failure rollback; private scoped backup; live transaction, committed readback, unchanged existing totals and missing=0, revision snapshots and UTF-8 HEX. Real authenticated browser remains separately reported.

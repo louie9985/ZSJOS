@@ -5508,6 +5508,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_registration_command` (`id` bigint NOT NULL AU
 CREATE TABLE IF NOT EXISTS `zsjos_registration_case` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '报名服务单编号',
   `order_id` bigint NOT NULL COMMENT '有效订单编号',
+  `order_item_id` bigint DEFAULT NULL COMMENT '履约订单商品；历史整单任务为空',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '报名服务状态',
   `checklist_version_id` bigint DEFAULT NULL COMMENT '清单版本',
   `assignment_mode` varchar(24) NOT NULL DEFAULT 'legacy_planner' COMMENT '分班模式',
@@ -5527,7 +5528,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_registration_case` (
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tenant_order` (`tenant_id`,`order_id`),
+  UNIQUE KEY `uk_registration_case_item` (`tenant_id`,`order_item_id`,`deleted`),
+  KEY `idx_registration_case_order` (`tenant_id`,`order_id`,`deleted`),
   KEY `idx_tenant_owner_status` (`tenant_id`,`owner_user_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 报名服务单';
 
@@ -7159,8 +7161,11 @@ CREATE TABLE IF NOT EXISTS zsjos_lead_submitter_feedback_attachment (
 
 -- UTF-8. Student information collection schema; empty business tables only.
 CREATE TABLE IF NOT EXISTS zsjos_student_info_form (
- id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, lead_id bigint NOT NULL,
+ id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, lead_id bigint NULL,
  sales_user_id bigint NOT NULL, config_version_id bigint NOT NULL,
+ registration_case_id BIGINT NULL, order_item_id BIGINT NULL, person_id BIGINT NULL, product_id BIGINT NULL,
+ sent_by_user_id BIGINT NULL, sent_at DATETIME NULL, fields_snapshot LONGTEXT NULL,
+ category_path_snapshot TEXT NULL, product_name VARCHAR(255) NULL,
  token_hash char(64) NOT NULL, token_ciphertext varchar(512) NOT NULL,
  status varchar(16) NOT NULL, expires_at datetime NOT NULL, revoked_at datetime DEFAULT NULL,
  submitted_at datetime DEFAULT NULL, submit_source varchar(16) DEFAULT NULL,
@@ -7170,6 +7175,7 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_form (
  deleted bit(1) NOT NULL DEFAULT b'0',
  PRIMARY KEY(id), UNIQUE KEY uk_student_info_token(token_hash),
  UNIQUE KEY uk_student_info_active(tenant_id,active_lead_id),
+ UNIQUE KEY uk_student_info_case(tenant_id,registration_case_id,deleted),
  KEY idx_student_info_lead(tenant_id,lead_id,id), KEY idx_student_info_expiry(tenant_id,status,expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员信息收集表';
 
@@ -7188,7 +7194,7 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_form_value (
 CREATE TABLE IF NOT EXISTS zsjos_student_info_form_config (
  id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, version_no int NOT NULL,
  revision int NOT NULL DEFAULT 0, status varchar(16) NOT NULL, fields_json json NOT NULL,
- published_at datetime DEFAULT NULL,
+ education_category_ids_json TEXT NULL, published_at datetime DEFAULT NULL,
  creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
  updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
  deleted bit(1) NOT NULL DEFAULT b'0',
@@ -8170,3 +8176,12 @@ CREATE TABLE IF NOT EXISTS zsjos_calendar_rest_day (
  deleted bit(1) NOT NULL DEFAULT b'0',
  PRIMARY KEY(id), UNIQUE KEY uk_calendar_rest_day_date(tenant_id,date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='首页共享休息日';
+
+CREATE TABLE IF NOT EXISTS zsjos_student_info_image (
+  id BIGINT NOT NULL AUTO_INCREMENT, tenant_id BIGINT NOT NULL,
+  form_id BIGINT NOT NULL, field_key VARCHAR(64) NOT NULL, side VARCHAR(8) NOT NULL DEFAULT '',
+  infra_file_id BIGINT NOT NULL, content_type VARCHAR(32) NOT NULL, file_size BIGINT NOT NULL,
+  creator VARCHAR(64) DEFAULT '', create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater VARCHAR(64) DEFAULT '', update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0', PRIMARY KEY(id), KEY idx_student_info_image_form(tenant_id,form_id,deleted)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员收集表图片关联';

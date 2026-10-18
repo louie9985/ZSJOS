@@ -89,15 +89,29 @@ class PerformanceConversionSqlTest {
    }
    session.clearCache();
    assertTrue(mapper.conversionReceipts(query).stream().filter(x->x.getLeadId()==3L).allMatch(x->Boolean.TRUE.equals(x.getCurrentAssignment())));
+   // Imported links can point at unrelated history, with or without an event recipient.
+   for (String recipient : List.of("2", "NULL")) {
+    try(var sql=session.getConnection().createStatement()) {
+     sql.execute("DELETE FROM zsjos_lead_assignment_history WHERE id=12");
+     sql.execute("INSERT INTO zsjos_lead_assignment_history VALUES(12,9,0,3,"+recipient+",'2025-01-14','other')");
+     sql.execute("UPDATE zsjos_lead SET current_assignment_history_id=12 WHERE id=3");
+    }
+    session.clearCache();
+    var legacy=PerformanceConversion.population(new PerformancePeriods.Window("month","",query.getStart(),query.getEnd()),mapper.conversionOrders(query),mapper.conversionReceipts(query));
+    assertEquals(Set.of(3L),legacy.keySet());
+    assertEquals(4L,legacy.get(3L).receipt().getAssignmentId());
+    assertNull(legacy.get(3L).order(),"Old seller order cannot match the new owner's receipt");
+   }
    try(var sql=session.getConnection().createStatement()) {
     sql.execute("INSERT INTO zsjos_lead_assignment_history VALUES(10,9,0,3,NULL,'2025-01-15','recycle')");
-    sql.execute("UPDATE zsjos_lead SET owner_user_id=NULL WHERE id=3");
+    // Even a stale owner cannot revive a receipt preceding the latest recycle.
+    sql.execute("UPDATE zsjos_lead SET owner_user_id=2 WHERE id=3");
    }
    session.clearCache();
    assertTrue(mapper.conversionReceipts(query).stream().noneMatch(x->Boolean.TRUE.equals(x.getCurrentAssignment())));
    try(var sql=session.getConnection().createStatement()) {
     sql.execute("INSERT INTO zsjos_lead_assignment_history VALUES(11,9,0,3,1,'2025-02-01','transfer')");
-    sql.execute("UPDATE zsjos_lead SET owner_user_id=1,current_assignment_history_id=11 WHERE id=3");
+    sql.execute("UPDATE zsjos_lead SET owner_user_id=1,current_assignment_history_id=12 WHERE id=3");
     sql.execute("INSERT INTO zsjos_performance_attribution(id,fact_type,fact_id,tenant_id,deleted,user_id,user_name,received_at,assignment_id,source_group,channel_label,channel_code,dept_id,center_id) VALUES(111,'ASSIGNMENT',11,9,0,1,'snapshot','2025-02-01',11,'inbound','channel','channel',10,20)");
    }
    session.clearCache();query.setId(10L);

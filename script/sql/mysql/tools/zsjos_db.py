@@ -1263,6 +1263,10 @@ def test_fresh() -> None:
         failure_lines = [line for line in output.splitlines() if re.search(r"(?:^|\t)(FAIL|MISSING)$", line)]
         if failure_lines:
             fail("Fresh database verification failed:\n" + "\n".join(failure_lines))
+        # Data snapshots cannot detect a migration missing from the desired schema.
+        drift = schema_drift(client, manifests)
+        if drift:
+            fail("Fresh schema drift:\n" + "\n".join(drift))
         second = docker_mysql_file(container, SQL_ROOT / "bootstrap.sql", expect_success=False)
         if second.returncode == 0:
             fail("Fresh bootstrap unexpectedly allowed execution against a non-empty database")

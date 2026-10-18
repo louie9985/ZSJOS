@@ -5508,6 +5508,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_registration_command` (`id` bigint NOT NULL AU
 CREATE TABLE IF NOT EXISTS `zsjos_registration_case` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '报名服务单编号',
   `order_id` bigint NOT NULL COMMENT '有效订单编号',
+  `order_item_id` bigint DEFAULT NULL COMMENT '履约订单商品；历史整单任务为空',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '报名服务状态',
   `checklist_version_id` bigint DEFAULT NULL COMMENT '清单版本',
   `assignment_mode` varchar(24) NOT NULL DEFAULT 'legacy_planner' COMMENT '分班模式',
@@ -5527,7 +5528,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_registration_case` (
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tenant_order` (`tenant_id`,`order_id`),
+  UNIQUE KEY `uk_registration_case_item` (`tenant_id`,`order_item_id`,`deleted`),
+  KEY `idx_registration_case_order` (`tenant_id`,`order_id`,`deleted`),
   KEY `idx_tenant_owner_status` (`tenant_id`,`owner_user_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 报名服务单';
 

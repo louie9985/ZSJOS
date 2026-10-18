@@ -24,6 +24,8 @@ DDL 隐式提交；业务拆分及两张台账在同一事务内。失败后先�
 
 ## 已验证与未执行
 
+以下为原功能交付时的验证记录；不代表其他环境当前的执行状态。
+
 - 46 项 Registration Java 测试通过，覆盖相同产品不同明细独立创建、重放、历史兼容、
   当前商品完成及拒绝兄弟商品分班、无需交付结束。
 - MySQL 隔离副本首次、重复、部分 DDL 恢复、空表、前置/数据失败台账保护通过。
@@ -39,3 +41,28 @@ DDL 隐式提交；业务拆分及两张台账在同一事务内。失败后先�
 其 --sync-local 仅能在另行获准且确认旧后端停止写入后使用，不是启动应用自动迁移。
 页面 fixture：Workbench test/registration-item-tasks.html（5297）；Admin test/registration-items.html
 配合 test/registration-items.vite.ts（5296）。验证脚本位于各端 test 目录。
+
+## V317 结构快照同步（2026-10-15）
+
+schema/core.sql 与 00-bootstrap-schema.sql 已同步 V317 的最终结构：
+报名表新增可空 order_item_id，唯一索引为
+uk_registration_case_item(tenant_id, order_item_id, deleted)，订单查询索引为
+idx_registration_case_order(tenant_id, order_id, deleted)，移除旧 uk_tenant_order。
+历史整单任务的商品身份仍可为空。两份文件仅同步这一张表的结构，不包含数据修复。
+
+适用范围：空库仍按 bootstrap 后执行待执行迁移的顺序初始化；已有库仍执行原 V317
+并遵守上述维护窗口要求。不得在已有库上重放 bootstrap 来修补结构，不新增迁移编号、
+不改写 V317 文件或历史账本校验和。已经完成 V317 的数据库只需更新仓库校验依据，
+不需要再次修改表。建表使用 IF NOT EXISTS，不能作为既有表结构升级手段；
+回滚限制仍按 V317 执行后的业务状态处理，不能恢复订单唯一约束而丢弃商品任务。
+
+验证：MySQL 8 隔离空库完整 Core 链、最终结构 drift 检查、非空 bootstrap 保护通过；
+专项覆盖 V316 旧结构升级、重复执行、缺少前置版本、第二账本失败回滚、部分 DDL
+恢复及中文 HEX。专项命令：python -B script/sql/mysql/tools/test_registration_schema.py。
+test_fresh 现会在迁移完成后比对实际结构，防止只检查数据快照而漏过此类问题。
+测试服务器当前数据库经全部模块只读结构比对无 drift，V317/V318 双账本存在；未写入该库。
+全模块 fresh 验收未在本次重跑，既有 PMS 前置依赖限制不由 Core 链通过而解除。
+
+数据级 WARN 与结构 drift 分开处理：业务字典非空可符合投入使用后的状态；
+菜单、模板、筛选和默认路由需核对管理员配置。编号格式/重复、角色菜单重复和
+联系人认领完整性需单独审计；本修复没有抑制告警，也不清理业务数据或权限。

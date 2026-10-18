@@ -56,10 +56,14 @@ public final class PerformanceDetailSql {
     }
     private static String conversionOwnershipJoin() {
         // Only conversion resolves current ownership. Shared receipt facts must retain actual historical workload.
-        // With no explicit link, use the latest ownership transition across ALL owners, including unowned intervals.
+        // Legacy links may identify an "other" event rather than a receipt. Resolve those through real
+        // ownership transitions across ALL owners, including unowned intervals; never treat "other" as a receipt.
         return "LEFT JOIN zsjos_lead cl ON cl.id=r.lead_id AND cl.tenant_id=#{tenant} AND cl.deleted=0 "
                 + "LEFT JOIN zsjos_lead_assignment_history ch ON ch.tenant_id=cl.tenant_id AND ch.lead_id=cl.id AND ch.deleted=0 "
-                + "AND ch.id=COALESCE(cl.current_assignment_history_id,(SELECT h.id FROM zsjos_lead_assignment_history h "
+                + "AND ch.id=COALESCE(CASE WHEN EXISTS (SELECT 1 FROM zsjos_lead_assignment_history linked "
+                + "WHERE linked.id=cl.current_assignment_history_id AND linked.tenant_id=cl.tenant_id "
+                + "AND linked.lead_id=cl.id AND linked.deleted=0 AND linked.action_type='other') "
+                + "THEN NULL ELSE cl.current_assignment_history_id END,(SELECT h.id FROM zsjos_lead_assignment_history h "
                 + "WHERE h.tenant_id=cl.tenant_id AND h.lead_id=cl.id AND h.deleted=0 "
                 + "AND h.action_type IN ('accept','claim','transfer','recycle','release_to_claim_pool','public_pool') "
                 + "ORDER BY h.occurred_at DESC,h.id DESC LIMIT 1)) "
