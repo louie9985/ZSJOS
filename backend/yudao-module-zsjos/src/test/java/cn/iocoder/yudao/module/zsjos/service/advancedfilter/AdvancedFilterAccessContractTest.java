@@ -91,7 +91,7 @@ class AdvancedFilterAccessContractTest {
     @Test void everySearchEntryRejectsUnauthorizedUseBeforeExecutingBusinessCode() throws Exception {
         int checked = 0;
         for (String name : List.of("lead.LeadManagementController", "lead.LeadDispatchController",
-                "lead.LeadAgingPoolController", "lead.LeadQualificationController", "lead.LeadAppealController",
+                "lead.LeadPublicSeaPoolController", "lead.LeadQualificationController", "lead.LeadAppealController",
                 "lead.LeadDuplicateReviewController", "lead.SubordinateSalesController", "order.SalesOrderController",
                 "registration.RegistrationController", "registration.MyStudentController", "registration.MediaStudentController",
                 "cashback.CashbackController", "withdrawal.WithdrawalController")) {

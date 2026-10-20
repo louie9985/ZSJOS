@@ -28,6 +28,7 @@ import static cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadOverturnP
 @Validated
 public class SupervisorLeadOverturnService {
     @Resource private LeadMapper leadMapper;
+    @Resource private SubordinateSalesScope salesScope;
     @Resource private LeadAppealMapper appealMapper;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
@@ -39,8 +40,8 @@ public class SupervisorLeadOverturnService {
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
 
     public LeadManagementRespVO.ActionVO action(LeadDO lead, Long userId) {
-        if (!STATUS_INVALID.equals(lead.getStatus()) || !securityFrameworkService.hasPermission(PERMISSION)
-                || lead.getOwnerUserId() == null || !permissionService.getManagedUserIds(userId).contains(lead.getOwnerUserId())) return null;
+        if (!OWNER_SALES.equals(lead.getOwnerIdentity()) || !STATUS_INVALID.equals(lead.getStatus()) || !securityFrameworkService.hasPermission(PERMISSION)
+                || lead.getOwnerUserId() == null || salesScope.managed(userId).stream().noneMatch(user -> Objects.equals(user.getId(), lead.getOwnerUserId()))) return null;
         if (rejection(lead, appealMapper.selectListByLeadId(lead.getId()), opportunityMapper.selectByLeadId(lead.getId()), eventMapper.selectLatestInvalidId(lead.getId())) != null) return null;
         var action = new LeadManagementRespVO.ActionVO(ACTION, true);
         action.setQualificationToken(currentToken(lead));
@@ -54,7 +55,7 @@ public class SupervisorLeadOverturnService {
         if (!securityFrameworkService.hasPermission(PERMISSION)) throw exception(LEAD_PERMISSION_DENIED);
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (lead.getOwnerUserId() == null || !permissionService.getManagedUserIds(userId).contains(lead.getOwnerUserId())) {
+        if (!OWNER_SALES.equals(lead.getOwnerIdentity()) || lead.getOwnerUserId() == null || salesScope.managed(userId).stream().noneMatch(user -> Objects.equals(user.getId(), lead.getOwnerUserId()))) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
         String key = "supervisor-overturn:" + request.getIdempotencyKey();

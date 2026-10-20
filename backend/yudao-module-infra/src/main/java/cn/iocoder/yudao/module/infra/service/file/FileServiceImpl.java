@@ -342,6 +342,14 @@ public class FileServiceImpl implements FileService {
         return fileMapper.selectLatestByConfigIdAndPath(configId, path);
     }
 
+    @Override
+    public FileDO getRegisteredFileByUrl(String url) {
+        if (url == null || url.isBlank()) return null;
+        // Never fetch arbitrary URLs; reject case-insensitive database collation matches.
+        return fileMapper.selectByRegisteredUrl(url).stream()
+                .filter(file -> url.equals(file.getUrl())).findFirst().orElse(null);
+    }
+
     private void validateLegacyDirectUploadPath(String path) {
         if (path != null && DIRECT_UPLOAD_ONLY_DIRECTORIES.stream()
                 .anyMatch(directory -> path.equals(directory) || path.startsWith(directory + "/"))) {

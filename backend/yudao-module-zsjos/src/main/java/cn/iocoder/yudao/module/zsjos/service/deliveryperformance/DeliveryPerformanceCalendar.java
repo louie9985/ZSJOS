@@ -1,0 +1,41 @@
+package cn.iocoder.yudao.module.zsjos.service.deliveryperformance;
+import cn.iocoder.yudao.module.zsjos.controller.admin.deliveryperformance.vo.DeliveryPerformanceVO.CalendarDay;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryperformance.DeliveryPerformanceFact;
+import java.time.*;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+public final class DeliveryPerformanceCalendar {
+ private DeliveryPerformanceCalendar() {}
+ public static CalendarDay summarize(LocalDate day,List<DeliveryPerformanceFact> receipts,List<DeliveryPerformanceFact> tasks,LocalDateTime now){
+  return new Index(tasks).summarize(day,receipts,now);
+ }
+ private record Responsibility(Long lead,Long user,Long assignment) {}
+ public static final class Index {
+ private final Map<Responsibility,List<DeliveryPerformanceFact>> tasks=new HashMap<>();
+ public Index(List<DeliveryPerformanceFact> rows){for(var t:rows)if("lead_qualification".equals(t.getGroupKey()))tasks.computeIfAbsent(new Responsibility(t.getLeadId(),t.getUserId(),t.getAssignmentId()),k->new ArrayList<>()).add(t);}
+ public CalendarDay summarize(LocalDate day,List<DeliveryPerformanceFact> receipts,LocalDateTime now){
+  var received=receipts.stream().filter(x->x.getReceivedAt().toLocalDate().equals(day)).collect(Collectors.toMap(DeliveryPerformanceFact::getLeadId,Function.identity(),(a,b)->a)).values();
+  long valid=0,invalid=0,pending=0,overdue=0,ended=0,late=0,onTime=0,due=0,unknown=0;
+  for(var receipt:received){
+   var rounds=tasks.getOrDefault(new Responsibility(receipt.getLeadId(),receipt.getUserId(),receipt.getAssignmentId()),List.of());
+   var task=rounds.stream().max(Comparator.comparing(DeliveryPerformanceFact::getId)).orElse(null);
+   var originalDeadline=rounds.stream().filter(t->!cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.isAutomaticSource(t.getGenerationSource())).map(DeliveryPerformanceFact::getDueAt).filter(Objects::nonNull).min(Comparator.naturalOrder()).orElse(null);
+   if(task==null||task.getOutcome()==null){unknown++;continue;}
+   if(cn.iocoder.yudao.module.zsjos.service.lead.LeadAutomaticGeneration.isAutomaticSource(task.getGenerationSource())) {
+    if("valid".equals(task.getOutcome()))valid++;else if("invalid".equals(task.getOutcome()))invalid++;else ended++;
+    continue;
+   }
+   boolean judged=Set.of("valid","invalid").contains(task.getOutcome());
+   boolean completedCycle=judged||"ended".equals(task.getOutcome())||Boolean.FALSE.equals(task.getCurrentAssignment());
+   // A cancelled responsibility is not a successful qualification. Keep its past deadline in the timeliness denominator.
+   if(originalDeadline!=null&&(!originalDeadline.isAfter(now)||judged)&&(!completedCycle||judged||task.getEndedAt()!=null&&!task.getEndedAt().isBefore(originalDeadline)))due++;
+   if(judged){if("invalid".equals(task.getOutcome()))invalid++;else valid++;if(task.getCompletedAt()!=null&&originalDeadline!=null){if(task.getCompletedAt().isAfter(originalDeadline))late++;else onTime++;}}
+   else if(completedCycle)ended++;
+   else if("overdue".equals(task.getOutcome())||task.getDueAt()!=null&&!task.getDueAt().isAfter(now))overdue++;
+   else pending++;
+  }
+  return new CalendarDay(day,received.size(),valid,invalid,pending,overdue,ended,late,onTime,due,unknown);
+ }
+ }
+}

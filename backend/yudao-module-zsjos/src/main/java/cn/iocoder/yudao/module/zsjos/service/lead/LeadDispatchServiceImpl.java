@@ -61,7 +61,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private FileApi fileApi;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
-    @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private NewcomerPoolService newcomerPoolService;
 
@@ -446,7 +446,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                                  String idempotencyKey, String ownerIdentity) {
         Long leadId = lead.getId();
         LocalDateTime transferredAt = LocalDateTime.now();
-        agingPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
+        publicSeaPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
         Long from = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getPendingAssigneeUserId();
         Long pendingAssigneeUserId = lead.getPendingAssigneeUserId();
         String fromAssignmentStatus = lead.getAssignmentStatus();

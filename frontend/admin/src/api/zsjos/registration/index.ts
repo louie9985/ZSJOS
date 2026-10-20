@@ -58,6 +58,9 @@ export interface RegistrationCase {
   cancelledAt?: string
   cancelReason?: string
   version: number
+  informationSent?: boolean
+  informationSentAt?: string
+  informationSubmissionStatus?: string
   deliveryEstablished?: boolean
   assignable?: boolean
   assignmentBlockReason?: string

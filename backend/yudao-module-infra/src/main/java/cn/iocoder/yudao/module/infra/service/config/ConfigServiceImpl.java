@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.infra.convert.config.ConfigConvert;
 import cn.iocoder.yudao.module.infra.dal.dataobject.config.ConfigDO;
 import cn.iocoder.yudao.module.infra.dal.mysql.config.ConfigMapper;
 import cn.iocoder.yudao.module.infra.enums.config.ConfigTypeEnum;
+import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class ConfigServiceImpl implements ConfigService {
     @Resource
     private ConfigMapper configMapper;
     @Resource private ConfigSecretSupport secrets;
+    @Resource private SecurityFrameworkService security;
 
     @Override
     public Long createConfig(ConfigSaveReqVO createReqVO) {
@@ -85,6 +87,7 @@ public class ConfigServiceImpl implements ConfigService {
         if (ConfigTypeEnum.SYSTEM.getType().equals(config.getType())) {
             throw exception(CONFIG_CAN_NOT_DELETE_SYSTEM_TYPE);
         }
+        requireSensitiveDeletePermission(config);
         // 删除
         configMapper.deleteById(id);
     }
@@ -97,10 +100,18 @@ public class ConfigServiceImpl implements ConfigService {
             if (ConfigTypeEnum.SYSTEM.getType().equals(config.getType())) {
                 throw exception(CONFIG_CAN_NOT_DELETE_SYSTEM_TYPE);
             }
+            requireSensitiveDeletePermission(config);
         });
 
         // 批量删除
         configMapper.deleteByIds(ids);
+    }
+
+    private void requireSensitiveDeletePermission(ConfigDO config) {
+        if (Boolean.TRUE.equals(config.getSensitive())
+                && !security.hasPermission("infra:config:secret-update")) {
+            throw new org.springframework.security.access.AccessDeniedException("无敏感配置删除权限");
+        }
     }
 
     @Override

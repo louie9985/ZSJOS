@@ -96,7 +96,9 @@
               {{ formatKnowledgeFileSize(preview.fileSize) }}
             </span>
           </div>
-          <FilePreview
+          <KnowledgeExcelPreview v-if="isKnowledgeExcel(preview.name, preview.fileType)"
+            :document-id="preview.id" :record-id="detail.root.id" />
+          <FilePreview v-else
             :file-name="preview.name"
             :file-type="preview.fileType"
             :url="preview.content"
@@ -112,6 +114,8 @@
 import KnowledgeAttachments from './KnowledgeAttachments.vue'
 import * as KnowledgeRecycleApi from '@/api/pms/kb/recycle'
 import { FilePreview } from '@/components/FilePreview'
+import KnowledgeExcelPreview from './KnowledgeExcelPreview.vue'
+import { isKnowledgeExcel } from '@/api/pms/kb/content/excel'
 import { formatDate } from '@/utils/formatTime'
 import { PmsKnowledgeObjectType } from '@/views/pms/kb/utils/constants'
 import { formatKnowledgeFileSize } from '@/views/pms/kb/utils/format'

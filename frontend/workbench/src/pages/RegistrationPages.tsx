@@ -1,4 +1,7 @@
+import { studentContactSchedule } from '../services/studentContactSchedule';
 import StudentServiceFilters, { type StudentQuickFilters } from '../components/StudentServiceFilters'
+import StudentServiceCard from '../components/StudentServiceCard'
+import RegistrationStudentInfo from '../components/RegistrationStudentInfo'
 import { studentServiceColumnDefinitions, studentServiceColumns, studentColumnDefaults, StudentServiceSummaryDetail, assignedName, acceptanceLabel, type ServiceStudent } from '../components/StudentServiceColumns'
 import BusinessSortMenu from '../components/BusinessSortMenu'
 import { sortableColumns, readTableSort, sortChoices, type BusinessSort } from '../services/businessListSort'
@@ -65,7 +68,7 @@ import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
 import type { AdvancedFilterGroup } from "../services/api";
 import { DICT_TYPE } from "../constants";
 import { dictionaryDisplayLabel } from "../services/leadManagement";
-import { applyFollowUpTimeShortcut, FOLLOW_UP_TIME_SHORTCUTS } from "../services/leadFollowUp";
+import { applyFollowUpTimeShortcut } from "../services/leadFollowUp";
 import RegistrationAttachmentPreview from "../components/RegistrationAttachmentPreview";
 
 const PAGE_SIZE = 20;
@@ -124,6 +127,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const [closeForm] = Form.useForm<{ reason: string }>();
   const [routeSaving, setRouteSaving] = useState(false);
   const [classSaving, setClassSaving] = useState(false);
+  const [informationBusy, setInformationBusy] = useState(false);
   const [classDraft, setClassDraft] = useState<Record<number, number>>({});
   const [classOptions, setClassOptions] = useState<DeliveryClassOption[]>([]);
   const [classOptionsLoading, setClassOptionsLoading] = useState(false);
@@ -145,7 +149,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const activeCaseId = useRef<number | undefined>(undefined);
   const draftDirty = useRef(false);
   draftDirty.current = !detailLoading && Boolean(classesDirty);
-  const mutationBusy = classSaving || routeSaving || completing || closing || savingItemIds.size > 0 || attachmentSavingIds.size > 0;
+  const mutationBusy = informationBusy || classSaving || routeSaving || completing || closing || savingItemIds.size > 0 || attachmentSavingIds.size > 0;
   const terminal = Boolean(selected && ["completed", "cancelled", "ended"].includes(selected.status));
   const confirmLeave = (action: () => void) => {
     if (!draftDirty.current) { action(); return; }
@@ -516,6 +520,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       </section>
       <section className="registration-checklist-card registration-step">
         <div className="registration-step-heading"><span className="registration-step-number">2</span><Typography.Title level={5}>核对履约事项</Typography.Title></div>
+        <RegistrationStudentInfo key={selected.id} item={selected} permissions={permissions} disabled={mutationBusy && !informationBusy} onBusy={setInformationBusy} onChanged={() => { const id=selected.id; void api.registrationCase(id).then(next=>{if(activeCaseId.current===id)applyCase(next)}).catch(error=>setOperationError(errorMessage(error))) }} />
         <Space wrap className="registration-checklist-progress"><Typography.Text type="secondary">人工确认 {checkboxItems.filter(item => item.checked).length} / {checkboxItems.length}</Typography.Text><Typography.Text type="secondary">必传附件 {requiredAttachments.filter(item => item.attachments?.length).length} / {requiredAttachments.length}</Typography.Text></Space>
         {!selected.items?.length && <Typography.Text type="secondary">暂无履约清单项</Typography.Text>}
         <div className="registration-checklist">
@@ -957,6 +962,10 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       openTaskId={taskTarget?.openContactTask ? taskTarget.taskId : undefined}
       openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
       onRefresh={refreshCurrentStudent}
+      onTransferred={async () => {
+        resetSelection(); setDrawerOpen(false); setPageNo(1);
+        await Promise.all([load(1, { force: true, reloadDetail: false }), loadClassOptions()]);
+      }}
     >
       {(studentToolbarActions) => <StudentDetail
       student={selected}
@@ -964,14 +973,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       contactContext={studentContactContext}
       contactRecords={studentContactRecords}
       toolbar={<OverflowToolbar actions={studentToolbarActions} />}
-      contextHeader={<><Typography.Text strong>当前服务：{selectedService.courseName || selectedService.skuName} · {selectedService.className}</Typography.Text><DetailFieldGrid items={[
-        { key: 'planner', label: '学习规划师（班主任）', value: assignedName(selectedService.ownerUserId, selectedService.ownerUserName) },
-        { key: 'acceptance', label: '服务接收', value: acceptanceLabel(selectedService.acceptanceStatus) },
-        { key: 'director', label: '编导', value: assignedName(selectedService.contentDirectorUserId, selectedService.contentDirectorUserName) },
-        { key: 'career', label: '职业规划师', value: assignedName(selectedService.careerPlannerUserId, selectedService.careerPlannerUserName) },
-        { key: 'operator', label: '运营负责人', value: assignedName(selectedService.operatorUserId, selectedService.operatorUserName) }
-      ]} /></>}
-      overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }} />}
+      overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords, onRefresh: refreshCurrentStudent }} slots={{ sidebarAfterStatus: <StudentServiceCard service={selectedService} /> }} />}
       extraTabs={[
         { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> },
         { key: 'student-service', label: '课程服务与交接', children: <StudentServiceSummaryDetail student={selected} /> },
@@ -1158,7 +1160,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   );
 }
 
-function StudentContactForm({
+export function StudentContactForm({
   relationId,
   context,
   onDone,
@@ -1168,7 +1170,11 @@ function StudentContactForm({
   const [submitting, setSubmitting] = useState(false);
   const [attachmentUploads, setAttachmentUploads] = useState<Array<{ uid: string; name: string; status: "uploading" | "done" | "error"; url?: string; fileId?: number }>>([]);
   const [extensionReasons, setExtensionReasons] = useState<DictData[]>([]);
-  const taskType = context.currentTask?.type;
+  const taskType = context.currentTask?.type || 'student_contact';
+  const successfulValue = Form.useWatch('successful', form);
+  const planCompletedValue = Form.useWatch('studyPlanCompletedAtFirstContact', form);
+  const schedule = studentContactSchedule(taskType, successfulValue === true, planCompletedValue === true,
+    context.firstContactTimeoutMinutes, context.studyPlanTimeoutMinutes);
   const [fieldDicts, setFieldDicts] = useState<Record<string, DictData[]>>({});
   useEffect(() => { void Promise.all([api.dictDataByType(DICT_TYPE.STUDENT_CONTACT_UNSUCCESSFUL_REASON), api.dictDataByType("zsjos_student_contact_extension_reason")]).then(([a,b]) => { setReasons(a); setExtensionReasons(b); }).catch(() => { setReasons([]); setExtensionReasons([]); }); }, []);
   useEffect(() => {
@@ -1180,7 +1186,7 @@ function StudentContactForm({
       .then(rows => setFieldDicts(Object.fromEntries(rows)))
       .catch(() => setFieldDicts({}));
   }, [context.formFields]);
-  if (!context.currentTask) return <Alert type="info" showIcon title="当前没有待处理联系任务" />;
+  if (!context.currentTask && !context.availableActions.includes("FOLLOW_UP")) return <Alert type="info" showIcon title="当前不可录入跟进" />;
   const submit = async (values: Record<string, unknown>) => {
     if (attachmentUploads.some(item => item.status !== "done" || item.fileId == null)) {
       message.warning("请等待附件上传完成，或移除上传失败的附件");
@@ -1188,18 +1194,16 @@ function StudentContactForm({
     }
     setSubmitting(true);
     try {
-      const nextContactAt = typeof values.nextContactAt === "object" && values.nextContactAt !== null
-        ? Number((values.nextContactAt as { valueOf: () => number }).valueOf())
-        : new Date(String(values.nextContactAt)).getTime();
-      const next = new Date(nextContactAt);
+      const nextContactAt = values.nextContactAt == null ? null : Number((values.nextContactAt as { valueOf: () => number }).valueOf());
+      const extensionRequired = Boolean(nextContactAt && schedule.timeout && nextContactAt > Date.now() + schedule.timeout * 60000);
       const successful = values.successful === true;
-      const nextTaskType = taskType === "student_first_contact" ? (successful ? "student_study_plan" : "student_first_contact") : taskType === "student_study_plan" ? (successful ? "student_contact" : "student_study_plan") : "student_contact";
-      const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0;
-      const extensionRequired = Boolean(timeout && next.getTime() > Date.now() + timeout * 60000);
       const attachmentFileIds = attachmentUploads.map(item => item.fileId as number);
+      if (taskType === "student_first_contact" && successful && context.firstContactChecklist.some(item =>
+        item.attachmentRequired && Array.isArray(values.completedChecklistKeys) && values.completedChecklistKeys.includes(item.key)
+      ) && attachmentFileIds.length === 0) { message.warning("已勾选的附件项需要上传附件"); return; }
       const configuredKeys = new Set((context.formFields || []).map(field => field.key));
       const data = Object.fromEntries(Object.entries(values).filter(([field]) => configuredKeys.has(field)));
-      const payload = { ...values, data, nextContactAt, taskId: context.currentTask!.id, idempotencyKey: key(), attachmentFileIds, extensionAttachmentFileIds: extensionRequired ? attachmentFileIds : [], extensionReasonValue: extensionRequired ? values.extensionReasonValue : undefined, extensionDescription: extensionRequired ? values.extensionDescription : undefined };
+      const payload = { ...values, data, nextContactAt, taskId: context.currentTask?.id, idempotencyKey: key(), attachmentFileIds, extensionAttachmentFileIds: extensionRequired ? attachmentFileIds : [], extensionReasonValue: extensionRequired ? values.extensionReasonValue : undefined, extensionDescription: extensionRequired ? values.extensionDescription : undefined };
       if (taskType === "student_first_contact") await api.studentFirstContact(relationId, payload);
       else if (taskType === "student_study_plan") await api.studentStudyPlan(relationId, payload);
       else await api.studentContact(relationId, payload);
@@ -1207,10 +1211,11 @@ function StudentContactForm({
     } catch (error) { message.error(errorMessage(error)); }
     finally { setSubmitting(false); }
   };
-  return <Form form={form} layout="vertical" onFinish={submit}>
+  return <Form form={form} layout="vertical" initialValues={{ studyPlanCompletedAtFirstContact: false }} onValuesChange={changed => { if (changed.successful === false) form.setFieldsValue({ completedChecklistKeys: [], studyPlanCompletedAtFirstContact: false }); }} onFinish={submit}>
     <Form.Item name="successful" label="是否成功联系上学员" rules={[{ required: true }]}><Radio.Group options={[{ label: "是", value: true }, { label: "否", value: false }]} /></Form.Item>
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => getFieldValue("successful") === false ? <Form.Item name="unsuccessfulReasonValue" label="未联系原因" rules={[{ required: true }]}><Select options={reasons.map(row => ({ label: row.label, value: row.value }))} placeholder={reasons.length ? "选择管理员配置的原因" : "暂无可用原因，请联系管理员"} /></Form.Item> : null}</Form.Item>
-    <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => taskType === "student_first_contact" && getFieldValue("successful") === true ? <Form.Item name="completedChecklistKeys" label="首联任务清单" rules={[{ required: true, type: "array", min: 1 }]}><Checkbox.Group options={context.firstContactChecklist.map(item => ({ label: item.title, value: item.key }))} /></Form.Item> : null}</Form.Item>
+    <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => taskType === "student_first_contact" && getFieldValue("successful") === true ? <Form.Item name="completedChecklistKeys" label="首联任务清单" extra="按实际完成情况勾选，未完成事项可后续补充"><Checkbox.Group options={context.firstContactChecklist.map(item => ({ label: item.title, value: item.key }))} /></Form.Item> : null}</Form.Item>
+    <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => taskType === "student_first_contact" && getFieldValue("successful") === true ? <Form.Item name="studyPlanCompletedAtFirstContact" valuePropName="checked" extra="勾选后直接进入学习监督，不再生成制定学习计划任务。"><Checkbox>首联时已完成学习计划制定</Checkbox></Form.Item> : null}</Form.Item>
     {(context.formFields || []).map(field => {
       const rules = field.required ? [{ required: true, message: `请填写${field.title}` }] : [];
       const dictOptions = field.dictType ? (fieldDicts[field.dictType] || []).map(item => ({ label: item.label, value: item.value })) : [];
@@ -1227,15 +1232,15 @@ function StudentContactForm({
     })}
     {context.quickNotes.length > 0 && <Form.Item label="快捷备注"><Space wrap>{context.quickNotes.map(note => <Button key={note} size="small" onClick={() => { const current = String(form.getFieldValue("remark") || "").trimEnd(); form.setFieldValue("remark", current ? `${current}\n${note}` : note); }}>{note}</Button>)}</Space></Form.Item>}
     <Form.Item name="remark" label="备注" rules={[{ required: true }]}><Input.TextArea rows={4} maxLength={2000} showCount /></Form.Item>
-    <Form.Item name="nextContactAt" label="下次联系时间" rules={[{ required: true }]}><DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} /></Form.Item>
-    <Space wrap className="student-contact-time-shortcuts">{FOLLOW_UP_TIME_SHORTCUTS.map(shortcut => <Button key={shortcut.key} size="small" onClick={() => form.setFieldValue("nextContactAt", applyFollowUpTimeShortcut(shortcut))}>{shortcut.label}</Button>)}</Space>
-    <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => { const value = getFieldValue("nextContactAt"); const successful = getFieldValue("successful") === true; const nextTaskType = taskType === "student_first_contact" ? (successful ? "student_study_plan" : "student_first_contact") : taskType === "student_study_plan" ? (successful ? "student_contact" : "student_study_plan") : "student_contact"; const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0; const extended = Boolean(value && timeout && new Date(String(value)).getTime() > Date.now() + timeout * 60000); return extended ? <><Alert type="warning" showIcon title={`超过允许时限（${timeout} 分钟），将发起延期审批`} /><Form.Item name="extensionReasonValue" label="延期原因" rules={[{ required: true }]}><Select options={extensionReasons.map(row => ({ label: row.label, value: row.value }))} /></Form.Item><Form.Item name="extensionDescription" label="延期说明" rules={[{ required: true }]}><Input.TextArea rows={3} maxLength={1000} /></Form.Item></> : null; }}</Form.Item>
+    <Form.Item name="nextContactAt" label="下次联系时间" extra={schedule.required ? undefined : "可留空；不填写则不生成下次联系待办，仍可主动录入跟进"} rules={[{ required: schedule.required }, { validator: (_, value) => !value || value.valueOf() > Date.now() ? Promise.resolve() : Promise.reject(new Error("下次联系时间必须晚于当前时间")) }]}><DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} /></Form.Item>
+    <Space wrap className="student-contact-time-shortcuts">{schedule.shortcuts.map(shortcut => <Button key={shortcut.key} size="small" onClick={() => form.setFieldValue("nextContactAt", applyFollowUpTimeShortcut(shortcut))}>{shortcut.label}</Button>)}</Space>
+    <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => { const value = getFieldValue("nextContactAt"); const extended = Boolean(value && schedule.timeout && value.valueOf() > Date.now() + schedule.timeout * 60000); const timeout = schedule.timeout; return extended ? <><Alert type="warning" showIcon title={`超过允许时限（${timeout} 分钟），将发起延期审批`} /><Form.Item name="extensionReasonValue" label="延期原因" rules={[{ required: true }]}><Select options={extensionReasons.map(row => ({ label: row.label, value: row.value }))} /></Form.Item><Form.Item name="extensionDescription" label="延期说明" rules={[{ required: true }]}><Input.TextArea rows={3} maxLength={1000} /></Form.Item></> : null; }}</Form.Item>
     <ClipboardUploadButtons disabled={attachmentUploads.length >= 20} canPaste={() => attachmentUploads.length < 20} onFiles={files => { const file = files[0]; if (!file) return; const uid = `paste-${Date.now()}`; setAttachmentUploads(items => [...items, { uid, name: file.name, status: "uploading" }]); void api.studentContactUpload(relationId, file).then(uploaded => { setAttachmentUploads(items => items.map(item => item.uid === uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); }).catch(error => { setAttachmentUploads(items => items.map(item => item.uid === uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); }) }}><Space wrap><Upload multiple fileList={attachmentUploads} beforeUpload={async file => { setAttachmentUploads(items => [...items.filter(item => item.uid !== file.uid), { uid: file.uid, name: file.name, status: "uploading" }]); try { const uploaded = await api.studentContactUpload(relationId, file); setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); } catch (error) { setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); } return false; }} onRemove={file => { setAttachmentUploads(items => items.filter(item => item.uid !== file.uid)); return true; }}><Button icon={<UploadOutlined />}>上传附件</Button></Upload>{attachmentUploads.length > 0 && <Tag>{attachmentUploads.length} 个附件</Tag>}</Space></ClipboardUploadButtons>
     <Space><Button type="primary" htmlType="submit" loading={submitting} disabled={attachmentUploads.some(item => item.status !== "done")}>提交{taskType === "student_first_contact" ? "首联" : taskType === "student_study_plan" ? "学习计划" : "普通跟进"}</Button></Space>
   </Form>;
 }
 
-export function StudentPlannerOperations({ student, service, context, permissions, openTaskId, openTaskType, onRefresh, children }: {
+export function StudentPlannerOperations({ student, service, context, permissions, openTaskId, openTaskType, onRefresh, onTransferred, children }: {
   student: MyStudent;
   service: MyStudent["services"][number];
   context: import("../services/api").StudentContactContext;
@@ -1243,6 +1248,7 @@ export function StudentPlannerOperations({ student, service, context, permission
   openTaskId?: number;
   openTaskType?: string;
   onRefresh: () => Promise<void>;
+  onTransferred?: () => Promise<void>;
   children: (actions: ToolbarAction[]) => ReactNode;
 }) {
   const [contactOpen, setContactOpen] = useState(false);
@@ -1264,6 +1270,8 @@ export function StudentPlannerOperations({ student, service, context, permission
   const [examDateSaving, setExamDateSaving] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferSaving, setTransferSaving] = useState(false);
+  const [transferTargetsLoading, setTransferTargetsLoading] = useState(false);
+  const [transferTargetsError, setTransferTargetsError] = useState("");
   const [transferTargets, setTransferTargets] = useState<DeliveryClassOption[]>([]);
   const [transferTargetId, setTransferTargetId] = useState<number>();
   const [transferReason, setTransferReason] = useState("");
@@ -1364,9 +1372,24 @@ export function StudentPlannerOperations({ student, service, context, permission
   };
   const openTransfer = async () => {
     setTransferOpen(true); setTransferReason(""); setTransferTargetId(undefined);
+    setTransferTargets([]); setTransferTargetsError(""); setTransferTargetsLoading(true);
     try {
-      setTransferTargets(await api.deliveryClasses.options(undefined, false));
-    } catch (error) { message.error(errorMessage(error)); setTransferTargets([]); }
+      if (hasPermission(permissions, "zsjos:delivery-class:direct-transfer")
+          && hasPermission(permissions, "zsjos:delivery-class:query-managed")) {
+        const targets: DeliveryClassOption[] = [];
+        let pageNo = 1;
+        for (;;) {
+          const page = await api.deliveryClasses.page({ pageNo, pageSize: 50, status: 'SERVING', excludeSystemClass: true }, true);
+          targets.push(...page.list.filter(row => row.id !== service.classId));
+          if (pageNo * 50 >= page.total || !page.list.length) break;
+          pageNo++;
+        }
+        setTransferTargets(targets);
+      } else {
+        setTransferTargets((await api.deliveryClasses.options(undefined, false)).filter(row => row.id !== service.classId));
+      }
+    } catch (error) { setTransferTargetsError(errorMessage(error)); setTransferTargets([]); }
+    finally { setTransferTargetsLoading(false); }
   };
   const submitTransfer = async () => {
     if (!transferTargetId || !transferReason.trim()) { message.warning("请选择目标班级并填写调班原因"); return; }
@@ -1376,7 +1399,9 @@ export function StudentPlannerOperations({ student, service, context, permission
       if (hasPermission(permissions, "zsjos:delivery-class:direct-transfer")) await api.deliveryClasses.directTransfer(service.serviceRelationId, payload);
       else await api.deliveryClasses.requestTransfer(service.serviceRelationId, payload);
       message.success(hasPermission(permissions, "zsjos:delivery-class:direct-transfer") ? "已完成调班" : "调班申请已提交");
-      setTransferOpen(false); await onRefresh();
+      setTransferOpen(false);
+      if (hasPermission(permissions, "zsjos:delivery-class:direct-transfer") && onTransferred) await onTransferred();
+      else await onRefresh();
     } catch (error) { message.error(errorMessage(error)); }
     finally { setTransferSaving(false); }
   };
@@ -1456,8 +1481,9 @@ export function StudentPlannerOperations({ student, service, context, permission
         <Form.Item name="examDate" label="考试时间" rules={[{ required: true, message: "请选择考试日期" }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
       </Form>
     </Modal>
-    <Modal title="调班" open={transferOpen} confirmLoading={transferSaving} okText={hasPermission(permissions, "zsjos:delivery-class:direct-transfer") ? "确认调班" : "提交申请"} onCancel={() => setTransferOpen(false)} onOk={() => void submitTransfer()} destroyOnHidden>
-      <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: row.className || row.classNo }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
+    <Modal title="调班" open={transferOpen} confirmLoading={transferSaving} okButtonProps={{ disabled: transferTargetsLoading || !!transferTargetsError }} okText={hasPermission(permissions, "zsjos:delivery-class:direct-transfer") ? "确认调班" : "提交申请"} onCancel={() => setTransferOpen(false)} onOk={() => void submitTransfer()} destroyOnHidden>
+      {transferTargetsError && <Alert type="error" showIcon message={transferTargetsError} action={<Button onClick={() => void openTransfer()}>重试</Button>} />}
+      <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch loading={transferTargetsLoading} disabled={transferTargetsLoading || !!transferTargetsError} notFoundContent={transferTargetsLoading ? '加载中…' : '暂无可调入的班级'} optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: row.className || row.classNo }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
     </Modal>
     <Modal title={assignmentType === "content_director" ? "分配编导" : "分配职业规划师"} open={Boolean(assignmentType)} confirmLoading={assignmentSaving} okText="确认分配" onCancel={() => setAssignmentType(undefined)} onOk={() => void assign()} destroyOnHidden>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>
@@ -1489,7 +1515,7 @@ function StudentContactDetail({ service }: { service: MyStudent["services"][numb
   useEffect(() => { void load(1); }, [load]);
   if (loading || !context) return <Skeleton active paragraph={{ rows: 10 }} />;
   const history = records.length ? <Space direction="vertical" className="student-contact-history" style={{ width: "100%" }}>{records.map(row => {
-    const checklistTitles = row.completedChecklistKeys.map(itemKey => context.firstContactChecklist.find(item => item.key === itemKey)?.title || itemKey);
+    const checklistTitles = (row.firstContactSnapshot?.items || []).filter(item => item.completed).map(item => item.title);
     return <section className="registration-summary-card student-contact-record" key={row.id}>
       <div className="student-contact-record-header">
         <Space wrap size={[8, 4]}>
@@ -1504,6 +1530,8 @@ function StudentContactDetail({ service }: { service: MyStudent["services"][numb
         {row.nextContactAt && <Typography.Text type="secondary">下次联系：{formatTimestamp(new Date(row.nextContactAt).getTime())}</Typography.Text>}
         {!row.successful && row.unsuccessfulReasonLabel && <Typography.Text type="secondary">原因：{row.unsuccessfulReasonLabel}</Typography.Text>}
       </div>
+      {row.firstContactSnapshot?.historyIncomplete && <Alert type="warning" title="历史清单信息不完整" />}
+      {row.studyPlanCompletedAtFirstContact === true && <Tag color="success">学习计划已在首联完成</Tag>}
       <Typography.Paragraph className="student-contact-record-remark">{row.remark || "未填写备注"}</Typography.Paragraph>
       {(checklistTitles.length > 0 || row.attachmentFileIds.length > 0) && <div className="student-contact-record-footer">
         {checklistTitles.length > 0 && <Typography.Text type="secondary">已完成清单：{checklistTitles.join("、")}</Typography.Text>}

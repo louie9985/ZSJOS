@@ -94,4 +94,12 @@ public class HrmEmployeeListReqVO {
     @Schema(hidden = true)
     private LocalDateTime[] activeTime;
 
+    @Schema(description = "计划转正日期范围")
+    @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
+    private LocalDateTime[] plannedRegularTime;
+
+    @Schema(description = "计划离职日期范围")
+    @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
+    private LocalDateTime[] plannedLeaveTime;
+
 }

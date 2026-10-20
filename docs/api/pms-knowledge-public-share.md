@@ -1,5 +1,7 @@
 # PMS 知识库公开分享
 
+XLS/XLSX 独立文件及勾选公开的附件新增“预览表格”入口，由后端返回安全 HTML，可通过链接切换工作表，继续禁止脚本。兼容 Vue 分享页调用同一解析服务的 JSON 接口；原“打开／下载文件”及附件下载链接保留。详见 [Excel 只读预览](pms-knowledge-excel-preview.md)。
+
 在线文档支持显式勾选公开附件，旧分享及新上传附件默认不公开；接口、权限例外和迁移顺序见 [文档附件](pms-knowledge-attachments.md)。
 
 知识库文档、分享令牌和有效状态仍由 PMS 持有；只对现有 PMS 分享能力调整地址和匿名阅读投影，不调用 System 公告内部实现。管理入口为 Vue Admin；Workbench 没有独立知识库分享 API 消费者，嵌入 Admin 的入口沿用同一组件。

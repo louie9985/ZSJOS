@@ -7,6 +7,8 @@ import java.util.List;
 @Data
 public class StudentContactRecordRespVO {
     private Long id;
+    private Boolean studyPlanCompletedAtFirstContact;
+    private StudentFirstContactProgressVO firstContactSnapshot;
     private String contactType;
     private Boolean successful;
     private String unsuccessfulReasonValue;

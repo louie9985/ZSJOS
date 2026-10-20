@@ -1,0 +1,18 @@
+# Remote integration — 2026-10-18 Beijing
+
+## Registration
+- Environment local; owner Codex /root; branch main; worktree D:/ZSJ-OS; base d29fcd5f88; target origin/main 29f8f5b5ee.
+- Goal: user-authorized merge preserving local feature history and pending files, guided by both handoffs; cloud migration identities authoritative.
+- Scope: Git integration and overlapping performance SQL/tests/docs and Core baselines; this record. No new feature work, database/ledger/service actions, push or cleanup. Integration order: capture pending file hashes, stash tracked changes, merge without commit, restore local changes, inspect and verify.
+- Migration review: cloud through V319; local committed V320–V322 and pending V323–V324 are unique and subsequent. No renumbering required.
+- Review: remote legacy-other conversion fallback complements local business-domain isolation; remote V317 per-item registration baseline correction complements local student-information changes. Remote handoff discloses conversion runtime tests not completed.
+- Verification: premerge snapshot and file preservation comparisons, merged overlap inspection, static database/numbering checks and focused tests where feasible. No release/database acceptance implied; keep merge uncommitted for requested local integration.
+
+## Delivery — 2026-10-18 Beijing
+- Context: local/main/D:/ZSJ-OS; HEAD remains d29fcd5f88; MERGE_HEAD 29f8f5b5ee7b0cfd3fe4539f640289e9783f51c8; owner /root. Remote content integrated into working tree/index, merge deliberately not committed or pushed. No unmerged paths remain.
+- Conflict resolution: PerformanceConversionSqlTest retains remote current_assignment_history_id=12 legacy-other scenario and local explicit attribution INSERT column list required by new business-domain columns. Local domain filtering and remote legacy ownership fallback both retained. Build-cache conflict resolved with saved local content.
+- Preservation: captured SHA256 for 487 pending files before merge; retained stash 7367d21657a3e81f4d2287fe4c785a857280b4b2. Git content comparison against the stash shows zero differences outside remote change paths; newline normalization explains raw changes in non-overlapping tracked text. Local student-information edits remain alongside remote V317 registration schema correction. Original pending work remains uncommitted; shared core.sql includes both sources in the merge index. No stash or local artifact deletion.
+- Migration identities: cloud V001–V319 unchanged; local committed V320–V322 and pending V323–V324 preserved without renumbering because none collide. No applied-file checksum or database ledger reconciliation.
+- Verification: Maven focused reactor test command succeeded; PerformanceConversionSqlTest 1, PerformanceConversionOwnershipTest 4, PerformanceDomainTest 3 passed (8 total, zero failures/errors/skips). Python migration numbering/schema-drift/migration-execution suites passed 17 tests. Merge staged diff check passed.
+- Static database limitation: zsjos_db.py check fails on the pre-existing pending student-information baseline gap: core.sql has new form/config/image schema from local work while 00-bootstrap-schema.sql lacks those changes. Remote V317 correction exists in both files. No local feature baseline fix, database execution, runtime/browser acceptance or full fresh/upgrade test performed by integration.
+- Changed scope: remote changes plus combined test conflict and this record; local edits preserved. Remaining: complete merge commit when requested, address local baseline synchronization in its owning workstream before release. Ownership released.

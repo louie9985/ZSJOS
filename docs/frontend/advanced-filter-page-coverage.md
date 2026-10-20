@@ -32,7 +32,7 @@ Workbench扫描src/pages全部非测试TSX；Admin扫描views/zsjos所有index.v
 | ExternalRepurchasePage | [ExternalRepurchasePage.tsx](../../frontend/workbench/src/pages/ExternalRepurchasePage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 无显式线索；查看源码/复用组件 |
 | FeedbackPage | [FeedbackPage.tsx](../../frontend/workbench/src/pages/FeedbackPage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 全部类型；全部状态 |
 | money | [financeTableColumns.tsx](../../frontend/workbench/src/pages/financeTableColumns.tsx) | 辅助列定义，不是页面 | — | — | 无显式线索；查看源码/复用组件 |
-| LeadAgingPoolPage | [LeadAgingPoolPage.tsx](../../frontend/workbench/src/pages/LeadAgingPoolPage.tsx) | 统一目录入口 | lead | lead_aging_pool | 公海池常驻筛选；搜索客资编号 / 姓名 / 手机号 / 微信号；选择同部门启用销售 |
+| LeadPublicSeaPoolPage | [LeadPublicSeaPoolPage.tsx](../../frontend/workbench/src/pages/LeadPublicSeaPoolPage.tsx) | 统一目录入口 | lead | lead_public_sea_pool | 公海池常驻筛选；搜索客资编号 / 姓名 / 手机号 / 微信号；选择同部门启用销售 |
 | LeadAppealPage | [LeadAppealPage.tsx](../../frontend/workbench/src/pages/LeadAppealPage.tsx) | 统一目录入口 | lead_appeal | lead_appeal | 搜索客资编号 / 姓名 / 手机号 / 微信号 |
 | LeadAssignmentPage | [LeadAssignmentPage.tsx](../../frontend/workbench/src/pages/LeadAssignmentPage.tsx) | 未发现统一目录入口（不等于无普通筛选） | — | — | 搜索姓名或手机号；全部配置状态；搜索姓名、手机号或部门 |
 | LeadClaimPoolPage | [LeadClaimPoolPage.tsx](../../frontend/workbench/src/pages/LeadClaimPoolPage.tsx) | 统一目录入口 | lead | lead_claim_pool | 搜索客资编号 / 姓名 / 手机号 / 微信号 |
@@ -92,7 +92,7 @@ Workbench扫描src/pages全部非测试TSX；Admin扫描views/zsjos所有index.v
 | gift-purchase/index | [index.vue](../../frontend/admin/src/views/zsjos/gift-purchase/index.vue) | 未发现统一目录入口（不等于无普通筛选） | — | — | query.studentName；query.orderNo；query.giftKeyword；query.pageNo；query.pageSize |
 | ZsjosImpersonation | [index.vue](../../frontend/admin/src/views/zsjos/impersonation/index.vue) | 未发现统一目录入口（不等于无普通筛选） | — | — | 无显式线索；查看源码/复用组件 |
 | ZsjosLeadManagement | [index.vue](../../frontend/admin/src/views/zsjos/lead/index.vue) | 统一目录入口 | lead | lead_management | queryParams.status；queryParams.assignmentStatus；queryParams.sourceChannel；queryParams.leadCategory；queryParams.sourceUserId；queryParams.partnerSubmitterId；queryParams.ownerUserId；queryParams.submittedAt；queryParams.pageNo；queryParams.pageSize |
-| ZsjosLeadAgingPool | [index.vue](../../frontend/admin/src/views/zsjos/leadAgingPool/index.vue) | 统一目录入口 | lead | lead_aging_pool | 全部状态；选择同部门启用销售；queryParams.status；queryParams.pageNo；queryParams.pageSize |
+| ZsjosLeadPublicSeaPool | [index.vue](../../frontend/admin/src/views/zsjos/leadPublicSeaPool/index.vue) | 统一目录入口 | lead | lead_public_sea_pool | 全部状态；选择同部门启用销售；queryParams.status；queryParams.pageNo；queryParams.pageSize |
 | leadAppeal/index | [index.vue](../../frontend/admin/src/views/zsjos/leadAppeal/index.vue) | 统一目录入口 | lead_appeal | lead_appeal | 无显式线索；查看源码/复用组件 |
 | ZsjosLeadAssignment | [index.vue](../../frontend/admin/src/views/zsjos/leadAssignment/index.vue) | 未发现统一目录入口（不等于无普通筛选） | — | — | 全部部门；全部；搜索姓名、手机号或部门；queryParams.keyword；queryParams.deptId；queryParams.configured；queryParams.pageNo；queryParams.pageSize |
 | ZsjosLeadClaimPool | [index.vue](../../frontend/admin/src/views/zsjos/leadClaimPool/index.vue) | 统一目录入口 | lead | lead_claim_pool | queryParams.pageNo；queryParams.pageSize |
@@ -202,7 +202,7 @@ Workbench扫描src/pages全部非测试TSX；Admin扫描views/zsjos所有index.v
 | ForcedFormPageReqVO | PageParam | name, status | [ForcedFormPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/forcedform/vo/ForcedFormPageReqVO.java) |
 | ForcedFormSubmissionPageReqVO | PageParam | formId, userId, platform | [ForcedFormSubmissionPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/forcedform/vo/ForcedFormSubmissionPageReqVO.java) |
 | GiftPurchasePageReqVO | PageParam | studentName, orderNo, giftKeyword | [GiftPurchasePageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/giftpurchase/vo/GiftPurchasePageReqVO.java) |
-| LeadAgingPoolPageReqVO | PageParam | keyword, status, inboxGroup, inboxStage, relationScope, advancedFilter | [LeadAgingPoolPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolPageReqVO.java) |
+| LeadPublicSeaPoolPageReqVO | PageParam | keyword, status, inboxGroup, inboxStage, relationScope, advancedFilter | [LeadPublicSeaPoolPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolPageReqVO.java) |
 | LeadAppealPageReqVO | PageParam | handled, cursor, limit, keyword, advancedFilter | [LeadAppealPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/appeal/LeadAppealPageReqVO.java) |
 | LeadAssignmentLogPageReqVO | PageParam | scene, actionType | [LeadAssignmentLogPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/assignment/LeadAssignmentLogPageReqVO.java) |
 | LeadAssignmentRelationPageReqVO | PageParam | keyword, deptId, configured | [LeadAssignmentRelationPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/assignment/LeadAssignmentRelationPageReqVO.java) |
@@ -253,3 +253,6 @@ Workbench扫描src/pages全部非测试TSX；Admin扫描views/zsjos所有index.v
 ## 2026-09-23 接入增量
 
 Admin 返现、提现和成交审批页面已接入统一高级筛选组件；Workbench 返现场景修正为 cashback。财务 POST search-page 现实际编译高级条件并参与分页，详见[查询修正记录](advanced-filter-inventory.md#9-已落实页面场景与后端查询契约2026-09-23)。以上为源码状态，不代表已完成已登录浏览器验收。
+# 教务团队独立筛选补充（2026-10-18）
+
+Workbench 教务团队采用独立 `education_team` scene/pageKey，字段前缀 `educationTeam.`。筛选目录及个人模板要求 `zsjos:education-team:query`；原 `subordinate_sales` 场景和两端消费方式不变。教务场景不包含接单、新人池配置字段。

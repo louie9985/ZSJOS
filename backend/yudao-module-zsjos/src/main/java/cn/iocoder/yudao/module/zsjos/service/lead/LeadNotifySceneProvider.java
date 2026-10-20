@@ -14,11 +14,11 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCycleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
@@ -47,7 +47,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     @Resource private PermissionApi permissionApi;
     @Resource private DeptApi deptApi;
     @Resource private LeadAssignmentService assignmentService;
-    @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
+    @Resource private LeadPublicSeaPoolCycleMapper publicSeaPoolCycleMapper;
     @Resource private PartnerAccountMapper partnerAccountMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper partnerMapper;
 
@@ -96,15 +96,15 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 timedScene(FIRST_FOLLOW_UP_REMINDER, "首次跟进时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(NEXT_FOLLOW_UP_REMINDER, "下次跟进提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(QUALIFICATION_REMINDER, "有效性判定时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
-                timedScene(AGING_POOL_REMINDER, "公海提前提醒", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_DUE, "客资进入公海", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_ASSIGNED_NOTICE, "公海指派协同销售", ROLE_OWNER, ROLE_COLLABORATOR,
+                timedScene(PUBLIC_SEA_POOL_REMINDER, "公海提前提醒", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
+                scene(PUBLIC_SEA_POOL_DUE, "客资进入公海", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
+                scene(PUBLIC_SEA_POOL_ASSIGNED_NOTICE, "公海指派协同销售", ROLE_OWNER, ROLE_COLLABORATOR,
                         ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_REASSIGNED_NOTICE, "公海更换协同销售", ROLE_OWNER,
+                scene(PUBLIC_SEA_POOL_REASSIGNED_NOTICE, "公海更换协同销售", ROLE_OWNER,
                         ROLE_PREVIOUS_COLLABORATOR, ROLE_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_REASSIGN_REQUIRED_NOTICE, "公海待重新指派", ROLE_OWNER,
+                scene(PUBLIC_SEA_POOL_REASSIGN_REQUIRED_NOTICE, "公海待重新指派", ROLE_OWNER,
                         ROLE_PREVIOUS_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_EXITED_NOTICE, "客资退出公海", ROLE_OWNER,
+                scene(PUBLIC_SEA_POOL_EXITED_NOTICE, "客资退出公海", ROLE_OWNER,
                         ROLE_PREVIOUS_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER));
     }
 
@@ -357,7 +357,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             copyContext(values, event.getPayload(), "feedback.id", "feedback.summary");
             copyContext(values, event.getPayload(), "assist.requestId", "assist.problem",
                     "assist.expectedAssistance", "assist.remark", "assist.attachmentNames", "assist.response");
-            copyContext(values, event.getPayload(), "agingPool.cycleId", "agingPool.dueAt");
+            copyContext(values, event.getPayload(), "publicSeaPool.cycleId", "publicSeaPool.dueAt");
         }
         return values;
     }
@@ -398,11 +398,11 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("reminder.stage", "提醒阶段"));
             variables.add(variable("reminder.dueAt", "截止时间"));
         }
-        if (Set.of(AGING_POOL_REMINDER, AGING_POOL_DUE, AGING_POOL_ASSIGNED_NOTICE,
-                AGING_POOL_REASSIGNED_NOTICE, AGING_POOL_REASSIGN_REQUIRED_NOTICE,
-                AGING_POOL_EXITED_NOTICE).contains(sceneCode)) {
-            variables.add(variable("agingPool.cycleId", "公海周期编号"));
-            variables.add(variable("agingPool.dueAt", "进入公海时间"));
+        if (Set.of(PUBLIC_SEA_POOL_REMINDER, PUBLIC_SEA_POOL_DUE, PUBLIC_SEA_POOL_ASSIGNED_NOTICE,
+                PUBLIC_SEA_POOL_REASSIGNED_NOTICE, PUBLIC_SEA_POOL_REASSIGN_REQUIRED_NOTICE,
+                PUBLIC_SEA_POOL_EXITED_NOTICE).contains(sceneCode)) {
+            variables.add(variable("publicSeaPool.cycleId", "公海周期编号"));
+            variables.add(variable("publicSeaPool.dueAt", "进入公海时间"));
         }
         if (SupervisorLeadOverturnPolicy.SCENE.equals(sceneCode)) {
             variables.add(variable("overturn.reason", "主管改判理由"));
@@ -503,11 +503,11 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         return PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(userId, lead.getProviderOwnerId()) || Objects.equals(userId, lead.getOwnerUserId())
                 || permissionApi.hasAnyPermissions(userId, QUERY_ALL_PERMISSION)
-                || managesOwnerDepartment(userId, lead.getOwnerUserId()) || canReadAgingPoolContact(lead.getId(), userId);
+                || managesOwnerDepartment(userId, lead.getOwnerUserId()) || canReadPublicSeaPoolContact(lead.getId(), userId);
     }
 
-    private boolean canReadAgingPoolContact(Long leadId, Long userId) {
-        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(leadId);
+    private boolean canReadPublicSeaPoolContact(Long leadId, Long userId) {
+        LeadPublicSeaPoolCycleDO cycle = publicSeaPoolCycleMapper.selectActiveByLeadId(leadId);
         if (cycle == null) return false;
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         boolean sales = assignmentService.getEligibleSalesUsers().stream()

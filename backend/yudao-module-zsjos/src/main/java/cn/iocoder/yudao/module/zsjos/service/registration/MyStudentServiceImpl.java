@@ -86,18 +86,31 @@ public class MyStudentServiceImpl implements MyStudentService {
     /**
      * Department-scoped student read. The visible owner set is resolved from the reader's persisted data
      * scope, so DEPT_AND_CHILD covers the whole subtree. Students follow their service owner live, which
-     * also keeps pending-class students visible to the owner's department.
+     * also keeps formal-class students visible to the owner's department. The actual tenant pending
+     * class is additionally readable by configured managers even before an owner is assigned.
      */
     private PageResult<MyStudentRespVO> getManagedPage(Long userId, MyStudentPageReqVO reqVO, List<Long> matchedIds) {
-        DeliveryClassScopeService.Scope scope = classScopeService.resolve(userId);
+        DeliveryClassScopeService.Scope scope = classScopeService.resolveRead(userId);
         Set<Long> ownerUserIds = resolveManagedOwnerIds(userId, scope);
+        Long pendingClassId = scope.allDepartments() ? null : classScopeService.readablePendingClassId(userId);
         PageResult<PersonDO> people = scope.allDepartments()
                 ? personMapper.selectAllStudentPage(reqVO, matchedIds)
-                : personMapper.selectManagedStudentPage(reqVO, ownerUserIds, matchedIds);
+                : personMapper.selectManagedStudentPage(reqVO, ownerUserIds, matchedIds, pendingClassId, userId);
         List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
         List<ServiceRelationDO> relations = scope.allDepartments()
                 ? relationMapper.selectOwnedByPersonIds(personIds, reqVO.getServiceStatus())
-                : relationMapper.selectOwnedByOwnerIdsAndPersonIds(ownerUserIds, personIds, reqVO.getServiceStatus());
+                : managedRelations(ownerUserIds, personIds, reqVO.getServiceStatus(), pendingClassId);
+        if (!scope.allDepartments()) {
+            Map<Long, ServiceRelationDO> visible = new LinkedHashMap<>();
+            relations.forEach(row -> visible.put(row.getId(), row));
+            relationMapper.selectAssignedByUserAndPersonIds(userId, personIds, reqVO.getServiceStatus()).stream()
+                    .filter(row -> Objects.equals(row.getOwnerUserId(), userId)
+                            || ("active".equals(row.getStatus()) && "accepted".equals(row.getAcceptanceStatus())
+                                && (Objects.equals(row.getContentDirectorUserId(), userId)
+                                    || Objects.equals(row.getCareerPlannerUserId(), userId))))
+                    .forEach(row -> visible.put(row.getId(), row));
+            relations = new ArrayList<>(visible.values());
+        }
         Map<Long, List<ServiceRelationDO>> groups = relations.stream()
                 .filter(relation -> reqVO.getClassId() == null || Objects.equals(relation.getClassId(), reqVO.getClassId()))
                 .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
@@ -204,13 +217,21 @@ public class MyStudentServiceImpl implements MyStudentService {
         }
         // A visible student does not make every course visible: match the managed list's owner scope.
         if (hasManagedStudentReadPermission(userId)) {
-            DeliveryClassScopeService.Scope scope = classScopeService.resolve(userId);
-            return scope.allDepartments()
-                    ? relationMapper.selectOwnedByPersonIds(List.of(personId), null)
-                    : relationMapper.selectOwnedByOwnerIdsAndPersonIds(
-                            resolveManagedOwnerIds(userId, scope), List.of(personId), null);
+            DeliveryClassScopeService.Scope scope = classScopeService.resolveRead(userId);
+            if (scope.allDepartments()) return relationMapper.selectOwnedByPersonIds(List.of(personId), null);
+            Map<Long, ServiceRelationDO> visible = new LinkedHashMap<>();
+            managedRelations(resolveManagedOwnerIds(userId, scope), List.of(personId), null,
+                    classScopeService.readablePendingClassId(userId)).forEach(row -> visible.put(row.getId(), row));
+            selectAssignedRelationsForPerson(userId, personId).forEach(row -> visible.put(row.getId(), row));
+            return new ArrayList<>(visible.values());
         }
         return selectAssignedRelationsForPerson(userId, personId);
+    }
+
+    private List<ServiceRelationDO> managedRelations(Set<Long> ownerIds, List<Long> personIds,
+            String status, Long pendingClassId) {
+        return pendingClassId == null ? relationMapper.selectOwnedByOwnerIdsAndPersonIds(ownerIds, personIds, status)
+                : relationMapper.selectManagedByPersonIds(ownerIds, personIds, status, pendingClassId);
     }
 
     private PageResult<MyStudentRespVO> getAllMediaPage(Long actorId, MyStudentPageReqVO req) {
@@ -305,7 +326,7 @@ public class MyStudentServiceImpl implements MyStudentService {
                 .max(Comparator.naturalOrder()).orElse(null));
         result.setServices(relations.stream().map(relation -> {
             MyStudentRespVO.ServiceVO row = new MyStudentRespVO.ServiceVO();
-            row.setServiceRelationId(relation.getId()); row.setOrderId(relation.getOrderId()); row.setOrderItemId(relation.getOrderItemId());
+            row.setServiceRelationId(relation.getId()); row.setRegistrationCaseId(relation.getRegistrationCaseId()); row.setOrderId(relation.getOrderId()); row.setOrderItemId(relation.getOrderItemId());
             SalesOrderDO order = (relation.getOrderId() == null ? null : orders.get(relation.getOrderId())); SalesOrderItemDO item = (relation.getOrderItemId() == null ? null : items.get(relation.getOrderItemId()));
             LeadDO serviceLead = order == null || order.getLeadId() == null ? null : leads.get(order.getLeadId());
             row.setLeadId(serviceLead == null ? null : serviceLead.getId());

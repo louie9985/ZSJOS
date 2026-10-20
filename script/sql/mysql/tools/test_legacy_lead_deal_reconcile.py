@@ -120,7 +120,7 @@ CASES = {
     'person_opportunity': "INSERT INTO zsjos_opportunity(person_id,type,lead_id,status,owner_user_id,tenant_id) VALUES (2,'initial_conversion',NULL,'open',101,1);",
     'multiple_orders': "INSERT INTO zsjos_order(order_no,lead_id,person_id,order_type,status,total_amount,payable_amount,effective_at,creator,tenant_id) VALUES ('ORSECOND',2,2,'first_purchase','effective',1,1,'2026-09-02','normal-user',1);",
     'pending_approval': "INSERT INTO zsjos_order(order_no,lead_id,person_id,order_type,status,total_amount,payable_amount,creator,tenant_id) VALUES ('ORPENDING',2,2,'repurchase','pending_approval',1,1,'normal-user',1);",
-    'public_sea': "INSERT INTO zsjos_lead_public_sea_record(lead_id,owner_user_id,released_by_user_id,released_at,release_reason,tenant_id) VALUES (2,101,101,NOW(),'验证',1);",
+    'public_sea': "INSERT INTO zsjos_lead_public_sea_pool_compatibility_record(lead_id,owner_user_id,released_by_user_id,released_at,release_reason,tenant_id) VALUES (2,101,101,NOW(),'验证',1);",
     'prerequisite': "UPDATE zsjos_schema_version SET version='V302' WHERE version='V303';",
     'ledger_failure': "CREATE TRIGGER v304_fail BEFORE INSERT ON zsjos_module_schema_version FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected ledger failure';",
     'insert_failure': "CREATE TRIGGER v304_fail BEFORE INSERT ON zsjos_opportunity FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='injected insertion failure';",

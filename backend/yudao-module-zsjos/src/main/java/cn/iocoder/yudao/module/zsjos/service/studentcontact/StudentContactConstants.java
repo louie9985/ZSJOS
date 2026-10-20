@@ -1,6 +1,10 @@
 package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 
 public interface StudentContactConstants {
+    String RETIRED_PLAN_CHECKLIST_KEY = "voice_learning_plan";
+    String PERMISSION_CHECKLIST_UPDATE = "zsjos:student-contact:checklist-update";
+    String ACTION_CHECKLIST_UPDATE = "UPDATE_FIRST_CONTACT_CHECKLIST";
+    String EVENT_CHECKLIST_UPDATED = "STUDENT_FIRST_CONTACT_CHECKLIST_UPDATED";
     String BIZ_TYPE = "student_service";
     String TYPE_FIRST_CONTACT = "student_first_contact";
     String TYPE_STUDY_PLAN = "student_study_plan";

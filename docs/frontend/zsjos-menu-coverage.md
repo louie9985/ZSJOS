@@ -1,5 +1,9 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
+学生交付中心端替换补充：按认证后的服务端交付域归属确认，移除原下属员工菜单和旧地址的可打开路由，仅使用获授权的教务团队入口；销售端下属销售入口保留。无教务授权不得回退旧入口或推导新权限。
+
+教务团队（2026-10-18）：`zsjos/educationTeam/index` → Workbench `/zsjos/education-team` 独立原生页面；Vue Admin 的菜单过滤器排除该组件，销售端下属销售页面保留。权限使用 `zsjos:education-team:*`，不继承下属员工授权，详见 [教务团队 API](../api/education-team.md)。
+
 考期产品／规格选项仅管理权限可读取，查看和管理仍使用独立叶子权限；仅考期允许部分规格。三端产品展示覆盖见 [产品规格展示清单](product-spec-presentation.md)。
 
 本矩阵记录父子菜单解析后的正式 URL。数据库中直接挂在 `/zsjos`“工作台”父菜单下的页面保存相对子路径，例如正式 URL `/zsjos/my-students` 对应菜单 `path=my-students`。React Workbench 的路由与直接访问使用原授权 `menus`，导航使用 System 计算的 `workbenchMenus` 投影；编排只改变分组、顺序和导航显隐，不改变本表的正式 URL、组件或权限身份。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
@@ -27,7 +31,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 7 | 派单关系配置 | `/zsjos/leads/assignment-relations` | `LeadAssignmentPage` | `zsjos/leadAssignment/index` |
 | 8 | 重复客资复核 | `/zsjos/leads/duplicate-review` | `LeadDuplicateReviewPage` | `zsjos/leadDuplicateReview/index` |
 | 9 | 客资抢单池 | `/zsjos/claim-pool` | `LeadClaimPoolPage` | `zsjos/leadClaimPool/index` |
-| 10 | 公海 | `/zsjos/lead-aging-pool` | `LeadAgingPoolPage` | `zsjos/leadAgingPool/index` |
+| 10 | 公海 | `/zsjos/lead-public-sea-pool` | `LeadPublicSeaPoolPage` | `zsjos/leadPublicSeaPool/index` |
 | 11 | 客资派单规则 | `/zsjos/lead-rule` | `LeadRuleConfigPage` | `zsjos/leadRule/index` |
 | 12 | 客资筛选方案 | `/zsjos/lead-filter` | `LeadFilterConfigPage` | `zsjos/leadFilter/index` |
 | 12.1 | 高级筛选预置 | `/zsjos/advanced-filter-template` | 不注册（Admin 配置页） | `zsjos/advancedFilterTemplate/index`（`workbenchRenderMode=admin_only`） |
@@ -53,6 +57,8 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 33 | 业务通知规则 | `/messages/notify/notify-rule` | `NotifyRulePage` | `system/notify/rule/index` |
 | 34 | 全部消息 | `/messages/all` | `MessageInboxPage(view=all)` | `system/notify/my/all/index` |
 | 35 | 未读消息 | `/messages/unread` | `MessageInboxPage(view=unread)` | `system/notify/my/unread/index` |
+
+消息中心导航角标由现有 System 未读摘要接口驱动：`/messages/notice` 显示当前用户公告未读数，`/messages/unread` 显示站内信未读数，`/messages` 显示两者合计；`/messages/all` 和“站内信管理”不重复显示数量。角标固定在服务端菜单图标右上外侧，超过 99 显示 `99+`，不改变菜单权限或可见性。
 | 36 | 报名履约公共池 | `/zsjos/registration-pool` | `RegistrationPoolPage` | `zsjos/registration-pool` |
 | 37 | 履约清单配置 | `/zsjos/registration-checklist-config` | `RegistrationChecklistConfigPage` | `zsjos/registrationChecklistConfig/index` |
 | 38 | 学员管理（隐藏深链） | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
@@ -99,7 +105,7 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 ## 路径约束
 
 - 申诉正式路径仅为 `/zsjos/appeals`，不提供 `/zsjos/leads/appeals` 兼容跳转。
-- 公海正式路径仅为 `/zsjos/lead-aging-pool`，不提供 `/zsjos/opportunity-public-sea` 兼容跳转。
+- 公海正式路径仅为 `/zsjos/lead-public-sea-pool`，不提供 `/zsjos/opportunity-public-sea` 兼容跳转。
 - 订单管理正式路径为 `/zsjos/sales-orders`，消费服务端 `zsjos:sales-order:query-management` 并按 System 数据权限过滤订单。
   页面授权；详情使用只读 `team` 模式，不投影修改、终止或审批操作。
 - `/zsjos/leads/manage` 是服务端隐藏菜单：具备菜单授权时可以直接访问，但不显示在 React 导航中。
@@ -116,7 +122,7 @@ The subordinate-sales left pane uses the shared 20-row append lazy-loading patte
 
 The subordinate Lead detail and batch toolbar render restore, transfer, recycle, claim-pool release,
 and public-sea release only from their server-returned button permissions. The canonical public-sea
-page remains `/zsjos/lead-aging-pool`; the retired `/zsjos/opportunity-public-sea` path is not aliased.
+page remains `/zsjos/lead-public-sea-pool`; the retired `/zsjos/opportunity-public-sea` path is not aliased.
 The public-sea page reuses the Lead-management status bar, list item, selected state, loading/empty/error
 states, complete `LeadDetail`, desktop master-detail layout, and mobile detail behavior. Its paging,
 statistics, A/B ownership fields, entry/expiry data, and `availableActions` remain public-sea-owned; it
@@ -156,3 +162,5 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 
 
 2026-10-08：主管直接改判有效仅在 Workbench 客资管理与下属销售详情提供，复用 `SUPERVISOR_OVERTURN_VALID` 动作和独立按钮权限。Vue Admin 不增加此操作，其客资详情及申诉处理保持原入口；新增动作字段兼容读取。V289 仅添加菜单按钮与通知元数据，不分配角色。见 [操作与发布说明](../api/supervisor-lead-overturn.md)。
+
+2026-10-19：下属销售恢复销售岗位及销售身份范围，教务团队使用独立六项今日指标。两页均沿用现有布局，不新增表格视图。服务端 V334 恢复下属销售菜单名称，不调整角色授权。

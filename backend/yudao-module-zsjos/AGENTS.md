@@ -46,11 +46,10 @@ ZSJOS business operations **MUST** enforce three independent and cumulative laye
 
 ## Lead pool terminology
 
-- The legacy ZSJOS technical value `assignment_status=public_pool` means the unowned first-come claim pool (抢单池).
-- The aging collaboration pool and the manually released public sea are owner-preserving collaboration views. They must not reuse the claim-pool assignment value, claim endpoints, direct-claim behavior, or business wording.
-- Manual public-sea release must preserve Lead owner, primary status, and assignment status. Collaboration alone does not change ownership; when the approved aging-pool or manual-public-sea collaborator submits an order, that transaction permanently transfers Lead and Opportunity ownership to the collaborator and freezes the order's formal sales owner accordingly.
-- During an active public-sea cycle, follow-up responsibility belongs exclusively to current collaborator B; formal owner A retains ownership but cannot create follow-up. Without B, personal follow-up responsibility is paused. Lists, calendars, pending tasks and reminders must use this responsibility rather than formal ownership. Completed/cancelled tasks and historical follow-up records retain their original attribution. Exiting public sea restores the formal owner's follow-up responsibility.
-- While an active aging-pool or manual-public-sea record exists, no user may create, revise, or continue a first-purchase deal order; the service boundary must reject the command until formal transfer or manager exit ends the public-sea record. Historical `deal_pending` approvals remain compatible and are not migrated.
+- The only owner-preserving public sea is 公海池. Active identifiers use PublicSeaPool, publicSeaPool, PUBLIC_SEA_POOL, public_sea_pool and public-sea-pool consistently.
+- The legacy assignment_status=public_pool value means the unowned first-come claim pool (抢单池), a separate business concept.
+- Current public-sea records live in zsjos_lead_public_sea_pool_cycle with its event and notify_stage tables. Historical compatibility rows remain in zsjos_lead_public_sea_pool_compatibility_record; they do not define a second product pool or authorize a new workflow.
+- Historical migrations, rendered notifications and immutable workflow snapshots retain their recorded identifiers. Old identifiers may occur only in explicit upgrade/read-compatibility boundaries, never as alternate active names.
 
 ## Database and SQL
 

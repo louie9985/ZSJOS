@@ -20,7 +20,8 @@ public class CalendarRestDayPermissionProvider implements ZsjosObjectPermissionP
         if (userId == null || tenantId == null || !Objects.equals(tenantId, TenantContextHolder.getTenantId())) return false;
         return switch (action) {
             case "read" -> permissions.hasAnyPermissions(userId, READ);
-            case "write" -> permissions.hasAnyPermissions(userId, MANAGE);
+            case "write" -> permissions.hasAnyPermissions(userId, READ)
+                    && permissions.hasAnyPermissions(userId, MANAGE);
             default -> false;
         };
     }

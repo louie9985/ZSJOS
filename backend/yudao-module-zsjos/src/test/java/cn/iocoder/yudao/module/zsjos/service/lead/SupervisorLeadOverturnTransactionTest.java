@@ -74,6 +74,7 @@ class SupervisorLeadOverturnTransactionTest {
         jdbc.execute("CREATE UNIQUE INDEX event_key ON zsjos_business_event(tenant_id,idempotency_key)");
         jdbc.execute("CREATE UNIQUE INDEX opportunity_lead ON zsjos_opportunity(tenant_id,lead_id)");
         jdbc.update("INSERT INTO zsjos_lead(id,tenant_id,person_id,owner_user_id,status,assignment_status,qualified_at,invalid_reason,invalid_reason_label_snapshot,invalid_description,invalid_evidence_refs,lead_category_label_snapshot,version) VALUES(1,9,5,20,'invalid','owned',CURRENT_TIMESTAMP,'wrong','原无效','原说明','[]','历史分类',1)");
+        jdbc.update("UPDATE zsjos_lead SET owner_identity='sales' WHERE id=1");
         jdbc.update("INSERT INTO zsjos_opportunity(id,tenant_id,lead_id,type,status,lost_reason,next_follow_up_at) VALUES(2,9,1,'initial_conversion','lost','原无效',CURRENT_TIMESTAMP)");
         leads=(LeadMapper)beans.get(LeadMapper.class);appeals=(LeadAppealMapper)beans.get(LeadAppealMapper.class);
         var raw=new SupervisorLeadOverturnService();
@@ -81,6 +82,8 @@ class SupervisorLeadOverturnTransactionTest {
             ReflectionTestUtils.setField(raw,field.getName(),beans.computeIfAbsent(field.getType(), key->mock(key)));
         when(((SecurityFrameworkService)beans.get(SecurityFrameworkService.class)).hasPermission(SupervisorLeadOverturnPolicy.PERMISSION)).thenReturn(true);
         when(((LeadObjectPermissionService)beans.get(LeadObjectPermissionService.class)).getManagedUserIds(30L)).thenReturn(Set.of(20L));
+        var member = new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO(); member.setId(20L);
+        when(((SubordinateSalesScope)beans.get(SubordinateSalesScope.class)).managed(30L)).thenReturn(List.of(member));
         cashback=(CashbackService)beans.get(CashbackService.class);
         var factory=new ProxyFactory(raw);factory.setProxyTargetClass(true);
         factory.addAdvice(new TransactionInterceptor(tx,new AnnotationTransactionAttributeSource()));service=(SupervisorLeadOverturnService)factory.getProxy();

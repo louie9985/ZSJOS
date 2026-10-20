@@ -32,6 +32,29 @@ class StudentServiceObjectPermissionProviderTest {
     @Mock private AdminUserApi adminUserApi;
 
     @Test
+    void pendingServiceReadDoesNotGrantOwnerCommandsOrExposeOtherClasses() {
+        org.mockito.Mockito.doReturn(false).when(permissionApi).hasAnyPermissions(7L, MediaStudentReadScope.QUERY_ALL);
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setClassId(90L); relation.setStatus("active");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(permissionApi.hasAnyPermissions(7L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(deliveryClassScopeService.resolveRead(7L)).thenReturn(new DeliveryClassScopeService.Scope(false, Set.of()));
+        when(deliveryClassScopeService.readablePendingClassId(7L)).thenReturn(90L);
+        assertTrue(provider.hasPermission(10L, "read", 7L));
+        relation.setOwnerUserId(99L);
+        assertTrue(provider.hasPermission(10L, "read", 7L));
+        for (String action : List.of("accept", "contact", "update-basic-info", "delivery-stage")) {
+            assertFalse(provider.hasPermission(10L, action, 7L));
+        }
+        relation.setClassId(91L); relation.setOwnerUserId(null);
+        assertFalse(provider.hasPermission(10L, "read", 7L));
+        relation.setClassId(null);
+        assertFalse(provider.hasPermission(10L, "read", 7L));
+        relation.setClassId(90L); relation.setStatus("terminated");
+        assertFalse(provider.hasPermission(10L, "read", 7L));
+    }
+
+    @Test
     void deliveryStageRequiresActiveOwner() {
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(10L); relation.setOwnerUserId(7L); relation.setStatus("active");
@@ -125,7 +148,7 @@ class StudentServiceObjectPermissionProviderTest {
         relation.setId(10L); relation.setOwnerUserId(31L); relation.setStatus("active");
         when(relationMapper.selectById(10L)).thenReturn(relation);
         when(permissionApi.hasAnyPermissions(9L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
-        when(deliveryClassScopeService.resolve(9L))
+        when(deliveryClassScopeService.resolveRead(9L))
                 .thenReturn(new DeliveryClassScopeService.Scope(false, Set.of(80L)));
         when(adminUserApi.getUserListByDeptIds(Set.of(80L)))
                 .thenReturn(List.of(new AdminUserRespDTO().setId(31L)));
@@ -160,9 +183,9 @@ class StudentServiceObjectPermissionProviderTest {
         relation.setId(10L); relation.setOwnerUserId(31L); relation.setStatus("active");
         when(relationMapper.selectById(10L)).thenReturn(relation);
         when(permissionApi.hasAnyPermissions(9L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
-        when(deliveryClassScopeService.resolve(9L)).thenReturn(new DeliveryClassScopeService.Scope(true, Set.of()));
+        when(deliveryClassScopeService.resolveRead(9L)).thenReturn(new DeliveryClassScopeService.Scope(true, Set.of()));
         assertTrue(provider.hasPermission(10L, "read", 9L));
-        when(deliveryClassScopeService.resolve(9L)).thenReturn(new DeliveryClassScopeService.Scope(false, Set.of()));
+        when(deliveryClassScopeService.resolveRead(9L)).thenReturn(new DeliveryClassScopeService.Scope(false, Set.of()));
         assertFalse(provider.hasPermission(10L, "read", 9L));
         relation.setOwnerUserId(9L);
         assertTrue(provider.hasPermission(10L, "read", 9L));

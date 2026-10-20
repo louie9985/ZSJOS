@@ -312,6 +312,14 @@ apply_body: BEGIN
 ('OR202609200026',17,'sales'),
 ('OR202609200027',17,'sales'),
 ('OR202609200030',23,'sales');
+ IF (SELECT COUNT(*) FROM v306_manifest) <> 286
+  OR EXISTS(SELECT 1 FROM v306_manifest m
+      LEFT JOIN zsjos_order o ON o.order_no=m.order_no AND o.tenant_id=1 AND o.deleted=0
+      LEFT JOIN zsjos_order_approval_round r ON r.id=o.current_approval_round_id
+          AND r.order_id=o.id AND r.tenant_id=1 AND r.deleted=0
+      WHERE o.id IS NULL OR r.id IS NULL) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V306 manifest target missing or incomplete';
+ END IF;
  SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
  START TRANSACTION;
  -- Lock current target orders and rounds before creating candidate images.
@@ -361,11 +369,7 @@ apply_body: BEGIN
     AND NOT EXISTS(SELECT 1 FROM v306_images i WHERE i.table_name=b.table_name AND i.row_id=b.row_id)) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V306 completed repair evidence incomplete';
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM v306_images WHERE
-    (table_name='zsjos_order' AND NOT(current_image->'$.identity' <=> after_image->'$.identity'))
-    OR (table_name='zsjos_order_approval_round' AND
-      (NOT(current_image->'$.snapshot.order.formalOwnerIdentity' <=> after_image->'$.snapshot.order.formalOwnerIdentity')
-       OR NOT(current_image->'$.snapshot.formalSales.identity' <=> after_image->'$.snapshot.formalSales.identity')))) THEN
+  IF NOT EXISTS(SELECT 1 FROM v306_images WHERE current_image<>after_image) THEN
     COMMIT;
     DROP TEMPORARY TABLE v306_images;
     SELECT 'V306' AS migration,'already_completed_verified' AS replay_status;

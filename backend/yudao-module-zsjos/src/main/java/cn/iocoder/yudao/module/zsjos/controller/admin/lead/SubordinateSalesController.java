@@ -21,7 +21,7 @@ import java.util.List;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 
-@Tag(name = "管理后台 - 下属员工")
+@Tag(name = "管理后台 - 下属销售")
 @RestController
 @RequestMapping("/zsjos/subordinate-sales")
 public class SubordinateSalesController {
@@ -45,7 +45,7 @@ public class SubordinateSalesController {
     }
 
     @GetMapping("/page")
-    @Operation(summary = "获得下属员工分页")
+    @Operation(summary = "获得下属销售分页")
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
     public CommonResult<PageResult<SubordinateSalesRespVO>> getPage(@Valid SubordinateSalesPageReqVO reqVO) {
         return success(service.getPage(reqVO, getLoginUserId()));
@@ -53,7 +53,7 @@ public class SubordinateSalesController {
 
     @PostMapping("/search-page")
     @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
-    @Operation(summary = "筛选下属员工分页")
+    @Operation(summary = "筛选下属销售分页")
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
     public CommonResult<PageResult<SubordinateSalesRespVO>> searchPage(
             @Valid @RequestBody SubordinateSalesPageReqVO reqVO) {
@@ -124,7 +124,7 @@ public class SubordinateSalesController {
     }
 
     @PutMapping("/dispatch-mode/pause-all")
-    @Operation(summary = "暂停全部下属员工接单")
+    @Operation(summary = "暂停全部下属销售接单")
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:pause-all')")
     public CommonResult<SubordinatePauseAllRespVO> pauseAllDispatch() {
         return success(service.pauseAllDispatch(getLoginUserId()));

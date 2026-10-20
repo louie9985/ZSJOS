@@ -11,10 +11,11 @@ import java.util.List;
 public class LeadDispatchRedisRepository {
 
     private static final long PRESENCE_TTL_SECONDS = 90L;
+    // 轮询从右端取人，首次上线或重连必须从左端加入等待队尾，避免插队。
     private static final DefaultRedisScript<Long> HEARTBEAT_SCRIPT = new DefaultRedisScript<>("""
             if redis.call('EXISTS', KEYS[2]) == 0 then
               redis.call('LREM', KEYS[1], 0, ARGV[1])
-              redis.call('RPUSH', KEYS[1], ARGV[1])
+              redis.call('LPUSH', KEYS[1], ARGV[1])
             end
             redis.call('SET', KEYS[2], 'online', 'EX', ARGV[3])
             redis.call('SET', KEYS[3], ARGV[2])

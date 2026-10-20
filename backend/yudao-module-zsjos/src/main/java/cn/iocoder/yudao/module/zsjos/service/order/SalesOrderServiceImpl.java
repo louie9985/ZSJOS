@@ -59,7 +59,7 @@ import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
-import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadCollaborationService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
@@ -121,7 +121,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private DeptApi deptApi;
     @Resource private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
     @Resource private AdminUserApi adminUserApi;
-    @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private OrderContactCompletionService contactCompletionService;
     @Resource private SalesOrderCommandService commandService;
@@ -173,7 +173,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         createDealCashbacks(leadId, order.getId(), createdItems, validated.items());
         contactCompletionService.complete(order, leadId, userId);
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
-        agingPoolService.markDealPending(leadId, userId, now);
+        publicSeaPoolService.markDealPending(leadId, userId, now);
         return order.getId();
     }
 
@@ -407,7 +407,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         contactCompletionService.complete(successor, successor.getLeadId(), userId);
         startRound(successor, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
         if (latest != null) businessTaskCommandService.completeByKey(TASK_REVISION_KEY_PREFIX + latest.getId(), now);
-        if (lead != null) agingPoolService.markDealPending(lead.getId(), userId, now);
+        if (lead != null) publicSeaPoolService.markDealPending(lead.getId(), userId, now);
         return successor.getId();
     }
 
@@ -1034,7 +1034,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
             OpportunityDO opportunity = opportunityMapper.selectById(order.getOpportunityId());
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
-            agingPoolService.handleOrderRejected(order.getLeadId(), now);
+            publicSeaPoolService.handleOrderRejected(order.getLeadId(), now);
         }
     }
 
@@ -1105,7 +1105,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 leadMapper.updateById(lead);
             }
             if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
-                agingPoolService.completeConversion(order.getLeadId(), order.getSubmitterUserId(), now);
+                publicSeaPoolService.completeConversion(order.getLeadId(), order.getSubmitterUserId(), now);
                 lifecycleTaskService.cancelFirstFollowUpTasks(order.getLeadId(), now, "成交订单已生效");
                 lifecycleTaskService.cancelFollowUpReminders(order.getLeadId(), now, "成交订单已生效");
             }
@@ -1113,12 +1113,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
             cashbackService.cancelDealCashbacks(order.getId(), "订单审批驳回");
-            if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) agingPoolService.handleOrderRejected(order.getLeadId(), now);
+            if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) publicSeaPoolService.handleOrderRejected(order.getLeadId(), now);
         } else {
             round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
             cashbackService.cancelDealCashbacks(order.getId(), "订单审批异常终止");
-            if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) agingPoolService.handleOrderRejected(order.getLeadId(), now);
+            if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) publicSeaPoolService.handleOrderRejected(order.getLeadId(), now);
         }
         round.setCompletedAt(now); roundMapper.updateById(round); orderMapper.updateById(order);
         if (!BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
@@ -1260,7 +1260,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private LeadDO requireRepurchaseLead(Long leadId, Long userId) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        agingPoolService.requireCanOperateForUpdate(leadId, lead.getOwnerUserId(), userId);
+        collaborationService.requireCanOperateForUpdate(lead, userId);
         if (lead.getSuspendedAt() != null || !STATUS_WON.equals(lead.getStatus())) {
             throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
         }

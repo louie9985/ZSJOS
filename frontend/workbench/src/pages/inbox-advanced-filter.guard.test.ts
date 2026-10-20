@@ -9,7 +9,7 @@ const read = (file: string) => readFileSync(resolve(root, file), 'utf8')
 const targetSurfaces = [
   ['pages/LeadManagementPage.tsx', 'lead', 'lead_management'],
   ['pages/LeadClaimPoolPage.tsx', 'lead', 'lead_claim_pool'],
-  ['pages/LeadAgingPoolPage.tsx', 'lead', 'lead_aging_pool'],
+  ['pages/LeadPublicSeaPoolPage.tsx', 'lead', 'lead_public_sea_pool'],
   ['pages/MySalesOrderPage.tsx', 'order', 'sales_order_'],
   ['pages/SalesOrderApprovalPage.tsx', 'order', 'sales_order_approval:'],
   ['components/SalesOrderSupervisorInbox.tsx', 'order', 'sales_order_supervisor_confirm'],

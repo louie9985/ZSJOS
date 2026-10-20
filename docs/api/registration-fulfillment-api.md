@@ -1,5 +1,9 @@
 # 报名履约与学员 API
 
+### 学员信息收集（2026-10-16）
+
+每个报名任务绑定一份学员收集表。Workbench 与 Admin 均在履约详情提供生成链接／二维码和“已发送”勾选，勾选立即保存；最终履约完成只检查生成并发送事实，不等待学员提交。正常完成后链接继续有效，取消／结束／订单终止使未提交链接失效。生成／发送／轮换使用任务版本与幂等键，轮换清除发送确认。详情新增 informationSent、informationSentAt、informationSentByUserId、informationSubmissionStatus。服务投影新增 registrationCaseId，资料摘要／详情按当前任务读取，不再按客资回退。详见[收集表契约](student-information-collection.md)。
+
 ### 学员管理服务摘要（2026-10-15）
 
 `my-service-page`、`my-service/search-page`、`my-service/{relationId}` 在既有字段外增加可选 `summary`：交付阶段名称、考试日期、当前联系任务、最近联系、班级编号/部门/考期、生命周期、`orderHandoff` 和 `infoSubmission`。旧 Admin 消费者继续读取原有字段；自然人聚合和新媒体接口不变。
@@ -8,7 +12,7 @@
 
 `orderHandoff.access` / `infoSubmission.access` 为 `readable`、`denied`、`absent`。拒绝时不返回内容。订单交接沿用订单详情功能权限及批量对象可读性；资料摘要沿用资料读取功能权限及客资对象可读性，只选表单状态和时间相关元数据，已提交版本优先，不加载字段值和令牌。订单字典及成交人员沿用审批快照，不重查当前字典拼历史标签。
 
-分页请求增加 `ownerUserId`、`acceptanceStatus`、`deliveryStage`、`taskState`，其中任务状态为 `none/pending/overdue`。高级筛选新增 `service.examDate/acceptedAt/latestContactAt/taskDueAt/acceptanceStatus/deliveryStage/taskState/contentDirectorUserId/careerPlannerUserId/operatorUserId`。选项来自服务端目录；现有字段标识和旧模板时间含义保留。使用订单交接字段的筛选同时限制到既有订单详情可读范围。
+分页请求增加 `ownerUserId`、`acceptanceStatus`、`deliveryStage`、`taskState`，其中任务状态为 `none/pending/overdue`。高级筛选新增 `service.examDate/acceptedAt/latestContactAt/taskDueAt/acceptanceStatus/deliveryStage/taskState/contentDirectorUserId/careerPlannerUserId/operatorUserId`。选项来自服务端目录；现有字段标识和旧模板时间含义保留。使用订单交接字段或 `orderItem.*` 商品字段的筛选同时限制到既有订单详情可读范围；无订单读取权限的用户不能通过商品金额、SKU 或商品快照条件推断订单数据。
 
 工作台默认展示 16 列，扩展字段进入列设置；原列显隐、顺序、列宽偏好保留。详情明确区分当前学习规划师和客资负责人，移动端保留列表及抽屉。没有摘要的旧服务端显示“摘要未提供”；上线先部署后端再部署工作台。
 
@@ -374,3 +378,57 @@ The media-only `/zsjos/media-students/page` response adds a required `accounts` 
 产品、SKU、分类或考期匹配。新班级可独立命名且不绑定产品，正式班仍须有效班主任；待分班、
 班级状态、租户隔离、保存/完成前的有效性复核保持原契约。WorkBench 与 Admin 调班候选也不按
 产品分类筛选；审批流程与服务归属校验保持不变，详见[班级管理](delivery-class-management.md)。
+
+
+## 首联清单进度与学习计划分支（2026-10-18）
+
+首联清单允许空选、部分或全部完成，不阻断交付。成功首联时独立提交
+`studyPlanCompletedAtFirstContact`（缺省 false）：true 直接进入 supervision，填写下次联系时间时创建普通联系任务；
+false 创建学习计划任务并进入 study_plan。未成功联系继续首联，不能同时提交已制定计划或非空清单。
+备注保持必填；下次联系时间按下述 2026-10-19 规则条件必填，延期规则按实际下一任务执行。附件项仅在勾选完成时要求附件。
+
+`PUT /zsjos/student/service/{relationId}/first-contact-checklist` 接收 version、completedChecklistKeys、
+attachmentFileIds 和 idempotencyKey。权限为 `zsjos:student-contact:checklist-update`，另要求当前服务负责人、
+active 且 accepted；其他状态仅可读。保留原附件证据，新附件通过当前操作者与服务归属校验。
+提交以服务关系锁、version 和业务事件幂等键控制，记录前后快照，不改原始首联记录、任务、联系时间或阶段。
+附件上传接口同时允许清单更新权限；每次最多 9 个附件。并发冲突必须刷新重试，重复请求返回原结果。
+错误区分无效事项（1900010041）、缺附件（1900010042）、历史缺失（1900010043）、幂等冲突（1900010044）；
+对象权限和服务版本冲突沿用原错误码。
+
+contact-context 增加 firstContactProgress，包含首联时间/操作者、配置来源、事项名称/顺序/完成状态/附件、
+学习计划完成来源与时间，新增可用动作 UPDATE_FIRST_CONTACT_CHECKLIST。摘要查询限定当前 serviceRelationId，
+不依赖联系历史分页；联系记录增加 firstContactSnapshot 和 studyPlanCompletedAtFirstContact。
+Workbench 概览支持查看与更新进度，阶段条标记“首联时完成”，历史记录使用保存的名称快照。
+
+普通清单保留现有服务端配置来源。voice_learning_plan 从新操作和配置编辑投影中移除，复制、保存和发布的新配置不再包含它，
+已发布/归档版本不重写。所有待提交首联任务采用新规则；既有学习计划任务不自动关闭。历史只从原任务配置版本还原，
+无法还原则显示“历史信息不完整”并禁用更新；旧勾选不推断首联已制定计划。历史记录展示保留旧项，当前进度不含旧项。
+独立流程字段不允许被自定义表单配置覆盖。两端配置页面消费同一过滤后的配置 API。
+
+数据库升级使用 V328__student_first_contact_progress.sql，新增两个联系记录字段和一个服务进度字段，均允许 NULL，
+不回填历史、不执行任务转换、不修改角色授权。前置为联系表、服务 delivery_stage/version 及唯一学员页面菜单；按现有
+编号顺序执行，失败后检查实际列再重放。DDL 非原子，回滚应用时保留新增列和已存快照。生产启用前先完成迁移，
+由管理员分配新增操作权限，再发布后端和 Workbench；未经迁移的旧后端可忽略新字段，旧前端不会提供跳过选项。
+
+
+## 联系预约时间规则（2026-10-19）
+
+- 首联未成功：下次联系时间必填，快捷项仅 +30分钟、+1小时，超过首联配置时限（120分钟）继续延期审批。
+- 首联成功且未制定计划，或学习计划任务未完成：时间必填，快捷项为 +30分钟、+1小时、+1天、+2天、+3天。
+  后续新建学习计划任务使用当前发布配置（升级后4320分钟），超过72小时继续现有延期审批；边界相等不算超时。
+- 首联时已制定计划、学习计划任务本次完成，以及后续普通跟进（包括未联系成功）：时间选填，保留上述五项。
+  留空完成已有任务并保存记录，不生成下次待办；填写则必须为未来时间，生成普通联系任务，不套用学习计划上限。
+- 每个快捷项以点击时刻加相应时长，不按自然日零点。销售跟进快捷列表保持不变。
+
+首联与学习计划 ReqVO 移除 nextContactAt 的无条件 NotNull，Service 根据下一阶段强制校验；普通跟进 contacts
+接口额外允许 taskId 为空。仅当前负责人、active/accepted 且已经进入 supervision 及后续交付阶段可主动录入。
+没有待办仍由服务端投影 FOLLOW_UP 操作，并沿用 zsjos:student-contact:submit 权限；不生成无截止时间的占位任务。
+有待办时服务端在服务关系锁内找到并完成现有普通联系任务，拒绝借此绕过首联或学习计划。按租户、服务与幂等键回放，
+无任务提交指纹与显式 taskId 提交区分。历史记录 taskId、nextContactAt 可空；概览显示“未安排下次联系”。
+
+V330__student_contact_optional_schedule.sql 将联系记录 task_id、next_contact_at 放宽为 NULL。已有 task 唯一索引保留，
+MySQL 可存多个 NULL，未预约跟进仍受提交幂等键约束。升级以租户1当前发布配置为源新增72小时配置并归档旧版，
+不改旧版时限、已有任务 dueAt、延期审批或历史记录；旧任务提交后生成的新学习计划任务也采用新发布配置。
+已有草稿仅当仍为旧1440分钟默认值时同步为4320并推进version，其他草稿设置保持不变。重放不覆盖后续管理员发布的设置。
+迁移依赖V328字段及forms_json，检查实际列后执行；DDL可部分提交，配置变更与双版本台账在同一事务内，失败可重放恢复。
+运行库迁移及发布须单独执行，未执行V330前新代码不应部署。应用回滚必须保留新增的可空数据，不能直接恢复NOT NULL。

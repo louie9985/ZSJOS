@@ -47,6 +47,20 @@ class SubordinateSalesServiceImplTest {
     @Mock private LeadSubmissionIdentityService identityService;
     @Mock private LeadTeamTransferPolicy teamTransferPolicy;
     @Mock private NewcomerPoolService newcomerPoolService;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SubordinateSalesDailyMapper salesDailyMapper;
+    @org.junit.jupiter.api.BeforeEach void wireSalesScope() {
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        var scope = new SubordinateSalesScope();
+        org.springframework.test.util.ReflectionTestUtils.setField(scope,"users",adminUserApi);
+        org.springframework.test.util.ReflectionTestUtils.setField(scope,"posts",postApi);
+        org.springframework.test.util.ReflectionTestUtils.setField(scope,"permissions",permissionApi);
+        org.springframework.test.util.ReflectionTestUtils.setField(scope,"managers",permissionService);
+        org.springframework.test.util.ReflectionTestUtils.setField(scope,"ownership",teamTransferPolicy);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"scope",scope);
+        org.mockito.Mockito.lenient().when(teamTransferPolicy.resolveIdentity(org.mockito.ArgumentMatchers.any())).thenAnswer(i -> ((LeadDO)i.getArgument(0)).getOwnerIdentity());
+    }
+    @org.junit.jupiter.api.AfterEach void clearTenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
+
 
     @Test
     void newcomerConfigAllowsManagedEligibleSales() {
@@ -112,25 +126,26 @@ class SubordinateSalesServiceImplTest {
         when(taskMapper.selectByAssigneeIds(List.of(20L))).thenReturn(List.of(pending, duplicate, completed,
                 cancelled, task(4L, "pending", end), task(5L, "pending", start.minusSeconds(1))));
         var fresh = new LeadDO(); fresh.setId(1L); fresh.setOwnerUserId(20L); fresh.setStatus("submitted");
-        fresh.setQualificationDeadlineAt(end.plusDays(3));
+        fresh.setOwnerIdentity("sales"); fresh.setQualificationDeadlineAt(end.plusDays(3));
         var old = new LeadDO(); old.setId(2L); old.setOwnerUserId(20L); old.setStatus("submitted");
-        old.setQualificationDeadlineAt(start.minusDays(3));
-        var valid = new LeadDO(); valid.setId(3L); valid.setOwnerUserId(20L); valid.setStatus("valid");
+        old.setOwnerIdentity("sales"); old.setQualificationDeadlineAt(start.minusDays(3));
+        var valid = new LeadDO(); valid.setId(3L); valid.setOwnerUserId(20L); valid.setStatus("valid"); valid.setOwnerIdentity("sales");
         when(leadMapper.selectByOwnerUserIds(List.of(20L))).thenReturn(List.of(fresh, old, valid));
+        when(leadMapper.selectBatchIds(org.mockito.ArgumentMatchers.anyCollection())).thenReturn(List.of(fresh,old,valid));
         when(assignmentHistoryMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(
                 assignment(1L, "dispatch"), assignment(1L, "dispatch"), assignment(1L, "timeout"),
                 assignment(2L, "accept"), assignment(2L, "claim"), assignment(3L, "claim")));
         var event = new cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO();
         event.setOperatorUserId(20L); event.setAggregateId(99L);
-        when(eventMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(event, event));
-        var follow = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRecordDO(); follow.setOperatorUserId(20L);
-        var opportunityFollow = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityFollowUpRecordDO(); opportunityFollow.setOperatorUserId(20L);
+        when(salesDailyMapper.selectQualifications(1L, List.of(20L), start, end)).thenReturn(List.of(event, event));
+        var follow = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRecordDO(); follow.setOperatorUserId(20L); follow.setOwnerIdentitySnapshot("sales");
+        var opportunityFollow = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityFollowUpRecordDO(); opportunityFollow.setOperatorUserId(20L); opportunityFollow.setOwnerIdentitySnapshot("sales");
         when(followUpRecordMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(follow));
         when(opportunityFollowUpRecordMapper.selectTodayByUserIds(List.of(20L), start, end)).thenReturn(List.of(opportunityFollow));
         var order = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO();
-        order.setSubmitterUserId(20L); order.setEffectiveAt(start); order.setTotalAmount(new java.math.BigDecimal("125.50"));
+        order.setSubmitterUserId(20L); order.setFormalOwnerIdentity("sales"); order.setEffectiveAt(start); order.setTotalAmount(new java.math.BigDecimal("125.50"));
         var previous = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO();
-        previous.setSubmitterUserId(20L); previous.setEffectiveAt(start.minusSeconds(1)); previous.setTotalAmount(java.math.BigDecimal.TEN);
+        previous.setSubmitterUserId(20L); previous.setFormalOwnerIdentity("sales"); previous.setEffectiveAt(start.minusSeconds(1)); previous.setTotalAmount(java.math.BigDecimal.TEN);
         when(orderMapper.selectEffectiveBySubmitterIds(List.of(20L))).thenReturn(List.of(order, previous));
         var row = service.getOverview(20L, 10L);
         assertEquals(2L, row.getTodayPendingCount());
@@ -160,16 +175,14 @@ class SubordinateSalesServiceImplTest {
         org.mockito.Mockito.verifyNoInteractions(assignmentHistoryMapper, eventMapper, followUpRecordMapper, opportunityFollowUpRecordMapper);
     }
 
-    @Test
-    void deliveryAndDisabledEmployeesAreReadableWithoutSalesPost() {
-        var planner = subordinate(20L, 0, 7L);
-        var disabled = subordinate(30L, 1, 8L);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L));
-        when(adminUserApi.getUserList(Set.of(20L, 30L))).thenReturn(List.of(planner, disabled));
-        assertEquals(0L, service.getTaskPage(20L, new SubordinateTaskPageReqVO(), 10L).getTotal());
-        assertEquals(0L, service.getTaskPage(30L, new SubordinateTaskPageReqVO(), 10L).getTotal());
-        assertThrows(ServiceException.class, () -> service.getTaskPage(40L, new SubordinateTaskPageReqVO(), 10L));
-        org.mockito.Mockito.verifyNoInteractions(postApi);
+    @Test void nonSalesEmployeesAreDeniedBeforeTaskQueries() {
+        var post = new PostRespDTO(); post.setId(5L);
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L,30L));
+        when(adminUserApi.getUserList(Set.of(20L,30L))).thenReturn(List.of(subordinate(20L,0,7L),subordinate(30L,1,8L)));
+        assertThrows(ServiceException.class, () -> service.getTaskPage(20L,new SubordinateTaskPageReqVO(),10L));
+        assertThrows(ServiceException.class, () -> service.getTaskPage(30L,new SubordinateTaskPageReqVO(),10L));
+        org.mockito.Mockito.verifyNoInteractions(taskMapper);
     }
 
     private static cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO task(Long leadId, String status, LocalDateTime dueAt) {
@@ -180,11 +193,13 @@ class SubordinateSalesServiceImplTest {
 
     private static cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO assignment(Long leadId, String action) {
         var item = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO();
-        item.setLeadId(leadId); item.setActionType(action); item.setCandidateUserId(20L); return item;
+        item.setLeadId(leadId); item.setActionType(action); item.setCandidateUserId(20L); item.setOwnerIdentitySnapshot("sales"); return item;
     }
 
     @Test
     void administratorReadsDisabledSalesWithoutGainingBulkPauseAuthority() {
+        var post = new PostRespDTO(); post.setId(5L);
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
         when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
         when(adminUserApi.getUserListByStatus(0)).thenReturn(List.of());
         when(adminUserApi.getUserListByStatus(1)).thenReturn(List.of(subordinate(30L, 1, 5L)));
@@ -220,6 +235,9 @@ class SubordinateSalesServiceImplTest {
         when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L));
         when(leadMapper.selectById(2L)).thenReturn(new LeadDO().setId(2L));
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L));
+        var post = new PostRespDTO(); post.setId(5L);
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(adminUserApi.getUserList(Set.of(20L,30L))).thenReturn(List.of(subordinate(20L,0,5L),subordinate(30L,0,5L)));
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(30L)));
         when(leadMapper.selectBatchIds(Set.of(1L, 2L))).thenReturn(List.of(
                 new LeadDO().setId(1L).setLeadNo("KZ202608141200000001"),
@@ -265,6 +283,7 @@ class SubordinateSalesServiceImplTest {
         AdminUserRespDTO subordinate = new AdminUserRespDTO();
         subordinate.setId(20L); subordinate.setPostIds(Set.of(5L));
         when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(subordinate));
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(salesPost);
         when(taskMapper.selectMyPending(20L)).thenReturn(List.of());
         SubordinateTaskPageReqVO request = new SubordinateTaskPageReqVO();
 
@@ -313,20 +332,16 @@ class SubordinateSalesServiceImplTest {
         LeadAssignmentUserRespVO result = new LeadAssignmentUserRespVO();
         result.setId(id); result.setNickname("销售" + id); return result;
     }
-    @Test void mixedOwnershipCandidatesUseIntersectionAndExcludeBothOwners() {
-        Set<Long> managed=Set.of(20L,30L,40L,50L);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(managed);
-        var education=new LeadDO().setId(1L).setOwnerUserId(20L).setStatus("submitted").setAssignmentStatus("owned");
-        var salesLead=new LeadDO().setId(2L).setOwnerUserId(30L).setStatus("submitted").setAssignmentStatus("owned");
-        when(leadMapper.selectBatchIds(List.of(1L,2L))).thenReturn(List.of(education,salesLead));
-        var employees=List.of(subordinate(20L,0,7L),subordinate(30L,0,5L),subordinate(40L,0,7L),subordinate(50L,0,5L));
-        when(adminUserApi.getUserList(managed)).thenReturn(employees);
-        when(teamTransferPolicy.eligibleTargets(employees)).thenReturn(Set.of(20L,40L));
-        when(teamTransferPolicy.isEducation(education)).thenReturn(true);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(30L),sales(40L),sales(50L)));
+    @Test void batchCandidatesExcludeEveryCurrentOwner() {
+        var post = new PostRespDTO(); post.setId(5L);
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L,30L,40L));
+        when(adminUserApi.getUserList(Set.of(20L,30L,40L))).thenReturn(List.of(subordinate(20L,0,5L),subordinate(30L,0,5L),subordinate(40L,0,5L)));
+        when(leadMapper.selectBatchIds(List.of(1L,2L))).thenReturn(List.of(
+            new LeadDO().setId(1L).setOwnerUserId(20L).setStatus("submitted").setAssignmentStatus("owned"),
+            new LeadDO().setId(2L).setOwnerUserId(30L).setStatus("submitted").setAssignmentStatus("owned")));
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(20L),sales(30L),sales(40L)));
         assertEquals(List.of(40L),service.getBatchTransferCandidates(10L,List.of(1L,2L)).stream().map(LeadAssignmentUserRespVO::getId).toList());
-        verify(leadMapper).selectBatchIds(List.of(1L,2L));
-        verify(adminUserApi).getUserList(managed);
     }
     @Test void completedBatchReplaysWithoutRecheckingChangedOwnership() {
         var request=new SubordinateBatchLeadActionReqVO();request.setLeadIds(List.of(1L));request.setTargetUserId(30L);request.setReason("转派");request.setIdempotencyKey("completed");

@@ -90,7 +90,7 @@ class LeadDispatchServiceImplTest {
     @Mock
     private OpportunityMapper opportunityMapper;
     @Mock
-    private LeadAgingPoolService agingPoolService;
+    private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock
     private LeadClaimDailyCounterMapper claimDailyCounterMapper;
     @Mock

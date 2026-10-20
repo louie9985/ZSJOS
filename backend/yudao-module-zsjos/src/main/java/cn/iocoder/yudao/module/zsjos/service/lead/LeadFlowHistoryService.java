@@ -6,18 +6,19 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.flow.LeadFlowHistoryRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolEventDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRecordDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolEventMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowDisplay;
 import lombok.Data;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,7 @@ public class LeadFlowHistoryService {
     @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadAssignmentHistoryMapper assignmentMapper;
     @Resource private LeadFollowUpRecordMapper followUpMapper;
-    @Resource private LeadAgingPoolEventMapper agingEventMapper;
+    @Resource private LeadPublicSeaPoolEventMapper publicSeaPoolEventMapper;
     @Resource private PartnerMapper partnerMapper;
     @Resource private AdminUserApi adminUserApi;
     @Resource private FileApi fileApi;
@@ -53,7 +54,7 @@ public class LeadFlowHistoryService {
                         (first, ignored) -> first));
         Map<Long, LeadFollowUpRecordDO> followUps = followUpMapper.selectListByLeadId(leadId).stream()
                 .collect(java.util.stream.Collectors.toMap(LeadFollowUpRecordDO::getId, item -> item));
-        List<LeadAgingPoolEventDO> agingEvents = agingEventMapper.selectByLeadId(leadId);
+        List<LeadPublicSeaPoolEventDO> publicSeaPoolEvents = publicSeaPoolEventMapper.selectByLeadId(leadId);
 
         Set<Long> referencedAssignments = new HashSet<>();
         events.forEach(event -> optionalLong(event.getRelatedObjectRefs(), "assignmentHistoryId")
@@ -65,7 +66,7 @@ public class LeadFlowHistoryService {
             addUser(userIds, item.getOperatorUserId()); addUser(userIds, item.getFromOwnerUserId());
             addUser(userIds, item.getToOwnerUserId()); addUser(userIds, item.getCandidateUserId());
         });
-        agingEvents.forEach(item -> {
+        publicSeaPoolEvents.forEach(item -> {
             addUser(userIds, item.getOperatorUserId()); addUser(userIds, item.getPreviousCollaboratorUserId());
             addUser(userIds, item.getCollaboratorUserId());
         });
@@ -83,7 +84,7 @@ public class LeadFlowHistoryService {
         Map<Long, cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowSnapshot> snapshots = new HashMap<>();
         for (var event : events) {
             var snapshot = cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowProjection.snapshot(event);
-            if (snapshot != null) { snapshots.put(event.getId(), snapshot); covered.addAll(snapshot.coveredRecords()); }
+            if (snapshot != null) { snapshots.put(event.getId(), snapshot); snapshot.coveredRecords().stream().map(cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowSnapshot::canonicalRecordKey).forEach(covered::add); }
         }
         for (var event : events) {
             if (covered.contains("event:" + event.getId())) continue;
@@ -100,7 +101,7 @@ public class LeadFlowHistoryService {
         }
         assignments.stream().filter(item -> !referencedAssignments.contains(item.getId()))
                 .forEach(item -> result.add(fromAssignment(item, users, identityContext)));
-        agingEvents.forEach(item -> result.add(fromAging(item, users, identityContext)));
+        publicSeaPoolEvents.forEach(item -> result.add(fromAging(item, users, identityContext)));
         result.removeIf(item -> covered.contains(item.getId()));
         result.sort(Comparator.comparing(LeadFlowHistoryRespVO::getOccurredAt,
                         Comparator.nullsLast(Comparator.reverseOrder()))
@@ -164,7 +165,8 @@ public class LeadFlowHistoryService {
     private LeadFlowHistoryRespVO fromAssignment(LeadAssignmentHistoryDO item, Map<Long, AdminUserRespDTO> users,
                                                   LeadIdentityMaskingService.LeadIdentityViewContext context) {
         LeadFlowHistoryRespVO vo = base("assignment:" + item.getId(), item.getOccurredAt(), "客资分配",
-                assignmentLabel(item.getActionType()), assignmentSource(item),
+                LeadFlowDisplay.isAssignmentBaseline(item.getReason())
+                        ? "历史分配初始记录" : assignmentLabel(item.getActionType()), assignmentSource(item),
                 leadIdentityMaskingService.employeeName(context, users, item.getOperatorUserId(), LeadIdentityRole.OPERATOR), item.getReason());
         vo.setFromOwner(leadIdentityMaskingService.employeeName(context, users, item.getFromOwnerUserId(), LeadIdentityRole.OWNER));
         vo.setToOwner(leadIdentityMaskingService.employeeName(context, users, item.getToOwnerUserId() != null ? item.getToOwnerUserId() : item.getCandidateUserId(), LeadIdentityRole.OWNER));
@@ -176,11 +178,11 @@ public class LeadFlowHistoryService {
         return vo;
     }
 
-    private LeadFlowHistoryRespVO fromAging(LeadAgingPoolEventDO item, Map<Long, AdminUserRespDTO> users,
+    private LeadFlowHistoryRespVO fromAging(LeadPublicSeaPoolEventDO item, Map<Long, AdminUserRespDTO> users,
                                             LeadIdentityMaskingService.LeadIdentityViewContext context) {
         boolean system = item.getOperatorUserId() == null || item.getOperatorUserId() == 0;
-        LeadFlowHistoryRespVO vo = base("aging:" + item.getId(), item.getOccurredAt(), "公海",
-                agingLabel(item.getEventType()), system ? "系统任务" : "公海处理",
+        LeadFlowHistoryRespVO vo = base("public-sea-pool:" + item.getId(), item.getOccurredAt(), "公海",
+                publicSeaPoolLabel(item.getEventType()), system ? "系统任务" : "公海处理",
                 system ? "系统" : leadIdentityMaskingService.employeeName(context, users, item.getOperatorUserId(), LeadIdentityRole.OPERATOR), item.getReason());
         vo.setFromOwner(leadIdentityMaskingService.employeeName(context, users, item.getPreviousCollaboratorUserId(), LeadIdentityRole.OWNER));
         vo.setToOwner(leadIdentityMaskingService.employeeName(context, users, item.getCollaboratorUserId(), LeadIdentityRole.OWNER));
@@ -213,7 +215,8 @@ public class LeadFlowHistoryService {
                                                String source, String operator, String reason) {
         LeadFlowHistoryRespVO vo = new LeadFlowHistoryRespVO();
         vo.setId(id); vo.setOccurredAt(time); vo.setBusinessObject(object); vo.setFlowNode(node);
-        vo.setSource(source); vo.setOperator(operator); vo.setReason(reason); return vo;
+        vo.setSource(source); vo.setOperator(operator);
+        vo.setReason(LeadFlowDisplay.reason(reason)); return vo;
     }
     private static void addUser(Set<Long> ids, Long id) { if (id != null && id > 0) ids.add(id); }
     private static String name(Map<Long, AdminUserRespDTO> users, Long id) {
@@ -291,12 +294,17 @@ public class LeadFlowHistoryService {
         vo.setAssignmentStatusAfter(assignmentStatusLabel(after));
     }
     private static boolean isLeadStatus(String status) {
-        return status != null && Set.of("submitted", "suspended", "valid", "converted", "invalid", "won", "closed").contains(status);
+        return leadStatusLabel(status) != null;
     }
     private static String leadStatusLabel(String status) { if (status == null) return null; return Map.ofEntries(
             Map.entry("submitted", "已提交"), Map.entry("suspended", "已挂起"),
             Map.entry("valid", "有效"), Map.entry("converted", "有效"), Map.entry("invalid", "无效"),
-            Map.entry("won", "已成交"), Map.entry("closed", "已关闭")
+            Map.entry("won", "已成交"), Map.entry("closed", "已关闭"),
+            Map.entry("pending_assignment", "待分配"), Map.entry("pending_follow", "待跟进"),
+            Map.entry("following", "跟进中"), Map.entry("in_pool", "抢单池"),
+            Map.entry("timeout_pending", "超时待处理"), Map.entry("recycled_pending", "回收待处理"),
+            Map.entry("deal_pending_review", "成交待审核"), Map.entry("deal_confirmed", "已成交"),
+            Map.entry("suspected_duplicate", "疑似重复"), Map.entry("appealing", "申诉中")
     ).get(status); }
     private static String eventSource(BusinessEventDO event, LeadAssignmentHistoryDO assignment, boolean system) {
         String automaticSource = LeadAutomaticGeneration.sourceFromJson(event.getRelatedObjectRefs());
@@ -334,6 +342,13 @@ public class LeadFlowHistoryService {
         return "客资";
     }
     private static String eventLabel(String type) { if (type == null) return "客资流转"; return Map.ofEntries(
+            Map.entry("lead_valid", "判定有效"), Map.entry("lead_invalid", "判定无效"),
+            Map.entry("lead_pending_follow", "待跟进"), Map.entry("lead_following", "跟进中"),
+            Map.entry("lead_appealing", "申诉中"), Map.entry("lead_closed", "客资关闭"),
+            Map.entry("lead_deal_confirmed", "成交确认"), Map.entry("lead_state_changed", "客资状态变更"),
+            Map.entry("lead_state_repaired", "客资状态修复"),
+            Map.entry("legacy_lead_assistance_message", "历史协助记录"),
+            Map.entry("legacy_lead_complaint_event", "历史投诉记录"),
             Map.entry("lead_qualified_valid", "判定有效"), Map.entry("lead_qualified_invalid", "判定无效"),
             Map.entry("lead_suspended", "客资挂起"), Map.entry("lead_released_to_claim_pool", "释放到抢单池"),
             Map.entry("lead_recycled", "主管回收"), Map.entry("lead_transferred", "主管转派"),
@@ -347,13 +362,14 @@ public class LeadFlowHistoryService {
             Map.entry("lead_submitter_assist_requested", "请求提交人协助"),
             Map.entry("lead_category_changed", "变更客资类别"),
             Map.entry("lead_duplicate_reviewed", "重复客资复核")
-    ).getOrDefault(type, type); }
+    ).getOrDefault(type, "客资流转（历史类型未识别）"); }
     private static String assignmentLabel(String type) { if (type == null) return "分配流转"; return Map.ofEntries(
             Map.entry("dispatch", "派单"), Map.entry("accept", "接单"), Map.entry("reject", "拒单"),
             Map.entry("timeout", "接单超时"), Map.entry("claim", "抢单"), Map.entry("transfer", "转派"),
+            Map.entry("restore", "恢复分配"), Map.entry("other", "其他分配记录"),
             Map.entry("recycle", "回收"), Map.entry("release_to_claim_pool", "释放到抢单池"),
             Map.entry("public_pool", "释放到抢单池"), Map.entry("duplicate_review_reactivate", "重复客资复核激活")
-    ).getOrDefault(type, type); }
+    ).getOrDefault(type, "分配流转（历史类型未识别）"); }
     private static String assignmentSource(LeadAssignmentHistoryDO item) {
         if (item.getOperatorUserId() == null || item.getOperatorUserId() == 0) return "系统任务";
         if ("dispatch".equals(item.getActionType())) {
@@ -368,12 +384,12 @@ public class LeadFlowHistoryService {
             Map.entry("recycle", "回收待处理"), Map.entry("release_to_claim_pool", "抢单池"),
             Map.entry("public_pool", "抢单池"), Map.entry("duplicate_review_reactivate", "未分配")
     ).getOrDefault(type, null); }
-    private static String agingLabel(String type) { if (type == null) return "公海流转"; return Map.ofEntries(
+    private static String publicSeaPoolLabel(String type) { if (type == null) return "公海流转"; return Map.ofEntries(
             Map.entry("entered", "进入公海"), Map.entry("assigned", "分配协作人"),
             Map.entry("reassigned", "变更协作人"), Map.entry("exited", "退出公海"),
             Map.entry("collaborator_cleared", "清除协作人"), Map.entry("deal_pending", "提交成交"),
             Map.entry("converted", "商机成交")
-    ).getOrDefault(type, type); }
+    ).getOrDefault(type, "公海流转（历史类型未识别）"); }
 
     @Data
     private static class EvidenceRef {

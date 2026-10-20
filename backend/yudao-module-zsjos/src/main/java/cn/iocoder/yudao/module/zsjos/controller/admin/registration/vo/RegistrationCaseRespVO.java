@@ -28,6 +28,10 @@ public class RegistrationCaseRespVO {
     private LocalDateTime cancelledAt;
     private String cancelReason;
     private Integer version;
+    private Boolean informationSent;
+    private LocalDateTime informationSentAt;
+    private Long informationSentByUserId;
+    private String informationSubmissionStatus;
     private Boolean deliveryEstablished;
     private Boolean assignable;
     private String assignmentBlockReason;

@@ -96,6 +96,8 @@
           </el-descriptions-item>
         </el-descriptions>
 
+        <RegistrationStudentInfo :key="detail.id" :case-id="detail.id" :version="detail.version" :status="detail.status" :sent="detail.informationSent" :disabled="classSaving || completing || closing || !!savingItemId" @busy="informationBusy = $event" @changed="refreshCollection" />
+
         <el-alert
           v-if="detail.completionBlockReason"
           :title="detail.completionBlockReason"
@@ -228,7 +230,7 @@
         v-if="canComplete && detail && isEditable(detail.status)"
         type="primary"
         :loading="completing"
-        :disabled="!detail.completable || classesDirty || classSaving"
+        :disabled="!detail.completable || classesDirty || classSaving || informationBusy"
         @click="complete"
         >完成报名履约</el-button
       >
@@ -239,6 +241,7 @@
 <script lang="ts" setup>
 import { ElMessageBox } from 'element-plus'
 import ProductSpecs from './components/ProductSpecs.vue'
+import RegistrationStudentInfo from './components/RegistrationStudentInfo.vue'
 import * as RegistrationApi from '@/api/zsjos/registration'
 import * as DeliveryClassApi from '@/api/zsjos/deliveryClass'
 import { useUserStore } from '@/store/modules/user'
@@ -262,6 +265,8 @@ const detailId = ref<number>()
 const routeCandidates = ref<Record<number, RegistrationApi.StudyPlanner[]>>({})
 const routeSaving = ref(false)
 const classSaving = ref(false)
+const informationBusy = ref(false)
+const refreshCollection = async () => { const id=detail.value?.id; if(!id)return; const updated=await RegistrationApi.getRegistrationCase(id); if(detail.value?.id===id)detail.value=updated }
 const classDraft = reactive<Record<number, number | undefined>>({})
 const classOptions = ref<DeliveryClassApi.DeliveryClassOption[]>([])
 const classOptionsLoading = ref(false)

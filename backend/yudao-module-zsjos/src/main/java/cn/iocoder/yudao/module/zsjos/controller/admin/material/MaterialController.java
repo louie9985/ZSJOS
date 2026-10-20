@@ -30,6 +30,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -61,6 +62,27 @@ public class MaterialController {
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:material:query','zsjos:material:manage')")
     public CommonResult<PageResult<MaterialRespVO>> getPage(@Valid MaterialPageReqVO request) {
         return success(materialService.getPage(request, getLoginUserId()));
+    }
+
+    @GetMapping("/browse/page")
+    @Operation(summary = "浏览已生效素材分页")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:material:query','zsjos:material:manage')")
+    public CommonResult<PageResult<MaterialRespVO>> browsePage(@Valid MaterialPageReqVO request) {
+        return success(materialService.getBrowsePage(request, getLoginUserId()));
+    }
+
+    @GetMapping("/browse/{id}")
+    @Operation(summary = "浏览素材生效版本")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:material:query','zsjos:material:manage')")
+    public CommonResult<MaterialRespVO> browse(@PathVariable("id") Long id) {
+        return success(materialService.getBrowse(id, getLoginUserId()));
+    }
+
+    @GetMapping("/browse/{id}/version/list")
+    @Operation(summary = "浏览素材已生效版本记录")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:material:query','zsjos:material:manage')")
+    public CommonResult<List<MaterialVersionRespVO>> browseVersions(@PathVariable("id") Long id) {
+        return success(materialService.getBrowseVersions(id, getLoginUserId()));
     }
 
     @GetMapping("/recommendation-account-candidates")
@@ -113,6 +135,15 @@ public class MaterialController {
     public CommonResult<Long> update(@PathVariable("id") Long id,
                                      @Valid @RequestBody MaterialSaveReqVO request) {
         return success(materialService.update(id, request, getLoginUserId()));
+    }
+
+    @DeleteMapping("/{id}/draft")
+    @Operation(summary = "删除本人未提交素材草稿")
+    @PreAuthorize("@ss.hasPermission('zsjos:material:delete-draft')")
+    public CommonResult<Boolean> deleteDraft(@PathVariable("id") Long id,
+                                             @RequestParam Integer expectedVersion) {
+        materialService.deleteDraft(id, expectedVersion, getLoginUserId());
+        return success(true);
     }
 
     @PostMapping("/{id}/submit")

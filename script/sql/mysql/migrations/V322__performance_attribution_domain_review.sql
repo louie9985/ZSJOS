@@ -11,6 +11,17 @@ DELIMITER $$
 CREATE PROCEDURE zsjos_v322_apply()
 BEGIN
  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+ IF (EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V322')
+      XOR EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V322')) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V322 ledger marker is one-sided';
+ END IF;
+ IF EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V322'
+      AND (description<>'业绩归属快照与结构复核' OR checksum<>SHA2('V322__performance_attribution_domain_review.sql',256)))
+    OR EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V322'
+      AND (description<>'业绩归属快照与结构复核' OR checksum<>SHA2('V322__performance_attribution_domain_review.sql',256)
+           OR release_version<>'baseline')) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V322 ledger identity conflict';
+ END IF;
  IF NOT EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version IN ('V320','V321') AND description='独立交付业绩域') THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V322 requires applied delivery domain schema';
  END IF;

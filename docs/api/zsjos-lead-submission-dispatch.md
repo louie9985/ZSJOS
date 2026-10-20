@@ -85,7 +85,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 高级筛选模板只保存上述结构化条件树，字段为 `filter`，持久化为 `filter_json`；任何用户、管理员和前端都不能保存或提交 SQL 片段。SQL 只在列表查询时由后端 `AdvancedFilterService` 根据场景字段目录即时校验和编译，并且始终叠加页面固定范围、租户、当前用户对象范围、数据范围和业务池约束。模板按 `scene + pageKey` 绑定到具体页面：个人模板 `scope=personal` 仅当前用户可见，系统预置 `scope=system` 由管理员维护并对当前租户该页面可见；同一页面、同一范围最多一个 `defaultTemplate=true`。
 
-已接入预置标签的业务页（`lead_management`、`lead_claim_pool`、`lead_aging_pool`、`sales_order_management`、`sales_order_supervisor_confirm`、`lead_appeal`、`lead_duplicate_review`、`registration_pool`、`student_my`、`subordinate_sales`）在加载时读取 `visible-list`，把返回的模板渲染为筛选栏下方的快捷标签，点击即把模板 `filter` 树作为该页当前的完整高级条件提交。页面首次加载且用户尚未添加任何条件时自动套用默认模板；用户已输入条件时不覆盖，改为手工套用后高亮失效，标签不再代表当前条件。预置只是把条件树交给既有查询链路，不改变页面固定范围、数据权限或对象范围，也不绕过用户当前查询条件之外的服务端约束。
+已接入预置标签的业务页（`lead_management`、`lead_claim_pool`、`lead_public_sea_pool`、`sales_order_management`、`sales_order_supervisor_confirm`、`lead_appeal`、`lead_duplicate_review`、`registration_pool`、`student_my`、`subordinate_sales`）在加载时读取 `visible-list`，把返回的模板渲染为筛选栏下方的快捷标签，点击即把模板 `filter` 树作为该页当前的完整高级条件提交。页面首次加载且用户尚未添加任何条件时自动套用默认模板；用户已输入条件时不覆盖，改为手工套用后高亮失效，标签不再代表当前条件。预置只是把条件树交给既有查询链路，不改变页面固定范围、数据权限或对象范围，也不绕过用户当前查询条件之外的服务端约束。
 
 个人模板由员工在业务页自助维护：当前高级条件非空时可「存为快捷筛选」保存为 `scope=personal`，并在「管理我的快捷筛选」中重命名、设为默认或删除，接口为 `POST/PUT/DELETE /zsjos/advanced-filter-template/personal`。重命名只改名称，不把当前条件写回该模板；`defaultTemplate` 的互斥范围是同一页面、同一 scope、同一 owner，因此个人默认与系统默认互不覆盖，可以并存。页面自动套用时的优先级为**个人默认高于系统默认**，该规则由服务端唯一实现在 `visible-list` 响应中：返回项带 `effectiveDefault=true` 的那条即页面应当套用的模板，至多一条；两者都未设默认时全部为 `false`，页面不自动套用。`system-list` 供管理页使用，不参与页面自动套用，其 `effectiveDefault` 恒为 `false`。前端不得自行按 `scope` 或 `defaultTemplate` 推断优先级。
 
@@ -102,7 +102,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `GET /zsjos/lead/qualification-exception/page` | 后端兼容查询接口；Workbench 不再提供独立异常客资路由 |
 | `POST /zsjos/lead/qualification-exception/search-page` | 同异常客资固定范围，组合关键词与高级条件 |
 | `POST /zsjos/lead/search-page` | 通用客资管理范围内组合关键词与高级条件 |
-| `POST /zsjos/lead/aging-pool/search-page` | 公海固定范围内组合关键词与高级条件 |
+| `POST /zsjos/lead/public-sea-pool/search-page` | 公海固定范围内组合关键词与高级条件 |
 | `POST /zsjos/lead/appeal/inbox/search-page`、`search-cursor` | 本人有权处理的申诉任务范围内组合关键词与申诉/关联客资条件 |
 | `POST /zsjos/lead-duplicate-review/search-page` | 租户复核队列内按结构化提交快照和复核字段筛选；不提供原始 JSON 检索 |
 | `POST /zsjos/subordinate-sales/search-page` | 当前用户可见下属范围内先聚合业务指标、再筛选和分页 |
@@ -123,7 +123,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 规则参数范围为接单超时 10–3600 秒、最大尝试 1–20 次。修改只影响之后提交的客资，进行中客资继续使用提交时规则快照。
 
-自动派单候选来自租户隔离的 Redis 轮询池。工作台每 30 秒刷新页面心跳，心跳键 90 秒过期；接单偏好持久化在 `zsjos_sales_dispatch_preference`，首次默认暂停。普通轮询最多旋转初始池长度的三倍，新手优先扫描额外旋转最多一圈，跳过离线、暂停、已有待接客资以及当前客资已经尝试过的销售。Redis 原子预留 `lead:lock` 与 `sale:pending` 后，数据库条件更新才确认 `pending_acceptance`；Redis 不是客资状态或归属的事实源。
+自动派单候选来自租户隔离的 Redis 轮询池。工作台每 30 秒刷新页面心跳，心跳键 90 秒过期；接单偏好持久化在 `zsjos_sales_dispatch_preference`，首次默认暂停。轮询从列表右端取人并移回左端；首次上线、主动离线后重连或心跳过期后恢复，均先去重再从左端加入等待队尾，不抢占仍在线等待者的普通轮询顺序。有效期内的重复心跳只续期并更新接单偏好，不改变队列位置。普通轮询最多旋转初始池长度的三倍，新手优先扫描额外旋转最多一圈，跳过离线、暂停、已有待接客资以及当前客资已经尝试过的销售。Redis 原子预留 `lead:lock` 与 `sale:pending` 后，数据库条件更新才确认 `pending_acceptance`；Redis 不是客资状态或归属的事实源。
 
 主管可在工作台“下属销售”详情中配置新手池开关与每人每日优先接单额度（正整数）。`PUT /zsjos/subordinate-sales/{salesUserId}/newcomer-pool` 使用独立按钮权限 `zsjos:subordinate-sales:newcomer-pool`，并校验当前租户、System 管理部门及子部门范围和目标销售接单资格。列表及详情返回 `newcomerPoolStatus=active|inactive`、`newcomerDailyQuota`、`newcomerAcceptedToday`、`newcomerRemainingToday`。自动派单先扫描在线池中今日尚有额度的新手，再执行原有普通轮询；无可接新手时直接回退。派单历史的 `newcomer_priority` 标记优先路径，仅这类派单被成功接受时按北京时间接单日期消耗额度；拒单、超时、指定派单、自拓和主动抢单均不计入。关闭配置保留额度和当日计数，重启不清零；调低额度不追改已接数量，也不撤回已有待接客资。配置和日计数属于租户内销售本人，多位有权主管看到同一状态。迁移只定义权限元数据，不授予任何角色。
 
@@ -356,4 +356,4 @@ Admin LeadCreateDialog 与 Workbench LeadSubmissionPage 继续传相同的选择
 进入公海保留正式负责人 A，但只有当前协助人 B 可新增跟进；待指派时暂停个人跟进责任。
 员工跟进中、今日待跟进、逾期待跟进的负责人范围按当前跟进执行人过滤，分页和总数采用相同条件。
 不带跟进筛选的正式归属列表和提交人查询保持既有范围。跟进日历与待办同时按 B 展示，
-详细生命周期与历史兼容规则见 [公海池 API](zsjos-lead-aging-pool.md#公海跟进责任与待办)。
+详细生命周期与历史兼容规则见 [公海池 API](zsjos-lead-public-sea-pool.md#公海跟进责任与待办)。

@@ -1,9 +1,9 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCompatibilityRecordDO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,8 +24,8 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LeadCollaborationServiceTest {
     @InjectMocks private LeadCollaborationService service;
-    @Mock private LeadAgingPoolService agingPoolService;
-    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper publicSeaRecordMapper;
+    @Mock private LeadPublicSeaPoolService publicSeaPoolService;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCompatibilityRecordMapper publicSeaPoolCompatibilityRecordMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper leadMapper;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
@@ -41,21 +41,21 @@ class LeadCollaborationServiceTest {
     @Test
     void formalOwnerCanEnterDealAndLocksPoolRows() {
         service.requireCanEnterDealForUpdate(lead(), 20L);
-        verify(agingPoolService).getActiveCycle(1L);
-        verify(publicSeaRecordMapper).selectByLeadIdForUpdate(1L, 1L);
+        verify(publicSeaPoolService).getActiveCycle(1L);
+        verify(publicSeaPoolCompatibilityRecordMapper).selectByLeadIdForUpdate(1L, 1L);
     }
 
     @Test
     void historicalPoolOverlapStillFailsClosedForCollaboration() {
         LeadDO lead = lead();
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO(); cycle.setLeadId(1L);
-        LeadPublicSeaRecordDO manual = new LeadPublicSeaRecordDO(); manual.setLeadId(1L);
-        when(agingPoolService.getActiveCycle(1L)).thenReturn(cycle);
-        when(publicSeaRecordMapper.selectByLeadIdForUpdate(1L, 1L)).thenReturn(manual);
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO(); cycle.setLeadId(1L);
+        LeadPublicSeaPoolCompatibilityRecordDO manual = new LeadPublicSeaPoolCompatibilityRecordDO(); manual.setLeadId(1L);
+        when(publicSeaPoolService.getActiveCycle(1L)).thenReturn(cycle);
+        when(publicSeaPoolCompatibilityRecordMapper.selectByLeadIdForUpdate(1L, 1L)).thenReturn(manual);
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.requireCanOperateForUpdate(lead, 30L));
         assertEquals(LEAD_COLLABORATION_POOL_CONFLICT.getCode(), error.getCode());
-        verify(agingPoolService, never()).requireCanOperateForUpdate(any(), any(), any());
+        verify(publicSeaPoolService, never()).requireCanOperateForUpdate(any(), any(), any());
     }
 
     private static LeadDO lead() {

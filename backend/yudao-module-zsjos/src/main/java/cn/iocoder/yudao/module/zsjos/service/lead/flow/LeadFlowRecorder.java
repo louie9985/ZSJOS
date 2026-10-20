@@ -19,10 +19,10 @@ public class LeadFlowRecorder {
     @Resource private LeadFlowEvidence evidenceService;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadIntendedProductMapper productMapper;
-    @Resource private LeadAgingPoolCycleMapper cycleMapper;
+    @Resource private LeadPublicSeaPoolCycleMapper cycleMapper;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadAssignmentHistoryMapper assignmentMapper;
-    @Resource private LeadAgingPoolEventMapper agingMapper;
+    @Resource private LeadPublicSeaPoolEventMapper publicSeaPoolEventMapper;
     @Resource private AdminUserApi userApi;
     @Resource private PartnerMapper partnerMapper;
 
@@ -90,7 +90,7 @@ public class LeadFlowRecorder {
         var result = new LinkedHashSet<String>();
         eventMapper.selectByLeadId(id).forEach(e -> result.add("event:"+e.getId()));
         assignmentMapper.selectByLeadId(id).forEach(e -> result.add("assignment:"+e.getId()));
-        agingMapper.selectByLeadId(id).forEach(e -> result.add("aging:"+e.getId()));
+        publicSeaPoolEventMapper.selectByLeadId(id).forEach(e -> result.add("public-sea-pool:"+e.getId()));
         return result;
     }
     public Value identity(String type,Long id,String snapshot) {
@@ -115,7 +115,7 @@ public class LeadFlowRecorder {
         var newEvents=eventMapper.selectByLeadId(leadId).stream().filter(item -> covered.contains("event:"+item.getId())).toList();
         if (reason==null) reason=newEvents.stream().map(BusinessEventDO::getReason).filter(Objects::nonNull).findFirst().orElse(null);
         if (reason==null) reason=assignmentMapper.selectByLeadId(leadId).stream().filter(item -> covered.contains("assignment:"+item.getId())).map(LeadAssignmentHistoryDO::getReason).filter(Objects::nonNull).findFirst().orElse(null);
-        if (reason==null) reason=agingMapper.selectByLeadId(leadId).stream().filter(item -> covered.contains("aging:"+item.getId())).map(LeadAgingPoolEventDO::getReason).filter(Objects::nonNull).findFirst().orElse(null);
+        if (reason==null) reason=publicSeaPoolEventMapper.selectByLeadId(leadId).stream().filter(item -> covered.contains("public-sea-pool:"+item.getId())).map(LeadPublicSeaPoolEventDO::getReason).filter(Objects::nonNull).findFirst().orElse(null);
         String name="SYSTEM".equals(actorType)?"系统":identity(actorType,actorId,null).text();
         var snapshot=new LeadFlowSnapshot(1,key,title,actorType,actorId,name,result,reason,relatedType,relatedId,relatedNo,changes,List.copyOf(covered));
         var event=new BusinessEventDO();
@@ -135,5 +135,5 @@ public class LeadFlowRecorder {
     private static String assignment(String s) { return lookup(s,Map.of("unassigned","未分配","pending_acceptance","待接单","owned","已归属","public_pool","抢单池","recycle_pending","回收待处理","closed","已关闭")); }
     private static String pool(String s) { return lookup(s,Map.of("waiting_assignment","待分配协作人","assigned","协作中","deal_pending","成交审批中","converted","已成交","exited","已退出")); }
     private static String source(String s) { return lookup(s,Map.of("partner","兼职","internal_new_media","新媒体","sales_self_sourced","销售自拓","education_self_sourced","教务自拓")); }
-    private static String lookup(String s, Map<String,String> labels) { return s==null?null:labels.getOrDefault(s,s); }
+    private static String lookup(String s, Map<String,String> labels) { return s==null?null:labels.get(s); }
 }

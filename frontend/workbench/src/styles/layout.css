@@ -337,8 +337,19 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
 .menu-task-badge {
   display: inline-flex;
   align-items: center;
+  position: absolute;
+  top: 0;
+  inset-inline-end: 0;
   flex: 0 0 auto;
   line-height: 1;
+}
+
+.menu-task-label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 100%;
+  padding-inline-end: 24px;
 }
 
 .menu-task-text {
@@ -349,15 +360,30 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
 }
 
 .menu-task-badge .ant-badge-count {
-  min-width: 14px;
-  height: 14px;
-  padding: 0 var(--crm-sp-1);
-  border-radius: 7px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
   font-size: var(--crm-font-xs);
-  line-height: 14px;
+  line-height: 18px;
   position: static;
   transform: none;
   box-shadow: 0 0 0 1px var(--crm-border);
+}
+
+.primary-nav-item {
+  position: relative;
+}
+
+.primary-nav-badge {
+  top: 4px;
+  inset-inline-end: 6px;
+}
+
+/* 二级导航保持在菜单行右侧居中，避免角标压到图标和文字。 */
+.secondary-sider .menu-task-badge {
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* 收起状态：只显示图标，按钮缩为正方形 */

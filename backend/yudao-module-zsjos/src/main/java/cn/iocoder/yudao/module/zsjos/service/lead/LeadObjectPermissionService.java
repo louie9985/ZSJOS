@@ -2,13 +2,13 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCompatibilityRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -44,12 +44,12 @@ public class LeadObjectPermissionService {
     }
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
-    @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
+    @Resource private LeadPublicSeaPoolCycleMapper publicSeaPoolCycleMapper;
     @Resource private ServiceRelationMapper serviceRelationMapper;
-    @Resource private LeadPublicSeaRecordMapper publicSeaRecordMapper;
+    @Resource private LeadPublicSeaPoolCompatibilityRecordMapper publicSeaPoolCompatibilityRecordMapper;
     @Resource private SalesOrderMapper salesOrderMapper;
     @Resource private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
-    @Resource private LeadAgingPoolService leadAgingPoolService;
+    @Resource private LeadPublicSeaPoolService leadPublicSeaPoolService;
     @Resource private MediaAccountMapper mediaAccountMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadReadBatchMapper readBatchMapper;
@@ -74,12 +74,12 @@ public class LeadObjectPermissionService {
                     || STATUS_WON.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
                     || ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && STATUS_SUBMITTED.equals(lead.getStatus()));
-            case "qualify" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
+            case "qualify" -> publicSeaPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
                     && Objects.equals(userId, lead.getOwnerUserId())
                     && (ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                     || STATUS_VALID.equals(lead.getStatus()));
             case "enter-deal" -> canOperateAsSales(lead, userId);
-            case "basic-info-update" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
+            case "basic-info-update" -> publicSeaPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
                     && Objects.equals(userId, lead.getOwnerUserId());
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
             case "admin-transfer" -> true; // Controller feature permission remains mandatory.
@@ -147,7 +147,7 @@ public class LeadObjectPermissionService {
                 || managesUserDepartment(userId, lead.getOwnerUserId())
                 || securityFrameworkService.hasPermission("zsjos:lead:qualification:manage")
                     && canManageQualificationException(lead, userId)
-                || canReadAgingPool(lead.getId(), userId)
+                || canReadPublicSeaPool(lead.getId(), userId)
                 || canReadManualPublicSea(lead, userId) || canReadStudentSalesHistory(lead, userId)
                 || canReadMediaStudentLead(lead, userId)
                 || lead.getPartnerId() != null && partnerOwnershipService.canRead(userId, lead.getPartnerId())) {
@@ -163,7 +163,7 @@ public class LeadObjectPermissionService {
      * request it; read-only visibility for other sales must not grant the action.
      */
     public boolean canRequestSubmitterAssist(LeadDO lead, Long userId) {
-        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(lead.getId());
+        LeadPublicSeaPoolCycleDO cycle = publicSeaPoolCycleMapper.selectActiveByLeadId(lead.getId());
         if (cycle != null) {
             return Objects.equals(userId, cycle.getOriginalOwnerUserId())
                     || Objects.equals(userId, cycle.getCollaboratorUserId());
@@ -205,24 +205,24 @@ public class LeadObjectPermissionService {
 
     private boolean canOperateAsSales(LeadDO lead, Long userId) {
         if (userId == null) return false;
-        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(lead.getId());
+        LeadPublicSeaPoolCycleDO cycle = publicSeaPoolCycleMapper.selectActiveByLeadId(lead.getId());
         if (cycle != null) {
-            return publicSeaRecordMapper.selectByLeadId(lead.getId()) == null
-                    && Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())
+            return publicSeaPoolCompatibilityRecordMapper.selectByLeadId(lead.getId()) == null
+                    && Set.of(PUBLIC_SEA_POOL_ASSIGNED, PUBLIC_SEA_POOL_DEAL_PENDING).contains(cycle.getStatus())
                     && Objects.equals(userId, cycle.getCollaboratorUserId());
         }
-        var manual = publicSeaRecordMapper.selectByLeadId(lead.getId());
+        var manual = publicSeaPoolCompatibilityRecordMapper.selectByLeadId(lead.getId());
         return manual == null ? Objects.equals(userId, lead.getOwnerUserId())
                 : Objects.equals(manual.getOwnerUserId(), lead.getOwnerUserId())
                 && Objects.equals(userId, manual.getCollaboratorUserId());
     }
 
-    private boolean canReadAgingPool(Long leadId, Long userId) {
-        return leadAgingPoolService.canRead(leadId, userId);
+    private boolean canReadPublicSeaPool(Long leadId, Long userId) {
+        return leadPublicSeaPoolService.canRead(leadId, userId);
     }
 
     private boolean canReadManualPublicSea(LeadDO lead, Long userId) {
-        var record = publicSeaRecordMapper.selectByLeadId(lead.getId());
+        var record = publicSeaPoolCompatibilityRecordMapper.selectByLeadId(lead.getId());
         return record != null && (Objects.equals(userId, record.getOwnerUserId())
                 || Objects.equals(userId, record.getCollaboratorUserId())
                 || managesUserDepartment(userId, record.getOwnerUserId()));
@@ -299,9 +299,9 @@ public class LeadObjectPermissionService {
         var remaining = leads.stream().filter(lead -> !result.contains(lead.getId())).toList();
         if (remaining.isEmpty()) return result;
         var ids = remaining.stream().map(LeadDO::getId).toList();
-        result.addAll(leadAgingPoolService.filterReadableLeadIds(ids, userId));
-        var sea = publicSeaRecordMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO>()
-                .in(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO::getLeadId, ids));
+        result.addAll(leadPublicSeaPoolService.filterReadableLeadIds(ids, userId));
+        var sea = publicSeaPoolCompatibilityRecordMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCompatibilityRecordDO>()
+                .in(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCompatibilityRecordDO::getLeadId, ids));
         for (var record : sea) {
             if (Objects.equals(userId, record.getOwnerUserId()) || Objects.equals(userId, record.getCollaboratorUserId())
                     || managed.contains(record.getOwnerUserId())) result.add(record.getLeadId());

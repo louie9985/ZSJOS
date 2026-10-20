@@ -59,11 +59,79 @@ class StudentServiceReadServiceTest {
     }
     @Test void managerScopeUsesServiceOwnerAndBoundDepartmentMembers(){
         when(permissionApi.hasAnyPermissions(7L,"zsjos:delivery-class:query",DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
-        when(classScope.resolve(7L)).thenReturn(new DeliveryClassScopeService.Scope(false,Set.of(31L)));
+        when(classScope.resolveRead(7L)).thenReturn(new DeliveryClassScopeService.Scope(false,Set.of(31L)));
         when(userApi.getUserListByDeptIds(Set.of(31L))).thenReturn(List.of(new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO().setId(8L)));
         var q=service.query(7L,new StudentServicePageReqVO());
         assertTrue(q.getWhereSql().contains("sr.owner_user_id IN"));
-        assertFalse(q.getWhereSql().contains("sr.content_director_user_id"));
+        assertTrue(q.getWhereSql().contains("sr.content_director_user_id"));
         assertEquals(8L,q.getParameters().get("owner1"));
+    }
+    @Test void pendingClassExtendsManagedReadButNotExplicitSelfOrUnownedFormalServices(){
+        when(permissionApi.hasAnyPermissions(7L,"zsjos:delivery-class:query",DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(classScope.resolveRead(7L)).thenReturn(new DeliveryClassScopeService.Scope(false,Set.of()));
+        when(classScope.readablePendingClassId(7L)).thenReturn(90L);
+        var req = new StudentServicePageReqVO(); req.setClassId(90L);
+        var q = service.query(7L, req);
+        assertTrue(q.getWhereSql().contains("OR (dc.system_class=1 AND dc.id=#{query.parameters.pendingClassId}"));
+        assertFalse(q.getWhereSql().contains("owner_user_id IS NULL"));
+        assertEquals(90L, q.getParameters().get("pendingClassId"));
+        assertEquals(90L, q.getParameters().get("classId"));
+        assertEquals(1L, q.getParameters().get("tenantId"));
+        req.setReadScope("SELF"); when(readScope.resolve("SELF",null,7L)).thenReturn(7L);
+        assertFalse(service.query(7L,req).getParameters().containsKey("pendingClassId"));
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="ZSJOS_CLASS_MYSQL_VERIFY", matches="true")
+    void mysqlEvaluatesPendingScopeWithoutWritingBusinessData() throws Exception {
+        when(permissionApi.hasAnyPermissions(7L,"zsjos:delivery-class:query",DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(classScope.resolveRead(7L)).thenReturn(new DeliveryClassScopeService.Scope(false,Set.of()));
+        when(classScope.readablePendingClassId(7L)).thenReturn(90L);
+        // CTEs shadow table names only within this SELECT. No schema or persistent data changes.
+        String fixtures = "WITH service_rows AS ("
+                + "SELECT 1 id,1 tenant_id,0 deleted,9 person_id,90 class_id,NULL owner_user_id,'active' status,NULL order_id,NULL order_item_id,NOW() update_time "
+                + "UNION ALL SELECT 2,1,0,9,90,99,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 3,1,0,9,92,NULL,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 4,1,0,9,92,7,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 5,2,0,9,90,NULL,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 6,1,1,9,90,NULL,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 7,1,0,9,90,NULL,'terminated',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 8,1,0,9,92,99,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 9,1,0,9,NULL,NULL,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 10,1,0,9,91,NULL,'active',NULL,NULL,NOW() "
+                + "UNION ALL SELECT 11,1,0,9,90,NULL,'paused',NULL,NULL,NOW()),"
+                + "zsjos_service_relation AS (SELECT service_rows.*,NULL content_director_user_id,NULL career_planner_user_id,'accepted' acceptance_status FROM service_rows),"
+                + "zsjos_person AS (SELECT 9 id,1 tenant_id,0 deleted UNION ALL SELECT 9,2,0),"
+                + "zsjos_order AS (SELECT 0 id,1 tenant_id,0 deleted,0 lead_id),"
+                + "zsjos_order_item AS (SELECT 0 id,0 order_id,1 tenant_id,0 deleted),"
+                + "zsjos_lead AS (SELECT 0 id,1 tenant_id,0 deleted),"
+                + "zsjos_delivery_class AS (SELECT 90 id,1 tenant_id,0 deleted,1 system_class "
+                + "UNION ALL SELECT 90,2,0,1 UNION ALL SELECT 91,1,1,1 UNION ALL SELECT 92,1,0,0) ";
+        try (var db = java.sql.DriverManager.getConnection(System.getenv("ZSJOS_CLASS_MYSQL_URL"),
+                System.getenv("ZSJOS_CLASS_MYSQL_USER"),System.getenv("ZSJOS_CLASS_MYSQL_PASSWORD"))) {
+            db.setReadOnly(true);
+            var req = new StudentServicePageReqVO(); req.setClassId(90L);
+            var pending = service.query(7L,req);
+            assertEquals(Set.of(1L,2L,11L), mysqlIds(db, fixtures, pending));
+            req.setClassId(null);
+            assertEquals(Set.of(1L,2L,4L,11L), mysqlIds(db, fixtures, service.query(7L,req)));
+            req.setServiceStatus("terminated");
+            assertTrue(mysqlIds(db, fixtures, service.query(7L,req)).isEmpty());
+        }
+    }
+
+    private Set<Long> mysqlIds(java.sql.Connection db, String fixtures, AdvancedFilterQuery q) throws Exception {
+        String sql = fixtures + StudentServicePageSql.page(Map.of("query",q)).replace("${query.whereSql}",q.getWhereSql());
+        var matcher = java.util.regex.Pattern.compile("#\\{query.parameters.([A-Za-z0-9]+)}").matcher(sql);
+        List<Object> values = new ArrayList<>();
+        StringBuffer bound = new StringBuffer();
+        while(matcher.find()){values.add(q.getParameters().get(matcher.group(1)));matcher.appendReplacement(bound,"?");}
+        matcher.appendTail(bound);
+        try(var statement=db.prepareStatement(bound.toString())) {
+            for(int i=0;i<values.size();i++)statement.setObject(i+1,values.get(i));
+            Set<Long> ids=new LinkedHashSet<>();
+            try(var result=statement.executeQuery()){while(result.next())ids.add(result.getLong("id"));}
+            return ids;
+        }
     }
 }

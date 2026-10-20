@@ -1,4 +1,6 @@
-import { DeliveryPerformanceModule } from '../pages/performance/PerformanceModule'
+import EducationTeamPage from '../pages/EducationTeamPage'
+import DeliveryPerformancePage from '../pages/DeliveryPerformancePage'
+import DeliveryPerformanceTargetPage from '../pages/DeliveryPerformanceTargetPage'
 import PointsRedemptionPage from '../pages/PointsRedemptionPage'
 import PointsPackagePage from '../pages/PointsPackagePage'
 import { POINTS_ROUTE, POINTS_PACKAGE_ROUTE } from '../services/pointsRedemptionApi'
@@ -11,7 +13,7 @@ import LeadSubmissionPage from '../pages/LeadSubmissionPage'
 import LeadManagementPage from '../pages/LeadManagementPage'
 import LeadAssignmentPage from '../pages/LeadAssignmentPage'
 import LeadClaimPoolPage from '../pages/LeadClaimPoolPage'
-import LeadAgingPoolPage from '../pages/LeadAgingPoolPage'
+import LeadPublicSeaPoolPage from '../pages/LeadPublicSeaPoolPage'
 import LeadDuplicateReviewPage from '../pages/LeadDuplicateReviewPage'
 import LeadComplaintPage from '../pages/LeadComplaintPage'
 import TodayTasksPage from '../pages/TodayTasksPage'
@@ -114,13 +116,14 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }
-  if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
-  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE) return <DeliveryPerformanceModule><SalesPerformancePage permissions={permissions}/></DeliveryPerformanceModule>
-  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE_TARGET) return <DeliveryPerformanceModule><SalesPerformanceTargetPage permissions={permissions}/></DeliveryPerformanceModule>
+  if (menu?.path === APP_ROUTES.LEAD_PUBLIC_SEA_POOL) return <LeadPublicSeaPoolPage/>
+  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE) return <DeliveryPerformancePage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE_TARGET) return <DeliveryPerformanceTargetPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE) return <SalesPerformancePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE_TARGET) return <SalesPerformanceTargetPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_LEAD_ANALYSIS) return <MediaLeadAnalysisPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_LEAD_TARGET) return <MediaLeadTargetPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.EDUCATION_TEAM || resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.EDUCATION_TEAM) return <EducationTeamPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage tenantReadAll={tenantReadAll} permissions={permissions} onOpenAssignment={onOpenAssignment}/>

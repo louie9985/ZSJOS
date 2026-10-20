@@ -179,20 +179,37 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     }
 
     /**
-     * Department-scoped student read. Visibility follows the service owner only, resolved live from
+     * Department-scoped student read. Visibility follows the service owner, resolved live from
      * the owner's department rather than a stored snapshot, so a homeroom transfer moves the student
-     * with its owner. Collaborator roles are deliberately excluded: they belong to other business lines.
+     * with its owner. The overload can additionally include the server-resolved pending class.
+     * Department grants use owners only; the optional personal subject retains its own collaboration.
      */
     default PageResult<PersonDO> selectManagedStudentPage(MyStudentPageReqVO reqVO,
                                                            java.util.Collection<Long> ownerUserIds,
                                                            java.util.Collection<Long> matchedIds) {
+        return selectManagedStudentPage(reqVO, ownerUserIds, matchedIds, null);
+    }
+
+    default PageResult<PersonDO> selectManagedStudentPage(MyStudentPageReqVO reqVO,
+            java.util.Collection<Long> ownerUserIds, java.util.Collection<Long> matchedIds, Long pendingClassId) {
+        return selectManagedStudentPage(reqVO, ownerUserIds, matchedIds, pendingClassId, null);
+    }
+
+    default PageResult<PersonDO> selectManagedStudentPage(MyStudentPageReqVO reqVO,
+            java.util.Collection<Long> ownerUserIds, java.util.Collection<Long> matchedIds, Long pendingClassId,
+            Long personalUserId) {
         QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
         if (ownerUserIds == null || ownerUserIds.isEmpty()) {
             return PageResult.empty();
         }
         String owners = ownerUserIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
         applyStatusPredicate(query, reqVO,
-                "AND ({0} IS NULL OR sr.class_id={0}) AND sr.owner_user_id IN (" + owners + ") AND ");
+                "AND ({0} IS NULL OR sr.class_id={0}) AND (sr.owner_user_id IN (" + owners + ")"
+                        + (personalUserId == null ? "" : " OR ((sr.content_director_user_id=" + personalUserId
+                        + " OR sr.career_planner_user_id=" + personalUserId
+                        + ") AND sr.status='active' AND sr.acceptance_status='accepted')")
+                        + (pendingClassId == null ? "" : " OR (sr.class_id=" + pendingClassId
+                        + " AND sr.status IN ('active','paused','completed'))") + ") AND ");
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }
 

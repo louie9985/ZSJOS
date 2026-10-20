@@ -5,13 +5,13 @@ public final class LeadFollowUpResponsibilitySql {
     private LeadFollowUpResponsibilitySql() {}
 
     private static String cycle(String lead) {
-        return " FROM zsjos_lead_aging_pool_cycle fc WHERE fc.lead_id=" + lead + ".id"
+        return " FROM zsjos_lead_public_sea_pool_cycle fc WHERE fc.lead_id=" + lead + ".id"
                 + " AND fc.tenant_id=" + lead + ".tenant_id AND fc.deleted=0"
                 + " AND fc.status IN ('waiting_assignment','assigned','deal_pending')";
     }
 
     private static String manual(String lead) {
-        return " FROM zsjos_lead_public_sea_record fm WHERE fm.lead_id=" + lead + ".id"
+        return " FROM zsjos_lead_public_sea_pool_compatibility_record fm WHERE fm.lead_id=" + lead + ".id"
                 + " AND fm.tenant_id=" + lead + ".tenant_id AND fm.deleted=0";
     }
 

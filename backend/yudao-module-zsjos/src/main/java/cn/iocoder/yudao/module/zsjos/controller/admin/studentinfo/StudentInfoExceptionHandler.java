@@ -26,6 +26,8 @@ public class StudentInfoExceptionHandler {
         response.setHeader("Cache-Control", "no-store");
         if (error instanceof ServiceException business) return CommonResult.error(business.getCode(), business.getMessage());
         if (error instanceof AccessDeniedException) return CommonResult.error(403, "没有操作权限");
+        if (error instanceof org.springframework.web.multipart.MaxUploadSizeExceededException)
+            return CommonResult.error(400, "图片超过上传大小限制，请压缩后重试");
         if (error instanceof MethodArgumentNotValidException || error instanceof HttpMessageNotReadableException
                 || error instanceof ServletRequestBindingException || error instanceof ConstraintViolationException)
             return CommonResult.error(400, "提交格式不符合要求，请检查字段");

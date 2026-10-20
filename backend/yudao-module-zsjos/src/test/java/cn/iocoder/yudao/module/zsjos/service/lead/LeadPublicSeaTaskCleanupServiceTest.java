@@ -26,8 +26,8 @@ class LeadPublicSeaTaskCleanupServiceTest {
         assertEquals(2,service.cancelObsolete(7L,now));
     }
     @Test void schedulerRunsCleanupAfterPoolChangesEvenWhenScanFails() {
-        var scheduler=new LeadAgingPoolScheduler();
-        var tenants=mock(TenantFrameworkService.class);var pools=mock(LeadAgingPoolService.class);
+        var scheduler=new LeadPublicSeaPoolScheduler();
+        var tenants=mock(TenantFrameworkService.class);var pools=mock(LeadPublicSeaPoolService.class);
         var cleanup=mock(LeadPublicSeaTaskCleanupService.class);var maintenance=mock(MaintenanceModeApi.class);
         ReflectionTestUtils.setField(scheduler,"tenantFrameworkService",tenants);
         ReflectionTestUtils.setField(scheduler,"service",pools);

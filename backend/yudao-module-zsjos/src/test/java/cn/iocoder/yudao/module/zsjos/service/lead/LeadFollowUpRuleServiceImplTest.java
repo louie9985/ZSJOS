@@ -31,7 +31,7 @@ class LeadFollowUpRuleServiceImplTest {
         request.setVersion(2);
         request.setFirstFollowUpTimeoutMinutes(720);
         request.setQualificationTimeoutMinutes(4320);
-        request.setAgingPoolTimeoutDays(120);
+        request.setPublicSeaPoolTimeoutDays(120);
         request.setNotificationPopupDurationMinutes(6);
         request.setDuplicateAutoResolutionEnabled(true);
 
@@ -40,7 +40,7 @@ class LeadFollowUpRuleServiceImplTest {
         service.updateRule(request);
 
         assertEquals(720, rule.getFirstFollowUpTimeoutMinutes());
-        assertEquals(120, rule.getAgingPoolTimeoutDays());
+        assertEquals(120, rule.getPublicSeaPoolTimeoutDays());
         assertEquals(7, rule.getNoProgressWarningDays());
         assertEquals(2, rule.getNoProgressGraceDays());
         assertEquals(6, rule.getNotificationPopupDurationMinutes());
@@ -103,7 +103,7 @@ class LeadFollowUpRuleServiceImplTest {
         LeadFollowUpRuleDO rule = new LeadFollowUpRuleDO();
         rule.setId(1L); rule.setCode("default"); rule.setName("默认首次跟进规则");
         rule.setFirstFollowUpTimeoutMinutes(timeout); rule.setQualificationTimeoutMinutes(4320);
-        rule.setAgingPoolTimeoutDays(90); rule.setNoProgressWarningDays(7); rule.setNoProgressGraceDays(2);
+        rule.setPublicSeaPoolTimeoutDays(90); rule.setNoProgressWarningDays(7); rule.setNoProgressGraceDays(2);
         rule.setNotificationPopupDurationMinutes(5); rule.setDuplicateAutoResolutionEnabled(false);
         rule.setStatus(0); rule.setVersion(version);
         return rule;
@@ -112,7 +112,7 @@ class LeadFollowUpRuleServiceImplTest {
     private static LeadFollowUpRuleUpdateReqVO validRequest(int version) {
         LeadFollowUpRuleUpdateReqVO request = new LeadFollowUpRuleUpdateReqVO();
         request.setVersion(version); request.setFirstFollowUpTimeoutMinutes(720);
-        request.setQualificationTimeoutMinutes(4320); request.setAgingPoolTimeoutDays(120);
+        request.setQualificationTimeoutMinutes(4320); request.setPublicSeaPoolTimeoutDays(120);
         request.setNotificationPopupDurationMinutes(6); request.setDuplicateAutoResolutionEnabled(true);
         return request;
     }

@@ -59,6 +59,10 @@ public class SubordinateSalesDailyQueryTest {
                 sql.execute("CREATE ALIAS JSON_EXTRACT FOR 'cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SubordinateSalesDailyQueryTest.jsonExtract'");
                 sql.execute("CREATE ALIAS JSON_UNQUOTE FOR 'cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SubordinateSalesDailyQueryTest.jsonUnquote'");
             }
+            try (var sql = session.getConnection().createStatement()) {
+                for (var table : List.of("zsjos_lead_assignment_history","zsjos_lead_follow_up_record","zsjos_opportunity_follow_up_record"))
+                    sql.execute("ALTER TABLE " + table + " ADD COLUMN owner_identity_snapshot VARCHAR(32)");
+            }
             var start = LocalDateTime.of(2026, 9, 22, 0, 0);
             var end = start.plusDays(1);
             var history = session.getMapper(LeadAssignmentHistoryMapper.class);

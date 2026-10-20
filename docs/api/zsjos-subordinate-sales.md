@@ -1,4 +1,4 @@
-# 下属员工 API
+# 下属销售 API
 
 Base path: `/admin-api/zsjos/subordinate-sales`. All endpoints require authentication, current tenant context, the listed feature permission, and a current System department-leader relationship covering the target sales department or one of its ancestors.
 
@@ -90,22 +90,18 @@ This state-guidance behavior uses existing Lead columns and the supervisor permi
 V139/V140/V142. It requires no new SQL migration, menu grant, dictionary entry, or data repair.
 
 
-## 交付团队主管能力（2026-10-14）
+## 销售业务边界（2026-10-19）
 
-技术路径 `/zsjos/subordinate-sales` 和原权限标识保持兼容。列表及单员工读取按当前 System 部门负责人及子部门关系覆盖全部员工，包含停用账号；租户全量读取管理员可以读取全部员工。接单、新手池等写操作仍只作用于实际销售岗位成员。
+`/zsjos/subordinate-sales` 恢复为下属销售，技术路由、组件和 `zsjos:subordinate-sales:*` 权限标识保持兼容。人员来自 System 配置的 `sales_specialist` 岗位，普通读取叠加主管部门及子部门范围；全租户读取也仅显示销售岗位。停用销售仍可查询，Workbench 默认启用账号。读权限不授予团队管理操作。
 
-响应增加 `deptId`、`departmentName`、`postNames`、`salesDispatchSupported`、`educationOwnershipSupported`、`orderCreationSupported`。前端根据服务端能力隐藏销售专属操作。账号状态继续展示，交付主管不配置账号启停权限。
+列表、概况、客资分页、任务和主管命令均排除教务身份。回收待处理仅使用最新同归属周期的可靠销售流水证明，来源未知或冲突时拒绝，不从岗位或当前负责人反推历史身份。单条、批量、转派候选和改判有效都在服务端校验；不能通过直接传入教务人员或客资 ID 绕过。销售转派候选仅为团队内合格销售，批量候选排除所有当前或回收原负责人。
 
-`GET /transfer-candidates?leadId=` 按客资归属返回团队内候选，省略参数保留原销售候选契约。教育归属客资仅转派给团队内启用且具备教育自拓配置权限的合格员工，保留教育身份、同步商机归属并沿用现有任务及通知。回收历史写入原负责人身份快照，回收后转派使用该快照。教育客资拒绝进入销售抢单池、公海。历史记录不批量改写。
+原教务适配已迁入独立 [教务团队](education-team.md)，不再通过销售主管接口提供。通用教务归属、投诉范围、独立交付业绩和其他业务调用仍保留。
 
-投诉列表在分页前按所管员工和客资当前负责人限定，投诉处理同时校验投诉记录关联员工或客资当前负责人范围，租户全量读取管理员保留全量处理。幂等重放校验目标及原处理人。
+返回的部门、岗位字段继续提供；兼容字段 `salesDispatchSupported` 为销售岗位能力，`educationOwnershipSupported` 为 false。Vue Admin 和 Workbench 均使用销售名称；不新增 Vue 教务页面。两种全局视图设置均沿用现有主从布局，不新增员工统计表格。
 
-菜单改名由 V320 提供；迁移仅修改元数据，不写角色菜单关系。管理员通过 System 角色管理配置权限。
+销售今日跟进和派单接收按记录中的销售身份快照归属；判定按发生时最后一笔有效销售归属流水确认，后续转派不改写已发生工作量。缺失历史证明不按当前身份补算。今日任务和累计客资限定当前销售归属；销售订单统计另要求订单中持久化的 formalOwnerIdentity 为 sales，不按当前客资归属反推。
 
+V334 只恢复规范菜单名称，不改角色菜单关系；V320 保留历史原文。初始化迁移执行器会按 Core 清单自动发现 V334，无需将编号迁移写入 bootstrap.sql。
 
-## Review 修复（2026-10-15）
-批量候选 `GET /batch-transfer-candidates?leadIds=` 对全部 1—200 个客资授权后返回交集，排除当前/回收原负责人。教育受让资格要求有效内部人员及跟进、判定、成交权限，不要求自拓创建。旧回收身份仅从同一归属周期可靠快照解析，未知身份拒绝，不默认转销售。员工客资查询支持 `recycledOnly=true`，按原负责人展示回收待处理；单条和批量重试先验证指纹并重放，首次执行再做状态及目标校验。投诉通过 SQL EXISTS 在分页前限定关系范围。
-
-## 2026-10-15 归属复审
-回收来源员工必须非空并精确匹配最新回收流水。仅允许从该回收记录读取归属，或从紧邻同员工的 accept/claim/transfer 归属快照确认；释放、重复回收、不同员工转换和未知证据均拒绝，不跨周期回溯。教育恢复/转派共享三类来源规则：教务自拓；内部新媒体且提交来源教务自拓且 self；partner 且 specified。
-单条主管 transfer/restore 可选 version 参数兼容旧客户端，新版 Workbench 发送读取版本；行锁内比较版本并在成功后推进版本，冲突回滚业务变更。旧客户端仍执行行锁后的最新范围、资格及状态校验。已设置关闭时间的客资拒绝主管处置。批量接口保留既有逐条独立事务和逐条结果语义。
+单条 transfer/restore 继续兼容可选 version；锁内校验并推进版本。幂等重放在首次状态预检之前完成，指纹冲突拒绝；批量仍逐条独立事务并返回逐条结果。回收身份只接受最新回收及必要时紧邻的 accept/claim/transfer 证明，不跨周期回溯。

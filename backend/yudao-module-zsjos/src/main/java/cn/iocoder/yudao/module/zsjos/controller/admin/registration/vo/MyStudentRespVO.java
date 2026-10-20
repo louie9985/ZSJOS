@@ -21,6 +21,7 @@ public class MyStudentRespVO {
     @Data
     public static class ServiceVO {
         private Long serviceRelationId;
+        private Long registrationCaseId;
         /** Technical link for loading the Lead detail; never a user-facing identifier. */
         private Long leadId;
         private String leadNo;

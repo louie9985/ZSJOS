@@ -30,9 +30,11 @@ public class ConfigSecretSupport {
             next.setVisible(false);
             String raw = next.getValue();
             if (raw == null || raw.isBlank()) {
-                if (previous != null && !wasSecret && previous.getValue() != null && !previous.getValue().isBlank())
+                if (previous == null || !wasSecret && previous.getValue() != null && !previous.getValue().isBlank())
                     throw exception(CONFIG_VALUE_INVALID);
-                next.setValue(previous == null ? "" : previous.getValue());
+                // Leave the value null so MyBatis keeps the current ciphertext. Copying a
+                // previously read ciphertext would allow a concurrent rotation to be lost.
+                next.setValue(null);
             }
             else {
                 if (raw.contains("****") || raw.length() < 32

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mock = vi.hoisted(() => ({get: vi.fn(), put: vi.fn()}))
 vi.mock('./api', () => ({http: mock, unwrap: (value: unknown) => value}))
-import { deliveryPerformanceApi, performanceApi } from './salesPerformance'
+import { deliveryPerformanceApi } from './deliveryPerformance'
+import { performanceApi } from './salesPerformance'
 beforeEach(() => {mock.get.mockReset().mockResolvedValue([]); mock.put.mockReset().mockResolvedValue(true)})
 describe('independent delivery performance API', () => {
  it('routes statistics, detail and targets only to delivery endpoints', async () => {

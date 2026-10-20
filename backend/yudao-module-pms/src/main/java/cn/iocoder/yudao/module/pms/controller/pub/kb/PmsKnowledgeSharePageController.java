@@ -25,6 +25,7 @@ import static cn.iocoder.yudao.module.pms.enums.ErrorCodeConstants.*;
 @RestController
 @RequestMapping("/pms/kb/document-share")
 public class PmsKnowledgeSharePageController {
+    @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeExcelPreviewService excel;
     @Resource private PmsKnowledgeDocumentShareService shareService;
     @Resource private FileApi fileApi;
     @Resource private cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeAttachmentService attachments;
@@ -80,6 +81,15 @@ public class PmsKnowledgeSharePageController {
                 + "img-src http: https:; media-src http: https:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
     }
 
+    @RequestMapping(value = "/excel", method = {RequestMethod.GET, RequestMethod.HEAD}, produces = "text/html;charset=UTF-8")
+    @PermitAll @TenantIgnore
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public String excel(@RequestParam String token, @RequestParam(required = false) Long fileId,
+            @RequestParam(defaultValue = "-1") int sheetIndex, HttpServletRequest request, HttpServletResponse response) {
+        headers(response);
+        return body(request, response, PmsKnowledgeSharePage.excel(excel.publicPreview(token, fileId, sheetIndex), token, fileId));
+    }
+
     @ExceptionHandler(Exception.class)
     public String failure(Exception error, HttpServletRequest request, HttpServletResponse response) {
         headers(response);
@@ -91,6 +101,11 @@ public class PmsKnowledgeSharePageController {
                 || KNOWLEDGE_ATTACHMENT_UNAVAILABLE.getCode().equals(business.getCode()))) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             html = PmsKnowledgeSharePage.error("分享文件不可用", "文件暂时不可用，请重试或联系分享人。", true);
+        } else if (error instanceof ServiceException business && business.getCode() >= 1_053_130_100
+                && business.getCode() <= 1_053_130_106) {
+            response.setStatus(business.getCode().equals(KNOWLEDGE_EXCEL_BUSY.getCode()) ? 503 : 422);
+            html = PmsKnowledgeSharePage.error("表格暂时无法预览", business.getMessage(),
+                    business.getCode().equals(KNOWLEDGE_EXCEL_BUSY.getCode()) || business.getCode().equals(KNOWLEDGE_EXCEL_UNAVAILABLE.getCode()));
         } else {
             // Do not echo or log exceptions that may include bearer tokens or private file URLs.
             response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);

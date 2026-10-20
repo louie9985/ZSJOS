@@ -41,8 +41,8 @@
         />
         <span class="unit">分钟</span>
       </el-form-item>
-      <el-form-item label="公海期限" prop="agingPoolTimeoutDays">
-        <el-input-number v-model="formData.agingPoolTimeoutDays" :min="1" :max="3650" :step="1" />
+      <el-form-item label="公海期限" prop="publicSeaPoolTimeoutDays">
+        <el-input-number v-model="formData.publicSeaPoolTimeoutDays" :min="1" :max="3650" :step="1" />
         <span class="unit">自然日</span>
       </el-form-item>
       <el-form-item label="消息浮窗时长" prop="notificationPopupDurationMinutes">
@@ -94,7 +94,7 @@ const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({
   version: 0,
   firstFollowUpTimeoutMinutes: 1440,
   qualificationTimeoutMinutes: 4320,
-  agingPoolTimeoutDays: 90,
+  publicSeaPoolTimeoutDays: 90,
   notificationPopupDurationMinutes: 5,
   duplicateAutoResolutionEnabled: false
 })
@@ -107,7 +107,7 @@ const rules: FormRules = {
     { required: true, message: '请输入有效性判定时限', trigger: 'blur' },
     { type: 'number', min: 5, max: 43200, message: '范围为 5–43200 分钟', trigger: 'change' }
   ],
-  agingPoolTimeoutDays: [
+  publicSeaPoolTimeoutDays: [
     { required: true, message: '请输入公海期限', trigger: 'blur' },
     { type: 'number', min: 1, max: 3650, message: '范围为 1–3650 个自然日', trigger: 'change' }
   ],
@@ -125,7 +125,7 @@ const loadRule = async () => {
     formData.version = rule.version
     formData.firstFollowUpTimeoutMinutes = rule.firstFollowUpTimeoutMinutes
     formData.qualificationTimeoutMinutes = rule.qualificationTimeoutMinutes
-    formData.agingPoolTimeoutDays = rule.agingPoolTimeoutDays
+    formData.publicSeaPoolTimeoutDays = rule.publicSeaPoolTimeoutDays
     formData.notificationPopupDurationMinutes = rule.notificationPopupDurationMinutes
     formData.duplicateAutoResolutionEnabled = rule.duplicateAutoResolutionEnabled
   } catch (loadError: any) {

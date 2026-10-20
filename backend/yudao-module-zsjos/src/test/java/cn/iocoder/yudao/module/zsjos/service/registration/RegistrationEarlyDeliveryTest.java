@@ -23,6 +23,12 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @ExtendWith(MockitoExtension.class)
 class RegistrationEarlyDeliveryTest {
     @InjectMocks RegistrationServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper informationForms;
+    @org.junit.jupiter.api.BeforeEach void sentInformationFixture() {
+        var form=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
+        form.setStatus("DRAFT"); form.setSentAt(java.time.LocalDateTime.now());
+        lenient().when(informationForms.byCase(anyLong())).thenReturn(form);
+    }
     @Mock RegistrationCaseMapper caseMapper;
     @Mock SalesOrderMapper orderMapper;
     @Mock SalesOrderItemMapper orderItemMapper;
@@ -53,6 +59,15 @@ class RegistrationEarlyDeliveryTest {
         lenient().when(orderMapper.selectByIdForUpdate(10L,1L)).thenReturn(order);
     }
     @AfterEach void clear() { TenantContextHolder.clear(); }
+    @Test void missingOrUnsentCollectionBlocksCompletion() {
+        when(informationForms.byCase(1L)).thenReturn(null);
+        var req=new RegistrationVersionReqVO();req.setVersion(3);req.setIdempotencyKey("unsent");
+        assertThrows(ServiceException.class,()->service.complete(1L,7L,req));
+        var form=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
+        form.setStatus("SUBMITTED");when(informationForms.byCase(1L)).thenReturn(form);
+        assertThrows(ServiceException.class,()->service.complete(1L,7L,req));
+        verifyNoInteractions(serviceRelationMapper);
+    }
 
     @ParameterizedTest @ValueSource(strings={"active","paused","completed"})
     void completionPreservesAcceptedOrTransferredService(String status) {

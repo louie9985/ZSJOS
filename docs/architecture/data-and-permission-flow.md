@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## Student delivery strict read scope (2026-10-19)
+
+Delivery-class and student reads consume System's merged all/dept grants without converting SELF into the current department. Existing `delivery-class:query` / `query-managed` entry compatibility is retained; feature permissions alone never grant department data. Personal ownership and existing collaboration remain independent grants. Class lists/filter contexts/object reads, service lists/search/detail, legacy student reads and contact subresources enforce the same service boundary; a readable sibling service does not expose another course. Only configured `query-managed` (or an already approved tenant-wide reader) gets the existing real system pending-class exception; explicit SELF/USER does not append it. Read-scope resolution is separate from existing command department/ownership checks. No role grants or business ownership are rewritten.
+
 ## Production content reviewer student reads
 
 New production-content rounds use the published BPM starter-select role scope, System role membership and configured feature permissions. A frozen selected reviewer gains only the batch-scoped media student GET projections while that round and exact BPM instance remain active. Account/service/group/owner associations are frozen and revalidated; the normal student lists and object write permissions do not expand. File bytes are read through authenticated batch endpoints and Infra's storage API, without returning signed storage URLs. See [the contract](../api/content-review-self-selection.md).
@@ -58,8 +62,8 @@ Implementation coverage and remaining acceptance work are tracked in [the delive
 ## Student Information Collection
 
 Collection operations use independent `zsjos:student-info-form:*` menu/button permissions
-and the `student-info` object provider. Related planners/directors read through existing
-Lead visibility relationships, with separate sensitive-read and export permissions. Public
+and the `student-info` object provider keyed by registration case. Related planners/directors read through the current
+student-service visibility relationship, with separate sensitive-read and export permissions. Public
 tokens locate the owning tenant, then all business reads/writes enforce that tenant.
 Template versions and dictionary/area labels are immutable snapshots. See
 [the collection contract](../api/student-information-collection.md).
@@ -412,7 +416,7 @@ Rules:
 - Backend component names are metadata only. React renders an explicitly registered local page or a safe placeholder.
 - The 36 active ZSJOS-facing page menus have matching React Workbench and Vue Admin renderers; the auditable mapping is maintained in `docs/frontend/zsjos-menu-coverage.md`. Both clients preserve the server path and permission identity instead of maintaining aliases or a duplicate menu tree.
 - Authorized hidden pages remain in the React renderable menu tree for direct routing but are removed from visible navigation. Therefore `/zsjos/leads/manage` can be opened only when returned by the permission response, while it remains absent from the side or top menu.
-- The canonical appeal and opportunity-public-sea routes are `/zsjos/appeals` and `/zsjos/lead-aging-pool`. The clients intentionally do not redirect the obsolete `/zsjos/leads/appeals` or `/zsjos/opportunity-public-sea` paths.
+- The canonical appeal and opportunity-public-sea routes are `/zsjos/appeals` and `/zsjos/lead-public-sea-pool`. The clients intentionally do not redirect the obsolete `/zsjos/leads/appeals` or `/zsjos/opportunity-public-sea` paths.
 - A valid active read-only impersonation session is injected by the shared clients as `X-ZSJOS-Impersonation-Session` only on ZSJOS requests and excluded from impersonation lifecycle requests. The clients clear malformed, inactive, or server-rejected sessions and synchronize their visible state. A request rejected with `IMPERSONATION_SESSION_INVALID` remains failed and is not replayed under the administrator identity. Storage is also cleared with authentication state; server-side authorization and write rejection remain authoritative.
 - Direct URL access must still resolve against the authorized menu set; hiding a menu item alone is not authorization.
 
@@ -662,14 +666,14 @@ otherwise
   types in the response.
 - Phase-four submitter commands continue to use immutable `source_user_id` after a post or department transfer, while requiring the system account and the original business subject to remain enabled. Ordinary creation identity is resolved from stable post, department-leader, and partner records rather than role or department display names. Sales self-sourced creation is a separate permission and direct-ownership path. Complaint handling is an independent shared business queue; it does not duplicate BPM tasks or modify sales assignment and performance state. Both founded and unfounded decisions notify the complainant persisted on the complaint record: employee complaints resolve `complainant_user_id`, partner complaints resolve `partner_id` to the partner account. Founded decisions additionally retain the snapshotted owner and current direct department leader recipients. Neither current Lead ownership nor a role/display name may substitute for the actual complainant.
 - Managed employees come from current System department-leader relationships, including child departments. Historical Leads follow the employee's current department after transfer; `source_dept_id` is not an authorization source.
-- Page and status-count queries retain the submitted/owned list boundary. A single-record detail request uses the unified Lead object reader instead: submitter, current owner, owner-department leader, `query-all`, authorized aging/manual-public-sea participant or manager, readable participant/approver of an order whose `lead_id` is the requested Lead, and owner of an active service relation on such an order. Sharing only the same Person, including a repurchase order with no `lead_id`, grants no Lead access. Aging-pool detail visibility delegates to the same `LeadAgingPoolService.canRead` rule as its list/detail API. A menu or peer-department relationship alone grants no object access.
+- Page and status-count queries retain the submitted/owned list boundary. A single-record detail request uses the unified Lead object reader instead: submitter, current owner, owner-department leader, `query-all`, authorized public-sea-pool participant or manager, readable participant/approver of an order whose `lead_id` is the requested Lead, and owner of an active service relation on such an order. Sharing only the same Person, including a repurchase order with no `lead_id`, grants no Lead access. Public-sea-pool detail visibility delegates to the same `LeadPublicSeaPoolService.canRead` rule as its list/detail API. A menu or peer-department relationship alone grants no object access.
 - 员工工作台统一从 `/zsjos/leads/manage` 进入，并通过 `relationScope=all|submitted|owned` 切换范围。`submitted` 要求 `zsjos:lead:query-submitted` 并消费提交人方案，`owned` 要求 `zsjos:lead:query-owned` 并消费负责人方案；旧 inbox API 与路由仅作兼容。成交审批继续使用独立的 `reviewer` 方案。
 - 提交人和负责人客资收件箱使用服务端游标每批读取 `20` 条。工作台使用左侧滚动容器内的底部哨兵提前加载下一批；切换搜索、分组或环节时废弃旧请求结果、回到列表顶部并重新读取首批。游标排序固定为 `last_activity_at DESC, id DESC`，下一批失败必须保留已加载客资并提供局部重试。旧分页接口继续保留给兼容调用方。
 - `zsjos_lead.last_activity_at` 是客资最近业务活动时间。基本资料和提交人补充、派单与归属变化、跟进、判定与挂起恢复、申诉/投诉处理、公海协作、正式提交人反馈，以及直接改变非复购 Lead 状态的订单流程都在各自业务事务中推进该值；已有业务事件时间时使用事件时间，否则同一操作生成一次当前时间。写入只接受晚于现值的时间，补偿或乱序事件不能将其改旧。查看详情、选择记录、标记已读、上传未提交的临时附件和发送任务提醒不推进该值，通用 `update_time` 也不作为替代。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 统一客资页固定使用 `relationScope=all`，对提交人与负责人两类已授权关系取去重并集，不再让前端通过“我提交的/我负责的”切换关系范围；旧接口传入 `submitted` 或 `owned` 仍必须具备对应关系权限。页面保留单选的简单状态标签，`simpleStatus` 只在上述关系并集内追加生命周期条件。跨订单、学员、商机或审批入口只可用内部 `leadId` 深链读取指定详情，绝不把该关系人的客资加入管理列表。
 - 详情响应由服务端投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。Lead 详情域的员工/兼职身份展示统一由 `LeadIdentityMaskingService` 按当前查看人和 Lead 关系实时投影，覆盖判定人、待接销售、回收来源负责人、跟进操作人及流转记录原/新负责人和操作人；历史快照不回写。相互脱敏只作用于提交人与负责人双方：负责人查看时隐藏提交人，员工提交人查看时隐藏负责人，第三方员工或无关操作人查看时不隐藏双方；完整身份权限继续覆盖该规则。合作方提交身份与 System 员工用户使用独立 ID 命名空间，合作方账号 ID 不参与员工身份匹配。`visibleTabs` 由独立 System 功能权限与统一对象关系共同决定；申诉页签对拥有申诉读取/审核能力的用户可见，也对当前 Lead 原提交人可见，但申诉记录接口仍校验 Lead 对象可读和同一申诉读取规则。`flow-history` 仅在当前用户持有 `zsjos:lead-detail:flow-read` 时投影，流转接口还必须通过同一个 Lead 对象读取检查。前端不得根据角色名、详情 mode 或关系字符串推断。跟进、申诉、投诉、订单和流转记录接口仍分别执行对象校验，隐藏页签不构成授权。
-- 客资流转记录是现有事实的只读合并投影：`zsjos_business_event` 提供判定、挂起、恢复、申诉和跟进等业务事件，`zsjos_lead_assignment_history` 提供派单、接单、抢单、转派、回收和释放等归属事件，`zsjos_lead_aging_pool_event` 提供公海进入、协作人分配/变更和退出等事件；提交节点来自 Lead 已持久化的提交时间。业务事件通过 `related_object_refs.assignmentHistoryId` 排除对应的重复分配记录，结果按实际发生时间及原始数值 ID 倒序。该投影不补造仓库未记录的历史，不修改三类来源记录，也不建立第二套流转事实表。
+- 客资流转记录是现有事实的只读合并投影：`zsjos_business_event` 提供判定、挂起、恢复、申诉和跟进等业务事件，`zsjos_lead_assignment_history` 提供派单、接单、抢单、转派、回收和释放等归属事件，`zsjos_lead_public_sea_pool_event` 提供公海进入、协作人分配/变更和退出等事件；提交节点来自 Lead 已持久化的提交时间。业务事件通过 `related_object_refs.assignmentHistoryId` 排除对应的重复分配记录，结果按实际发生时间及原始数值 ID 倒序。该投影不补造仓库未记录的历史，不修改三类来源记录，也不建立第二套流转事实表。
 - 流转记录的事件码、状态码和来源关联由服务端映射为中文显示值。自动与指定派单以分配历史中是否存在持久化规则引用区分，不能从人员或节点显示名称推断。历史 `lead_appeal_overturned` 即使保存的是申诉审核状态，也按稳定事件语义投影为客资“无效 → 有效”；提交申诉和维持原判不产生客资状态变化，历史 `converted` 状态码兼容显示为“有效”，均不改写原事件。原因与备注必须分字段投影：业务原因使用来源记录的原因或原因标签快照，提交说明、判定说明和跟进内容使用已有备注事实，不得复制同一文本填充两个字段。三类来源表只保存人员 ID 而没有统一的姓名快照，因此员工事件通过 System 用户解析当前昵称，兼职提交通过当前 Partner 记录解析名称；主体已删除且无来源快照时显示“未知账号”，不得虚构历史姓名。事件证据引用解析为短时 Infra 文件预览地址，仍受租户、功能权限和 Lead 对象权限保护；Workbench 仅为图片和 PDF 提供预览入口，不提供下载按钮。
 - Lead 业务通知统一深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={目标页签}`。申诉结果进入 `appeals`，投诉结果进入 `complaints`，跟进和提醒进入 `follow-ups`，其余场景进入 `overview`；申诉提交给审核人的待办入口仍优先进入独立申诉处理页。实时弹窗、消息铃铛和消息中心复用同一动作解析。`tab` 只是导航意图，Workbench 必须用详情响应的 `visibleTabs` 再校验，不可见时回退概览，不能据此扩大对象或接口权限。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询只消费已发布版本；筛选标签不返回数量且不执行额外统计查询。保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
@@ -727,10 +731,10 @@ The Opportunity public sea is independent from the pre-qualification claim pool.
 Lead with an open/following Opportunity can enter. The formal owner and owner department remain
 authoritative; configuring collaborator B does not transfer Lead or Opportunity ownership.
 
-- `zsjos:lead-aging-pool:query` grants feature access only. Rows are limited to enabled eligible
+- `zsjos:lead-public-sea-pool:query` grants feature access only. Rows are limited to enabled eligible
   sales in formal owner A's current department, that department's direct leader, A, B, or a user with
-  `zsjos:lead-aging-pool:manage-all`.
-- The direct current-department leader also needs `zsjos:lead-aging-pool:manage` to assign, reassign,
+  `zsjos:lead-public-sea-pool:manage-all`.
+- The direct current-department leader also needs `zsjos:lead-public-sea-pool:manage` to assign, reassign,
   or exit a cycle. `manage-all` is the tenant-wide operational fallback.
 - B must be an enabled eligible sales user in A's current department and must differ from A. The entry-time
   department snapshot is retained for audit only.
@@ -742,7 +746,7 @@ authoritative; configuring collaborator B does not transfer Lead or Opportunity 
   transfer to self through the configured BPM approval; the formal owner cannot request transfer to self.
 - Full contact data follows the same server-side pool visibility. Frontends consume
   `availableActions` and do not infer mutation rights from owner or department labels.
-- The published `agingPool` inbox audience owns the configurable status grouping for the dedicated
+- The published `publicSeaPool` inbox audience owns the configurable status grouping for the dedicated
   pool page. It filters cycle status only and does not reinterpret ordinary Lead assignment state.
 - When an order becomes effective, the cycle exits as converted while Lead and Opportunity formal
   ownership remain unchanged. The immutable order submitter records the actual operator.
@@ -869,7 +873,7 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 - 上线后轮次允许普通审批人每轮唯一一次申请销售主管审批，因此整轮最多是报名履约、财务和主管三方。主管只取订单正式销售当前直属部门的 `leaderUserId`，必须启用、不能是正式销售本人且必须持有 `zsjos:sales-order:supervisor-confirm`；BPM 通过并行加签拥有主管任务、评论和历史，ZSJOS 的 `zsjos_order_supervisor_confirmation` 只保存业务申请、决定、状态和 BPM 引用，不复制任务。`pending` 不锁定普通审批任务，报名履约、财务与主管任务可同时可见和处理；一旦申请加签，该中心普通审批与对应主管审批都成为通过条件，先通过的一方等待另一方，二者通过后该中心节点才完成，另一中心状态不受影响。任一中心或主管驳回都由 BPM 驳回整轮；申请中心通过不取消主管记录，中心驳回、销售终止或流程取消才取消未完成申请。普通审批与主管审批共用服务端“成交订单审批”页面，功能权限和本人 BPM 任务仍分别校验。
 - 今日任务和业务消息通过 `/zsjos/bpm/business-task-target` 校验 BPM 任务关系后深链到员工端业务页；成交订单仍保留 `/zsjos/sales-order/approval/task-target` 作为订单专用兼容入口。从客户档案返回时仅允许 `/zsjos/sales-order-approvals` 白名单相对路径，禁止站外跳转。
 - 成交普通审批累计要求 Controller 功能权限 `zsjos:sales-order:review`、配置部门范围及本人普通 BPM 任务；主管确认累计要求 `zsjos:sales-order:supervisor-confirm`、本人主管 BPM 子任务、申请记录指定主管和订单对象关系。菜单可见、部门成员、对象可读和 BPM 任务所有权互不替代。
-- 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化。产品上只有一个公海池，现行入口统一使用 `zsjos_lead_aging_pool_cycle`；旧 `zsjos_lead_public_sea_record` 仅作历史兼容审计，不得成为新的业务事实源。活动公海期间任何销售都不得新建、补正或接续成交，必须先通过线上转派申请或主管直接转派，或由主管退出公海；客资退出公海后才恢复成交录入。订单驳回、取消或终止不回滚已完成的正式转派；历史 `deal_pending` 只按原审批流程兼容完成。
+- 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化。产品上只有一个公海池，现行入口统一使用 `zsjos_lead_public_sea_pool_cycle`；旧 `zsjos_lead_public_sea_pool_compatibility_record` 仅作历史兼容审计，不得成为新的业务事实源。活动公海期间任何销售都不得新建、补正或接续成交，必须先通过线上转派申请或主管直接转派，或由主管退出公海；客资退出公海后才恢复成交录入。订单驳回、取消或终止不回滚已完成的正式转派；历史 `deal_pending` 只按原审批流程兼容完成。
 - 报名履约和财务任务处理、驳回、创建人或正式负责人终止均按“订单→当前审批轮次”顺序加锁，并校验当前 BPM 任务、轮次、订单/轮次版本与节点幂等键。终止由 BPM 业务授权公共 API 执行并记录真实操作人、授权类型和原因；ZSJOS 保存订单业务状态、轮次和原因快照。
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`. Resubmission never mutates the rejected order into a new round: it creates an independent successor, marks the old order `superseded`, preserves old audit facts, and starts a new BPM round in one transaction.
 - 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。筛选项稳定编码使用小写下划线格式 `registration_review` / `finance_review`，与保持 BPM 契约的驼峰条件值相互独立；读取历史配置时兼容旧筛选项编码，并在下一次保存或发布时规范化。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。
@@ -882,7 +886,7 @@ The subordinate Lead detail reuses the same presentation component in read-only 
   不再成为新报名完成条件。存量服务关系只补充真实租户待分班 `classId`，原 owner 保留。
 - 班级管理统一页面按权限调用管理范围或本人班级列表：`query-managed` 累积部门 DataPermission，本人范围只按当前班主任关系。页面卡片点击进入学员管理时，`classId` 仅作为原有学员可见范围内的查询条件，不扩大对象权限。
   单班读取、更新、结课继续经过 `delivery-class` 对象权限。待分班是主管可读的租户系统对象，
-  不可编辑或结课；主管直调另需 `direct-transfer`，不能由查询权限隐式获得。
+  不可编辑或结课；其 active/paused/completed 课程服务向持有 `query-managed` 的主管开放读取，不要求已有 owner；列表、详情和详情子资源一致，其他无 owner 的记录不因此开放。待分班与正式班使用同一卡片网格并参与服务端分页与筛选。主管直调另需 `direct-transfer`，不能由查询权限隐式获得。
 - 班主任变化、主管直调和 BPM 调班共用服务归属迁移边界：原子更新课程服务 owner 与未完成业务
   待办，不重置接收状态，不改写联系、学习计划、督学、协作者或已完成任务历史。System 通知场景
   根据原、新 owner 定向通知；待分班转正式班只通知新 owner。
@@ -1061,3 +1065,12 @@ V311 增加申诉周期键及周期内唯一约束；新后端、工作台、H5 
 公海遗留错误任务实际取消：入池、换派/清除 B 同事务取消旧 pending 首跟/提醒；现有公海扫描每轮每租户
 最多清理 500 条存量。当前 B 本次指派后创建的正常提醒保留，已取消任务不会在退出公海后复活。
 取消原因和时间保存在业务任务行，历史跟进/已完成任务保持原事实。
+
+
+## 公海池统一命名（2026-10-19）
+
+公海池是唯一的正式归属保持型公海业务，当前实现统一使用 PublicSeaPool / publicSeaPool / PUBLIC_SEA_POOL / public_sea_pool / public-sea-pool。抢单池的 public_pool 状态仍是独立概念。V329 无损重命名三张当前业务表、历史兼容记录表、跟进规则列及菜单/筛选/通知元数据；不调整原授权关系或业务状态。旧名称仅存在于历史迁移和显式历史读取兼容边界。接口和两端必须与数据库升级同步发布，详见 [公海池命名升级](../operations/lead-public-sea-pool-deployment.md)。
+
+## Subordinate sales and education separation (2026-10-19)
+
+The subordinate-sales API again restricts every employee read (including tenant-wide readers) to the System sales_specialist post. Lead pages, tasks and commands additionally require sales ownership; recycled records require latest same-cycle historical proof. Education employees and commands use the independent education-team API. Existing role-menu grants are preserved; V334 changes only the menu label to 下属销售. Both Admin and Workbench consume the restored sales contract; delivery navigation continues excluding the old sales entry. See the respective API contracts for event-time daily statistics.

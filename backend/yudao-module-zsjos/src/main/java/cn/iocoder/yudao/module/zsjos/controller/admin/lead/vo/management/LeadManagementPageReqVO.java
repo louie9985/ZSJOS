@@ -72,6 +72,9 @@ public class LeadManagementPageReqVO extends PageParam {
     private String providerOwnerType;
     private Long providerOwnerId;
     private Long ownerUserId;
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Schema(hidden = true)
+    private boolean salesOnly;
 
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] submittedAt;

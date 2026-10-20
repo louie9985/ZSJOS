@@ -15,6 +15,8 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 public class StudentContactRecordDO extends TenantBaseDO {
     @TableId private Long id;
+    private Boolean studyPlanCompletedAtFirstContact;
+    private String checklistSnapshotJson;
     private Long serviceRelationId;
     private Long taskId;
     private String contactType;

@@ -50,9 +50,9 @@ async function get<T>(path: string, params?: object, signal?: AbortSignal): Prom
  const response = await http.get<unknown>(path, { params, signal })
  return normalizePerformanceDates(unwrap<unknown>(response)) as T
 }
-export function createPerformanceApi(domain: 'sales' | 'delivery') {
-const BASE = `/zsjos/${domain}-performance`
-const TARGET = `/zsjos/${domain}-performance-target`
+function createPerformanceApi() {
+const BASE = '/zsjos/sales-performance'
+const TARGET = '/zsjos/sales-performance-target'
 return {
  unclassifiedHistory: (pageNo: number, pageSize: number, signal?: AbortSignal, userId?: number) => get<{list: UnclassifiedDetail[]; total: number}>(`${BASE}/unclassified-history`, {pageNo, pageSize, userId}, signal),
  tree: (targets = false, signal?: AbortSignal) => get<OrgNode[]>(`${targets ? TARGET : BASE}/tree`, undefined, signal),
@@ -74,8 +74,7 @@ return {
  revisions: (id: number) => get<{ id: number; reason: string; before: string; after: string; operatorName: string; at: string }[]>(`${TARGET}/history`, { id })
 }
 }
-export const performanceApi = createPerformanceApi('sales')
-export const deliveryPerformanceApi = createPerformanceApi('delivery')
+export const performanceApi = createPerformanceApi()
 export const money = (value?: number | null) => value == null ? '—' : new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY', maximumFractionDigits: 2 }).format(value)
 export const percent = (value?: number | null) => value == null ? '—' : `${(value * 100).toFixed(2)}%`
 export function dateText(date: Date) { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` }

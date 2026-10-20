@@ -1585,3 +1585,16 @@ V321 adds independent delivery performance domain, target uniqueness and menu me
 After the canonical delivery-domain schema (renumbered V320 or already-applied legacy V321), validate exact menu contracts, domain columns and full target uniqueness; add nullable attribution business_domain without historical backfill. Does not reconcile existing version/checksum drift or role grants. Partial DDL is retained and revalidated. Run tools/test_performance_attribution_review.py in retained synthetic databases. Full fresh-chain acceptance remains blocked by the unresolved legacy V321/renumber ledger mapping; this migration is not authorization to rewrite historical ledgers.
 
 2026-10-16 integration: main V318 exam and V319 rest-days retain their identities. Employee menu moved to V320; delivery domain restored to V321; review remains V322. Core source numbering is contiguous. Historical execution evidence above retains its dates; existing database ledger reconciliation remains separately reviewed.
+## V326 教务团队独立菜单
+
+`V326__education_team_menu.sql` 依赖规范下属员工菜单、Workbench 根节点、交付组织 business_domain 结构及两本版本账本，仅新增教务团队页面与五个操作权限元数据，不修改角色授权、旧菜单或业务数据。首次执行、重放、部分恢复和失败回滚验证入口为 `tools/test_education_team_menu.py`。本地开发库尚缺交付组织字段，应先审查其交付域升级路径，不可盲目重放有编号差异的历史迁移。详见 `docs/api/education-team.md`。
+
+### V334 — restore subordinate-sales name
+
+`V334__restore_subordinate_sales_menu.sql` restores only the canonical subordinate-sales page label after education-team separation. Requires System menu metadata and both ledgers, and executes in normal numeric Core order. V320 remains unchanged. No role-menu assignments, business rows or dictionaries change. Failure rolls back the menu and both ledger writes; reruns recover a renamed page with missing markers. Rollback uses System menu management and preserves migration history. UTF-8 client connection and HEX checks are required. The Core manifest automatically discovers this migration; bootstrap.sql intentionally contains only the unversioned baseline.
+
+Controlled verification: `python script/sql/mysql/tools/test_education_team_statistics.py` retains a new MySQL test database and checks first application, replay, metadata failure, ledger rollback and partial recovery, grants and Chinese HEX. Shared database execution and service deployment are separate operations.
+
+### V335 — student archive extra field visibility
+
+`V335__student_archive_extra_visibility.sql` requires V332 and creates the tenant-1 configuration row for the per-field education visibility of exam and certificate archive data, defaulting all fields to visible. It does not assign roles, rewrite archive revisions or seed business values. The service filters closed fields unless the caller has `zsjos:exam-calendar:query`, and settings writes require `zsjos:exam-calendar:manage`. The migration is repeatable and failure-controlled; DDL can commit implicitly, so verify the real table and both ledgers before recovery. Controlled verification must cover initial application, replay, partial DDL recovery, revision conflict, tenant=1 and UTF-8 checks.

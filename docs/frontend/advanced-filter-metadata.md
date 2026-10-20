@@ -29,7 +29,7 @@
 
 | scene | 已知正确接入的pageKey |
 |---|---|
-| lead | lead_management、lead_claim_pool、lead_aging_pool、subordinate_sales_leads |
+| lead | lead_management、lead_claim_pool、lead_public_sea_pool、subordinate_sales_leads |
 | order | sales_order_management、sales_order_approval:registration、sales_order_approval:finance、sales_order_supervisor_confirm |
 | lead_appeal | lead_appeal |
 | duplicate_review | lead_duplicate_review |
@@ -76,7 +76,7 @@
   "optionsState": "empty",
   "optionsErrorCode": null,
   "supportedScenes": ["lead"],
-  "supportedPages": ["lead_management", "lead_claim_pool", "lead_aging_pool", "subordinate_sales_leads"],
+  "supportedPages": ["lead_management", "lead_claim_pool", "lead_public_sea_pool", "subordinate_sales_leads"],
   "permission": "inherit_query_authorization",
   "dataScope": "inherit_query_data_scope",
   "sensitive": true,

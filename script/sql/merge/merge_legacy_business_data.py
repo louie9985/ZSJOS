@@ -148,11 +148,11 @@ COL_SPACE = {
         "sales_user_id": "staff", "handler_user_id": "staff",
     },
     "zsjos_lead_claim_daily_counter": {"sales_user_id": "staff"},
-    "zsjos_lead_aging_pool_event": {
+    "zsjos_lead_public_sea_pool_event": {
         "operator_user_id": "staff", "previous_collaborator_user_id": "staff",
         "collaborator_user_id": "staff", "lead_id": "lead",
     },
-    "zsjos_lead_aging_pool_cycle": {
+    "zsjos_lead_public_sea_pool_cycle": {
         "original_owner_user_id": "staff", "collaborator_user_id": "staff",
         "lead_id": "lead",
     },

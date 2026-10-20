@@ -180,10 +180,10 @@
     },
     {
       "scene": "lead",
-      "pageKey": "lead_aging_pool",
+      "pageKey": "lead_public_sea_pool",
       "consumers": {
-        "workbench": "LeadAgingPoolPage.tsx",
-        "admin": "leadAgingPool/index.vue"
+        "workbench": "LeadPublicSeaPoolPage.tsx",
+        "admin": "leadPublicSeaPool/index.vue"
       }
     },
     {

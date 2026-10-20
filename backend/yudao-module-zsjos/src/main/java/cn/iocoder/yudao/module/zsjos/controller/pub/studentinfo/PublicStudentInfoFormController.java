@@ -20,6 +20,28 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @TenantIgnore
 public class PublicStudentInfoFormController {
     @Resource private StudentInfoFormService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoImageService images;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoUploadRateLimit uploadLimit;
+    @PostMapping("/images")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Image> upload(
+            @RequestHeader("X-Student-Info-Token") String token,@RequestParam String fieldKey,
+            @RequestParam(defaultValue="") String side,@RequestParam org.springframework.web.multipart.MultipartFile file,
+            jakarta.servlet.http.HttpServletRequest request,HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store"); uploadLimit.check(token,request.getRemoteAddr());
+        return success(images.upload(token,fieldKey,side,file));
+    }
+    @DeleteMapping("/images/{id}")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    public CommonResult<Boolean> delete(@RequestHeader("X-Student-Info-Token") String token,@PathVariable Long id,HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store"); images.delete(token,id); return success(true);
+    }
+    @GetMapping("/images/{id}")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    public byte[] image(@RequestHeader("X-Student-Info-Token") String token,@PathVariable Long id,HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store"); response.setHeader("X-Content-Type-Options","nosniff");
+        response.setContentType("application/octet-stream"); return images.publicRead(token,id);
+    }
     @GetMapping("/detail")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     public CommonResult<Runtime> detail(@RequestHeader("X-Student-Info-Token") String token,HttpServletResponse response) {

@@ -58,6 +58,14 @@ public class StudentContactController {
         return success(true);
     }
 
+    @PutMapping("/{relationId}/first-contact-checklist")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-contact:checklist-update')")
+    public CommonResult<Boolean> updateFirstContactChecklist(@PathVariable Long relationId,
+            @Valid @RequestBody StudentFirstContactChecklistUpdateReqVO request) {
+        service.updateFirstContactChecklist(relationId, request, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
     @PostMapping("/{relationId}/first-contact")
     @PreAuthorize("@ss.hasPermission('zsjos:student-contact:first-submit')")
     public CommonResult<Long> submitFirstContact(@PathVariable Long relationId,
@@ -151,7 +159,7 @@ public class StudentContactController {
     @PostMapping("/{relationId}/attachments")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-contact:first-submit', 'zsjos:student-contact:study-plan-submit', "
             + "'zsjos:student-contact:submit', 'zsjos:student-contact:delivery-stage-submit', "
-            + "'zsjos:student-contact-extension:apply')")
+            + "'zsjos:student-contact:checklist-update', 'zsjos:student-contact-extension:apply')")
     public CommonResult<StudentContactAttachmentRespVO> uploadAttachment(@PathVariable Long relationId,
                                                                           @RequestParam("file") MultipartFile file)
             throws IOException {

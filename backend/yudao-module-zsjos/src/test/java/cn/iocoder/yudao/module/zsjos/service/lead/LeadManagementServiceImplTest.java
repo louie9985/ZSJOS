@@ -66,7 +66,6 @@ class LeadManagementServiceImplTest {
     private LeadManagementServiceImpl service;
     @Mock private LeadSubmitterFeedbackPermissionProvider submitterFeedbackPermission;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadSubmitterAssistRequestMapper submitterAssistRequestMapper;
-    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
     @Mock
     private LeadMapper leadMapper;
     @Mock private LeadRestoreOwnerPolicy restoreOwnerPolicy;
@@ -97,7 +96,7 @@ class LeadManagementServiceImplTest {
     @Mock
     private SalesOrderMapper salesOrderMapper;
     @Mock
-    private LeadAgingPoolService agingPoolService;
+    private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock
     private AdvancedFilterService advancedFilterService;
     @Mock
@@ -220,7 +219,7 @@ class LeadManagementServiceImplTest {
         org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null);
         org.mockito.Mockito.lenient().when(securityFrameworkService.hasPermission(
                 org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
-        org.mockito.Mockito.lenient().when(agingPoolService.canOperate(
+        org.mockito.Mockito.lenient().when(publicSeaPoolService.canOperate(
                         org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(Long.class),
                         org.mockito.ArgumentMatchers.anyLong()))
                 .thenAnswer(invocation -> java.util.Objects.equals(invocation.getArgument(1), invocation.getArgument(2)));
@@ -674,12 +673,8 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
-    void studentInformationEntryRequiresWonOwnershipAndHidesAfterSubmission() {
+    void collectionGenerationIsNoLongerExposedOnLead() {
         LeadDO lead = actionLead("won", "owned", false);
-        when(securityFrameworkService.hasPermission("zsjos:student-info-form:create")).thenReturn(true);
-        when(leadObjectPermissionService.canReadAsOwnerOrManager(lead, 20L)).thenReturn(true);
-        assertActions(lead, null, "GENERATE_STUDENT_INFO_FORM", "ENTER_REPURCHASE");
-        when(studentInfoForms.submitted(1L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO());
         assertActions(lead, null, "ENTER_REPURCHASE");
     }
 
@@ -701,7 +696,7 @@ class LeadManagementServiceImplTest {
 
         assertEquals(List.of("SUPERVISOR_TRANSFER", "SUPERVISOR_RELEASE_CLAIM_POOL"),
                 result.getAvailableActions().stream().map(LeadManagementRespVO.ActionVO::getCode).toList());
-        verify(agingPoolService, never()).canEnterManually(1L);
+        verify(publicSeaPoolService, never()).canEnterManually(1L);
     }
 
     @Test
@@ -709,11 +704,11 @@ class LeadManagementServiceImplTest {
         LeadDO lead = actionLead("valid", "owned", true);
         OpportunityDO opportunity = new OpportunityDO();
         opportunity.setId(30L); opportunity.setStatus("following");
-        cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO cycle =
-                new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO();
+        cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO cycle =
+                new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO();
         cycle.setStatus("assigned"); cycle.setCollaboratorUserId(30L);
-        when(agingPoolService.getActiveCycle(1L)).thenReturn(cycle);
-        when(agingPoolService.canOperate(1L, 20L, 30L)).thenReturn(true);
+        when(publicSeaPoolService.getActiveCycle(1L)).thenReturn(cycle);
+        when(publicSeaPoolService.canOperate(1L, 20L, 30L)).thenReturn(true);
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());

@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.pms.service.kb.interaction;
 
 import cn.iocoder.yudao.module.pms.controller.admin.kb.interaction.vo.share.PmsKnowledgeDocumentSharePublicRespVO;
 import cn.iocoder.yudao.module.pms.enums.kb.content.PmsKnowledgeDocumentTypeEnum;
+import cn.iocoder.yudao.module.pms.service.kb.content.PmsKnowledgeExcelParser;
+import cn.iocoder.yudao.module.pms.controller.admin.kb.content.vo.document.PmsKnowledgeExcelPreviewRespVO;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.DocumentType;
@@ -25,7 +27,9 @@ public final class PmsKnowledgeSharePage {
         var article = page.selectFirst("main").appendElement("article");
         article.appendElement("h1").text(document.getTitle());
         if (file) {
-            article.appendElement("p").text("图片、PDF 可由浏览器查看；其他文件请下载后打开。");
+            article.appendElement("p").text("图片、PDF 可由浏览器查看，Excel 支持表格预览；其他文件请下载后打开。");
+            if (PmsKnowledgeExcelParser.supports(document.getTitle(), document.getFileType()))
+                article.appendElement("p").appendElement("a").attr("href", excelLink(token, null, -1)).text("预览表格");
             article.appendElement("a").attr("href", "file?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8))
                     .attr("target", "_blank").attr("rel", "noopener noreferrer").text("打开／下载文件");
         } else {
@@ -35,6 +39,9 @@ public final class PmsKnowledgeSharePage {
             var section = article.appendElement("section");
             section.appendElement("h2").text("附件");
             for (var attachment : document.getAttachments()) {
+                if (PmsKnowledgeExcelParser.supports(attachment.getFileName(), attachment.getMimeType()))
+                    section.appendElement("p").appendElement("a")
+                            .attr("href", excelLink(token, attachment.getFileId(), -1)).text("预览表格：" + attachment.getFileName());
                 section.appendElement("p").appendElement("a")
                         .attr("href", "attachment?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8) + "&fileId=" + attachment.getFileId())
                         .attr("target", "_blank").attr("rel", "noopener noreferrer").text(attachment.getFileName());
@@ -49,6 +56,58 @@ public final class PmsKnowledgeSharePage {
         state.appendElement("h1").text(title);
         state.appendElement("p").text(message);
         if (retry) state.appendElement("a").attr("href", "").text("重试");
+        return page.outerHtml();
+    }
+
+    private static String excelLink(String token, Long fileId, int sheet) {
+        return "excel?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)
+                + (fileId == null ? "" : "&fileId=" + fileId) + "&sheetIndex=" + sheet;
+    }
+
+    public static String excel(PmsKnowledgeExcelPreviewRespVO preview, String token, Long fileId) {
+        var page = shell("Excel 表格预览", "中世健教育知识库表格只读预览");
+        var main = page.selectFirst("main");
+        main.appendElement("h1").text("表格预览");
+        main.appendElement("p").text("只读预览 · 公式使用文件已保存的结果 · 不含图表及打印版式");
+        main.appendElement("a").attr("href", "page?token=" + URLEncoder.encode(token, StandardCharsets.UTF_8)).text("返回文档");
+        var nav = main.appendElement("nav").attr("aria-label", "工作表");
+        for (var sheet : preview.sheets()) {
+            var link = nav.appendElement("a").attr("href", excelLink(token, fileId, sheet.index()))
+                    .attr("style", "display:inline-block;margin:12px 16px 12px 0").text(sheet.name());
+            if (sheet.index() == preview.sheetIndex()) link.attr("aria-current", "page");
+        }
+        preview.notices().forEach(notice -> main.appendElement("p").attr("role", "status").text(notice));
+        if (preview.rows().isEmpty() || preview.columnCount() == 0) main.appendElement("p").text("工作表为空");
+        else {
+            var table = main.appendElement("div").addClass("table-scroll")
+                    .attr("style", "max-height:70vh;overflow:auto").attr("tabindex", "0").appendElement("table");
+            var header = table.appendElement("thead").appendElement("tr");
+            header.appendElement("th").attr("scope", "col").text("行");
+            for (int c = 0; c < preview.columnCount(); c++)
+                header.appendElement("th").attr("scope", "col").text(org.apache.poi.ss.util.CellReference.convertNumToColString(c));
+            var body = table.appendElement("tbody");
+            boolean[][] covered = new boolean[preview.rows().size()][preview.columnCount()];
+            var anchors = new java.util.HashMap<Integer, PmsKnowledgeExcelPreviewRespVO.Merge>();
+            for (var merge : preview.merges()) {
+                anchors.put(merge.row() * preview.columnCount() + merge.column(), merge);
+                for (int r = merge.row(); r < merge.row() + merge.rowSpan(); r++)
+                    for (int c = merge.column(); c < merge.column() + merge.colSpan(); c++)
+                        if (r != merge.row() || c != merge.column()) covered[r][c] = true;
+            }
+            for (int r = 0; r < preview.rows().size(); r++) {
+                var tr = body.appendElement("tr");
+                tr.appendElement("th").attr("scope", "row").text(String.valueOf(r + 1));
+                var cells = preview.rows().get(r);
+                for (int c = 0; c < preview.columnCount(); c++) {
+                    if (covered[r][c]) continue;
+                    var cell = tr.appendElement("td").attr("style", "white-space:pre-wrap;max-width:480px")
+                            .text(c < cells.size() ? cells.get(c) : "");
+                    var merge = anchors.get(r * preview.columnCount() + c);
+                    if (merge != null) cell.attr("rowspan", String.valueOf(merge.rowSpan()))
+                            .attr("colspan", String.valueOf(merge.colSpan()));
+                }
+            }
+        }
         return page.outerHtml();
     }
 

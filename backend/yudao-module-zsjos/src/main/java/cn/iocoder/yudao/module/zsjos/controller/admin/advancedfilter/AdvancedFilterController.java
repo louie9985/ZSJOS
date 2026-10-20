@@ -28,7 +28,7 @@ public class AdvancedFilterController {
     @Operation(summary = "获得高级筛选字段目录")
     @PreAuthorize("(#scene == 'lead' && @ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted',"
             + "'zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:claim-pool:query',"
-            + "'zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
+            + "'zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query'))"
             + " || (#scene == 'order' && @ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-management','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create'))"
@@ -41,6 +41,7 @@ public class AdvancedFilterController {
             + " || (#scene == 'student_service' && @ss.hasPermission('zsjos:student:query-my'))"
             + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
             + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))"
+            + " || (#scene == 'education_team' && @ss.hasPermission('zsjos:education-team:query'))"
             + " || (#scene == 'cashback' && @ss.hasAnyPermissions('zsjos:cashback:my-query','zsjos:cashback:finance-query'))"
             + " || (#scene == 'withdrawal' && @ss.hasAnyPermissions('zsjos:withdrawal:my-query','zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query'))")
     public CommonResult<AdvancedFilterCatalogRespVO> catalog(@RequestParam String scene) {

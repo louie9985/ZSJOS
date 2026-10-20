@@ -16,7 +16,7 @@ public interface LeadAssignmentHistoryMapper extends BaseMapperX<LeadAssignmentH
             java.time.LocalDateTime start, java.time.LocalDateTime end) {
         if (userIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<LeadAssignmentHistoryDO>()
-                .select(LeadAssignmentHistoryDO::getLeadId, LeadAssignmentHistoryDO::getCandidateUserId, LeadAssignmentHistoryDO::getActionType)
+                .select(LeadAssignmentHistoryDO::getLeadId, LeadAssignmentHistoryDO::getCandidateUserId, LeadAssignmentHistoryDO::getActionType, LeadAssignmentHistoryDO::getOwnerIdentitySnapshot)
                 .in(LeadAssignmentHistoryDO::getCandidateUserId, userIds)
                 .ge(LeadAssignmentHistoryDO::getOccurredAt, start).lt(LeadAssignmentHistoryDO::getOccurredAt, end));
     }

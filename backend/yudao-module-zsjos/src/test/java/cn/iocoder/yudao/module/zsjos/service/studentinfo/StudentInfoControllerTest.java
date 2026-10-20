@@ -19,20 +19,21 @@ class StudentInfoControllerTest {
     @Configuration @EnableMethodSecurity
     static class Config {
         @Bean(name="ss") SecurityFrameworkService security() { return mock(SecurityFrameworkService.class); }
+
         @Bean StudentInfoFormController controller() { return new StudentInfoFormController(); }
     }
     @Test void sensitiveReadRequiresBothPermissionsAndExportIsIndependent() throws Exception {
         try (var context=new AnnotationConfigApplicationContext()) {
             var service=mock(StudentInfoFormService.class);
-            context.getBeanFactory().registerSingleton("service",service); context.register(Config.class); context.refresh();
+            context.getBeanFactory().registerSingleton("studentInfoFormService",service); context.getBeanFactory().registerSingleton("imageService",mock(StudentInfoImageService.class)); context.register(Config.class); context.refresh();
             var controller=context.getBean(StudentInfoFormController.class);
             var ss=context.getBean(SecurityFrameworkService.class);
-            assertThrows(AccessDeniedException.class, () -> controller.generate(1L));
+            assertThrows(AccessDeniedException.class, () -> controller.generate(1L,new cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Command()));
             when(ss.hasPermission("zsjos:student-info-form:read")).thenReturn(true);
             controller.detail(1L); verify(service).detail(1L);
             assertThrows(AccessDeniedException.class, () -> controller.sensitive(1L));
             assertThrows(AccessDeniedException.class, () -> controller.export(1L,new org.springframework.mock.web.MockHttpServletResponse()));
-            when(ss.hasPermission("zsjos:student-info-form:sensitive-read")).thenReturn(true);
+            when(service.canReadSensitive()).thenReturn(true);
             controller.sensitive(1L); verify(service).sensitiveDetail(1L);
             when(ss.hasPermission("zsjos:student-info-form:read")).thenReturn(false);
             assertThrows(AccessDeniedException.class, () -> controller.sensitive(1L));

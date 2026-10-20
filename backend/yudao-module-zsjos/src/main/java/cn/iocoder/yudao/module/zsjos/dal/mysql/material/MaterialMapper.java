@@ -19,10 +19,22 @@ import java.util.List;
 public interface MaterialMapper extends BaseMapperX<MaterialDO> {
 
     default PageResult<MaterialDO> selectPage(MaterialPageReqVO req, Long userId, boolean canManage) {
+        return selectPage(req, userId, canManage, false);
+    }
+
+    default PageResult<MaterialDO> selectPage(MaterialPageReqVO req, Long userId, boolean canManage, boolean browse) {
         LambdaQueryWrapperX<MaterialDO> query = new LambdaQueryWrapperX<MaterialDO>()
                 .eqIfPresent(MaterialDO::getMaterialTypeId, req.getMaterialTypeId())
                 .eqIfPresent(MaterialDO::getSource, req.getSource());
-        if (canManage) {
+        if (browse) {
+            query.eq(MaterialDO::getStatus, "EFFECTIVE")
+                    .apply("EXISTS (SELECT 1 FROM zsjos_material_version mv WHERE mv.id=zsjos_material.current_effective_version_id "
+                            + "AND mv.material_id=zsjos_material.id AND mv.tenant_id=zsjos_material.tenant_id "
+                            + "AND mv.deleted=b'0' AND mv.status='EFFECTIVE')")
+                    .apply("EXISTS (SELECT 1 FROM zsjos_material_type mt WHERE mt.id=zsjos_material.material_type_id "
+                            + "AND mt.tenant_id=zsjos_material.tenant_id AND mt.status=0 AND mt.deleted=b'0')");
+            if (Boolean.TRUE.equals(req.getMine())) query.eq(MaterialDO::getOwnerUserId, userId);
+        } else if (canManage) {
             query.eqIfPresent(MaterialDO::getStatus, req.getStatus());
             if (Boolean.TRUE.equals(req.getMine())) query.eq(MaterialDO::getOwnerUserId, userId);
         } else if (Boolean.TRUE.equals(req.getMine())) {
@@ -35,19 +47,27 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
         }
         // A published material stays EFFECTIVE while its revision is under review.
         // Personal filters must follow the selected revision, not the public material status.
-        if (Boolean.TRUE.equals(req.getMine()) && req.getVersionStatus() != null) {
+        if (!browse && Boolean.TRUE.equals(req.getMine()) && req.getVersionStatus() != null) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_material_version mv WHERE "
                     + "mv.id=COALESCE(zsjos_material.current_draft_version_id,zsjos_material.current_effective_version_id) "
                     + "AND mv.tenant_id=zsjos_material.tenant_id AND mv.deleted=b'0' AND mv.status={0})",
                     req.getVersionStatus());
         }
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
-            query.and(item -> item.like(MaterialDO::getMaterialNo, req.getKeyword())
-                    .or().like(MaterialDO::getTitle, req.getKeyword())
-                    .or().like(MaterialDO::getSummary, req.getKeyword())
-                    .or().apply("EXISTS (SELECT 1 FROM zsjos_material_version mv WHERE "
-                            + "mv.id=zsjos_material.current_effective_version_id AND mv.tenant_id=zsjos_material.tenant_id "
-                            + "AND mv.deleted=b'0' AND mv.search_text LIKE CONCAT('%',{0},'%'))", req.getKeyword()));
+            if (browse) {
+                query.and(item -> item.like(MaterialDO::getMaterialNo, req.getKeyword())
+                        .or().apply("EXISTS (SELECT 1 FROM zsjos_material_version mv WHERE "
+                                + "mv.id=zsjos_material.current_effective_version_id AND mv.tenant_id=zsjos_material.tenant_id "
+                                + "AND mv.deleted=b'0' AND (mv.title LIKE CONCAT('%',{0},'%') "
+                                + "OR mv.summary LIKE CONCAT('%',{0},'%') OR mv.search_text LIKE CONCAT('%',{0},'%')))", req.getKeyword()));
+            } else {
+                query.and(item -> item.like(MaterialDO::getMaterialNo, req.getKeyword())
+                        .or().like(MaterialDO::getTitle, req.getKeyword())
+                        .or().like(MaterialDO::getSummary, req.getKeyword())
+                        .or().apply("EXISTS (SELECT 1 FROM zsjos_material_version mv WHERE "
+                                + "mv.id=zsjos_material.current_effective_version_id AND mv.tenant_id=zsjos_material.tenant_id "
+                                + "AND mv.deleted=b'0' AND mv.search_text LIKE CONCAT('%',{0},'%'))", req.getKeyword()));
+            }
         }
         if (Boolean.TRUE.equals(req.getFavorite())) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_material_favorite f WHERE f.material_id=zsjos_material.id "
@@ -198,6 +218,12 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
 
     @Select("SELECT * FROM zsjos_material WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     MaterialDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+    default int deleteDraft(Long id, Integer expectedVersion) {
+        return delete(new LambdaQueryWrapperX<MaterialDO>()
+                .eq(MaterialDO::getId, id).eq(MaterialDO::getVersion, expectedVersion)
+                .eq(MaterialDO::getStatus, "DRAFT").isNull(MaterialDO::getCurrentEffectiveVersionId));
+    }
 
     default int updateDraftPointer(Long id, Integer expectedVersion, Long draftVersionId, String status) {
         return update(null, new LambdaUpdateWrapper<MaterialDO>()

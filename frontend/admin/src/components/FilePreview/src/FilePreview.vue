@@ -6,21 +6,22 @@
       v-if="failed"
       :closable="false"
       show-icon
-      title="预览加载失败，请使用文件名旁的下载入口查看"
+      title="预览加载失败，请点击此处重试"
       type="info"
+      @click="retryPreview"
     />
     <el-image
       v-else-if="previewType === 'image'"
       class="h-520px w-full"
       fit="contain"
-      :preview-src-list="[url]"
-      :src="url"
+      :preview-src-list="[previewUrl]"
+      :src="previewUrl"
       @error="failed = true"
     />
     <iframe
       v-else-if="previewType === 'iframe'"
       class="h-620px w-full border-0 bg-[var(--el-bg-color)]"
-      :src="url"
+      :src="previewUrl"
       @error="failed = true"
       title="文件在线预览"
     ></iframe>
@@ -28,7 +29,7 @@
       v-else-if="previewType === 'video'"
       class="h-520px w-full"
       controls
-      :src="url"
+      :src="previewUrl"
       @error="failed = true"
     >
       当前浏览器不支持视频预览
@@ -37,7 +38,7 @@
       v-else-if="previewType === 'audio'"
       class="w-[min(560px,90%)]"
       controls
-      :src="url"
+      :src="previewUrl"
       @error="failed = true"
     >
       当前浏览器不支持音频预览
@@ -47,6 +48,8 @@
 </template>
 
 <script lang="ts" setup>
+import { retryImageUrl } from '@/utils/imageRetry'
+
 defineOptions({ name: 'FilePreview' })
 
 const props = defineProps<{
@@ -57,12 +60,21 @@ const props = defineProps<{
 }>()
 
 const failed = ref(false)
+const retryAttempt = ref(0)
+const previewUrl = ref(props.url)
 watch(
   () => props.url,
   () => {
     failed.value = false
+    retryAttempt.value = 0
+    previewUrl.value = props.url
   }
 )
+function retryPreview() {
+  retryAttempt.value += 1
+  failed.value = false
+  previewUrl.value = retryImageUrl(props.url, retryAttempt.value)
+}
 
 const IMAGE_EXTENSIONS = new Set(['bmp', 'gif', 'jpeg', 'jpg', 'png', 'svg', 'webp'])
 const IFRAME_EXTENSIONS = new Set(['pdf', 'txt'])

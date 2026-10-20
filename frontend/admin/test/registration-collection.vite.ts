@@ -1,0 +1,5 @@
+import {defineConfig} from 'vite'
+import vue from '@vitejs/plugin-vue'
+import AutoImport from 'unplugin-auto-import/vite'
+import {resolve} from 'node:path'
+export default defineConfig({cacheDir:'node_modules/.cache/registration-collection',plugins:[vue(),AutoImport({imports:['vue'],dts:false})],css:{preprocessorOptions:{scss:{additionalData:(source:string,filename:string)=>filename.replaceAll(String.fromCharCode(92),'/').endsWith('/styles/global.module.scss')||filename.replaceAll(String.fromCharCode(92),'/').endsWith('/styles/variables.scss')?source:'$namespace: v; $elNamespace: el;'+source}}},resolve:{alias:[...['@/config/axios','@/utils/permission','@/hooks/web/useMessage'].map(find=>({find,replacement:resolve(process.cwd(),'test/registration-collection-request.ts')})),{find:'@',replacement:resolve(process.cwd(),'src')}]},server:{host:'127.0.0.1',port:5299,strictPort:true},build:{outDir:'test/.collection-build',rollupOptions:{input:resolve(process.cwd(),'test/registration-collection.html')}}})

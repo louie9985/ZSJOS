@@ -64,17 +64,15 @@ public class StudentServiceSummaryReader {
         var readableOrders = readableOrders(orderRows, actor);
         var roundIds = orderRows.stream().filter(o -> readableOrders.contains(o.getId())).map(o -> o.getCurrentApprovalRoundId()).filter(Objects::nonNull).distinct().toList();
         var roundMap = index(roundIds.isEmpty() ? List.<cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalRoundDO>of() : rounds.selectBatchIds(roundIds), cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalRoundDO::getId);
-        var leadIds = orderRows.stream().map(o -> o.getLeadId()).filter(Objects::nonNull).distinct().toList();
-        Set<Long> readableInfo = permission.hasAnyPermissions(actor, "zsjos:student-info-form:read") && !leadIds.isEmpty()
-                ? leadPermission.filterReadableDetails(leads.selectBatchIds(leadIds), actor) : Set.of();
+        var caseIds = relations.stream().map(ServiceRelationDO::getRegistrationCaseId).filter(Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> readableInfo = permission.hasAnyPermissions(actor, "zsjos:student-info-form:read") ? caseIds : Set.of();
         // Metadata-only projection deliberately excludes token hashes, field values and attachments.
         var formRows = readableInfo.isEmpty() ? List.<StudentInfoFormDO>of() : forms.selectList(new LambdaQueryWrapper<StudentInfoFormDO>()
-                .select(StudentInfoFormDO::getId, StudentInfoFormDO::getLeadId, StudentInfoFormDO::getStatus, StudentInfoFormDO::getSubmittedAt, StudentInfoFormDO::getRevokedAt, StudentInfoFormDO::getExpiresAt)
-                .in(StudentInfoFormDO::getLeadId, readableInfo).orderByDesc(StudentInfoFormDO::getId));
+                .select(StudentInfoFormDO::getId, StudentInfoFormDO::getRegistrationCaseId, StudentInfoFormDO::getStatus, StudentInfoFormDO::getSubmittedAt, StudentInfoFormDO::getRevokedAt, StudentInfoFormDO::getExpiresAt)
+                .in(StudentInfoFormDO::getRegistrationCaseId, readableInfo).orderByDesc(StudentInfoFormDO::getId));
         Map<Long, StudentInfoFormDO> formMap = new HashMap<>();
         for (var form : formRows) {
-            var previous = formMap.get(form.getLeadId());
-            if (previous == null || !"SUBMITTED".equals(previous.getStatus()) && "SUBMITTED".equals(form.getStatus())) formMap.put(form.getLeadId(), form);
+            formMap.put(form.getRegistrationCaseId(), form);
         }
         Map<Long, StudentServiceSummaryVO> result = new LinkedHashMap<>();
         for (var relation : relations) {
@@ -114,10 +112,10 @@ public class StudentServiceSummaryReader {
                 handoff.setSubmitterUserName(snapshot.getSubmitter() == null ? null : snapshot.getSubmitter().name());
             }
             var info = new StudentServiceSummaryVO.InfoSubmission(); value.setInfoSubmission(info);
-            var leadId = order == null ? null : order.getLeadId();
-            info.setAccess(leadId == null ? "absent" : readableInfo.contains(leadId) ? "readable" : "denied");
+            var caseId = relation.getRegistrationCaseId();
+            info.setAccess(caseId == null ? "absent" : readableInfo.contains(caseId) ? "readable" : "denied");
             if ("readable".equals(info.getAccess())) {
-                var form = formMap.get(leadId);
+                var form = formMap.get(caseId);
                 info.setStatus(form == null ? "NONE" : "DRAFT".equals(form.getStatus()) && (form.getRevokedAt() != null || form.getExpiresAt() == null || !form.getExpiresAt().isAfter(now)) ? "EXPIRED" : form.getStatus());
                 info.setSubmittedAt(form == null ? null : form.getSubmittedAt());
             }

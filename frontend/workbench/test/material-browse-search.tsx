@@ -30,25 +30,37 @@ const rows: Material[] = Array.from({ length: 23 }, (_, index) => ({
   }
 }))
 const params = new URLSearchParams(location.search)
+const publication = params.has('publication')
+const browseRows = publication ? rows.slice(0, 1).map(row => ({ ...row, materialTypeName: '爆款账号',
+  currentVersion: { ...row.currentVersion!, title: 'Published account', values: { account_name: 'Published account' },
+    fields: [{ key: 'account_name', label: '账号名称', type: 'text' as const }] } })) : rows
 let failed = false
 http.defaults.adapter = async config => {
   const url = config.url || ''; let data: unknown
-  if (url.endsWith('/material-type/list')) data = [{ id: 2, code: 'synthetic', name: '验收素材', status: 0 }]
-  else if (url.endsWith('/material/page')) {
+  if (url.endsWith('/material-type/list')) data = [{ id: 2, code: publication ? 'viral_account' : 'synthetic', name: '验收素材', status: 0 }]
+  else if (url.endsWith('/material/browse/page')) {
     document.documentElement.dataset.request = JSON.stringify(config.params)
     if (params.has('error') && !failed) { failed = true; throw new Error('素材加载失败（验收）') }
     if (params.has('denied')) return { data: { code: 403, msg: '无权访问素材库' }, status: 200, statusText: 'OK', headers: {}, config }
     const keyword = config.params?.keyword || ''
-    const list = keyword === '不存在' ? [] : rows
+    const list = keyword === '不存在' ? [] : browseRows
     const offset = (config.params.pageNo - 1) * config.params.pageSize
     data = { list: list.slice(offset, offset + config.params.pageSize), total: list.length }
     await new Promise(resolve => setTimeout(resolve, 80))
-  } else if (/\/material\/\d+$/.test(url)) data = rows.find(row => row.id === Number(url.split('/').pop()))
+  } else if (/\/material\/browse\/\d+$/.test(url)) {
+    document.documentElement.dataset.detailRequest = url
+    data = browseRows.find(row => row.id === Number(url.split('/').pop()))
+    if (!data) return { data: { code: 403, msg: '无权浏览未生效素材' }, status: 200, statusText: 'OK', headers: {}, config }
+  } else if (/\/material\/browse\/\d+\/version\/list$/.test(url)) {
+    document.documentElement.dataset.historyRequest = url
+    data = [browseRows[0].currentVersion]
+  }
   else if (url.endsWith('/recommendation-account-candidates')) { document.documentElement.dataset.unexpectedRecommendation = 'true'; throw new Error('Unexpected recommendation request') }
   else if (url.includes('/dict-data/')) data = []
   else throw new Error(`Unexpected fixture request: ${url}`)
   return { data: { code: 0, data }, status: 200, statusText: 'OK', headers: {}, config }
 }
 createRoot(document.getElementById('root')!).render(<App><MemoryRouter>
-  <MaterialLibraryPage permissions={['zsjos:material:query']} />
+  <MaterialLibraryPage permissions={publication ? ['zsjos:material:query', 'zsjos:material:manage', 'zsjos:material:create',
+    'zsjos:material:update', 'zsjos:material:submit', 'zsjos:material-approval:approve', 'bpm:process-instance:cancel'] : ['zsjos:material:query']} />
 </MemoryRouter></App>)

@@ -255,6 +255,7 @@ class MyStudentServiceImplTest {
 
     @Test
     void getMyPageWithManagedPermissionReadsDepartmentSubtreeByServiceOwner() {
+        when(classScopeService.readablePendingClassId(28L)).thenReturn(null);
         MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20);
         PersonDO person = new PersonDO(); person.setId(70L); person.setName("Dept Student");
@@ -264,12 +265,12 @@ class MyStudentServiceImplTest {
         relation.setActivatedAt(LocalDateTime.of(2026, 9, 1, 9, 0));
         when(advancedFilterService.matchStudentPersonIds(null, 28L)).thenReturn(null);
         when(permissionApi.hasAnyPermissions(28L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
-        when(classScopeService.resolve(28L))
+        when(classScopeService.resolveRead(28L))
                 .thenReturn(new DeliveryClassScopeService.Scope(false, Set.of(1050L, 1051L)));
         when(adminUserApi.getUserListByDeptIds(Set.of(1050L, 1051L)))
                 .thenReturn(List.of(new AdminUserRespDTO().setId(31L), new AdminUserRespDTO().setId(32L)));
         Set<Long> expectedOwners = new LinkedHashSet<>(List.of(28L, 31L, 32L));
-        when(personMapper.selectManagedStudentPage(reqVO, expectedOwners, null))
+        when(personMapper.selectManagedStudentPage(reqVO, expectedOwners, null, null, 28L))
                 .thenReturn(new PageResult<>(List.of(person), 1L));
         when(relationMapper.selectOwnedByOwnerIdsAndPersonIds(expectedOwners, List.of(70L), null))
                 .thenReturn(List.of(relation));
@@ -283,7 +284,7 @@ class MyStudentServiceImplTest {
         MyStudentRespVO.ServiceVO service0 = result.getList().getFirst().getServices().getFirst();
         assertEquals(90L, service0.getClassId());
         assertEquals("CLASS-A", service0.getClassName());
-        verify(personMapper).selectManagedStudentPage(reqVO, expectedOwners, null);
+        verify(personMapper).selectManagedStudentPage(reqVO, expectedOwners, null, null, 28L);
         verify(personMapper, never()).selectMyStudentPage(any(), anyLong(), any());
     }
 
@@ -366,14 +367,47 @@ class MyStudentServiceImplTest {
     @Test
     void managedScopeFailureDoesNotFallBackToGlobalRead() {
         when(permissionApi.hasAnyPermissions(28L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
-        when(classScopeService.resolve(28L)).thenThrow(new IllegalStateException("scope unavailable"));
+        when(classScopeService.resolveRead(28L)).thenThrow(new IllegalStateException("scope unavailable"));
         assertThrows(IllegalStateException.class, () -> service.getMyStudent(28L, 70L));
         verifyNoInteractions(relationMapper, personMapper);
     }
 
     private void mockManagedScope(boolean all, Set<Long> departments) {
         when(permissionApi.hasAnyPermissions(28L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
-        when(classScopeService.resolve(28L)).thenReturn(new DeliveryClassScopeService.Scope(all, departments));
+        when(classScopeService.resolveRead(28L)).thenReturn(new DeliveryClassScopeService.Scope(all, departments));
+        org.mockito.Mockito.lenient().when(classScopeService.readablePendingClassId(28L)).thenReturn(null);
+    }
+
+    @Test
+    void pendingDetailIncludesUnownedServiceButNotSiblingOutsideScope() {
+        mockManagedScope(false, Set.of());
+        when(classScopeService.readablePendingClassId(28L)).thenReturn(90L);
+        ServiceRelationDO pending = detailRelation(71L, null); pending.setClassId(90L);
+        ServiceRelationDO sibling = detailRelation(72L, 99L); sibling.setClassId(91L);
+        when(relationMapper.selectManagedByPersonIds(Set.of(28L), List.of(70L), null, 90L)).thenReturn(List.of(pending));
+        PersonDO person = new PersonDO(); person.setId(70L);
+        when(personMapper.selectById(70L)).thenReturn(person);
+        when(relationMapper.selectById(71L)).thenReturn(pending);
+        when(relationMapper.selectById(72L)).thenReturn(sibling);
+        assertEquals(List.of(71L), service.getMyStudentByService(28L, 71L).getServices().stream()
+                .map(MyStudentRespVO.ServiceVO::getServiceRelationId).toList());
+        assertThrows(ServiceException.class, () -> service.getMyStudentByService(28L, 72L));
+    }
+
+    @Test
+    void legacyManagedPageIncludesPendingWithoutExpandingOtherCourses() {
+        mockManagedScope(false, Set.of());
+        when(classScopeService.readablePendingClassId(28L)).thenReturn(90L);
+        var req = new MyStudentPageReqVO(); req.setClassId(90L);
+        var person = new PersonDO(); person.setId(70L);
+        var relation = detailRelation(71L, null); relation.setClassId(90L);
+        when(personMapper.selectManagedStudentPage(req, Set.of(28L), List.of(), 90L, 28L))
+                .thenReturn(new PageResult<>(List.of(person), 1L));
+        when(relationMapper.selectManagedByPersonIds(Set.of(28L), List.of(70L), null, 90L)).thenReturn(List.of(relation));
+        when(personMapper.selectById(70L)).thenReturn(person);
+        var result = service.getMyPage(28L, req);
+        assertEquals(1L, result.getTotal());
+        assertEquals(71L, result.getList().getFirst().getServices().getFirst().getServiceRelationId());
     }
 
     private ServiceRelationDO detailRelation(Long id, Long owner) {

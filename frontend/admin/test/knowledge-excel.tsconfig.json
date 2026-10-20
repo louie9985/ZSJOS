@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": [], "rootDir": ".." },
+  "include": [
+    "../src/api/pms/kb/content/excel.ts",
+    "../src/views/pms/kb/document/KnowledgeExcelPreview.vue",
+    "../src/views/pms/kb/document/KnowledgeAttachments.vue",
+    "../src/views/pms/kb/document/KnowledgeDocumentDetail.vue",
+    "../src/views/pms/kb/document/KnowledgeRecycleDetail.vue",
+    "../src/views/pms/kb/document/share/index.vue",
+    "../types/**/*.d.ts",
+    "../src/types/*.d.ts",
+    "../node_modules/vite/client.d.ts"
+  ]
+}

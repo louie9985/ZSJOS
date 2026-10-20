@@ -20,8 +20,8 @@ KEY = 'legacy-deal-state-v304'
 LOCAL_DB = 'ruoyi-vue-pro'
 TABLES = ['zsjos_person', 'zsjos_lead', 'zsjos_opportunity', 'zsjos_order',
           'zsjos_lead_intended_product', 'zsjos_business_task', 'zsjos_lead_follow_up_record',
-          'zsjos_opportunity_follow_up_record', 'zsjos_lead_aging_pool_cycle',
-          'zsjos_lead_public_sea_record', 'zsjos_order_approval_round',
+          'zsjos_opportunity_follow_up_record', 'zsjos_lead_public_sea_pool_cycle',
+          'zsjos_lead_public_sea_pool_compatibility_record', 'zsjos_order_approval_round',
           'zsjos_data_repair_backup', 'zsjos_schema_version', 'zsjos_module_schema_version']
 
 

@@ -42,17 +42,14 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
         query.and(req.getKeyword() != null && !req.getKeyword().isBlank(), q -> q
                 .like(DeliveryClassDO::getClassName, req.getKeyword().trim())
                 .or().like(DeliveryClassDO::getClassNo, req.getKeyword().trim()));
-        if (homeroomUserId != null) query.eq(DeliveryClassDO::getHomeroomUserId, homeroomUserId);
-        if (!allDepartments && homeroomUserId == null) {
-            if (deptIds == null || deptIds.isEmpty()) {
-                if (includeSystem) query.eq(DeliveryClassDO::getSystemClass, true);
-                else query.apply("1 = 0");
-            } else if (includeSystem) {
-                query.and(scope -> scope.eq(DeliveryClassDO::getSystemClass, true)
-                        .or().in(DeliveryClassDO::getDeptId, deptIds));
-            } else {
-                query.in(DeliveryClassDO::getDeptId, deptIds);
-            }
+        if (!allDepartments) {
+            query.and(scope -> {
+                // Identity and configured departments are independent grants; neither implies the other.
+                scope.apply("1 = 0");
+                if (homeroomUserId != null) scope.or().eq(DeliveryClassDO::getHomeroomUserId, homeroomUserId);
+                if (deptIds != null && !deptIds.isEmpty()) scope.or().in(DeliveryClassDO::getDeptId, deptIds);
+                if (includeSystem) scope.or().eq(DeliveryClassDO::getSystemClass, true);
+            });
         }
         if (!includeSystem) query.eq(DeliveryClassDO::getSystemClass, false);
         return query.orderByDesc(DeliveryClassDO::getSystemClass)

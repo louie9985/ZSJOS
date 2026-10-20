@@ -36,12 +36,17 @@ import ResizableDrawer from './ResizableDrawer'
 import { SETTINGS_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 import { useTheme } from './Theme/ThemeContext'
 import { BgColorsOutlined, CheckOutlined } from '@ant-design/icons'
+import NavigationOrderModal from './NavigationOrderModal'
+import { NAVIGATION_QUERY, NAVIGATION_UPDATE, type NavigationNode } from '../services/navigationOrder'
 
 const { Text } = Typography
 
 /** 独立设置 Drawer，集中承载所有主题与布局设置 */
-const SettingsDrawer: React.FC = () => {
+const SettingsDrawer: React.FC<{ menus: NavigationNode[]; permissions: string[] }> = ({ menus, permissions }) => {
   const [open, setOpen] = useState(false)
+  const [navigationOpen, setNavigationOpen] = useState(false)
+  const canReadNavigation = permissions.includes(NAVIGATION_QUERY) || permissions.includes('*:*:*')
+  const canSaveNavigation = permissions.includes(NAVIGATION_UPDATE) || permissions.includes('*:*:*')
   const { token } = theme.useToken()
   const {
     preset,
@@ -83,6 +88,7 @@ const SettingsDrawer: React.FC = () => {
 
   return (
     <>
+      {canReadNavigation && <NavigationOrderModal open={navigationOpen} menus={menus} canSave={canSaveNavigation} onClose={() => setNavigationOpen(false)} />}
       <Tooltip title="系统设置">
         <Button
           type="text"
@@ -103,6 +109,7 @@ const SettingsDrawer: React.FC = () => {
         styles={{ body: { paddingTop: 12 } }}
       >
         {/* ===== 导航布局 ===== */}
+        {canReadNavigation && <><SectionTitle>导航栏</SectionTitle><Button block onClick={() => { setOpen(false); setNavigationOpen(true) }}>导航栏调整</Button><Divider /></>}
         <SectionTitle>导航布局</SectionTitle>
         <div className="settings-layout-grid">
           {LAYOUT_MODE_OPTIONS.map((item) => {

@@ -30,7 +30,7 @@ public interface BusinessEventMapper extends BaseMapperX<BusinessEventDO> {
             java.time.LocalDateTime start, java.time.LocalDateTime end) {
         if (userIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<BusinessEventDO>()
-                .select(BusinessEventDO::getOperatorUserId, BusinessEventDO::getAggregateId)
+                .select(BusinessEventDO::getOperatorUserId, BusinessEventDO::getAggregateId, BusinessEventDO::getRelatedObjectRefs)
                 .apply("COALESCE(JSON_UNQUOTE(JSON_EXTRACT(related_object_refs,'$.generationSource')),'') NOT IN ('sales_self_sourced_auto','education_self_sourced_auto')")
                 .in(BusinessEventDO::getOperatorUserId, userIds)
                 .ge(BusinessEventDO::getOccurredAt, start).lt(BusinessEventDO::getOccurredAt, end)

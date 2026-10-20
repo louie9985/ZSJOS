@@ -17,7 +17,7 @@ public class LeadFollowUpRuleUpdateReqVO {
     private Integer qualificationTimeoutMinutes;
 
     @NotNull @Min(1) @Max(3650)
-    private Integer agingPoolTimeoutDays;
+    private Integer publicSeaPoolTimeoutDays;
 
     @NotNull @Min(1) @Max(30)
     private Integer notificationPopupDurationMinutes;

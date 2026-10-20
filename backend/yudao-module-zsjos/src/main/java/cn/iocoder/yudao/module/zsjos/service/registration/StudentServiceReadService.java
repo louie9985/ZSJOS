@@ -82,7 +82,7 @@ public class StudentServiceReadService {
             subject = readScope.resolve(req.getReadScope(), req.getTargetUserId(), actor);
             all = subject == null;
         } else if (permissionApi.hasAnyPermissions(actor, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)) {
-            var scope = classScope.resolve(actor); all = scope.allDepartments();
+            var scope = classScope.resolveRead(actor); all = scope.allDepartments();
             owners = new LinkedHashSet<>(); owners.add(actor);
             if (!all && !scope.deptIds().isEmpty()) {
                 for (var user : userApi.getUserListByDeptIds(scope.deptIds())) owners.add(user.getId());
@@ -91,7 +91,17 @@ public class StudentServiceReadService {
         if (!all && owners != null) {
             List<String> keys = new ArrayList<>();
             for (Long owner : owners) { String key="owner"+keys.size(); params.put(key,owner); keys.add("#{query.parameters."+key+"}"); }
-            clauses.add("sr.owner_user_id IN ("+String.join(",",keys)+")");
+            Long pendingClassId = classScope.readablePendingClassId(actor);
+            params.put("subject", actor);
+            String ownerClause = "(sr.owner_user_id IN ("+String.join(",",keys)+") OR "
+                    + "((sr.content_director_user_id=#{query.parameters.subject} OR sr.career_planner_user_id=#{query.parameters.subject})"
+                    + " AND sr.acceptance_status='accepted' AND sr.status='active'))";
+            if (pendingClassId != null) {
+                params.put("pendingClassId", pendingClassId);
+                // The tenant-scoped class join excludes missing/deleted classes and unrelated unowned services.
+                clauses.add("(" + ownerClause + " OR (dc.system_class=1 AND dc.id=#{query.parameters.pendingClassId}"
+                        + " AND sr.status IN ('active','paused','completed')))");
+            } else clauses.add(ownerClause);
         } else if (!all) {
             params.put("subject", subject);
             clauses.add("(sr.owner_user_id=#{query.parameters.subject} OR ((sr.content_director_user_id=#{query.parameters.subject} OR sr.career_planner_user_id=#{query.parameters.subject}) AND sr.acceptance_status='accepted' AND sr.status='active'))");
@@ -123,7 +133,8 @@ public class StudentServiceReadService {
         if (group == null) return false;
         if (group.getConditions() != null) for (var condition : group.getConditions()) {
             for (String key : java.util.Arrays.asList(condition.getFieldKey(), condition.getStartFieldKey(), condition.getEndFieldKey()))
-                if (key != null && key.startsWith("order.") && !key.equals("order.orderNo")) return true;
+                if (key != null && (key.startsWith("orderItem.")
+                        || key.startsWith("order.") && !key.equals("order.orderNo"))) return true;
         }
         return group.getGroups() != null && group.getGroups().stream().anyMatch(StudentServiceReadService::usesOrderHandoff);
     }

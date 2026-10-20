@@ -243,7 +243,7 @@ const sceneOptions: Array<{ label: string; value: AdvancedFilterApi.AdvancedFilt
 const pageOptions: PageOption[] = [
   { label: '客资管理', scene: 'lead', pageKey: 'lead_management' },
   { label: '抢单池', scene: 'lead', pageKey: 'lead_claim_pool' },
-  { label: '老客资协作池', scene: 'lead', pageKey: 'lead_aging_pool' },
+  { label: '老客资协作池', scene: 'lead', pageKey: 'lead_public_sea_pool' },
   { label: '下属销售 · 名下客资', scene: 'lead', pageKey: 'subordinate_sales_leads' },
   { label: '订单管理', scene: 'order', pageKey: 'sales_order_management' },
   { label: '成交审批 · 管理端', scene: 'order', pageKey: 'sales_order_approval' },

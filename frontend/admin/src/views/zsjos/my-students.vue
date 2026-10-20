@@ -62,7 +62,11 @@
       <el-table-column label="班级" prop="service.className" min-width="150" />
       <el-table-column label="负责人" prop="service.ownerUserName" min-width="120" />
       <el-table-column label="服务激活时间" prop="activatedAt" min-width="170" />
-      <el-table-column label="订单审核" min-width="120"><template #default="{ row }">{{ row.service?.orderStatusLabel || '独立服务' }}</template></el-table-column>
+      <el-table-column label="订单审核" min-width="120"
+        ><template #default="{ row }">{{
+          row.service?.orderStatusLabel || '独立服务'
+        }}</template></el-table-column
+      >
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row.serviceRelationId)">详情</el-button>
@@ -93,49 +97,63 @@
         >
       </el-alert>
       <template v-else-if="detail">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="学员姓名">{{ detail.name }}</el-descriptions-item>
-          <el-descriptions-item label="客资编号">{{
-            detail.leadNo || '客资编号暂未生成'
-          }}</el-descriptions-item>
-          <el-descriptions-item label="手机号">{{ detail.mobile || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="微信号">{{ detail.wechatId || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="转为学员时间" :span="2">{{
-            detail.activatedAt || '-'
-          }}</el-descriptions-item>
-        </el-descriptions>
+        <el-tabs>
+          <el-tab-pane label="概览">
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="学员姓名">{{ detail.name }}</el-descriptions-item>
+              <el-descriptions-item label="客资编号">{{
+                detail.leadNo || '客资编号暂未生成'
+              }}</el-descriptions-item>
+              <el-descriptions-item label="手机号">{{ detail.mobile || '-' }}</el-descriptions-item>
+              <el-descriptions-item label="微信号">{{
+                detail.wechatId || '-'
+              }}</el-descriptions-item>
+              <el-descriptions-item label="转为学员时间" :span="2">{{
+                detail.activatedAt || '-'
+              }}</el-descriptions-item>
+            </el-descriptions>
 
-        <StudentPartnerBinding
-          v-if="readScope.readScope === 'SELF' && checkPermi(['zsjos:partner:manage-all'])"
-          :key="detail.personId"
-          :student-person-id="detail.personId"
-          :student-name="detail.name"
-          :student-mobile="detail.mobile"
-        />
-        <div class="section-heading">课程服务</div>
-        <el-table :data="[detail.service]" row-key="serviceRelationId" border>
-          <el-table-column label="订单编号" prop="orderNo" min-width="190" />
-          <el-table-column label="订单审核" prop="orderStatusLabel" min-width="120" />
-          <el-table-column label="课程权益" min-width="320">
-            <template #default="{ row }">
-              <div class="course-rights-cell">
-                <strong>{{ serviceCourseName(row) }}</strong>
-                <span v-if="row.skuName && row.skuName !== row.courseName">{{ row.skuName }}</span>
-                <span>{{ serviceCategoryPath(row) }}</span>
-                <ProductSpecs :product="row" />
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="服务状态" width="110">
-            <template #default="{ row }"
-              ><el-tag :type="row.status === 'active' ? 'success' : 'info'">{{
-                serviceStatusLabel(row.status)
-              }}</el-tag></template
-            >
-          </el-table-column>
-          <el-table-column label="生效时间" prop="activatedAt" min-width="170" />
-          <template #empty><el-empty description="暂无课程服务" /></template>
-        </el-table>
+            <StudentPartnerBinding
+              v-if="readScope.readScope === 'SELF' && checkPermi(['zsjos:partner:manage-all'])"
+              :key="detail.personId"
+              :student-person-id="detail.personId"
+              :student-name="detail.name"
+              :student-mobile="detail.mobile"
+            />
+            <div class="section-heading">课程服务</div>
+            <el-table :data="[detail.service]" row-key="serviceRelationId" border>
+              <el-table-column label="订单编号" prop="orderNo" min-width="190" />
+              <el-table-column label="订单审核" prop="orderStatusLabel" min-width="120" />
+              <el-table-column label="课程权益" min-width="320">
+                <template #default="{ row }">
+                  <div class="course-rights-cell">
+                    <strong>{{ serviceCourseName(row) }}</strong>
+                    <span v-if="row.skuName && row.skuName !== row.courseName">{{
+                      row.skuName
+                    }}</span>
+                    <span>{{ serviceCategoryPath(row) }}</span>
+                    <ProductSpecs :product="row" />
+                  </div>
+                </template>
+              </el-table-column>
+              <el-table-column label="服务状态" width="110">
+                <template #default="{ row }"
+                  ><el-tag :type="row.status === 'active' ? 'success' : 'info'">{{
+                    serviceStatusLabel(row.status)
+                  }}</el-tag></template
+                >
+              </el-table-column>
+              <el-table-column label="生效时间" prop="activatedAt" min-width="170" />
+              <template #empty><el-empty description="暂无课程服务" /></template>
+            </el-table>
+          </el-tab-pane>
+          <el-tab-pane v-if="checkPermi(['zsjos:student-archive:read'])" label="学员档案" lazy>
+            <StudentArchivePanel
+              :key="detail.serviceRelationId"
+              :relation-id="detail.serviceRelationId"
+            />
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </div>
   </el-drawer>
@@ -143,6 +161,7 @@
 
 <script lang="ts" setup>
 import ProductSpecs from './components/ProductSpecs.vue'
+import StudentArchivePanel from './components/StudentArchivePanel.vue'
 import BusinessReadScope from '@/components/BusinessReadScope/index.vue'
 import { useUserStore } from '@/store/modules/user'
 import StudentPartnerBinding from './components/StudentPartnerBinding.vue'
@@ -156,7 +175,9 @@ defineOptions({ name: 'ZsjosMyStudents' })
 const loading = ref(false)
 const route = useRoute()
 const userStore = useUserStore()
-const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({ readScope: 'SELF' })
+const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({
+  readScope: 'SELF'
+})
 const error = ref('')
 const list = ref<RegistrationApi.StudentServiceSubject[]>([])
 const total = ref(0)
@@ -179,7 +200,8 @@ const serviceStatusLabel = (status: string) =>
 let listRequest = 0
 const load = async () => {
   const run = ++listRequest
-  list.value = []; total.value = 0
+  list.value = []
+  total.value = 0
   loading.value = true
   error.value = ''
   try {
@@ -231,15 +253,31 @@ const openDetail = async (relationId: number) => {
   }
 }
 const reloadDetail = () => detailServiceId.value && openDetail(detailServiceId.value)
-watch(readScope, () => { detailRequest++; detailOpen.value = false; detail.value = undefined; handleQuery() }, { deep: true })
+watch(
+  readScope,
+  () => {
+    detailRequest++
+    detailOpen.value = false
+    detail.value = undefined
+    handleQuery()
+  },
+  { deep: true }
+)
 
-watch(() => route.fullPath, async () => {
-  detailRequest++; detail.value = undefined; detailOpen.value = false
-  await load()
-  const id = Number(route.query.serviceRelationId)
-  if (id > 0) await openDetail(id)
-  else if (Number(route.query.personId) > 0 && total.value === 1) await openDetail(list.value[0].serviceRelationId)
-}, { immediate: true })
+watch(
+  () => route.fullPath,
+  async () => {
+    detailRequest++
+    detail.value = undefined
+    detailOpen.value = false
+    await load()
+    const id = Number(route.query.serviceRelationId)
+    if (id > 0) await openDetail(id)
+    else if (Number(route.query.personId) > 0 && total.value === 1)
+      await openDetail(list.value[0].serviceRelationId)
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

@@ -137,6 +137,40 @@ public class MaterialService {
         return new PageResult<>(toResponses(page.getList(), userId, canManage), page.getTotal());
     }
 
+    public PageResult<MaterialRespVO> getBrowsePage(MaterialPageReqVO request, Long userId) {
+        // Browse is a publication view even for owners and tenant administrators.
+        PageResult<MaterialDO> page = materialMapper.selectPage(request, userId, false, true);
+        if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
+        return new PageResult<>(toResponses(page.getList(), userId, false, true), page.getTotal());
+    }
+
+    @ZsjosPermission(bizType = "material", bizId = "#materialId", action = "read")
+    public MaterialRespVO getBrowse(Long materialId, Long userId) {
+        return toResponses(List.of(requireBrowsable(materialId)), userId, false, true).getFirst();
+    }
+
+    @ZsjosPermission(bizType = "material", bizId = "#materialId", action = "read")
+    public List<MaterialVersionRespVO> getBrowseVersions(Long materialId, Long userId) {
+        requireBrowsable(materialId);
+        return versionMapper.selectByMaterialId(materialId).stream()
+                .filter(version -> VERSION_EFFECTIVE.equals(version.getStatus()))
+                .map(this::toVersionResp).toList();
+    }
+
+    private MaterialDO requireBrowsable(Long materialId) {
+        MaterialDO material = requireMaterial(materialId);
+        MaterialVersionDO effective = material.getCurrentEffectiveVersionId() == null ? null
+                : versionMapper.selectById(material.getCurrentEffectiveVersionId());
+        MaterialTypeDO type = typeMapper.selectById(material.getMaterialTypeId());
+        if (!MATERIAL_EFFECTIVE.equals(material.getStatus()) || effective == null
+                || !Objects.equals(effective.getMaterialId(), materialId)
+                || !VERSION_EFFECTIVE.equals(effective.getStatus()) || type == null
+                || !CommonStatusEnum.ENABLE.getStatus().equals(type.getStatus())) {
+            throw exception(MATERIAL_PERMISSION_DENIED);
+        }
+        return material;
+    }
+
     public List<MaterialRecommendationAccountRespVO> getRecommendationAccountCandidates(String keyword,
                                                                                          Long userId) {
         boolean all = permissionApi.hasTenantReadAllAccess(userId)
@@ -720,12 +754,16 @@ public class MaterialService {
     }
 
     private List<MaterialRespVO> toResponses(List<MaterialDO> materials, Long userId, boolean canManage) {
+        return toResponses(materials, userId, canManage, false);
+    }
+
+    private List<MaterialRespVO> toResponses(List<MaterialDO> materials, Long userId, boolean canManage, boolean browse) {
         Set<Long> typeIds = materials.stream().map(MaterialDO::getMaterialTypeId).collect(Collectors.toSet());
         Map<Long, MaterialTypeDO> types = typeMapper.selectBatchIds(typeIds).stream()
                 .collect(Collectors.toMap(MaterialTypeDO::getId, Function.identity()));
         Set<Long> ownerIds = materials.stream().map(MaterialDO::getOwnerUserId).collect(Collectors.toSet());
         Map<Long, AdminUserRespDTO> users = ownerIds.isEmpty() ? Map.of() : adminUserApi.getUserMap(ownerIds);
-        Set<Long> versionIds = materials.stream().map(material -> selectedVersionId(material, userId, canManage))
+        Set<Long> versionIds = materials.stream().map(material -> browse ? material.getCurrentEffectiveVersionId() : selectedVersionId(material, userId, canManage))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, MaterialVersionDO> versions = (versionIds.isEmpty() ? List.<MaterialVersionDO>of()
                 : versionMapper.selectBatchIds(versionIds)).stream()
@@ -744,16 +782,50 @@ public class MaterialService {
             response.setOwnerName(owner == null ? null : owner.getNickname());
             response.setLiked(liked.contains(material.getId()));
             response.setFavorited(favorited.contains(material.getId()));
-            MaterialVersionDO selected = versions.get(selectedVersionId(material, userId, canManage));
+            MaterialVersionDO selected = versions.get(browse ? material.getCurrentEffectiveVersionId() : selectedVersionId(material, userId, canManage));
             response.setCurrentVersion(selected == null ? null : toVersionResp(selected));
             if (response.getCurrentVersion() != null) {
                 response.setCoverFileId(response.getCurrentVersion().getCoverFileId());
                 response.setCoverPreviewUrl(response.getCurrentVersion().getCoverPreviewUrl());
             }
-            response.setAvailableActions(availableActions(material, selected, userId, canManage));
+            if (browse) {
+                response.setTitle(selected == null ? null : selected.getTitle());
+                response.setSummary(selected == null ? null : selected.getSummary());
+                response.setCurrentDraftVersionId(null);
+                response.setAvailableActions(java.util.stream.Stream.of("LIKE", "FAVORITE", "REFERENCE")
+                        .filter(action -> permissionApi.hasAnyPermissions(userId, "zsjos:material:" + action.toLowerCase(java.util.Locale.ROOT)))
+                        .toList());
+            } else {
+                response.setAvailableActions(availableActions(material, selected, userId, canManage));
+            }
             responses.add(response);
         }
         return responses;
+    }
+
+    @ZsjosPermission(bizType = "material", bizId = "#materialId", action = "delete-draft")
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteDraft(Long materialId, Integer expectedVersion, Long userId) {
+        MaterialDO material = lockMaterial(materialId);
+        // Recheck after taking the same lock used by save/submit; read-all never grants deletion.
+        if (!Objects.equals(material.getOwnerUserId(), userId)
+                || !permissionApi.hasAnyPermissions(userId, "zsjos:material:delete-draft")) {
+            throw exception(MATERIAL_PERMISSION_DENIED);
+        }
+        if (!Objects.equals(material.getVersion(), expectedVersion)) {
+            throw exception(MATERIAL_VERSION_CONFLICT);
+        }
+        MaterialVersionDO draft = material.getCurrentDraftVersionId() == null ? null
+                : versionMapper.selectByIdForUpdate(material.getCurrentDraftVersionId(), tenantId());
+        if (!MATERIAL_DRAFT.equals(material.getStatus()) || material.getCurrentEffectiveVersionId() != null
+                || draft == null || !Objects.equals(draft.getMaterialId(), materialId)
+                || !VERSION_DRAFT.equals(draft.getStatus()) || draft.getProcessInstanceId() != null) {
+            throw exception(MATERIAL_STATE_INVALID);
+        }
+        // Retain immutable versions and uploaded files for audit; all reads require a live material.
+        if (materialMapper.deleteDraft(materialId, expectedVersion) != 1) {
+            throw exception(MATERIAL_VERSION_CONFLICT);
+        }
     }
 
     List<String> availableActions(MaterialDO material, MaterialVersionDO selected, Long userId,
@@ -762,6 +834,11 @@ public class MaterialService {
         boolean owner = Objects.equals(material.getOwnerUserId(), userId);
         MaterialVersionDO draft = material.getCurrentDraftVersionId() == null ? null
                 : versionMapper.selectById(material.getCurrentDraftVersionId());
+        if (owner && MATERIAL_DRAFT.equals(material.getStatus()) && material.getCurrentEffectiveVersionId() == null
+                && draft != null && VERSION_DRAFT.equals(draft.getStatus()) && draft.getProcessInstanceId() == null
+                && permissionApi.hasAnyPermissions(userId, "zsjos:material:delete-draft")) {
+            actions.add("DELETE_DRAFT");
+        }
         // BPM still checks the starter, tenant, live state and model's cancellation setting.
         if (draft != null && VERSION_IN_APPROVAL.equals(draft.getStatus())
                 && Objects.equals(draft.getSubmittedByUserId(), userId)

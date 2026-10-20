@@ -40,12 +40,15 @@ public class StudentObjectPermissionProvider implements ZsjosObjectPermissionPro
         if (!relationMapper.selectByOwnerAndPersonIncludingHistory(userId, bizId).isEmpty()) return true;
         if (relationMapper.existsActiveByCollaboratorAndPerson(userId, bizId)) return true;
         if (!hasManagedStudentReadPermission(userId)) return false;
-        DeliveryClassScopeService.Scope scope = scopeService.resolve(userId);
+        DeliveryClassScopeService.Scope scope = scopeService.resolveRead(userId);
         if (scope.allDepartments()) return !relationMapper.selectOwnedByPersonIds(java.util.List.of(bizId), null).isEmpty();
         var ownerIds = new java.util.LinkedHashSet<Long>(); ownerIds.add(userId);
         if (!scope.deptIds().isEmpty()) adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
                 .map(AdminUserRespDTO::getId).filter(java.util.Objects::nonNull).forEach(ownerIds::add);
-        return !relationMapper.selectOwnedByOwnerIdsAndPersonIds(ownerIds, java.util.List.of(bizId), null).isEmpty();
+        Long pendingClassId = scopeService.readablePendingClassId(userId);
+        return !(pendingClassId == null
+                ? relationMapper.selectOwnedByOwnerIdsAndPersonIds(ownerIds, java.util.List.of(bizId), null)
+                : relationMapper.selectManagedByPersonIds(ownerIds, java.util.List.of(bizId), null, pendingClassId)).isEmpty();
     }
     @Override public void check(Long bizId, String action, Long userId) {
         if (!hasPermission(bizId, action, userId)) throw exception(STUDENT_PERMISSION_DENIED);

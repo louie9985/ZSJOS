@@ -87,10 +87,13 @@ public class PmsKnowledgeAttachmentService {
         return boundUrl(documentId, fileId, false);
     }
     public String boundUrl(Long documentId, Long fileId, boolean sharedOnly) {
+        validateBound(documentId, fileId, sharedOnly);
+        return files.presignGetUrl(fileId, 600);
+    }
+    public void validateBound(Long documentId, Long fileId, boolean sharedOnly) {
         if (mapper.list(documentId).stream().noneMatch(row -> row.getFileId().equals(fileId) && (!sharedOnly || Boolean.TRUE.equals(row.getShared()))))
             throw exception(KNOWLEDGE_ATTACHMENT_UNAVAILABLE);
         if (files.getFileInfo(fileId) == null) throw exception(KNOWLEDGE_ATTACHMENT_UNAVAILABLE);
-        return files.presignGetUrl(fileId, 600);
     }
     public List<PmsKnowledgeAttachmentRespVO> publicList(Long documentId, String token) {
         var selected = selected(documentId);

@@ -274,7 +274,7 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (userIds == null || userIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<SalesOrderDO>()
                 .select(SalesOrderDO::getId, SalesOrderDO::getLeadId, SalesOrderDO::getSubmitterUserId,
-                        SalesOrderDO::getEffectiveAt, SalesOrderDO::getTotalAmount)
+                        SalesOrderDO::getEffectiveAt, SalesOrderDO::getTotalAmount, SalesOrderDO::getFormalOwnerIdentity)
                 .in(SalesOrderDO::getSubmitterUserId, userIds).eq(SalesOrderDO::getStatus, "effective"));
     }
 }

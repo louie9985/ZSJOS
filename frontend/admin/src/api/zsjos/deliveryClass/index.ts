@@ -130,6 +130,7 @@ export const updateDeliveryClass = (
     examScheduleId?: number
     startDate?: string
     endDate?: string
+    preserveExamDate?: boolean
     homeroomUserId: number
     version: number
   }

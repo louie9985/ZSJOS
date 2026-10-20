@@ -10,6 +10,9 @@ import lombok.EqualsAndHashCode;
 @TableName(value = "zsjos_student_info_form", autoResultMap = true)
 public class StudentInfoFormDO extends TenantBaseDO {
     private Long id, leadId, salesUserId, configVersionId;
+    private Long registrationCaseId, orderItemId, personId, productId, sentByUserId;
+    private String fieldsSnapshot, categoryPathSnapshot, productName;
+    private java.time.LocalDateTime sentAt;
     private String tokenHash, status, submitSource;
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class)
     @lombok.ToString.Exclude

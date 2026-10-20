@@ -1,3 +1,4 @@
+import StudentFirstContactProgress from './StudentFirstContactProgress'
 import ProductSpecs from './ProductSpecs'
 import LeadAppealSummary from './LeadAppealSummary'
 import { isLeadAppealPending, leadAppealSummaryLabel } from '../services/leadAppealSummary'
@@ -526,7 +527,7 @@ function StudentTaskPipeline({ context, records }: { context: StudentContactCont
     {deliveryStages.map((step, index) => <div key={step.code} className={`lead-status-node ${step.status === 'pending' ? 'future' : step.status}`}>
       <div className="lead-status-dot" />
       {index < deliveryStages.length - 1 && <div className="lead-status-connector" />}
-      <span className="lead-status-step-label">{step.label}</span>
+      <span className="lead-status-step-label">{step.label}{step.code === "study_plan" && context.firstContactProgress?.studyPlanStatus === "first_contact" ? "（首联时完成）" : ""}</span>
     </div>)}
   </div>
   const currentIndex = STUDENT_STEPS.findIndex(step => step.key === context.currentTask?.type)
@@ -615,7 +616,7 @@ function LeadStatusLabels({ lead }: { lead: ManagedLead }) {
 
 /* ========== 主导出：概览 ========== */
 
-export type StudentOverviewContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
+export type StudentOverviewContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[]; onRefresh?: () => Promise<void> }
 
 export type LeadOverviewSlots = {
   latestActivity?: React.ReactNode
@@ -623,6 +624,7 @@ export type LeadOverviewSlots = {
   taskStatus?: React.ReactNode
   mainBeforeColumns?: React.ReactNode
   sidebarBeforeStatus?: React.ReactNode
+  sidebarAfterStatus?: React.ReactNode
 }
 
 export function studentProfileIdentity(lead?: ManagedLead, student?: MyStudent) {
@@ -785,20 +787,13 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
               </section>
             </div>
 
-            {/* 4 列：时效进度 + 客资流转 */}
+            {/* 4 列：联系任务时效、首联完成情况与客资流转 */}
             <div className="lead-overview-col-secondary">
               {studentContext && <section className="lead-card">
                 <div className="lead-card-header"><Typography.Text strong>联系任务时效</Typography.Text></div>
-                {studentContext.contactContext.currentTask?.dueAt ? <div className="lead-deadlines"><DeadlineIndicator label="下次联系截止" deadline={new Date(studentContext.contactContext.currentTask.dueAt).getTime()} /></div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无待处理联系任务" />}
+                {studentContext.contactContext.currentTask?.dueAt ? <div className="lead-deadlines"><DeadlineIndicator label="下次联系截止" deadline={new Date(studentContext.contactContext.currentTask.dueAt).getTime()} /></div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未安排下次联系" />}
               </section>}
-              {studentContext && (
-                <section className="lead-card">
-                  <div className="lead-card-header">
-                    <Typography.Text strong>时效进度</Typography.Text>
-                  </div>
-                  <StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} />
-                </section>
-              )}
+              {studentContext && <StudentFirstContactProgress key={studentContext.contactContext.serviceRelationId} context={studentContext.contactContext} onRefresh={studentContext.onRefresh} />}
               {!studentContext && lead && (lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
                 <section className="lead-card">
                   <div className="lead-card-header">
@@ -845,6 +840,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                   : null)}
               </div>
             </section>
+            {slots?.sidebarAfterStatus}
             {!studentContext && showFollowUp && lead && <LeadFollowUpCharts leadId={lead.id} />}
           </aside>
         </div>

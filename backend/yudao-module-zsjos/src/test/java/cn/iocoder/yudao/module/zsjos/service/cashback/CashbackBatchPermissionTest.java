@@ -56,11 +56,11 @@ class CashbackBatchPermissionTest {
 
     @Test void detailBatchMatchesEveryExistingRelationshipBranch() {
         var service=spy(new LeadObjectPermissionService());var permissions=mock(PermissionApi.class);var security=mock(SecurityFrameworkService.class);
-        var users=mock(AdminUserApi.class);var depts=mock(DeptApi.class);var aging=mock(LeadAgingPoolService.class);
-        var sea=mock(LeadPublicSeaRecordMapper.class);var history=mock(ServiceRelationMapper.class);var media=mock(MediaAccountMapper.class);
+        var users=mock(AdminUserApi.class);var depts=mock(DeptApi.class);var publicSeaPool=mock(LeadPublicSeaPoolService.class);
+        var sea=mock(LeadPublicSeaPoolCompatibilityRecordMapper.class);var history=mock(ServiceRelationMapper.class);var media=mock(MediaAccountMapper.class);
         var batch=mock(LeadReadBatchMapper.class);var partner=mock(PartnerOwnershipService.class);var orders=mock(SalesOrderMapper.class);var orderAccess=mock(SalesOrderObjectPermissionService.class);
         inject(service,"permissionApi",permissions);inject(service,"securityFrameworkService",security);inject(service,"adminUserApi",users);inject(service,"deptApi",depts);
-        inject(service,"leadAgingPoolService",aging);inject(service,"publicSeaRecordMapper",sea);inject(service,"serviceRelationMapper",history);
+        inject(service,"leadPublicSeaPoolService",publicSeaPool);inject(service,"publicSeaPoolCompatibilityRecordMapper",sea);inject(service,"serviceRelationMapper",history);
         inject(service,"mediaAccountMapper",media);inject(service,"readBatchMapper",batch);inject(service,"partnerOwnershipService",partner);
         inject(service,"salesOrderMapper",orders);inject(service,"salesOrderObjectPermissionService",orderAccess);
         when(depts.getDeptListByLeaderUserId(7L)).thenReturn(List.of(dept(10,7)));when(users.getUser(20L)).thenReturn(user(20,10L));
@@ -73,8 +73,8 @@ class CashbackBatchPermissionTest {
         rows.get(3).setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(20L);
         rows.get(4).setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING).setRecycleSourceOwnerUserId(7L);
         rows.get(5).setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING).setRecycleSourceOwnerUserId(20L);
-        when(aging.canRead(7L,7L)).thenReturn(true);when(aging.filterReadableLeadIds(anyCollection(),eq(7L))).thenReturn(Set.of(7L));
-        var record=new LeadPublicSeaRecordDO().setLeadId(8L).setCollaboratorUserId(7L);
+        when(publicSeaPool.canRead(7L,7L)).thenReturn(true);when(publicSeaPool.filterReadableLeadIds(anyCollection(),eq(7L))).thenReturn(Set.of(7L));
+        var record=new LeadPublicSeaPoolCompatibilityRecordDO().setLeadId(8L).setCollaboratorUserId(7L);
         when(sea.selectByLeadId(8L)).thenReturn(record);when(sea.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(record));
         when(history.countActiveByParticipantAndLead(7L,9L,1L)).thenReturn(1L);when(media.countParticipantByLead(7L,10L,1L)).thenReturn(1L);
         when(batch.selectStudentReadableLeadIds(anyCollection(),eq(7L),eq(1L))).thenReturn(Set.of(9L,10L));
@@ -83,23 +83,23 @@ class CashbackBatchPermissionTest {
         when(orderAccess.canRead(order,7L)).thenReturn(true);when(orders.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(order));
         when(orderAccess.filterReadable(anyCollection(),eq(7L))).thenReturn(Set.of(40L));
         var expected=rows.stream().filter(l -> service.canReadDetail(l,7L)).map(LeadDO::getId).collect(Collectors.toSet());
-        assertEquals(12,expected.size());clearInvocations(users,orders,sea,aging);
+        assertEquals(12,expected.size());clearInvocations(users,orders,sea,publicSeaPool);
         assertEquals(expected,service.filterReadableDetails(rows,7L));
-        verify(orders,never()).selectByLeadId(anyLong());verify(sea,never()).selectByLeadId(anyLong());verify(aging,never()).canRead(anyLong(),anyLong());
+        verify(orders,never()).selectByLeadId(anyLong());verify(sea,never()).selectByLeadId(anyLong());verify(publicSeaPool,never()).canRead(anyLong(),anyLong());
     }
 
     @Test void orderBatchMatchesOwnOwnerAgingSupervisorTeamAndApprovalBranches() {
-        var service=spy(new SalesOrderObjectPermissionService());var leads=mock(LeadMapper.class);var aging=mock(LeadAgingPoolService.class);
-        var supervisors=mock(SalesOrderSupervisorConfirmationMapper.class);inject(service,"leadMapper",leads);inject(service,"agingPoolService",aging);inject(service,"supervisorConfirmationMapper",supervisors);
+        var service=spy(new SalesOrderObjectPermissionService());var leads=mock(LeadMapper.class);var publicSeaPool=mock(LeadPublicSeaPoolService.class);
+        var supervisors=mock(SalesOrderSupervisorConfirmationMapper.class);inject(service,"leadMapper",leads);inject(service,"publicSeaPoolService",publicSeaPool);inject(service,"supervisorConfirmationMapper",supervisors);
         doReturn(false).when(service).isApprovalPoolMember(7L);doReturn(Set.of(20L)).when(service).teamUserIds(7L);
         var rows=new ArrayList<SalesOrderDO>();for(long i=1;i<=7;i++)rows.add(new SalesOrderDO().setId(i).setLeadId(i).setSubmitterUserId(99L));
         rows.get(0).setSubmitterUserId(7L);rows.get(1).setFormalSalesUserId(7L);rows.get(4).setCurrentApprovalRoundId(50L);rows.get(5).setSubmitterUserId(20L);
         var lead=new LeadDO().setId(3L).setOwnerUserId(7L);when(leads.selectById(3L)).thenReturn(lead);when(leads.selectBatchIds(anyCollection())).thenReturn(List.of(lead));
-        when(aging.canRead(4L,7L)).thenReturn(true);when(aging.filterReadableLeadIds(anyCollection(),eq(7L))).thenReturn(Set.of(4L));
+        when(publicSeaPool.canRead(4L,7L)).thenReturn(true);when(publicSeaPool.filterReadableLeadIds(anyCollection(),eq(7L))).thenReturn(Set.of(4L));
         var confirmation=new SalesOrderSupervisorConfirmationDO().setApprovalRoundId(50L).setSupervisorUserId(7L);
         when(supervisors.selectByRoundId(50L)).thenReturn(List.of(confirmation));when(supervisors.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(confirmation));
         var expected=rows.stream().filter(o -> service.canRead(o,7L)).map(SalesOrderDO::getId).collect(Collectors.toSet());assertEquals(6,expected.size());
-        clearInvocations(leads,supervisors,aging);assertEquals(expected,service.filterReadable(rows,7L));
+        clearInvocations(leads,supervisors,publicSeaPool);assertEquals(expected,service.filterReadable(rows,7L));
         verify(leads,never()).selectById(anyLong());verify(supervisors,never()).selectByRoundId(anyLong());
         doReturn(true).when(service).isApprovalPoolMember(7L);assertEquals(7,service.filterReadable(rows,7L).size());
     }
@@ -118,8 +118,8 @@ class CashbackBatchPermissionTest {
         assertEquals(Set.of(1L,2L,3L),service.filterFinanceReadable(rows,7L));
     }
 
-    @Test void agingBatchMatchesSingleReadsIncludingNewestCycleAndMissingOwner() {
-        var service=new LeadAgingPoolServiceImpl();var mapper=mock(LeadAgingPoolCycleMapper.class);
+    @Test void publicSeaPoolBatchMatchesSingleReadsIncludingNewestCycleAndMissingOwner() {
+        var service=new LeadPublicSeaPoolServiceImpl();var mapper=mock(LeadPublicSeaPoolCycleMapper.class);
         var users=mock(AdminUserApi.class);var depts=mock(DeptApi.class);var security=mock(SecurityFrameworkService.class);
         var assignments=mock(LeadAssignmentService.class);
         inject(service,"cycleMapper",mapper);inject(service,"adminUserApi",users);inject(service,"deptApi",depts);
@@ -130,25 +130,25 @@ class CashbackBatchPermissionTest {
         when(users.getUserMap(anyCollection())).thenReturn(Map.of(7L,current,20L,owner,21L,managed,22L,unrelated));
         var eligible=new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO();eligible.setId(7L);
         when(assignments.getEligibleSalesUsers()).thenReturn(List.of(eligible));
-        when(security.hasPermission(PERMISSION_AGING_POOL_MANAGE)).thenReturn(true);
+        when(security.hasPermission(PERMISSION_PUBLIC_SEA_POOL_MANAGE)).thenReturn(true);
         when(depts.getDept(11L)).thenReturn(dept(11,7));when(depts.getDeptListByLeaderUserId(7L)).thenReturn(List.of(dept(11,7)));
         var cycles=List.of(
-                new LeadAgingPoolCycleDO().setId(8L).setLeadId(1L).setOriginalOwnerUserId(20L),
-                new LeadAgingPoolCycleDO().setId(7L).setLeadId(2L).setOriginalOwnerUserId(21L),
-                new LeadAgingPoolCycleDO().setId(6L).setLeadId(3L).setOriginalOwnerUserId(7L),
-                new LeadAgingPoolCycleDO().setId(5L).setLeadId(4L).setOriginalOwnerUserId(22L).setCollaboratorUserId(7L),
-                new LeadAgingPoolCycleDO().setId(4L).setLeadId(5L).setOriginalOwnerUserId(22L),
-                new LeadAgingPoolCycleDO().setId(3L).setLeadId(6L).setOriginalOwnerUserId(999L),
-                new LeadAgingPoolCycleDO().setId(2L).setLeadId(7L),
-                new LeadAgingPoolCycleDO().setId(1L).setLeadId(5L).setOriginalOwnerUserId(7L));
+                new LeadPublicSeaPoolCycleDO().setId(8L).setLeadId(1L).setOriginalOwnerUserId(20L),
+                new LeadPublicSeaPoolCycleDO().setId(7L).setLeadId(2L).setOriginalOwnerUserId(21L),
+                new LeadPublicSeaPoolCycleDO().setId(6L).setLeadId(3L).setOriginalOwnerUserId(7L),
+                new LeadPublicSeaPoolCycleDO().setId(5L).setLeadId(4L).setOriginalOwnerUserId(22L).setCollaboratorUserId(7L),
+                new LeadPublicSeaPoolCycleDO().setId(4L).setLeadId(5L).setOriginalOwnerUserId(22L),
+                new LeadPublicSeaPoolCycleDO().setId(3L).setLeadId(6L).setOriginalOwnerUserId(999L),
+                new LeadPublicSeaPoolCycleDO().setId(2L).setLeadId(7L),
+                new LeadPublicSeaPoolCycleDO().setId(1L).setLeadId(5L).setOriginalOwnerUserId(7L));
         when(mapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(cycles);
         Set<Long> seen=new HashSet<>();var newest=cycles.stream().filter(c -> seen.add(c.getLeadId())).toList();
-        var expected=newest.stream().filter(c -> service.canRead(c,7L)).map(LeadAgingPoolCycleDO::getLeadId).collect(Collectors.toSet());
+        var expected=newest.stream().filter(c -> service.canRead(c,7L)).map(LeadPublicSeaPoolCycleDO::getLeadId).collect(Collectors.toSet());
         assertEquals(Set.of(1L,2L,3L,4L),expected);
         clearInvocations(users,depts,assignments);assertEquals(expected,service.filterReadableLeadIds(seen,7L));
         verify(users,times(1)).getUser(7L);verify(users,never()).getUser(20L);
         verify(assignments,times(1)).getEligibleSalesUsers();verify(depts,never()).getDept(anyLong());
-        when(security.hasPermission(PERMISSION_AGING_POOL_MANAGE_ALL)).thenReturn(true);
+        when(security.hasPermission(PERMISSION_PUBLIC_SEA_POOL_MANAGE_ALL)).thenReturn(true);
         assertEquals(seen,service.filterReadableLeadIds(seen,7L));
     }
 }

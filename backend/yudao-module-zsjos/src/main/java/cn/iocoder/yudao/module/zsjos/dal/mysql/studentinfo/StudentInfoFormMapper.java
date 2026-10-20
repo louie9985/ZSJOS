@@ -7,13 +7,9 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface StudentInfoFormMapper extends BaseMapperX<StudentInfoFormDO> {
-    default StudentInfoFormDO byLead(Long leadId) {
+    default StudentInfoFormDO byCase(Long caseId) {
         return selectOne(new LambdaQueryWrapperX<StudentInfoFormDO>()
-                .eq(StudentInfoFormDO::getLeadId, leadId).orderByDesc(StudentInfoFormDO::getId).last("LIMIT 1"));
-    }
-    default StudentInfoFormDO submitted(Long leadId) {
-        return selectOne(new LambdaQueryWrapperX<StudentInfoFormDO>().eq(StudentInfoFormDO::getLeadId, leadId)
-                .eq(StudentInfoFormDO::getStatus, "SUBMITTED").orderByDesc(StudentInfoFormDO::getId).last("LIMIT 1"));
+                .eq(StudentInfoFormDO::getRegistrationCaseId, caseId).orderByDesc(StudentInfoFormDO::getId).last("LIMIT 1"));
     }
     default StudentInfoFormDO byToken(String hash) {
         return selectOne(new LambdaQueryWrapperX<StudentInfoFormDO>().eq(StudentInfoFormDO::getTokenHash, hash));

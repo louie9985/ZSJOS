@@ -464,7 +464,9 @@ public class HrmEmployeeController {
                     .setPostName(employee.getPostName()).setPostLevel(employee.getPostLevel())
                     .setEntryStatus(employee.getEntryStatus()).setStatus(employee.getStatus()).setType(employee.getType())
                     .setEntryTime(employee.getEntryTime()).setRegularTime(employee.getRegularTime())
-                    .setLeaveTime(employee.getLeaveTime())
+                    .setLeaveTime(employee.getLeaveTime()).setPlannedRegularTime(employee.getPlannedRegularTime())
+                    .setPlannedLeaveTime(employee.getPlannedLeaveTime()).setTypeLabel(employee.getTypeLabel())
+                    .setStatusLabel(employee.getStatusLabel()).setEntryStatusLabel(employee.getEntryStatusLabel())
                     .setWorkCity(employee.getWorkCity()).setWorkAddress(employee.getWorkAddress());
             MapUtils.findAndThen(userMap, employee.getUserId(), user -> vo.setUserNickname(user.getNickname()));
             MapUtils.findAndThen(deptMap, employee.getDeptId(), dept -> vo.setDeptName(dept.getName()));

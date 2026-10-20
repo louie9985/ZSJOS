@@ -150,8 +150,16 @@ def tests():
         q.execute('CREATE DATABASE '+ident(empty)+' CHARACTER SET utf8mb4')
         for t in TABLES:q.execute('CREATE TABLE '+ident(empty)+'.'+ident(t)+' LIKE '+ident(name)+'.'+ident(t))
         for t in TABLES[3:]:q.execute('INSERT INTO '+ident(empty)+'.'+ident(t)+' SELECT * FROM '+ident(name)+'.'+ident(t)+" WHERE version='V305'")
-    e.close();e=connect(empty);run(e);run(e);assert audit(e)['globalLedger']==1;e.close()
-    print(json.dumps({'schema':name,'emptySchema':empty,'result':result,'checks':['prerequisite','ledger_failure_rollback','initial','repeat','partial_recovery','later_change_rejection','rollback_rehearsal','empty_repeat']}))
+    e.close();e=connect(empty)
+    try:
+        run(e)
+    except Exception:
+        pass
+    else:
+        raise AssertionError('V306 must reject a missing historical manifest target')
+    assert audit(e)['globalLedger']==0
+    e.close()
+    print(json.dumps({'schema':name,'emptySchema':empty,'result':result,'checks':['prerequisite','ledger_failure_rollback','initial','repeat','partial_recovery','later_change_rejection','rollback_rehearsal','missing_target_rejected']}))
 
 
 def main():

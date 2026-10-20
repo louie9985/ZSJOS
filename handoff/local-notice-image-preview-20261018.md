@@ -1,0 +1,23 @@
+# 公告正文图片预览
+
+- Environment: local (fallback; no explicit environment value).
+- Workstream: notice-image-preview-20261018; owner: Codex; status: active.
+- Goal: click images in announcement reading surfaces to preview and switch images.
+- Non-goals: other rich text surfaces, saved announcement HTML, APIs/permissions, database, deployment, Git publication.
+- Branch: main; worktree: D:/ZSJ-OS; base: d29fcd5f888ceca4a1980720b1eb0fbf6a1cbfc2.
+- Ownership: workbench SafeRichText.tsx and test/notice-images{.html,.tsx,-browser.py}; admin notice NoticeContent.vue (new), NoticeDetail.vue, NoticeShareDialog.vue and test/notice-images{.html,.ts,.vite.ts}; H5 pages/notice/share.vue; System notice/NoticeSharePage.java and NoticeShareImagePreviewTest.java; docs/frontend/notice-center.md and notice-public-share.md; this record. Existing unrelated changes preserved; scoped targets were clean.
+- Dependencies: existing Ant Design, Element Plus and Vant; server share must retain script-src none.
+- Verification: focused type checks, isolated compilation of actual server renderer, real Chromium desktop/mobile fixtures across all four readers, scoped diff. No shared service startup/restart.
+- Target branch / integration order: None.
+
+## Delivery — 2026-10-18
+
+- Status: delivered locally; ownership released. Environment/branch/worktree/base unchanged.
+- Result: Workbench announcement-only SafeRichText now opens the existing Ant Design gallery; Admin detail/share preview use notice-owned NoticeContent with Element Plus viewer; legacy H5 uses Vant image preview; server-generated share HTML uses fragment links/CSS without changing the script-free CSP. Linked images open previews while ordinary link text remains navigable. Stored content, business APIs, permissions and attachments are unchanged.
+- Keyboard Enter/Space opens images on the three JS readers; desktop supports viewer close controls/Escape, H5 supports touch gestures and close icon. Content changes clear old previews. Server HTML offers previous/next, close and original image; browser original-image view provides zoom.
+- Verification: Workbench tsc --noEmit passed; H5 vue-tsc --noEmit --incremental false passed; Admin focused vue-tsc for NoticeContent, NoticeDetail, NoticeShareDialog with project declaration files passed. H5 Vite production build passed to isolated temporary output. No shared TypeScript build-info written.
+- Backend: isolated javac compiled the current NoticeSharePage, NoticeShareContent and NoticeShareTables; a temporary reflection runner executed 6 actual JUnit-annotated tests from NoticeShareImagePreviewTest and NoticeShareContentTest, all passed. Covers zero/single/multiple images, executable image/script rejection, nested-anchor avoidance, original text links, unchanged saved HTML, and prior table preservation. This is focused compile/test evidence, not a full Maven reactor run.
+- Browser: test/notice-images-browser.py passed React/Admin/H5/server at 1440 and 390 widths (8 combinations), including selected second image, keyboard opening, pointer reopening, next/previous, Workbench zoom, mobile H5 touch swipe, closing, JS reader content-change cleanup, script-free server CSP and no page overflow. Actual current Java output and production H5 assets used; synthetic images/API data only. Desktop/mobile screenshots reviewed.
+- Evidence: C:/Users/EDY/AppData/Local/Temp/notice-images-20261018 (classes, actual test exports, H5 build, typecheck config/log, screenshots). Browser command: python frontend/workbench/test/notice-images-browser.py --fixtures C:/Users/EDY/AppData/Local/Temp/notice-images-20261018. Reproduction uses Workbench on 5174 and Admin isolated `node node_modules/vite/bin/vite.js --config test/notice-images.vite.ts` on 5198; origins can be overridden. The temporary Admin helper was stopped after verification; existing services were not reconfigured.
+- Verification repairs: fixed H5 initial second-image positioning by mounting the viewer closed and updating show; preserved authored text links in server HTML after a focused test caught their removal. Test harness was corrected for current Ant Design DOM selectors, synthetic image dimensions, and touch timing after opening transition. An initial temporary Admin typecheck configuration omitted valid declaration globs; corrected configuration then passed with an empty diagnostics log.
+- Scoped diff/whitespace checks passed. Existing unrelated dirty and staged work preserved; no database changes, runtime deployment/restart, live-account acceptance, branch/worktree operation, commit or push. Deploy the affected frontend assets/backend to activate on the target site; physical embedded-browser acceptance remains unverified.

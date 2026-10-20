@@ -8,6 +8,17 @@ DELIMITER $$
 CREATE PROCEDURE zsjos_v320_apply()
 BEGIN
  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+ IF (EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V320')
+      XOR EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V320')) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V320 ledger marker is one-sided';
+ END IF;
+ IF EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V320'
+      AND (description<>'下属员工菜单名称' OR checksum<>SHA2('V320__subordinate_employee_menu.sql',256)))
+    OR EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V320'
+      AND (description<>'下属员工菜单名称' OR checksum<>SHA2('V320__subordinate_employee_menu.sql',256)
+           OR release_version<>'baseline')) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V320 ledger identity conflict';
+ END IF;
  START TRANSACTION;
  IF NOT EXISTS (SELECT 1 FROM system_menu WHERE id=6814 AND deleted=0
   AND permission='zsjos:subordinate-sales:query' AND path='subordinate-sales'

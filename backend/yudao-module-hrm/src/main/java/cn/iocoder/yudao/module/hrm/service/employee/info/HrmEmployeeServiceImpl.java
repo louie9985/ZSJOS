@@ -975,9 +975,13 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         HrmEmployeeSaveReqVO metadata = BeanUtils.toBean(command, HrmEmployeeSaveReqVO.class);
         HrmEmployeeSaveReqVO req = BeanUtils.toBean(employee, HrmEmployeeSaveReqVO.class);
         if (command instanceof HrmEmployeeSaveReqVO full) req = BeanUtils.toBean(full, HrmEmployeeSaveReqVO.class);
+        String commandReason = metadata.getChangeReason();
+        if (command instanceof HrmEmployeeCancelQuitReqVO cancelQuit) {
+            commandReason = cancelQuit.getReason();
+        }
         req.setId(employeeId).setVersion(metadata.getVersion()).setOperationKey(metadata.getOperationKey())
                 .setChangeType(type).setChangeMode("PLAN".equals(metadata.getChangeMode()) ? "PLAN" : "BUSINESS")
-                .setChangeReason(StrUtil.isNotBlank(metadata.getChangeReason()) ? metadata.getChangeReason()
+                .setChangeReason(StrUtil.isNotBlank(commandReason) ? commandReason
                         : StrUtil.isNotBlank(metadata.getRemark()) ? metadata.getRemark() : HrmEmployeeChangeTypeEnum.valueOf(type).getName())
                 .setCommandRequestHash(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(command));
         HrmEmployeeChangeRecordCreateReqVO change = type == 13 ? new HrmEmployeeChangeRecordCreateReqVO() : BeanUtils.toBean(command, HrmEmployeeChangeRecordCreateReqVO.class);

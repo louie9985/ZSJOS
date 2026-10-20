@@ -34,7 +34,7 @@ public class SalesOrderObjectPermissionService {
     @Resource private DeptApi deptApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private PermissionApi permissionApi;
-    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService agingPoolService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolService publicSeaPoolService;
 
     public void check(Long orderId, String action) {
         SalesOrderDO order = orderMapper.selectById(orderId);
@@ -59,7 +59,7 @@ public class SalesOrderObjectPermissionService {
         return Objects.equals(order.getSubmitterUserId(), userId)
                 || Objects.equals(order.getFormalSalesUserId(), userId)
                 || lead != null && Objects.equals(lead.getOwnerUserId(), userId)
-                || order.getLeadId() != null && agingPoolService.canRead(order.getLeadId(), userId)
+                || order.getLeadId() != null && publicSeaPoolService.canRead(order.getLeadId(), userId)
                 || isApprovalPoolMember(userId) || isCurrentSupervisor(order, userId)
                 || isTeamOrderReader(order, userId);
     }
@@ -71,7 +71,7 @@ public class SalesOrderObjectPermissionService {
 
     public boolean canContinue(SalesOrderDO order, Long userId) {
         if (order.getLeadId() == null) return false;
-        var cycle = agingPoolService.getActiveCycle(order.getLeadId());
+        var cycle = publicSeaPoolService.getActiveCycle(order.getLeadId());
         return cycle != null && Objects.equals(cycle.getCollaboratorUserId(), userId)
                 && !Objects.equals(order.getSubmitterUserId(), userId) && order.getSupersededByOrderId() == null;
     }
@@ -175,7 +175,7 @@ public class SalesOrderObjectPermissionService {
                 .collect(java.util.stream.Collectors.toSet());
         var leads = leadIds.isEmpty() ? new java.util.HashMap<Long, LeadDO>() : leadMapper.selectBatchIds(leadIds).stream()
                 .collect(java.util.stream.Collectors.toMap(LeadDO::getId, java.util.function.Function.identity()));
-        var aging = new java.util.HashSet<>(agingPoolService.filterReadableLeadIds(leadIds, userId));
+        var publicSeaPool = new java.util.HashSet<>(publicSeaPoolService.filterReadableLeadIds(leadIds, userId));
         var team = new java.util.HashSet<>(teamUserIds(userId));
         var rounds = orders.stream().map(SalesOrderDO::getCurrentApprovalRoundId).filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
@@ -188,7 +188,7 @@ public class SalesOrderObjectPermissionService {
         return orders.stream().filter(order -> Objects.equals(order.getSubmitterUserId(), userId)
                 || Objects.equals(order.getFormalSalesUserId(), userId)
                 || leads.containsKey(order.getLeadId()) && Objects.equals(leads.get(order.getLeadId()).getOwnerUserId(), userId)
-                || aging.contains(order.getLeadId()) || order.getCurrentApprovalRoundId() != null && supervised.contains(order.getCurrentApprovalRoundId())
+                || publicSeaPool.contains(order.getLeadId()) || order.getCurrentApprovalRoundId() != null && supervised.contains(order.getCurrentApprovalRoundId())
                 || team.contains(order.getSubmitterUserId())).map(SalesOrderDO::getId)
                 .collect(java.util.stream.Collectors.toSet());
     }

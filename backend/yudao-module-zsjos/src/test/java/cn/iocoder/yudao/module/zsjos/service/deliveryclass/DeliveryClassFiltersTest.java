@@ -43,9 +43,10 @@ class DeliveryClassFiltersTest {
         var mapper = mock(DeliveryClassMapper.class);
         var permissions = mock(PermissionApi.class);
         var scopes = mock(DeliveryClassScopeService.class);
-        when(scopes.resolve(7L)).thenReturn(new DeliveryClassScopeService.Scope(false, Set.of(20L)));
+        when(permissions.hasAnyPermissions(7L, DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(scopes.resolveRead(7L)).thenReturn(new DeliveryClassScopeService.Scope(false, Set.of(20L)));
         var query = new LambdaQueryWrapperX<DeliveryClassDO>();
-        when(mapper.classQuery(any(), eq(Set.of(20L)), isNull(), eq(false), eq(true))).thenReturn(query);
+        when(mapper.classQuery(any(), eq(Set.of(20L)), eq(7L), eq(false), eq(true))).thenReturn(query);
         var row = new DeliveryClassDO().setId(10L).setSystemClass(false).setHomeroomUserId(8L).setHomeroomUserNameSnapshot("历史老师"); row.setTenantId(1L);
         var pending = new DeliveryClassDO().setId(1L).setSystemClass(true); pending.setTenantId(1L);
         when(mapper.selectList(query)).thenReturn(List.of(pending, row));

@@ -33,7 +33,7 @@
 |---|---|---|---|---|
 | 客资管理 | `lead / lead_management` | 同目录 | Lead；租户与已授权关系范围 | A，客资扩展业务字段仍缺，见 G01–G05 |
 | 客资抢单池 | `lead / lead_claim_pool` | 同目录 | 当前可抢 Lead | A；池的时效、分配属性没有专属目录 |
-| 公海 | `lead / lead_aging_pool` | 同目录 | 公海周期 + Lead | A/C；入池、到期、协同人不能用一般 Lead 时间/负责人替代 |
+| 公海 | `lead / lead_public_sea_pool` | 同目录 | 公海周期 + Lead | A/C；入池、到期、协同人不能用一般 Lead 时间/负责人替代 |
 | 下属销售人员列表 | `subordinate_sales / subordinate_sales` | 同目录 | 当前授权下属的人员与业务指标 | A/C；新增指标未全部登记 |
 | 下属销售的客资子列表 | `lead / subordinate_sales_leads` | 未发现对应 pageKey 入口 | 指定授权下属 + Lead | A；与人员指标 scene 是两个查询对象 |
 | 重复客资复核 | `duplicate_review / lead_duplicate_review` | 同目录 | 复核记录与提交快照 | A/C；规则、候选集合需明确查询口径 |

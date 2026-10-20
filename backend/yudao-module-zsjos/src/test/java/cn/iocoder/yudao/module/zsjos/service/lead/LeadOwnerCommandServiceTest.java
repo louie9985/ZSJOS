@@ -32,7 +32,7 @@ class LeadOwnerCommandServiceTest {
     @Mock private LeadMapper leadMapper;
     @Mock private SalesOrderMapper salesOrderMapper;
     @Mock private LeadDispatchService dispatchService;
-    @Mock private LeadAgingPoolService agingPoolService;
+    @Mock private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock private LeadAssignmentService assignmentService;
 
     @BeforeEach

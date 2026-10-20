@@ -38,6 +38,7 @@ public class MaterialObjectPermissionProvider implements ZsjosObjectPermissionPr
             case "read" -> permissionApi.hasTenantReadAllAccess(userId) || owner || manager || material.getCurrentEffectiveVersionId() != null
                     && permissionApi.hasAnyPermissions(userId, "zsjos:material:query");
             case "edit", "submit" -> owner || manager;
+            case "delete-draft" -> owner;
             case "disable", "restore" -> manager;
             case "interact", "reference" -> MATERIAL_EFFECTIVE.equals(material.getStatus())
                     && material.getCurrentEffectiveVersionId() != null;

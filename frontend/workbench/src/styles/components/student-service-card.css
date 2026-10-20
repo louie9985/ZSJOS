@@ -1,0 +1,72 @@
+.student-service-card h4 {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  margin: 0 0 var(--crm-sp-4);
+  color: var(--crm-text);
+  font-size: var(--crm-font-base);
+  font-weight: var(--crm-weight-semibold);
+}
+
+.student-service-card h4 .anticon {
+  color: var(--crm-color-primary);
+}
+
+.student-service-card-course {
+  margin-bottom: var(--crm-sp-2);
+  color: var(--crm-text);
+  font-size: var(--crm-font-base);
+  font-weight: var(--crm-weight-semibold);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.student-service-card-class {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--crm-sp-2);
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.student-service-card-class .anticon {
+  flex: none;
+  margin-top: var(--crm-sp-1);
+}
+
+.student-service-card-class span { min-width: 0; }
+
+.student-service-card-people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+  margin: var(--crm-sp-4) 0 0;
+  padding-top: var(--crm-sp-4);
+  border-top: 1px solid var(--crm-border);
+}
+
+.student-service-card-person {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--crm-sp-3);
+  font-size: var(--crm-font-sm);
+  line-height: 1.6;
+}
+
+.student-service-card-person dt {
+  color: var(--crm-text-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.student-service-card-person dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--crm-text);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.student-service-card-person dd.is-unassigned { color: var(--crm-text-tertiary); }

@@ -8,6 +8,9 @@ public interface StudentInfoConstants {
     String REGENERATE = PREFIX + "regenerate", REVOKE = PREFIX + "revoke";
     String SENSITIVE = PREFIX + "sensitive-read", EXPORT = PREFIX + "export";
     String TAB = "student-info", ACTION = "GENERATE_STUDENT_INFO_FORM";
+    String ARCHIVE_READ = "zsjos:student-archive:read", ARCHIVE_UPDATE = "zsjos:student-archive:update";
+    // Exam staff permissions are the server-owned role boundary for hidden exam fields.
+    String EXAM_READ = "zsjos:exam-calendar:query", EXAM_VISIBILITY_UPDATE = "zsjos:exam-calendar:manage";
     ErrorCode CONFIG_INVALID = new ErrorCode(1_900_090_001, "收集表配置无效，请检查字段及字典设置");
     ErrorCode CONFIG_MISSING = new ErrorCode(1_900_090_002, "尚未发布学员信息收集表配置");
     ErrorCode VERSION_CONFLICT = new ErrorCode(1_900_090_003, "记录已变化，请刷新后重试");

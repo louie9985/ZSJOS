@@ -359,7 +359,7 @@ const audienceOptions = [
   { label: '提交人视角', value: 'submitter' },
   { label: '负责人视角', value: 'owner' },
   { label: '审批人视角', value: 'reviewer' },
-  { label: '公海池视角', value: 'agingPool' },
+  { label: '公海池视角', value: 'publicSeaPool' },
   { label: '统一客资管理视角', value: 'management' }
 ]
 const audienceLabel = computed(

@@ -691,6 +691,7 @@ export type RegistrationCase = {
   completedAt?: Timestamp;
   cancelledAt?: Timestamp;
   cancelReason?: string;
+  informationSent?: boolean; informationSentAt?: Timestamp; informationSentByUserId?: number; informationSubmissionStatus?: string;
   version: number;
   deliveryEstablished?: boolean;
   assignable?: boolean;
@@ -791,6 +792,7 @@ export type MyStudent = {
   wechatId?: string;
   activatedAt?: Timestamp;
   services: Array<{
+    registrationCaseId?: number;
     serviceRelationId: number;
     leadId?: number;
     leadNo?: string;
@@ -1059,6 +1061,7 @@ export type DirectorStageForm = {
   interviewAt?: Timestamp;
 };
 export type StudentContactAction =
+  | "UPDATE_FIRST_CONTACT_CHECKLIST"
   | "ACCEPT"
   | "FIRST_CONTACT"
   | "STUDY_PLAN"
@@ -1086,7 +1089,15 @@ export type StudentDeliveryStage = {
   current?: boolean;
   available?: boolean;
 };
+export type StudentFirstContactProgress = {
+  recordId: number; configVersionId?: number; source: 'snapshot' | 'historical_config'; historyIncomplete: boolean;
+  submittedAt: Timestamp; operatorUserId: number; operatorUserName?: string;
+  studyPlanCompletedAtFirstContact?: boolean; studyPlanStatus?: 'first_contact' | 'later' | 'pending' | 'unknown';
+  studyPlanCompletedAt?: Timestamp;
+  items: Array<{ key: string; title: string; sort: number; completed: boolean; attachmentRequired: boolean; attachmentFileIds: number[] }>;
+};
 export type StudentContactContext = {
+  firstContactProgress?: StudentFirstContactProgress;
   serviceRelationId: number;
   acceptanceStatus?: string;
   acceptedAt?: string;
@@ -1126,6 +1137,8 @@ export type StudentContactContext = {
   operatorAssignmentConflict?: boolean;
 };
 export type StudentContactRecord = {
+  studyPlanCompletedAtFirstContact?: boolean;
+  firstContactSnapshot?: StudentFirstContactProgress;
   id: number;
   contactType: string;
   successful: boolean;
@@ -1134,7 +1147,7 @@ export type StudentContactRecord = {
   remark: string;
   attachmentFileIds: number[];
   completedChecklistKeys: string[];
-  nextContactAt: string;
+  nextContactAt?: string | null;
   operatorUserId: number;
   operatorUserName?: string;
   submittedAt: string;
@@ -1206,6 +1219,7 @@ export type AdvancedFilterScene =
   | "student_service"
   | "media_student"
   | "subordinate_sales"
+  | "education_team"
   | "cashback"
   | "withdrawal";
 export type AdvancedFilterField = {
@@ -2682,7 +2696,7 @@ export type LeadFollowUpRule = {
   name: string;
   firstFollowUpTimeoutMinutes: number;
   qualificationTimeoutMinutes: number;
-  agingPoolTimeoutDays: number;
+  publicSeaPoolTimeoutDays: number;
   noProgressWarningDays: number;
   noProgressGraceDays: number;
   notificationPopupDurationMinutes: number;
@@ -2873,14 +2887,14 @@ export type SubordinateSales = {
   effectiveOrderCount: number;
   effectiveOrderAmount: number;
 };
-export type LeadAgingPoolStatus =
+export type LeadPublicSeaPoolStatus =
   "waiting_assignment" | "assigned" | "deal_pending";
-export type LeadAgingPoolItem = {
+export type LeadPublicSeaPoolItem = {
   cycleId: number;
   leadId: number;
   leadNo: string;
   cycleNo: number;
-  status: LeadAgingPoolStatus;
+  status: LeadPublicSeaPoolStatus;
   originalOwnerUserId: number;
   originalOwnerUserName?: string;
   collaboratorUserId?: number;
@@ -4462,52 +4476,52 @@ export const api = {
       : unwrap<CursorPageResult<ManagedLead>>(
           await http.get("/zsjos/lead/cursor", { params }),
         ),
-  agingPoolPage: async (params: {
+  publicSeaPoolPage: async (params: {
     pageNo: number;
     pageSize: number;
     keyword?: string;
-    status?: LeadAgingPoolStatus;
+    status?: LeadPublicSeaPoolStatus;
     inboxGroup?: string;
     inboxStage?: string;
     relationScope?: "owned" | "following";
     advancedFilter?: AdvancedFilterGroup;
   }) =>
     params.advancedFilter
-      ? unwrap<PageResult<LeadAgingPoolItem>>(
-          await http.post("/zsjos/lead/aging-pool/search-page", params),
+      ? unwrap<PageResult<LeadPublicSeaPoolItem>>(
+          await http.post("/zsjos/lead/public-sea-pool/search-page", params),
         )
-      : unwrap<PageResult<LeadAgingPoolItem>>(
-          await http.get("/zsjos/lead/aging-pool/page", { params }),
+      : unwrap<PageResult<LeadPublicSeaPoolItem>>(
+          await http.get("/zsjos/lead/public-sea-pool/page", { params }),
         ),
-  agingPoolCounts: async () =>
+  publicSeaPoolCounts: async () =>
     unwrap<Record<string, number>>(
-      await http.get("/zsjos/lead/aging-pool/counts"),
+      await http.get("/zsjos/lead/public-sea-pool/counts"),
     ),
-  agingPoolFilterProfile: async () =>
+  publicSeaPoolFilterProfile: async () =>
     unwrap<LeadInboxFilterProfile>(
-      await http.get("/zsjos/lead/aging-pool/filter-profile"),
+      await http.get("/zsjos/lead/public-sea-pool/filter-profile"),
     ),
-  agingPoolCandidates: async (cycleId: number) =>
+  publicSeaPoolCandidates: async (cycleId: number) =>
     unwrap<Array<{ id: number; nickname: string }>>(
-      await http.get(`/zsjos/lead/aging-pool/${cycleId}/candidates`),
+      await http.get(`/zsjos/lead/public-sea-pool/${cycleId}/candidates`),
     ),
-  assignAgingPool: async (cycleId: number, salesUserId: number) =>
+  assignPublicSeaPool: async (cycleId: number, salesUserId: number) =>
     unwrap<boolean>(
-      await http.post(`/zsjos/lead/aging-pool/${cycleId}/assign`, {
+      await http.post(`/zsjos/lead/public-sea-pool/${cycleId}/assign`, {
         salesUserId,
         idempotencyKey: createIdempotencyKey(),
       }),
     ),
-  exitAgingPool: async (cycleId: number, reason: string) =>
+  exitPublicSeaPool: async (cycleId: number, reason: string) =>
     unwrap<boolean>(
-      await http.post(`/zsjos/lead/aging-pool/${cycleId}/exit`, {
+      await http.post(`/zsjos/lead/public-sea-pool/${cycleId}/exit`, {
         reason,
         idempotencyKey: createIdempotencyKey(),
       }),
     ),
-  requestAgingPoolTransfer: async (cycleId: number, reason: string) =>
+  requestPublicSeaPoolTransfer: async (cycleId: number, reason: string) =>
     unwrap<number>(
-      await http.post(`/zsjos/lead/aging-pool/${cycleId}/transfer-request`, {
+      await http.post(`/zsjos/lead/public-sea-pool/${cycleId}/transfer-request`, {
         reason,
         idempotencyKey: createIdempotencyKey(),
       }),
@@ -5454,7 +5468,7 @@ export const api = {
       | "version"
       | "firstFollowUpTimeoutMinutes"
       | "qualificationTimeoutMinutes"
-      | "agingPoolTimeoutDays"
+      | "publicSeaPoolTimeoutDays"
       | "noProgressWarningDays"
       | "noProgressGraceDays"
       | "notificationPopupDurationMinutes"
@@ -6075,6 +6089,8 @@ export const api = {
     unwrap<boolean>(
       await http.put(`/zsjos/student/service/${relationId}/basic-info`, data),
     ),
+  studentFirstContactChecklist: async (relationId: number, data: { version: number; completedChecklistKeys: string[]; attachmentFileIds: number[]; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.put('/zsjos/student/service/' + relationId + '/first-contact-checklist', data)),
   studentFirstContact: async (
     relationId: number,
     data: Record<string, unknown>,

@@ -15,7 +15,7 @@ public interface OpportunityFollowUpRecordMapper extends BaseMapperX<Opportunity
             java.time.LocalDateTime start, java.time.LocalDateTime end) {
         if (userIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<OpportunityFollowUpRecordDO>()
-                .select(OpportunityFollowUpRecordDO::getOperatorUserId)
+                .select(OpportunityFollowUpRecordDO::getOperatorUserId, OpportunityFollowUpRecordDO::getOwnerIdentitySnapshot)
                 .in(OpportunityFollowUpRecordDO::getOperatorUserId, userIds)
                 .ge(OpportunityFollowUpRecordDO::getOccurredAt, start).lt(OpportunityFollowUpRecordDO::getOccurredAt, end));
     }

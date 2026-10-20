@@ -17,6 +17,8 @@ import java.util.Map;
  * @author 芋道源码
  */
 public interface FileApi {
+    /** Exact persisted URL lookup; caller authorizes the owning business record first. */
+    FileInfoRespDTO getRegisteredFileByUrl(String url);
     /** Internal business-authorized read through the original storage configuration. */
     byte[] getFileContent(Long fileId) throws Exception;
 

@@ -9,18 +9,18 @@ describe('delivery class review fixes', () => {
     expect(source).toContain('delivery-class-grid')
   })
 
-  it('loads formal classes incrementally and separates the pending entry', () => {
+  it('loads pending and formal classes in the same server-paginated grid', () => {
     expect(source).toContain('IntersectionObserver')
-    expect(source).toContain('excludeSystemClass: true')
+    expect(source).not.toContain('excludeSystemClass: true')
     expect(source).toContain('delivery-class-grid">{rows.map(row => <Card')
-    expect(source).toContain("row.systemClass ? ' delivery-class-pending' : ''")
+    expect(source).toContain('className="delivery-class-card"')
     expect(source).toContain('setHasMore(targetPage * CLASS_PAGE_SIZE < page.total)')
   })
 
-  it('keeps a pending navigation entry independent of formal filters', () => {
+  it('uses the same class navigation without system-class maintenance actions', () => {
     expect(source).toContain('hoverable onClick={() => navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })}')
-    expect(source).toContain('查看待分班学员')
-    expect(source).toContain('classId: pending.id')
+    expect(source).not.toContain('delivery-class-pending-entry')
+    expect(source).toContain('无固定班主任')
     expect(source).toContain('manage && !row.systemClass')
   })
 

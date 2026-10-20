@@ -28,8 +28,13 @@ public class DeliveryClassObjectPermissionProvider implements ZsjosObjectPermiss
         if ("read".equals(action) && Boolean.TRUE.equals(row.getSystemClass())) {
             return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED);
         }
-        if ("read".equals(action) && Objects.equals(row.getHomeroomUserId(), userId)
-                && permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MY)) return true;
+        if ("read".equals(action)) {
+            if (Objects.equals(row.getHomeroomUserId(), userId)
+                    && permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
+                            DeliveryClassService.PERMISSION_QUERY_MANAGED, DeliveryClassService.PERMISSION_QUERY_MY)) return true;
+            return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
+                    DeliveryClassService.PERMISSION_QUERY_MANAGED) && scopeService.containsRead(userId, row.getDeptId());
+        }
         return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED)
                 && scopeService.contains(userId, row.getDeptId());
     }

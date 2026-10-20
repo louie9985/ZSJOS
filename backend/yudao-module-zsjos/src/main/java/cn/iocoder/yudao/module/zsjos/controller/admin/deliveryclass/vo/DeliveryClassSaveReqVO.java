@@ -16,6 +16,8 @@ public class DeliveryClassSaveReqVO {
     private Long examScheduleId;
     private java.time.LocalDate startDate;
     private java.time.LocalDate endDate;
+    /** Existing clients omit this field; the new editor sets it when only metadata changes. */
+    private Boolean preserveExamDate;
 
     @jakarta.validation.constraints.AssertTrue(message = "请选择考期日期，结束日期不能早于开始日期")
     @com.fasterxml.jackson.annotation.JsonIgnore

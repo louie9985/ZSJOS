@@ -310,50 +310,50 @@
 | LeadEvidenceVO | fileSize | Long |
 | LeadEvidenceVO | sort | Integer |
 
-### LeadAgingPoolPageReqVO
+### LeadPublicSeaPoolPageReqVO
 
-[LeadAgingPoolPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolPageReqVO.java)
-
-| 声明类型（内嵌类型按源码出现顺序） | 属性 | Java类型 |
-|---|---|---|
-| LeadAgingPoolPageReqVO | keyword | String |
-| LeadAgingPoolPageReqVO | status | String |
-| LeadAgingPoolPageReqVO | inboxGroup | String |
-| LeadAgingPoolPageReqVO | inboxStage | String |
-| LeadAgingPoolPageReqVO | relationScope | String |
-| LeadAgingPoolPageReqVO | advancedFilter | AdvancedFilterGroupReqVO |
-
-### LeadAgingPoolRespVO
-
-[LeadAgingPoolRespVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolRespVO.java)
+[LeadPublicSeaPoolPageReqVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolPageReqVO.java)
 
 | 声明类型（内嵌类型按源码出现顺序） | 属性 | Java类型 |
 |---|---|---|
-| LeadAgingPoolRespVO | cycleId | Long |
-| LeadAgingPoolRespVO | leadId | Long |
-| LeadAgingPoolRespVO | leadNo | String |
-| LeadAgingPoolRespVO | cycleNo | Integer |
-| LeadAgingPoolRespVO | status | String |
-| LeadAgingPoolRespVO | originalOwnerUserId | Long |
-| LeadAgingPoolRespVO | originalOwnerUserName | String |
-| LeadAgingPoolRespVO | collaboratorUserId | Long |
-| LeadAgingPoolRespVO | collaboratorUserName | String |
-| LeadAgingPoolRespVO | frozenDeptId | Long |
-| LeadAgingPoolRespVO | frozenDeptName | String |
-| LeadAgingPoolRespVO | submittedName | String |
-| LeadAgingPoolRespVO | submittedMobile | String |
-| LeadAgingPoolRespVO | submittedWechatId | String |
-| LeadAgingPoolRespVO | leadCategory | String |
-| LeadAgingPoolRespVO | sourceChannel | String |
-| LeadAgingPoolRespVO | ownershipStartedAt | LocalDateTime |
-| LeadAgingPoolRespVO | dueAt | LocalDateTime |
-| LeadAgingPoolRespVO | enteredAt | LocalDateTime |
-| LeadAgingPoolRespVO | assignedAt | LocalDateTime |
-| LeadAgingPoolRespVO | lastFollowUpAt | LocalDateTime |
-| LeadAgingPoolRespVO | nextFollowUpAt | LocalDateTime |
-| LeadAgingPoolRespVO | activeSalesOrderId | Long |
-| LeadAgingPoolRespVO | activeSalesOrderStatus | String |
-| LeadAgingPoolRespVO | availableActions | List<String> |
+| LeadPublicSeaPoolPageReqVO | keyword | String |
+| LeadPublicSeaPoolPageReqVO | status | String |
+| LeadPublicSeaPoolPageReqVO | inboxGroup | String |
+| LeadPublicSeaPoolPageReqVO | inboxStage | String |
+| LeadPublicSeaPoolPageReqVO | relationScope | String |
+| LeadPublicSeaPoolPageReqVO | advancedFilter | AdvancedFilterGroupReqVO |
+
+### LeadPublicSeaPoolRespVO
+
+[LeadPublicSeaPoolRespVO.java](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolRespVO.java)
+
+| 声明类型（内嵌类型按源码出现顺序） | 属性 | Java类型 |
+|---|---|---|
+| LeadPublicSeaPoolRespVO | cycleId | Long |
+| LeadPublicSeaPoolRespVO | leadId | Long |
+| LeadPublicSeaPoolRespVO | leadNo | String |
+| LeadPublicSeaPoolRespVO | cycleNo | Integer |
+| LeadPublicSeaPoolRespVO | status | String |
+| LeadPublicSeaPoolRespVO | originalOwnerUserId | Long |
+| LeadPublicSeaPoolRespVO | originalOwnerUserName | String |
+| LeadPublicSeaPoolRespVO | collaboratorUserId | Long |
+| LeadPublicSeaPoolRespVO | collaboratorUserName | String |
+| LeadPublicSeaPoolRespVO | frozenDeptId | Long |
+| LeadPublicSeaPoolRespVO | frozenDeptName | String |
+| LeadPublicSeaPoolRespVO | submittedName | String |
+| LeadPublicSeaPoolRespVO | submittedMobile | String |
+| LeadPublicSeaPoolRespVO | submittedWechatId | String |
+| LeadPublicSeaPoolRespVO | leadCategory | String |
+| LeadPublicSeaPoolRespVO | sourceChannel | String |
+| LeadPublicSeaPoolRespVO | ownershipStartedAt | LocalDateTime |
+| LeadPublicSeaPoolRespVO | dueAt | LocalDateTime |
+| LeadPublicSeaPoolRespVO | enteredAt | LocalDateTime |
+| LeadPublicSeaPoolRespVO | assignedAt | LocalDateTime |
+| LeadPublicSeaPoolRespVO | lastFollowUpAt | LocalDateTime |
+| LeadPublicSeaPoolRespVO | nextFollowUpAt | LocalDateTime |
+| LeadPublicSeaPoolRespVO | activeSalesOrderId | Long |
+| LeadPublicSeaPoolRespVO | activeSalesOrderStatus | String |
+| LeadPublicSeaPoolRespVO | availableActions | List<String> |
 
 ### LeadClaimPoolPageReqVO
 

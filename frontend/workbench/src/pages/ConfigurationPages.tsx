@@ -42,7 +42,7 @@ export function LeadFollowUpRuleConfigPage({ permissions }: { permissions: strin
         { title: '规则', dataIndex: 'name', width: 160 },
         { title: '首次跟进', dataIndex: 'firstFollowUpTimeoutMinutes', width: 120, render: v => `${v} 分钟` },
         { title: '判定时限', dataIndex: 'qualificationTimeoutMinutes', width: 120, render: v => `${v} 分钟` },
-        { title: '公海', dataIndex: 'agingPoolTimeoutDays', width: 120, render: v => `${v} 天` },
+        { title: '公海', dataIndex: 'publicSeaPoolTimeoutDays', width: 120, render: v => `${v} 天` },
         { title: '通知浮窗', dataIndex: 'notificationPopupDurationMinutes', width: 120, render: v => `${v} 分钟` },
         { title: '自动判重', dataIndex: 'duplicateAutoResolutionEnabled', width: 100, render: v => <Tag color={v ? 'success' : 'default'}>{v ? '开启' : '关闭'}</Tag> },
         { key: 'action', title: '操作', width: 80, render: () => permissions.includes('zsjos:lead-follow-up-rule:update') ? <Button type="link" onClick={edit}>编辑</Button> : '-' }
@@ -53,7 +53,7 @@ export function LeadFollowUpRuleConfigPage({ permissions }: { permissions: strin
         <Form.Item name="version" hidden><InputNumber /></Form.Item>
         <NumberField name="firstFollowUpTimeoutMinutes" label="首次跟进时限（分钟）" min={5} max={10080}/>
         <NumberField name="qualificationTimeoutMinutes" label="有效性判定时限（分钟）" min={5} max={43200}/>
-        <NumberField name="agingPoolTimeoutDays" label="公海期限（天）" min={1} max={3650}/>
+        <NumberField name="publicSeaPoolTimeoutDays" label="公海期限（天）" min={1} max={3650}/>
         <NumberField name="notificationPopupDurationMinutes" label="消息通知浮窗时长（分钟）" min={1} max={30}/>
         <Form.Item name="duplicateAutoResolutionEnabled" label="重复客资自动判重" valuePropName="checked"><Switch/></Form.Item>
       </Form>

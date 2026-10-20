@@ -21,7 +21,8 @@ with sync_playwright() as p:
             page.locator('tr.ant-table-row').nth(1).click()
         else:
             page.locator('#student-avatar-list button.lead-inbox-item').nth(1).click()
-        expect(page.get_by_text('当前服务：课程2 · 班级2', exact=True).filter(visible=True)).to_be_visible()
+        expect(page.locator('.student-service-card').filter(visible=True)).to_contain_text('课程2')
+        expect(page.locator('.student-service-card').filter(visible=True)).to_contain_text('班级2')
         page.get_by_role('tab', name='课程服务与交接').filter(visible=True).click()
         expect(page.get_by_text('当前课程服务与交接信息', exact=True).filter(visible=True)).to_be_visible()
         page.screenshot(path=str(output / f'student-table-completion-{width}.png'), full_page=True)

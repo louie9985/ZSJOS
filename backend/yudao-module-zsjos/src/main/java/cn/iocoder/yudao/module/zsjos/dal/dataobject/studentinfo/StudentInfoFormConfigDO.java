@@ -12,5 +12,6 @@ public class StudentInfoFormConfigDO extends TenantBaseDO {
     private Long id;
     private Integer versionNo, revision;
     private String status, fieldsJson;
+    private String educationCategoryIdsJson;
     private java.time.LocalDateTime publishedAt;
 }

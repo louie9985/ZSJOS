@@ -6,12 +6,12 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.flow.LeadFlowHistoryRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolEventDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRecordDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolEventMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
@@ -47,7 +47,7 @@ class LeadFlowHistoryServiceTest {
     @Mock private BusinessEventMapper eventMapper;
     @Mock private LeadAssignmentHistoryMapper assignmentMapper;
     @Mock private LeadFollowUpRecordMapper followUpMapper;
-    @Mock private LeadAgingPoolEventMapper agingEventMapper;
+    @Mock private LeadPublicSeaPoolEventMapper publicSeaPoolEventMapper;
     @Mock private PartnerMapper partnerMapper;
     @Mock private AdminUserApi adminUserApi;
     @Mock private FileApi fileApi;
@@ -65,7 +65,7 @@ class LeadFlowHistoryServiceTest {
         when(eventMapper.selectByLeadId(7L)).thenReturn(List.of());
         when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of());
         when(followUpMapper.selectListByLeadId(7L)).thenReturn(List.of());
-        when(agingEventMapper.selectByLeadId(7L)).thenReturn(List.of());
+        when(publicSeaPoolEventMapper.selectByLeadId(7L)).thenReturn(List.of());
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
     }
 
@@ -139,15 +139,15 @@ class LeadFlowHistoryServiceTest {
         accepted.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of("assignmentHistoryId", 20L)));
         LeadAssignmentHistoryDO duplicate = assignment(20L, "accept", occurredAt);
         LeadAssignmentHistoryDO transfer = assignment(10L, "transfer", occurredAt);
-        LeadAgingPoolEventDO aging = new LeadAgingPoolEventDO();
-        aging.setId(11L); aging.setLeadId(7L); aging.setEventType("assigned"); aging.setOccurredAt(occurredAt);
+        LeadPublicSeaPoolEventDO publicSeaPool = new LeadPublicSeaPoolEventDO();
+        publicSeaPool.setId(11L); publicSeaPool.setLeadId(7L); publicSeaPool.setEventType("assigned"); publicSeaPool.setOccurredAt(occurredAt);
         when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(accepted));
         when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(duplicate, transfer));
-        when(agingEventMapper.selectByLeadId(7L)).thenReturn(List.of(aging));
+        when(publicSeaPoolEventMapper.selectByLeadId(7L)).thenReturn(List.of(publicSeaPool));
 
         List<LeadFlowHistoryRespVO> result = service.getHistory(7L, 99L);
 
-        assertEquals(List.of("aging:11", "assignment:10", "event:9", "lead:7"),
+        assertEquals(List.of("public-sea-pool:11", "assignment:10", "event:9", "lead:7"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
         assertEquals("待接单", result.get(2).getAssignmentStatusBefore());
         assertEquals("已归属", result.get(2).getAssignmentStatusAfter());
@@ -339,6 +339,52 @@ class LeadFlowHistoryServiceTest {
         assertEquals("本次恢复",rows.getFirst().getRemark());
         assertEquals("suspended",old.getToStatus());
         org.mockito.Mockito.verify(eventMapper,org.mockito.Mockito.never()).updateById(org.mockito.ArgumentMatchers.any(BusinessEventDO.class));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "lead_valid, 判定有效", "lead_invalid, 判定无效",
+            "lead_pending_follow, 待跟进", "lead_following, 跟进中",
+            "lead_state_changed, 客资状态变更", "lead_state_repaired, 客资状态修复",
+            "lead_appealing, 申诉中", "lead_closed, 客资关闭",
+            "lead_deal_confirmed, 成交确认", "legacy_lead_assistance_message, 历史协助记录",
+            "legacy_lead_complaint_event, 历史投诉记录", "future_event, 客资流转（历史类型未识别）"
+    })
+    void translatesHistoricalEventTitles(String type, String title) {
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(event(1L,type,submittedAt.plusMinutes(1),null,null)));
+        assertEquals(title, service.getHistory(7L,99L).getFirst().getFlowNode());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "pending_assignment, pending_follow, 待分配, 待跟进",
+            "pending_follow, following, 待跟进, 跟进中",
+            "following, timeout_pending, 跟进中, 超时待处理",
+            "recycled_pending, in_pool, 回收待处理, 抢单池",
+            "valid, deal_pending_review, 有效, 成交待审核",
+            "deal_pending_review, deal_confirmed, 成交待审核, 已成交",
+            "invalid, appealing, 无效, 申诉中"
+    })
+    void translatesPersistedLegacyStates(String from, String to, String before, String after) {
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(event(1L,"lead_state_changed",submittedAt.plusMinutes(1),from,to)));
+        var row=service.getHistory(7L,99L).getFirst();
+        assertEquals(before,row.getLeadStatusBefore()); assertEquals(after,row.getLeadStatusAfter());
+    }
+
+    @Test
+    void distinguishesBaselineFromOtherAssignmentsWithoutRewritingReasons() {
+        var baseline=assignment(1L,"other",submittedAt.plusMinutes(1));
+        baseline.setReason("legacy assignment history baseline");
+        var other=assignment(2L,"other",submittedAt.plusMinutes(2)); other.setReason("业务说明 CRM");
+        var accepted=assignment(3L,"accept",submittedAt.plusMinutes(3));
+        accepted.setReason("legacy-assignment-log-1233 销售确认接单");
+        when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(baseline,other,accepted));
+        var rows=service.getHistory(7L,99L);
+        assertEquals("历史分配记录：销售确认接单",rows.get(0).getReason());
+        assertEquals("其他分配记录",rows.get(1).getFlowNode()); assertEquals("业务说明 CRM",rows.get(1).getReason());
+        assertEquals("历史分配初始记录",rows.get(2).getFlowNode());
+        assertEquals("legacy assignment history baseline",baseline.getReason());
+        assertEquals("legacy-assignment-log-1233 销售确认接单",accepted.getReason());
     }
 
     private BusinessEventDO event(Long id, String type, LocalDateTime at, String from, String to) {

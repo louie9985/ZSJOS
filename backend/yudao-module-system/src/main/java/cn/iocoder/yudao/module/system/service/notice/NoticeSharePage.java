@@ -26,7 +26,8 @@ public final class NoticeSharePage {
             article.appendElement("p").addClass("muted").text(notice.getPublishTime()
                     .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         }
-        article.appendElement("div").addClass("content").html(content);
+        Element body = article.appendElement("div").addClass("content").html(content);
+        addImagePreviews(page, body);
         if (notice.getAttachments() != null && !notice.getAttachments().isEmpty()) {
             Element files = article.appendElement("section").addClass("files");
             files.appendElement("h2").text("附件");
@@ -49,6 +50,37 @@ public final class NoticeSharePage {
         state.appendElement("p").text(message);
         if (retry) state.appendElement("a").attr("href", "").text("重试");
         return page.outerHtml();
+    }
+
+    // The anonymous reader deliberately forbids scripts. Fragment links and :target
+    // provide an image gallery without weakening CSP or modifying saved content.
+    private static void addImagePreviews(Document page, Element body) {
+        var images = body.select("img[src]").stream()
+                .filter(image -> NoticeShareContent.safeUrl(image.attr("src"))).toList();
+        for (int index = 0; index < images.size(); index++) {
+            Element image = images.get(index);
+            String id = "notice-image-" + index;
+            Element link = new Element("a").attr("href", "#" + id)
+                    .attr("id", id + "-source").attr("aria-label", "预览图片 " + (index + 1));
+            // Preserve an authored link's other text; avoid nested anchors.
+            Element authoredLink = image.closest("a");
+            if (authoredLink != null) authoredLink.before(link);
+            else image.replaceWith(link);
+            link.appendChild(image);
+            Element preview = page.body().appendElement("section").addClass("notice-image-preview")
+                    .attr("id", id).attr("role", "dialog").attr("aria-label", "图片预览 " + (index + 1));
+            Element toolbar = preview.appendElement("nav").attr("aria-label", "图片预览操作");
+            toolbar.appendElement("a").attr("href", "#" + id + "-source").text("关闭");
+            if (images.size() > 1) {
+                toolbar.appendElement("a").attr("href", "#notice-image-" + (index + images.size() - 1) % images.size()).text("上一张");
+                toolbar.appendElement("span").text((index + 1) + " / " + images.size());
+                toolbar.appendElement("a").attr("href", "#notice-image-" + (index + 1) % images.size()).text("下一张");
+            }
+            toolbar.appendElement("a").attr("href", image.attr("src")).attr("target", "_blank")
+                    .attr("rel", "noopener noreferrer").text("查看原图");
+            preview.appendElement("img").attr("src", image.attr("src")).attr("alt", image.attr("alt"))
+                    .attr("loading", "lazy");
+        }
     }
 
     private static Document shell(String title, String summary) {
@@ -79,6 +111,13 @@ public final class NoticeSharePage {
                 .muted { color: #666; font-size: 13px; }
                 .content { margin-top: 28px; }
                 .content img, .content video { max-width: 100%; height: auto; }
+                .content a:has(> img) { cursor: zoom-in; }
+                .notice-image-preview { display: none; position: fixed; inset: 0; z-index: 1000; background: #101010; color: #fff; padding: 16px; overflow: auto; }
+                .notice-image-preview:target { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+                body:has(.notice-image-preview:target) { overflow: hidden; }
+                .notice-image-preview nav { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 20px; flex-shrink: 0; }
+                .notice-image-preview a { color: #fff; padding: 8px; }
+                .notice-image-preview img { min-height: 0; max-width: 100%; max-height: calc(100dvh - 150px); object-fit: contain; margin: auto; }
                 .content pre { display: block; max-width: 100%; overflow-x: auto; }
                 .notice-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; margin: 12px 0; }
                 .notice-table-scroll:focus-visible { outline: 2px solid #1677ff; outline-offset: 2px; }

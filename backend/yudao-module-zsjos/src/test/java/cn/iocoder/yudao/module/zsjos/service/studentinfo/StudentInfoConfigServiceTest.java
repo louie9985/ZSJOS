@@ -17,6 +17,7 @@ import static org.mockito.Mockito.*;
 class StudentInfoConfigServiceTest {
     @InjectMocks StudentInfoConfigService service;
     @Mock StudentInfoFormConfigMapper mapper;
+    @Spy StudentInfoProductRules productRules=new StudentInfoProductRules();
     @Spy StudentInfoFields fields=new StudentInfoFields();
     @BeforeEach void setup() { TenantContextHolder.setTenantId(9L); }
     @AfterEach void cleanup() { TenantContextHolder.clear(); }

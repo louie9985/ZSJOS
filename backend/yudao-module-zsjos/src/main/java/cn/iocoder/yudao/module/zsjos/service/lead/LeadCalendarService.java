@@ -77,6 +77,13 @@ public class LeadCalendarService {
     }
 
     static Comparator<DueLead> comparator(String sort, String direction, Map<String, Integer> categoryOrder) {
+        if ("ownershipStartedAt".equals(sort)) {
+            Comparator<java.time.LocalDateTime> timeOrder = "desc".equals(direction)
+                    ? Comparator.reverseOrder() : Comparator.naturalOrder();
+            // Missing historical ownership dates stay last in either direction; do not invent an acquisition date.
+            return Comparator.comparing(DueLead::getOwnershipStartedAt, Comparator.nullsLast(timeOrder))
+                    .thenComparing(DueLead::getDeadline).thenComparing(DueLead::getId);
+        }
         Comparator<DueLead> primary = "category".equals(sort)
                 ? Comparator.comparingInt(row -> row.getCategory() == null ? Integer.MAX_VALUE
                     : categoryOrder.getOrDefault(row.getCategory(), Integer.MAX_VALUE))

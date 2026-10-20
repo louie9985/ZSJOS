@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_INBOX_FILTER_INVALID;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.AGING_POOL_ASSIGNED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PUBLIC_SEA_POOL_ASSIGNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -260,18 +260,18 @@ class LeadInboxFilterConfigServiceImplTest {
     }
 
     @Test
-    void saveDraftAcceptsAgingPoolStatusAudience() {
+    void saveDraftAcceptsPublicSeaPoolStatusAudience() {
         LeadInboxFilterSaveReqVO reqVO = new LeadInboxFilterSaveReqVO();
-        reqVO.setAudience("agingPool");
+        reqVO.setAudience("publicSeaPool");
         LeadInboxFilterConfigVO.GroupVO all = group("all", "全部公海客资", 0);
         LeadInboxFilterConfigVO.OptionVO allOption = option("all", "全部", 0);
         LeadInboxFilterConfigVO.OptionVO assigned = option("assigned", "协同跟进中", 10);
-        assigned.setConditions(List.of(condition("pool_status", AGING_POOL_ASSIGNED)));
+        assigned.setConditions(List.of(condition("pool_status", PUBLIC_SEA_POOL_ASSIGNED)));
         all.setSections(List.of(section("pool_status", "公海状态", 0, allOption, assigned)));
         reqVO.setGroups(List.of(all));
         LeadInboxFilterSchemeDO scheme = scheme(reqVO);
-        scheme.setAudience("agingPool");
-        when(schemeMapper.selectByAudience("agingPool")).thenReturn(scheme);
+        scheme.setAudience("publicSeaPool");
+        when(schemeMapper.selectByAudience("publicSeaPool")).thenReturn(scheme);
 
         service.saveDraft(reqVO);
 

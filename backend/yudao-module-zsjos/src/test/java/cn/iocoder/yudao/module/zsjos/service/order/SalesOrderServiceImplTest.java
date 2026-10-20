@@ -42,7 +42,7 @@ import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
-import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadCollaborationService;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
@@ -121,7 +121,7 @@ class SalesOrderServiceImplTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
     @Mock private LeadInboxFilterConfigService inboxFilterConfigService;
-    @Mock private LeadAgingPoolService agingPoolService;
+    @Mock private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock private LeadCollaborationService collaborationService;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private SalesOrderCommandService commandService;
@@ -151,7 +151,7 @@ class SalesOrderServiceImplTest {
                 .map(value -> new cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO().setValue(value).setLabel("历史标签"))
                 .toList());
         lenient().when(advancedFilterService.matchOrderIds(any())).thenReturn(null);
-        lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
+        lenient().doNothing().when(publicSeaPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
         lenient().doNothing().when(collaborationService).requireCanEnterDealForUpdate(any(LeadDO.class), anyLong());
         lenient().when(commandService.fingerprint(any())).thenReturn("fingerprint");
         lenient().when(orderNumberService.next()).thenReturn("OD202608141200000001");
@@ -1422,7 +1422,7 @@ class SalesOrderServiceImplTest {
                         && "sales-order-cancelled:200".equals(event.getSourceEventKey())
                         && List.of(20L).equals(event.getPayload().get("resultUserIds"))
                         && "客户取消".equals(event.getPayload().get("decisionReason"))));
-        verifyNoInteractions(opportunityMapper, agingPoolService);
+        verifyNoInteractions(opportunityMapper, publicSeaPoolService);
     }
 
     @org.junit.jupiter.params.ParameterizedTest

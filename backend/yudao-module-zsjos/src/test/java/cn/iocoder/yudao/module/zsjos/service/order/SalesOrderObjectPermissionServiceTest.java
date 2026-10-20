@@ -38,7 +38,7 @@ class SalesOrderObjectPermissionServiceTest {
     @Mock private DeptApi deptApi;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
-    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService agingPoolService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolService publicSeaPoolService;
 
     @Test
     void enabledUsersIncludesDepartmentLeadersAndExcludesDisabledUser() {

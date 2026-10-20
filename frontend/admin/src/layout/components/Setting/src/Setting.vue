@@ -13,6 +13,9 @@ import InterfaceDisplay from './components/InterfaceDisplay.vue'
 import LayoutRadioPicker from './components/LayoutRadioPicker.vue'
 import { isHeaderNavLayout } from '@/utils/layout'
 import { useSetting } from './useSetting'
+import NavigationOrderDialog from './components/NavigationOrderDialog.vue'
+import { useUserStore } from '@/store/modules/user'
+import { NAVIGATION_QUERY } from '@/utils/navigationOrder'
 
 defineOptions({ name: 'Setting' })
 
@@ -20,6 +23,13 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const layout = computed(() => appStore.getLayout)
 const { drawerVisible } = useSetting()
+const navigationOrderOpen = ref(false)
+const navigationUser = useUserStore()
+const canAdjustNavigation = computed(
+  () =>
+    navigationUser.getPermissions.has(NAVIGATION_QUERY) ||
+    navigationUser.getPermissions.has('*:*:*')
+)
 
 // 主题色相关
 const systemTheme = ref(appStore.getTheme.elColorPrimary)
@@ -207,6 +217,10 @@ const clear = () => {
     </template>
 
     <div class="text-center">
+      <template v-if="canAdjustNavigation">
+        <ElDivider>导航栏</ElDivider>
+        <ElButton @click="navigationOrderOpen = true">导航栏调整</ElButton>
+      </template>
       <!-- 主题 -->
       <ElDivider>{{ t('setting.theme') }}</ElDivider>
       <ThemeSwitch />
@@ -285,4 +299,5 @@ const clear = () => {
       </el-button>
     </div>
   </ElDrawer>
+  <NavigationOrderDialog v-model="navigationOrderOpen" />
 </template>

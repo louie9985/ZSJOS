@@ -1,5 +1,29 @@
 # Database migration operations
 
+## V331 Flowable utf8mb4
+
+V331 converts the 41 explicitly named Flowable tables to utf8mb4_bin during the normal
+release migration phase. It preserves data, types, indexes and installed foreign keys;
+both version markers are written only after postconditions and FK-data validation succeed.
+All backend instances/executors must be stopped. A mixed charset state after interrupted
+DDL is recoverable by replay; existing markers never suppress actual metadata checks.
+Fresh and desired schemas use the same charset. No historical migration or grant is
+rewritten. See [prerequisites, rollout, verification and rollback limits](flowable-utf8mb4.md).
+
+## V327 student archive
+
+V327 adds encrypted immutable archive revision snapshots, image archive_only separation, unique form revision/idempotency constraints and separate student archive read/update menu metadata. Requires V323/V324 collection schema and both V324 ledgers; run after existing numbered migrations, preserving deployed history. Does not seed archive answers or assign/reset roles. Administrators assign permissions in role management. No target DB application is implied by source delivery.
+
+Verification: `python -B script/sql/mysql/tools/test_student_archive.py` retains controlled MySQL databases and checks initial/replay/partial DDL recovery, prerequisite and ledger-write failures, UTF-8 HEX, permission metadata and both ledgers. Source Docker instance can lack V324 ledgers; only test prerequisites are explicitly seeded. Apply to the named target only under controlled authorization after backup. DDL rollback is not atomic; retain revisions/images if rolling back application code, inspect actual structure after failure, rerun safely, never clear submissions or role grants.
+
+## V323 registration student collection
+
+V324 follows V323 and adds the four user-approved collection dictionaries (ethnicity, retraining, current education and registration level), totaling 70 choices. It inserts missing identities only, preserving administrator labels, status and deleted entries. New configuration presets bind the owning dictionaries; existing saved configuration is not rewritten or published. Run python -B script/sql/mysql/tools/test_student_information_dictionaries.py for first/replay/partial/failure/UTF-8 verification; local authorized synchronization adds --sync-local and writes a backup. No role grants or shared-service changes are included.
+
+V323 follows V322 in both ledgers and requires no legacy Lead-level collection instances or answers. It adds registration bindings/snapshots/send metadata, category configuration, an image-reference table and one send permission, and relocates existing collection operation metadata under registration. It never changes role-menu assignments. Current target structure is in schema/core.sql; historical V183 and bootstrap remain unchanged and fresh installs continue through the existing upgrade chain.
+
+Run python -B script/sql/mysql/tools/test_registration_student_information.py for retained isolated first/replay/partial/error/ledger/UTF-8/schema comparison checks. Local authorized application uses --sync-local and writes a scoped backup before execution. MySQL DDL is not transactionally reversible; retain partial DDL, inspect structure and replay only after correcting the cause. Existing version rows/checksums are not reconciled. Rollback retains answers, images and encryption keys; old Lead-only code is incompatible with this flow. Deployment and full historical fresh-chain acceptance are separate checks. See [collection activation and APIs](../api/student-information-collection.md).
+
 ## 2026-09-29 V279 collision resolution
 
 The remote, already-deployed `V279__attribution_org_provenance_and_identity_split.sql` remains the
@@ -449,6 +473,14 @@ those later changes again. Missing evidence or an unexplained current change fai
 The finalizer independently rechecks preparation prerequisites and completion;
 continuing after a failed prepare cannot register success on an empty target.
 
+V306 additionally requires every reviewed tenant-1 manifest order and its current
+approval round to resolve before it can write either ledger; missing targets are a
+failed repair, not an empty successful replay. Completed replay compares the full
+recorded after-image, including audit/version fields. V320/V321/V322 reject one-sided
+ledger markers and existing records whose description, checksum, module or release
+identity belongs to another migration. These guards preserve administrator metadata
+and require ledger drift to be reviewed separately.
+
 First-time V305 on a database with target orders still requires the reviewed private
 plan and its dedicated executor: see [order history repair](order-history-repair.md).
 Old private plans remain evidence, not permission to overwrite later changes; a
@@ -642,7 +674,7 @@ sales. The runtime permission remains cumulative with the existing Lead object r
 grant cannot expand the set of visible Leads. A successful V091 version marker prevents later
 bootstrap reruns from restoring a role-menu relation that an administrator manually removed.
 
-The migration changes no Lead, business event, assignment history, aging-pool event, account, or
+The migration changes no Lead, business event, assignment history, public-sea-pool event, account, or
 historical row. It is additive, transaction-wrapped, repeatable, and forward-only, and it is wired
 after V090 in fresh bootstrap order. Existing-environment execution still requires separate
 approval. After controlled execution, run `verify-bootstrap.sql` to verify the version markers and
@@ -859,7 +891,7 @@ historical links to `create_time + 7 days`, and widens the student decision comm
 It restores menu `73460` to the student business-form page, moves the interview-template page and its
 buttons/grants to stable menu `73483`, and forward-repairs V139 supervisor permission definitions by
 preferring the oldest compatible identity, preserving its grants, and leaving exactly one active definition
-per permission. It also preserves the canonical relative public-sea path `lead-aging-pool`.
+per permission. It also preserves the canonical relative public-sea path `lead-public-sea-pool`.
 
 The migration is forward-only and repeatable. This repository update does not execute it against any
 database. V139 and V140 now execute their repair and version writes inside one stored-procedure call; their
@@ -1063,3 +1095,8 @@ V298/V299/V302/V303 的历史字典、订单和账号前置条件仅对存在相
 本次范围为隔离副本与源码修复，实际测试库保持只读。部署前必须审查已部署文件版本和
 对应 checksum；不能用批量 reconcile 冒充迁移完成。完整恢复边界、验证和清理规则见
 [测试库迁移恢复](test-migration-recovery-20261013.md)。
+
+
+### V329 公海池统一命名
+
+V329 在保留已部署历史脚本的前提下重命名公海表、规则列、接口对应菜单权限/组件、筛选视角和通知元数据，不改变 system_role_menu。历史基线与当前结构通过 Core manifest 的 baselineNamingUpgrade 显式名称映射校验，其他差异仍阻断检查。升级前排空历史公海通知、获准停止旧应用，配套发布两个前端和后端。执行、恢复和验收见 [公海池命名升级](lead-public-sea-pool-deployment.md)。

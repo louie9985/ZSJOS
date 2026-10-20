@@ -1,0 +1,140 @@
+# Public sea pool naming unification
+
+## Registration - public-sea-pool-naming-20261019
+- Owner: Codex /root; environment: local (ZSJOS_AGENT_ENV unset; /etc/zsjos/agent-environment absent).
+- Branch: main; worktree: D:/ZSJ-OS; base commit: 6bf0ce81a182b0a5ea040c8536a1ae7fad485e5e; target branch/integration: None.
+- Goal: canonical PublicSeaPool / public_sea_pool / public-sea-pool in active code, API, configured menu/notification metadata and schema.
+- Non-goals: no claim-pool or repurchase-rule changes; no historical notification/event rewrites, applied migration rewrites, service restart, real account grant changes, Git publication or branch operations.
+- Ownership: naming-related edits in backend/yudao-module-zsjos (including AGENTS.md), frontend/admin/src/api/zsjos and views/zsjos, frontend/workbench/src with related tests/styles; directly affected docs/api, docs/architecture/data-and-permission-flow.md, docs/frontend and docs/operations; script/sql/mysql/schema/core.sql, modules/core.json, verification scripts, new V329 migration and verifier; this handoff. Preserve all existing dirty content.
+- Dependencies: authoritative System menus/notification configuration; deployed migration compatibility requires a forward migration. Compatibility storage is retained under the canonical namespace.
+- Verification: scoped residual scan/diff; focused backend compile/tests; both frontend contract/type checks/builds; controlled MySQL initial/replay/partial-recovery/failure-ledger execution and scoped data comparison.
+- Rollout: prepare a reviewable upgrade before activation; no real/shared database schema or metadata mutation and no service restart in this registration.
+
+## Naming edit scope
+- backend/yudao-module-zsjos/AGENTS.md
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/advancedfilter/AdvancedFilterController.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/advancedfilter/AdvancedFilterTemplateController.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/LeadAgingPoolController.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/LeadPublicSeaPoolController.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolAssignReqVO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolAssignReqVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolCandidateRespVO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolCandidateRespVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolExitReqVO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolExitReqVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolPageReqVO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolPageReqVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadAgingPoolRespVO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadPublicSeaPoolRespVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/agingpool/LeadTransferRequestCreateReqVO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/publicseapool/LeadTransferRequestCreateReqVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/followup/LeadFollowUpRuleRespVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/followup/LeadFollowUpRuleUpdateReqVO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadAgingPoolCycleDO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadPublicSeaPoolCycleDO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadAgingPoolEventDO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadPublicSeaPoolEventDO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadAgingPoolNotifyStageDO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadPublicSeaPoolNotifyStageDO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadFollowUpRuleDO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadPublicSeaRecordDO.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/lead/LeadPublicSeaPoolCompatibilityRecordDO.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadAgingPoolCycleMapper.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaPoolCycleMapper.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadAgingPoolEventMapper.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaPoolEventMapper.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadAgingPoolNotifyStageMapper.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaPoolNotifyStageMapper.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadFollowUpResponsibilitySql.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadMapper.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaRecordMapper.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaPoolCompatibilityRecordMapper.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaTaskCleanupSql.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadConstants.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadNotifySceneConstants.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/ZsjosErrorCodeConstants.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/AdvancedFilterMetadata.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/bpm/content/provider/LeadTransferContentProvider.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolScheduler.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadPublicSeaPoolScheduler.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolService.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadPublicSeaPoolService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolServiceImpl.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadPublicSeaPoolServiceImpl.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolTenantInitializer.java -> backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadPublicSeaPoolTenantInitializer.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadCollaborationService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadDispatchServiceImpl.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadFlowHistoryService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadFollowUpRuleServiceImpl.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadInboxFilterConfigServiceImpl.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProvider.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadObjectPermissionService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadOwnerCommandService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadTransferRequestService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadTransferRequestServiceImpl.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesCommandService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/flow/LeadFlowOperationAspect.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/flow/LeadFlowRecorder.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/order/SalesOrderObjectPermissionService.java
+- backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/order/SalesOrderServiceImpl.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/admin/advancedfilter/AdvancedFilterTemplateControllerPermissionTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadAgingPoolCycleMapperTest.java -> backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaPoolCycleMapperTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadFollowUpResponsibilityTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadPublicSeaTaskCleanupTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/AdvancedFilterAccessContractTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/cashback/CashbackBatchPermissionTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolServiceImplTest.java -> backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadPublicSeaPoolServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolTenantInitializerTest.java -> backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadPublicSeaPoolTenantInitializerTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadCollaborationServiceTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadDispatchServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadFlowHistoryServiceTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadFollowUpRuleServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadInboxFilterConfigServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProviderTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadObjectPermissionServiceTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadOwnerCommandServiceTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadPublicSeaTaskCleanupServiceTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadTransferRequestServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesCommandServiceTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/flow/LeadFlowRecorderTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/order/NotifyStartupContextTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/order/SalesOrderObjectPermissionServiceTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/order/SalesOrderServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/task/MenuTaskSummaryServiceImplTest.java
+- backend/yudao-module-zsjos/src/test/resources/advanced-filter-contract.json
+- docs/api/cashback.md
+- docs/api/zsjos-lead-aging-pool.md -> docs/api/zsjos-lead-public-sea-pool.md
+- docs/api/zsjos-lead-flow-history.md
+- docs/api/zsjos-lead-submission-dispatch.md
+- docs/architecture/data-and-permission-flow.md
+- docs/frontend/advanced-filter-field-catalog.md
+- docs/frontend/advanced-filter-inventory.md
+- docs/frontend/advanced-filter-metadata.md
+- docs/frontend/advanced-filter-page-coverage.md
+- docs/frontend/zsjos-menu-coverage.md
+- docs/operations/database-migrations.md
+- docs/operations/lead-aging-pool-deployment.md -> docs/operations/lead-public-sea-pool-deployment.md
+- frontend/admin/src/api/zsjos/leadAgingPool/index.ts -> frontend/admin/src/api/zsjos/leadPublicSeaPool/index.ts
+- frontend/admin/src/api/zsjos/leadFilter/index.ts
+- frontend/admin/src/api/zsjos/leadFollowUpRule/index.ts
+- frontend/admin/src/views/zsjos/advancedFilterTemplate/index.vue
+- frontend/admin/src/views/zsjos/leadAgingPool/index.vue -> frontend/admin/src/views/zsjos/leadPublicSeaPool/index.vue
+- frontend/admin/src/views/zsjos/leadFilter/index.vue
+- frontend/admin/src/views/zsjos/leadFollowUpRule/index.vue
+- frontend/workbench/docs/ui-guidelines.md
+- frontend/workbench/src/constants.test.ts
+- frontend/workbench/src/constants.ts
+- frontend/workbench/src/layouts/RouteHost.tsx
+- frontend/workbench/src/pages/ConfigurationPages.tsx
+- frontend/workbench/src/pages/LeadAgingPoolPage.tsx -> frontend/workbench/src/pages/LeadPublicSeaPoolPage.tsx
+- frontend/workbench/src/pages/inbox-advanced-filter.guard.test.ts
+- frontend/workbench/src/pages/inbox-descriptions.guard.test.ts
+- frontend/workbench/src/pages/lead-aging-pool.guard.test.ts -> frontend/workbench/src/pages/lead-public-sea-pool.guard.test.ts
+- frontend/workbench/src/pages/lead-keyword-search.guard.test.ts
+- frontend/workbench/src/services/api.ts
+- frontend/workbench/src/services/menu.test.ts
+- frontend/workbench/src/styles/index.css
+- frontend/workbench/src/styles/pages/aging-pool.css -> frontend/workbench/src/styles/pages/public-sea-pool.css
+- script/sql/mysql/schema/core.sql
+- script/sql/mysql/verify-bootstrap.sql
+- script/sql/mysql/verify-collaboration-pool-overlap.sql
+
+- Scope update: fresh post-migration seed 02-bootstrap-zsjos-seed.sql and docs/api/zsjos-education-self-sourced.md naming included. Historical baseline 00-bootstrap-schema.sql and applied migrations remain unchanged.
+
+- Scope update: untracked EducationTeamCommandService.java has one old service reference; replace only its public-sea service type/field and preserve all other concurrent code.
+
+- Fresh chain correction: bootstrap seed precedes migrations, so restored its original names. V329 alone upgrades persisted names; no historical baseline or seed change. Active-schema vs historical-baseline equality guard needs an explicit verified naming upgrade mapping. Scope adds tools/zsjos_db.py and modules/core.json for that guard only.
+
+
+## Delivery - public-sea-pool-naming-20261019 - 2026-10-19 13:45 北京时间
+- Implemented the active naming unification. Java service/controller/VO/DO/Mapper/scheduler/initializer names use LeadPublicSeaPool* and publicSeaPool*; table mappings use zsjos_lead_public_sea_pool_cycle, zsjos_lead_public_sea_pool_event, zsjos_lead_public_sea_pool_notify_stage and zsjos_lead_public_sea_pool_compatibility_record. Active timeout, index, menu/path/permission/component, filter audience, notification scene/template/variable and Workbench/Admin APIs use public-sea-pool vocabulary. The claim pool public_pool remains separate.
+- Added V329__public_sea_pool_naming.sql. It preserves rows, IDs and role-menu grants, checks notification outbox drain and naming conflicts, supports mixed old/canonical recovery, fails without success ledger registration on DML failure, and records both ledgers only after postconditions. Historical migration source text and immutable historical flow coverage retain explicit compatibility identifiers.
+- Updated fresh schema/seed, desired schema, verification SQL, merge/reconcile tools, module manifest naming mapping, backend AGENTS, API/architecture/operations docs and focused tests. No applied historical migration was rewritten. The existing non-naming core baseline drift remains reported by zsjos_db.py check: student information schema additions in the concurrent workstream account for 31 diff lines.
+- Verification: verify_public_sea_pool_naming.py PASS (initial/replay/full-row-signatures/unchanged-role-grants; failure-ledger/mixed-state-recovery/replay; UTF-8 HEX; source database unchanged). Backend focused public-sea/flow tests PASS (63 tests), follow-up history/recorder tests PASS, Workbench focused tests PASS (31 tests), Workbench production build PASS, Admin production build PASS, migration numbering PASS (4), checksum PASS (6), schema-drift unit checks PASS (8), git diff --check PASS for scoped files.
+- Unverified/limits: full Admin ts:check remains blocked by pre-existing duplicate withdrawal fields; full schema check remains blocked by concurrent student-information baseline drift. No application restart, live database V329 application, shared runtime mutation, commit, branch, or push was performed. The controlled verification database remains local and isolated for review.
+
+- Final rerun: focused Maven suite passed 95 tests with zero failures/errors; Workbench focused suite passed 31 tests. The earlier 63-test line was the first selected subset before the compatibility test was moved to the recorder suite.

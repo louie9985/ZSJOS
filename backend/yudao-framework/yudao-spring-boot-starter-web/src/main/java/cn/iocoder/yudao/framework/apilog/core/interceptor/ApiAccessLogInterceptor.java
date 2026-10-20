@@ -6,6 +6,7 @@ import cn.hutool.core.io.resource.ResourceUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.common.util.spring.SpringUtils;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -42,7 +43,7 @@ public class ApiAccessLogInterceptor implements HandlerInterceptor {
         }
 
         // 打印 request 日志
-        if (!SpringUtils.isProd()) {
+        if (!SpringUtils.isProd() && requestLoggingEnabled(handlerMethod)) {
             Map<String, String> queryString = ServletUtils.getParamMap(request);
             String requestBody = ServletUtils.getBody(request);
             if (CollUtil.isEmpty(queryString) && StrUtil.isEmpty(requestBody)) {
@@ -64,12 +65,21 @@ public class ApiAccessLogInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         // 打印 response 日志
-        if (!SpringUtils.isProd()) {
+        if (!SpringUtils.isProd() && requestLoggingEnabled(
+                request.getAttribute(ATTRIBUTE_HANDLER_METHOD) instanceof HandlerMethod method ? method : null)) {
             StopWatch stopWatch = (StopWatch) request.getAttribute(ATTRIBUTE_STOP_WATCH);
             stopWatch.stop();
             log.info("[afterCompletion][完成请求 URL({}) 耗时({} ms)]",
                     request.getRequestURI(), stopWatch.getTotalTimeMillis());
         }
+    }
+
+    private boolean requestLoggingEnabled(HandlerMethod handlerMethod) {
+        if (handlerMethod == null) {
+            return true;
+        }
+        ApiAccessLog annotation = handlerMethod.getMethodAnnotation(ApiAccessLog.class);
+        return annotation == null || (annotation.enable() && annotation.requestEnable());
     }
 
     /**

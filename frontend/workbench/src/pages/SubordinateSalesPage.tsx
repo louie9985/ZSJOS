@@ -493,7 +493,7 @@ function SalesDetail({
               onReasonAction({ type: "account", sales, value })
             }
           />
-          {sales.salesDispatchSupported !== false && <><span>接单</span>
+          {<><span>接单</span>
           <Switch
             checkedChildren="开启"
             unCheckedChildren="关闭"
@@ -537,7 +537,7 @@ function SalesDetail({
                         <span className="subordinate-field-label">页面状态</span>
                         <span className="subordinate-field-value">{sales.presence === 'online' ? '在线' : '离线'}</span>
                       </div>
-                      {sales.salesDispatchSupported !== false && <><div className="subordinate-profile-row">
+                      {<><div className="subordinate-profile-row">
                         <span className="subordinate-field-label">接单状态</span>
                         <span className="subordinate-field-value">{sales.accepting ? '开启' : '关闭'}</span>
                       </div>
@@ -598,7 +598,7 @@ function SalesDetail({
                 <div className="subordinate-batch-bar">
                   <Typography.Text>已选 {selected.length} 条</Typography.Text>
                   <Space wrap>
-                    {batchActions.filter(action => sales.salesDispatchSupported !== false || !['claimPool', 'publicSea'].includes(action.type)).map(action => {
+                    {batchActions.map(action => {
                       const selection = eligibility(action.type);
                       const hasPermission = permissions.includes(action.permission);
                       const disabled = !hasPermission || !selection.allowed;
@@ -715,8 +715,8 @@ function SalesDetail({
           {batchType === "transfer" ? (
             <Form.Item
               name="targetUserId"
-              label="目标员工"
-              rules={[{ required: true, message: "请选择目标员工" }]}
+              label="目标销售"
+              rules={[{ required: true, message: "请选择目标销售" }]}
             >
               <EmployeeSelect
                 showSearch
@@ -810,7 +810,7 @@ export default function SubordinateSalesPage({
     } catch (loadError) {
       if (requestVersion !== requestVersionRef.current) return;
       setError(
-        loadError instanceof Error ? loadError.message : "下属员工加载失败",
+        loadError instanceof Error ? loadError.message : "下属销售加载失败",
       );
     } finally {
       if (requestVersion === requestVersionRef.current) setLoading(false);
@@ -841,7 +841,7 @@ export default function SubordinateSalesPage({
       setLoadedPage(nextPage);
     } catch (loadError) {
       if (requestVersion !== requestVersionRef.current) return;
-      setLoadMoreError(loadError instanceof Error ? loadError.message : "更多下属员工加载失败");
+      setLoadMoreError(loadError instanceof Error ? loadError.message : "更多下属销售加载失败");
     } finally {
       loadingMoreRef.current = false;
       if (requestVersion === requestVersionRef.current) setLoadingMore(false);
@@ -1014,7 +1014,7 @@ export default function SubordinateSalesPage({
               )}
               </>
             ) : (
-              <Empty image={<TeamOutlined />} description="暂无下属员工" />
+              <Empty image={<TeamOutlined />} description="暂无下属销售" />
             )}
           </div>
         </aside>

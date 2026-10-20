@@ -153,6 +153,15 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .eq(ServiceRelationDO::getContentDirectorUserId, userId)) > 0;
     }
 
+    default int updateFirstContactProgress(Long id, Long ownerId, Integer version, String json) {
+        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getOwnerUserId, ownerId)
+                .eq(ServiceRelationDO::getStatus, "active").eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .eq(ServiceRelationDO::getVersion, version)
+                .set(ServiceRelationDO::getFirstContactProgressJson, json)
+                .set(ServiceRelationDO::getVersion, version + 1));
+    }
+
     default int advanceDeliveryStage(Long id, Long userId, String expectedStage, String nextStage,
                                      String deliveryDataJson, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
@@ -341,13 +350,22 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
     default List<ServiceRelationDO> selectOwnedByOwnerIdsAndPersonIds(Collection<Long> ownerUserIds,
                                                                        Collection<Long> personIds,
                                                                        String status) {
+        return selectManagedByPersonIds(ownerUserIds, personIds, status, null);
+    }
+
+    /** Pending class identity is resolved from the tenant-scoped class mapper, never supplied by the client. */
+    default List<ServiceRelationDO> selectManagedByPersonIds(Collection<Long> ownerUserIds,
+            Collection<Long> personIds, String status, Long pendingClassId) {
         if (ownerUserIds == null || ownerUserIds.isEmpty() || personIds == null || personIds.isEmpty()) {
             return List.of();
         }
         LambdaQueryWrapperX<ServiceRelationDO> query = new LambdaQueryWrapperX<>();
         query.in(ServiceRelationDO::getPersonId, personIds)
-                .in(ServiceRelationDO::getOwnerUserId, ownerUserIds)
                 .eqIfPresent(ServiceRelationDO::getStatus, status)
+                .and(scope -> {
+                    scope.in(ServiceRelationDO::getOwnerUserId, ownerUserIds);
+                    if (pendingClassId != null) scope.or().eq(ServiceRelationDO::getClassId, pendingClassId);
+                })
                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
                 .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId);
         return selectList(query);

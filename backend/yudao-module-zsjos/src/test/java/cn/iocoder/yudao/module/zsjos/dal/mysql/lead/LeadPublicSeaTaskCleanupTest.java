@@ -15,11 +15,11 @@ class LeadPublicSeaTaskCleanupTest {
     @BeforeEach void setup() throws Exception {
         db=DriverManager.getConnection("jdbc:h2:mem:"+UUID.randomUUID()+";MODE=MySQL");
         sql("CREATE TABLE zsjos_lead(id BIGINT,tenant_id BIGINT,deleted INT)");
-        sql("CREATE TABLE zsjos_lead_aging_pool_cycle(lead_id BIGINT,tenant_id BIGINT,deleted INT,status VARCHAR,collaborator_user_id BIGINT,assigned_at TIMESTAMP,entered_at TIMESTAMP)");
-        sql("CREATE TABLE zsjos_lead_public_sea_record(lead_id BIGINT,tenant_id BIGINT,deleted INT,collaborator_user_id BIGINT,released_at TIMESTAMP)");
+        sql("CREATE TABLE zsjos_lead_public_sea_pool_cycle(lead_id BIGINT,tenant_id BIGINT,deleted INT,status VARCHAR,collaborator_user_id BIGINT,assigned_at TIMESTAMP,entered_at TIMESTAMP)");
+        sql("CREATE TABLE zsjos_lead_public_sea_pool_compatibility_record(lead_id BIGINT,tenant_id BIGINT,deleted INT,collaborator_user_id BIGINT,released_at TIMESTAMP)");
         sql("CREATE TABLE zsjos_business_task(id BIGINT PRIMARY KEY,biz_id BIGINT,tenant_id BIGINT,deleted INT,biz_type VARCHAR,task_type VARCHAR,status VARCHAR,assignee_id BIGINT,create_time TIMESTAMP,cancelled_at TIMESTAMP,cancel_reason VARCHAR,version INT DEFAULT 0,update_time TIMESTAMP,updater VARCHAR)");
         sql("INSERT INTO zsjos_lead VALUES(1,1,0),(2,1,0),(3,1,0),(1,2,0)");
-        sql("INSERT INTO zsjos_lead_aging_pool_cycle VALUES(1,1,0,'assigned',20,'2026-10-14 10:00:00','2026-10-14 09:00:00'),(2,1,0,'waiting_assignment',NULL,NULL,'2026-10-14 09:00:00')");
+        sql("INSERT INTO zsjos_lead_public_sea_pool_cycle VALUES(1,1,0,'assigned',20,'2026-10-14 10:00:00','2026-10-14 09:00:00'),(2,1,0,'waiting_assignment',NULL,NULL,'2026-10-14 09:00:00')");
     }
     @AfterEach void close() throws Exception {db.close();}
     private void sql(String s) throws Exception {try(var statement=db.createStatement()){statement.execute(s);}}
@@ -73,12 +73,12 @@ class LeadPublicSeaTaskCleanupTest {
     @Test void updateRechecksPoolExitAndCompletionAfterScan() throws Exception {
         task(1,1,1,10,"2026-10-14 08:00:00","pending","lead_follow_up_reminder");
         var ids=candidates();assertEquals(List.of(1L),ids);
-        sql("UPDATE zsjos_lead_aging_pool_cycle SET status='exited'");assertEquals(0,cancel(ids));
-        sql("UPDATE zsjos_lead_aging_pool_cycle SET status='assigned'");
+        sql("UPDATE zsjos_lead_public_sea_pool_cycle SET status='exited'");assertEquals(0,cancel(ids));
+        sql("UPDATE zsjos_lead_public_sea_pool_cycle SET status='assigned'");
         sql("UPDATE zsjos_business_task SET status='completed'");assertEquals(0,cancel(ids));
     }
     @Test void legacyPublicSeaUsesCurrentBAndReleaseTime() throws Exception {
-        sql("INSERT INTO zsjos_lead_public_sea_record VALUES(3,1,0,20,'2026-10-14 10:00:00')");
+        sql("INSERT INTO zsjos_lead_public_sea_pool_compatibility_record VALUES(3,1,0,20,'2026-10-14 10:00:00')");
         task(1,3,1,10,"2026-10-14 08:00:00","pending","lead_follow_up_reminder");
         task(2,3,1,20,"2026-10-14 11:00:00","pending","lead_follow_up_reminder");
         assertEquals(List.of(1L),candidates());assertEquals(1,cancel(candidates()));

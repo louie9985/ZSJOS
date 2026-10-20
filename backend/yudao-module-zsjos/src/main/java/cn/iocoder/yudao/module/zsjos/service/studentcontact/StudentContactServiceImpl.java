@@ -108,9 +108,11 @@ public class StudentContactServiceImpl implements StudentContactService {
         BusinessTaskDO task = currentTask(relationId);
         StudentContactConfigVersionDO config = task == null ? configService.requirePublished() : configFromTask(task);
         result.setFirstContactChecklist(checklist(config));
+        StudentFirstContactProgressVO progress = firstContactProgress(relation);
+        result.setFirstContactProgress(progress);
         result.setQuickNotes(JsonUtils.parseArray(config.getQuickNotesJson(), String.class));
         result.setFirstContactTimeoutMinutes(config.getFirstContactTimeoutMinutes());
-        result.setStudyPlanTimeoutMinutes(config.getStudyPlanTimeoutMinutes());
+        result.setStudyPlanTimeoutMinutes(configService.requirePublished().getStudyPlanTimeoutMinutes());
         // Managed-scope access is read-only. Only the service owner receives owner operation projections.
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
         boolean operational = "active".equals(relation.getStatus());
@@ -125,10 +127,9 @@ public class StudentContactServiceImpl implements StudentContactService {
             if (configured instanceof Collection<?> values) values.stream().map(String::valueOf).forEach(visible::add);
             result.setVisibleTabs(visible);
         }
-        if (permissionApi.hasAnyPermissions(userId, cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.READ)) {
-            SalesOrderDO collectionOrder = relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
-            if (collectionOrder != null && collectionOrder.getLeadId() != null
-                    && studentInfoPermission.hasPermission(collectionOrder.getLeadId(), "read", userId)) {
+        result.setVisibleTabs(result.getVisibleTabs().stream().filter(tab -> !cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.TAB.equals(tab)).toList());
+        if (permissionApi.hasAnyPermissions(userId, cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.ARCHIVE_READ)) {
+            if (serviceReadPermission.hasPermission(relation.getId(), "read", userId)) {
                 List<String> tabs = new ArrayList<>(result.getVisibleTabs());
                 tabs.add(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.TAB);
                 result.setVisibleTabs(tabs);
@@ -139,6 +140,8 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (operational && owner && !accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_ACCEPT)) {
             availableActions.add(CONTEXT_ACTION_ACCEPT);
         }
+        if (operational && owner && accepted && task == null && canContactWithoutTask(relation)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_CONTACT_SUBMIT)) availableActions.add(CONTEXT_ACTION_FOLLOW_UP);
         if (operational && owner && accepted && task != null && "pending".equals(task.getStatus())) {
             String permission = switch (task.getTaskType()) {
                 case TYPE_FIRST_CONTACT -> PERMISSION_FIRST_CONTACT_SUBMIT;
@@ -211,6 +214,8 @@ public class StudentContactServiceImpl implements StudentContactService {
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)) {
             availableActions.add(CONTEXT_ACTION_ASSIGN_OPERATOR);
         }
+        if (operational && accepted && owner && progress != null && !Boolean.TRUE.equals(progress.getHistoryIncomplete())
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_CHECKLIST_UPDATE)) availableActions.add(ACTION_CHECKLIST_UPDATE);
         result.setAvailableActions(availableActions);
         if (task != null) {
             StudentContactContextRespVO.CurrentTaskVO row = new StudentContactContextRespVO.CurrentTaskVO();
@@ -266,6 +271,8 @@ public class StudentContactServiceImpl implements StudentContactService {
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
             availableActions.add(CONTEXT_ACTION_END_SERVICE);
         }
+        if (operational && accepted && owner && progress != null && !Boolean.TRUE.equals(progress.getHistoryIncomplete())
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_CHECKLIST_UPDATE)) availableActions.add(ACTION_CHECKLIST_UPDATE);
         result.setAvailableActions(availableActions);
         return result;
     }
@@ -279,6 +286,9 @@ public class StudentContactServiceImpl implements StudentContactService {
                 .map(StudentContactRecordDO::getOperatorUserId).toList());
         return new PageResult<>(rows.getList().stream().map(row -> {
             StudentContactRecordRespVO result = new StudentContactRecordRespVO();
+            result.setStudyPlanCompletedAtFirstContact(row.getStudyPlanCompletedAtFirstContact());
+            if (TYPE_FIRST_CONTACT.equals(row.getContactType()) && Boolean.TRUE.equals(row.getSuccessful()))
+                result.setFirstContactSnapshot(recordSnapshot(row));
             result.setId(row.getId()); result.setContactType(row.getContactType()); result.setSuccessful(row.getSuccessful());
             result.setUnsuccessfulReasonValue(row.getUnsuccessfulReasonValue());
             result.setUnsuccessfulReasonLabel(row.getUnsuccessfulReasonLabelSnapshot()); result.setRemark(row.getRemark());
@@ -345,7 +355,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     public Long submitFirstContact(Long relationId, StudentFirstContactSubmitReqVO request, Long userId) {
         return submit(relationId, request.getTaskId(), TYPE_FIRST_CONTACT, request.getSuccessful(),
                 request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(),
-                request.getCompletedChecklistKeys(), request.getNextContactAt(), request.getExtensionReasonValue(),
+                request.getCompletedChecklistKeys(), request.getStudyPlanCompletedAtFirstContact(), request.getNextContactAt(), request.getExtensionReasonValue(),
                 request.getExtensionDescription(), request.getExtensionAttachmentFileIds(), request.getData(), request.getIdempotencyKey(), userId);
     }
 
@@ -353,7 +363,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
     public Long submitStudyPlan(Long relationId, StudentStudyPlanSubmitReqVO request, Long userId) {
         return submit(relationId, request.getTaskId(), TYPE_STUDY_PLAN, request.getSuccessful(),
-                request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null,
+                request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null, false,
                 request.getNextContactAt(), request.getExtensionReasonValue(), request.getExtensionDescription(),
                 request.getExtensionAttachmentFileIds(), request.getData(), request.getIdempotencyKey(), userId);
     }
@@ -362,7 +372,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
     public Long submitContact(Long relationId, StudentContactSubmitReqVO request, Long userId) {
         return submit(relationId, request.getTaskId(), TYPE_CONTACT, request.getSuccessful(),
-                request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null,
+                request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null, false,
                 request.getNextContactAt(), null, null, null, request.getData(), request.getIdempotencyKey(), userId);
     }
 
@@ -438,32 +448,59 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
 
     private Long submit(Long relationId, Long taskId, String expectedType, Boolean successful, String unsuccessfulReason,
-                          String remark, List<Long> attachments, List<String> checklistKeys, LocalDateTime nextAt,
+                          String remark, List<Long> attachments, List<String> checklistKeys, Boolean planCompleted, LocalDateTime nextAt,
                           String extensionReason, String extensionDescription, List<Long> extensionAttachments,
                           Map<String, Object> data, String idempotencyKey, Long userId) {
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
         String requestFingerprint = contactFingerprint(expectedType, successful, unsuccessfulReason, remark,
-                attachments, checklistKeys, nextAt, extensionReason, extensionDescription, extensionAttachments, data);
+                attachments, checklistKeys, planCompleted, nextAt, extensionReason, extensionDescription, extensionAttachments, data);
+        if (taskId == null) requestFingerprint = DigestUtil.sha256Hex("taskless:" + requestFingerprint);
         StudentContactRecordDO replay = recordMapper.selectByIdempotencyKey(idempotencyKey);
         if (replay != null) {
             validateReplay(replay, relationId, taskId, userId, requestFingerprint);
             return replay.getId();
         }
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
-        BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
-        if (task == null || !"pending".equals(task.getStatus()) || !expectedType.equals(task.getTaskType())
-                || !BIZ_TYPE.equals(task.getBizType()) || !relationId.equals(task.getBizId())
-                || !userId.equals(task.getAssigneeId()) || nextAt == null || !nextAt.isAfter(LocalDateTime.now())) {
-            throw exception(STUDENT_CONTACT_TASK_INVALID);
+        BusinessTaskDO task;
+        if (TYPE_CONTACT.equals(expectedType) && taskId == null) {
+            if (!canContactWithoutTask(relation)) throw exception(STUDENT_CONTACT_TASK_INVALID);
+            task = currentTask(relationId);
+            if (task != null) {
+                if (!TYPE_CONTACT.equals(task.getTaskType())) throw exception(STUDENT_CONTACT_TASK_INVALID);
+                task = taskMapper.selectByIdForUpdate(task.getId(), TenantContextHolder.getRequiredTenantId());
+                if (task == null) throw exception(STUDENT_CONTACT_TASK_INVALID);
+            }
+        } else {
+            if (taskId == null) throw exception(STUDENT_CONTACT_TASK_INVALID);
+            task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
+            if (task == null) throw exception(STUDENT_CONTACT_TASK_INVALID);
         }
-        StudentContactConfigVersionDO config = configFromTask(task);
+        if (task != null && (!"pending".equals(task.getStatus()) || !expectedType.equals(task.getTaskType())
+                || !BIZ_TYPE.equals(task.getBizType()) || !relationId.equals(task.getBizId())
+                || !userId.equals(task.getAssigneeId()))) throw exception(STUDENT_CONTACT_TASK_INVALID);
+        String nextType = TYPE_FIRST_CONTACT.equals(expectedType) && Boolean.TRUE.equals(successful)
+                && Boolean.TRUE.equals(planCompleted) ? TYPE_CONTACT : nextType(expectedType, successful);
+        if (nextAt == null && !TYPE_CONTACT.equals(nextType)
+                || nextAt != null && !nextAt.isAfter(LocalDateTime.now())) throw exception(STUDENT_CONTACT_FORM_INVALID);
+        StudentContactConfigVersionDO config = task == null ? configService.requirePublished() : configFromTask(task);
+        // Existing task deadlines/config snapshots are immutable; every new study-plan task uses the published policy.
+        StudentContactConfigVersionDO nextConfig = TYPE_STUDY_PLAN.equals(nextType) ? configService.requirePublished() : config;
         validateAttachments(attachments, relationId, userId);
+        if (TYPE_FIRST_CONTACT.equals(expectedType) && !Boolean.TRUE.equals(successful)
+                && (Boolean.TRUE.equals(planCompleted) || checklistKeys != null && !checklistKeys.isEmpty())) {
+            throw exception(STUDENT_CONTACT_FORM_INVALID);
+        }
         String reasonLabel = Boolean.TRUE.equals(successful) ? null : dictLabel(DICT_UNSUCCESSFUL_REASON, unsuccessfulReason);
         if (Boolean.TRUE.equals(successful) && TYPE_FIRST_CONTACT.equals(expectedType)) {
             validateChecklist(config, checklistKeys, attachments);
         }
         StudentContactRecordDO record = new StudentContactRecordDO();
-        record.setServiceRelationId(relationId); record.setTaskId(taskId); record.setContactType(expectedType);
+        if (TYPE_FIRST_CONTACT.equals(expectedType)) {
+            record.setStudyPlanCompletedAtFirstContact(Boolean.TRUE.equals(planCompleted));
+            if (Boolean.TRUE.equals(successful)) record.setChecklistSnapshotJson(JsonUtils.toJsonString(
+                    firstContactSnapshot(config, checklistKeys, attachments)));
+        }
+        record.setServiceRelationId(relationId); record.setTaskId(task == null ? null : task.getId()); record.setContactType(expectedType);
         record.setSuccessful(successful); record.setUnsuccessfulReasonValue(Boolean.TRUE.equals(successful) ? null : unsuccessfulReason);
         record.setUnsuccessfulReasonLabelSnapshot(reasonLabel); record.setRemark(remark.trim());
         record.setAttachmentFileIdsJson(JsonUtils.toJsonString(attachments == null ? List.of() : attachments));
@@ -477,20 +514,27 @@ public class StudentContactServiceImpl implements StudentContactService {
             validateReplay(concurrent, relationId, taskId, userId, requestFingerprint);
             return concurrent.getId();
         }
-        taskCommandService.completeByKey(task.getIdempotencyKey(), record.getSubmittedAt());
+        if (TYPE_FIRST_CONTACT.equals(expectedType) && Boolean.TRUE.equals(successful)) {
+            if (relationMapper.updateFirstContactProgress(relationId, userId, relation.getVersion(),
+                    record.getChecklistSnapshotJson()) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+            relation.setVersion(relation.getVersion() + 1);
+        }
+        if (task != null) taskCommandService.completeByKey(task.getIdempotencyKey(), record.getSubmittedAt());
         if (TYPE_FIRST_CONTACT.equals(expectedType)) {
             taskCommandService.completeByKey("student-assistance:" + taskId, record.getSubmittedAt());
         }
-        String nextType = nextType(expectedType, successful);
-        int limit = timeout(config, nextType);
-        LocalDateTime allowedDueAt = limit == 0 ? nextAt : record.getSubmittedAt().plusMinutes(limit);
-        boolean extensionRequired = limit > 0 && nextAt.isAfter(allowedDueAt);
-        Long nextTaskId = createTask(relation, nextType, extensionRequired ? allowedDueAt : nextAt,
-                "student-contact:record:" + record.getId(), config.getId());
-        if (extensionRequired) createExtension(relation, nextTaskId, allowedDueAt, nextAt, extensionReason,
-                extensionDescription, extensionAttachments, userId, idempotencyKey + ":extension");
+        if (nextAt != null) {
+            int limit = timeout(nextConfig, nextType);
+            LocalDateTime allowedDueAt = limit == 0 ? nextAt : record.getSubmittedAt().plusMinutes(limit);
+            boolean extensionRequired = limit > 0 && nextAt.isAfter(allowedDueAt);
+            Long nextTaskId = createTask(relation, nextType, extensionRequired ? allowedDueAt : nextAt,
+                    "student-contact:record:" + record.getId(), nextConfig.getId());
+            if (extensionRequired) createExtension(relation, nextTaskId, allowedDueAt, nextAt, extensionReason,
+                    extensionDescription, extensionAttachments, userId, idempotencyKey + ":extension");
+        }
         if (Boolean.TRUE.equals(successful) && TYPE_FIRST_CONTACT.equals(expectedType)) {
-            if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN,
+            if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_FIRST_CONTACT,
+                    Boolean.TRUE.equals(planCompleted) ? STAGE_SUPERVISION : STAGE_STUDY_PLAN,
                     null, relation.getVersion()) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
         } else if (Boolean.TRUE.equals(successful) && TYPE_STUDY_PLAN.equals(expectedType)) {
             if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
@@ -749,18 +793,138 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (config == null) throw exception(STUDENT_CONTACT_CONFIG_INVALID); return config;
     }
 
+    private StudentFirstContactProgressVO firstContactSnapshot(StudentContactConfigVersionDO config,
+            List<String> completed, List<Long> attachments) {
+        StudentFirstContactProgressVO snapshot = new StudentFirstContactProgressVO();
+        snapshot.setConfigVersionId(config.getId()); snapshot.setSource("snapshot"); snapshot.setHistoryIncomplete(false);
+        Set<String> selected = new HashSet<>(completed == null ? List.of() : completed);
+        snapshot.setItems(JsonUtils.parseArray(config.getChecklistJson(), StudentContactConfigRespVO.ChecklistItemVO.class).stream()
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && !RETIRED_PLAN_CHECKLIST_KEY.equals(item.getKey()))
+                .sorted(Comparator.comparing(StudentContactConfigRespVO.ChecklistItemVO::getSort))
+                .map(item -> {
+                    StudentFirstContactProgressVO.Item row = new StudentFirstContactProgressVO.Item();
+                    row.setKey(item.getKey()); row.setTitle(item.getTitle()); row.setSort(item.getSort());
+                    row.setAttachmentRequired(item.getAttachmentRequired()); row.setCompleted(selected.contains(item.getKey()));
+                    row.setAttachmentFileIds(row.getCompleted() && attachments != null ? attachments : List.of()); return row;
+                }).toList());
+        return snapshot;
+    }
+
+    private StudentFirstContactProgressVO recordSnapshot(StudentContactRecordDO record) {
+        StudentFirstContactProgressVO snapshot;
+        if (record.getChecklistSnapshotJson() != null) {
+            snapshot = JsonUtils.parseObject(record.getChecklistSnapshotJson(), StudentFirstContactProgressVO.class);
+        } else {
+            snapshot = new StudentFirstContactProgressVO();
+            snapshot.setSource("historical_config"); snapshot.setHistoryIncomplete(true); snapshot.setItems(List.of());
+            BusinessTaskDO task = taskMapper.selectById(record.getTaskId());
+            if (task != null) {
+                try {
+                    StudentContactConfigVersionDO config = configFromTask(task);
+                    // Reconstruct only from the version bound to the original task; keep retired items in history.
+                    var selected = new HashSet<>(parseStrings(record.getChecklistResultJson()));
+                    snapshot.setConfigVersionId(config.getId());
+                    snapshot.setItems(JsonUtils.parseArray(config.getChecklistJson(), StudentContactConfigRespVO.ChecklistItemVO.class)
+                            .stream().filter(item -> Boolean.TRUE.equals(item.getEnabled()))
+                            .sorted(Comparator.comparing(StudentContactConfigRespVO.ChecklistItemVO::getSort)).map(item -> {
+                                var row = new StudentFirstContactProgressVO.Item();
+                                row.setKey(item.getKey()); row.setTitle(item.getTitle()); row.setSort(item.getSort());
+                                row.setAttachmentRequired(item.getAttachmentRequired()); row.setCompleted(selected.contains(item.getKey()));
+                                row.setAttachmentFileIds(row.getCompleted() ? parseLongs(record.getAttachmentFileIdsJson()) : List.of()); return row;
+                            }).toList());
+                    snapshot.setHistoryIncomplete(!snapshot.getItems().stream().map(StudentFirstContactProgressVO.Item::getKey)
+                            .collect(java.util.stream.Collectors.toSet()).containsAll(selected));
+                } catch (cn.iocoder.yudao.framework.common.exception.ServiceException missingVersion) {
+                    // Missing historical configuration is explicitly represented, never replaced with today's labels.
+                }
+            }
+        }
+        snapshot.setRecordId(record.getId()); snapshot.setSubmittedAt(record.getSubmittedAt());
+        snapshot.setOperatorUserId(record.getOperatorUserId());
+        snapshot.setStudyPlanCompletedAtFirstContact(record.getStudyPlanCompletedAtFirstContact());
+        return snapshot;
+    }
+
+    private StudentFirstContactProgressVO firstContactProgress(ServiceRelationDO relation) {
+        StudentContactRecordDO first = recordMapper.selectLatestSuccessful(relation.getId(), TYPE_FIRST_CONTACT);
+        if (first == null) return null;
+        StudentFirstContactProgressVO progress = recordSnapshot(first);
+        if (relation.getFirstContactProgressJson() != null) {
+            var current = JsonUtils.parseObject(relation.getFirstContactProgressJson(), StudentFirstContactProgressVO.class);
+            progress.setItems(current.getItems()); progress.setSource(current.getSource());
+            progress.setHistoryIncomplete(current.getHistoryIncomplete());
+        }
+        progress.setItems(progress.getItems().stream().filter(item -> !RETIRED_PLAN_CHECKLIST_KEY.equals(item.getKey())).toList());
+        AdminUserRespDTO operator = adminUserApi.getUser(first.getOperatorUserId());
+        progress.setOperatorUserName(name(operator));
+        if (Boolean.TRUE.equals(first.getStudyPlanCompletedAtFirstContact())) {
+            progress.setStudyPlanStatus("first_contact"); progress.setStudyPlanCompletedAt(first.getSubmittedAt());
+        } else {
+            StudentContactRecordDO plan = recordMapper.selectLatestSuccessful(relation.getId(), TYPE_STUDY_PLAN);
+            progress.setStudyPlanStatus(plan != null ? "later" : STAGE_STUDY_PLAN.equals(relation.getDeliveryStage()) ? "pending" : "unknown");
+            if (plan != null) progress.setStudyPlanCompletedAt(plan.getSubmittedAt());
+        }
+        return progress;
+    }
+
+    @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
+    public void updateFirstContactChecklist(Long relationId, StudentFirstContactChecklistUpdateReqVO request, Long userId) {
+        if (!permissionApi.hasAnyPermissions(userId, PERMISSION_CHECKLIST_UPDATE)) throw exception(STUDENT_PERMISSION_DENIED);
+        ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
+        String commandKey = "student-checklist:" + relationId + ":" + request.getIdempotencyKey();
+        String fingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(request));
+        BusinessEventDO replay = eventMapper.selectByIdempotencyKey(commandKey);
+        if (replay != null) {
+            if (!Objects.equals(replay.getAggregateId(), relationId) || !Objects.equals(replay.getOperatorUserId(), userId)
+                    || !Objects.equals(replay.getReason(), fingerprint)) throw exception(STUDENT_CONTACT_CHECKLIST_REPLAY_CONFLICT);
+            return;
+        }
+        if (!Objects.equals(relation.getVersion(), request.getVersion())) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        StudentFirstContactProgressVO progress = firstContactProgress(relation);
+        if (progress == null || Boolean.TRUE.equals(progress.getHistoryIncomplete())) throw exception(STUDENT_CONTACT_CHECKLIST_HISTORY_INCOMPLETE);
+        String before = JsonUtils.toJsonString(progress);
+        Set<String> selected = new HashSet<>(request.getCompletedChecklistKeys());
+        Set<String> allowed = progress.getItems().stream().map(StudentFirstContactProgressVO.Item::getKey)
+                .collect(java.util.stream.Collectors.toSet());
+        if (!allowed.containsAll(selected) || selected.size() != request.getCompletedChecklistKeys().size())
+            throw exception(STUDENT_CONTACT_CHECKLIST_INVALID);
+        validateAttachments(request.getAttachmentFileIds(), relationId, userId);
+        for (var item : progress.getItems()) {
+            boolean complete = selected.contains(item.getKey());
+            List<Long> evidence = new ArrayList<>(item.getAttachmentFileIds() == null ? List.of() : item.getAttachmentFileIds());
+            if (complete && request.getAttachmentFileIds() != null) request.getAttachmentFileIds().stream()
+                    .filter(id -> !evidence.contains(id)).forEach(evidence::add);
+            if (complete && Boolean.TRUE.equals(item.getAttachmentRequired()) && evidence.isEmpty())
+                throw exception(STUDENT_CONTACT_CHECKLIST_EVIDENCE_REQUIRED);
+            item.setCompleted(complete); item.setAttachmentFileIds(complete ? evidence : List.of());
+        }
+        String after = JsonUtils.toJsonString(progress);
+        if (relationMapper.updateFirstContactProgress(relationId, userId, request.getVersion(), after) != 1)
+            throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        BusinessEventDO event = new BusinessEventDO();
+        event.setEventType(EVENT_CHECKLIST_UPDATED); event.setAggregateType(BIZ_TYPE); event.setAggregateId(relationId);
+        event.setOperatorUserId(userId); event.setOccurredAt(LocalDateTime.now()); event.setIdempotencyKey(commandKey);
+        event.setReason(fingerprint); event.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of(
+                "before", JsonUtils.parseObject(before, Map.class), "after", JsonUtils.parseObject(after, Map.class))));
+        eventMapper.insert(event);
+    }
+
     private void validateChecklist(StudentContactConfigVersionDO config, List<String> completed, List<Long> attachments) {
         List<StudentContactContextRespVO.ChecklistItemVO> items = checklist(config);
-        Set<String> required = items.stream().map(StudentContactContextRespVO.ChecklistItemVO::getKey)
+        Set<String> selected = new HashSet<>(completed == null ? List.of() : completed);
+        Set<String> allowed = items.stream().map(StudentContactContextRespVO.ChecklistItemVO::getKey)
                 .collect(java.util.stream.Collectors.toSet());
-        if (completed == null || !new HashSet<>(completed).containsAll(required)) throw exception(STUDENT_CONTACT_FORM_INVALID);
-        if (items.stream().anyMatch(item -> Boolean.TRUE.equals(item.getAttachmentRequired()))
-                && (attachments == null || attachments.isEmpty())) throw exception(STUDENT_CONTACT_FORM_INVALID);
+        if (!allowed.containsAll(selected) || completed != null && selected.size() != completed.size())
+            throw exception(STUDENT_CONTACT_CHECKLIST_INVALID);
+        if (items.stream().anyMatch(item -> selected.contains(item.getKey()) && Boolean.TRUE.equals(item.getAttachmentRequired()))
+                && (attachments == null || attachments.isEmpty())) throw exception(STUDENT_CONTACT_CHECKLIST_EVIDENCE_REQUIRED);
     }
 
     private List<StudentContactContextRespVO.ChecklistItemVO> checklist(StudentContactConfigVersionDO config) {
         return JsonUtils.parseArray(config.getChecklistJson(), StudentContactConfigRespVO.ChecklistItemVO.class).stream()
-                .filter(StudentContactConfigRespVO.ChecklistItemVO::getEnabled).sorted(Comparator.comparing(StudentContactConfigRespVO.ChecklistItemVO::getSort))
+                .filter(item -> Boolean.TRUE.equals(item.getEnabled()) && !RETIRED_PLAN_CHECKLIST_KEY.equals(item.getKey())).sorted(Comparator.comparing(StudentContactConfigRespVO.ChecklistItemVO::getSort))
                 .map(item -> { StudentContactContextRespVO.ChecklistItemVO row = new StudentContactContextRespVO.ChecklistItemVO();
                     row.setKey(item.getKey()); row.setTitle(item.getTitle()); row.setType(item.getType());
                     row.setAttachmentRequired(item.getAttachmentRequired()); return row; }).toList();
@@ -810,6 +974,10 @@ public class StudentContactServiceImpl implements StudentContactService {
         return dictDataApi.getDictDataList(type).stream().filter(row -> value.equals(row.getValue()))
                 .map(DictDataRespDTO::getLabel).findFirst().orElseThrow(() -> exception(STUDENT_CONTACT_REASON_INVALID));
     }
+    private boolean canContactWithoutTask(ServiceRelationDO relation) {
+        return Set.of(STAGE_SUPERVISION, STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
+                STAGE_CERTIFICATE, STAGE_CONTINUOUS_FOLLOW_UP).contains(relation.getDeliveryStage() == null ? "" : relation.getDeliveryStage());
+    }
     private int timeout(StudentContactConfigVersionDO config, String type) {
         return TYPE_FIRST_CONTACT.equals(type) ? config.getFirstContactTimeoutMinutes()
                 : TYPE_STUDY_PLAN.equals(type) ? config.getStudyPlanTimeoutMinutes() : 0;
@@ -850,18 +1018,20 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
     private void validateReplay(StudentContactRecordDO replay, Long relationId, Long taskId, Long userId,
                                 String requestFingerprint) {
-        if (!Objects.equals(replay.getServiceRelationId(), relationId) || !Objects.equals(replay.getTaskId(), taskId)
+        if (!Objects.equals(replay.getServiceRelationId(), relationId) || taskId != null && !Objects.equals(replay.getTaskId(), taskId)
                 || !Objects.equals(replay.getOperatorUserId(), userId)
                 || !Objects.equals(replay.getRequestFingerprint(), requestFingerprint)) {
             throw exception(STUDENT_CONTACT_FORM_INVALID);
         }
     }
     private String contactFingerprint(String type, Boolean successful, String unsuccessfulReason, String remark,
-                                      List<Long> attachments, List<String> checklistKeys, LocalDateTime nextAt,
+                                      List<Long> attachments, List<String> checklistKeys, Boolean planCompleted, LocalDateTime nextAt,
                                       String extensionReason, String extensionDescription,
                                       List<Long> extensionAttachments, Map<String, Object> data) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("type", type); payload.put("successful", successful);
+        // Omitted/false remains compatible with retries of pre-upgrade requests.
+        if (Boolean.TRUE.equals(planCompleted)) payload.put("studyPlanCompletedAtFirstContact", true);
         payload.put("unsuccessfulReason", unsuccessfulReason); payload.put("remark", remark);
         payload.put("attachments", attachments == null ? List.of() : attachments);
         payload.put("checklistKeys", checklistKeys == null ? List.of() : checklistKeys);

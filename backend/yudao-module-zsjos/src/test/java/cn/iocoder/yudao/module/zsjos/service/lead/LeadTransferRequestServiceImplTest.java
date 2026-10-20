@@ -11,9 +11,9 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadTransferRequestDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCycleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadTransferRequestMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
@@ -27,18 +27,18 @@ import org.springframework.dao.DuplicateKeyException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_AGING_POOL_STATE_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PUBLIC_SEA_POOL_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PUBLIC_SEA_POOL_IDEMPOTENCY_CONFLICT;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class LeadTransferRequestServiceImplTest {
     @InjectMocks private LeadTransferRequestServiceImpl service;
     @Mock private LeadTransferRequestMapper requestMapper;
-    @Mock private LeadAgingPoolCycleMapper cycleMapper;
+    @Mock private LeadPublicSeaPoolCycleMapper cycleMapper;
     @Mock private LeadMapper leadMapper;
-    @Mock private LeadAgingPoolService agingPoolService;
+    @Mock private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock private LeadDispatchService dispatchService;
     @Mock private SalesOrderMapper orderMapper;
     @Mock private LeadNotifyEventPublisher notifyEventPublisher;
@@ -71,27 +71,27 @@ class LeadTransferRequestServiceImplTest {
 
     @Test
     void createRejectsEndedCycleAfterLockAndAuthorizationWhenNoReplayExists() {
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("exited"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
-        when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
-        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.create(3L, 20L,
-                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                                 .setIdempotencyKey("transfer-1").setReason("持续跟进")));
 
-        assertEquals(LEAD_AGING_POOL_STATE_INVALID.getCode(), error.getCode());
-        verify(agingPoolService).canRead(cycle, 20L);
+        assertEquals(LEAD_PUBLIC_SEA_POOL_STATE_INVALID.getCode(), error.getCode());
+        verify(publicSeaPoolService).canRead(cycle, 20L);
     }
 
     @Test
     void createReplaysCompletedRequestBeforeCheckingMutableCycleState() {
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("exited"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         LeadTransferRequestDO replay = new LeadTransferRequestDO();
@@ -99,33 +99,33 @@ class LeadTransferRequestServiceImplTest {
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
-        when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
-        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
         when(requestMapper.selectByIdempotencyKey("transfer-completed")).thenReturn(replay);
 
         Long result = service.create(3L, 20L,
-                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                         .setIdempotencyKey("transfer-completed").setReason("持续跟进"));
 
         assertEquals(9L, result);
-        verify(agingPoolService).canRead(cycle, 20L);
+        verify(publicSeaPoolService).canRead(cycle, 20L);
         verify(leadMapper, never()).touchActivity(anyLong(), any());
         verifyNoInteractions(adminUserApi, deptApi, processInstanceApi, notifyEventPublisher);
     }
 
     @Test
     void createRejectsRequesterWithoutCycleVisibilityAfterLock() {
-        LeadAgingPoolCycleDO snapshot = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO snapshot = new LeadPublicSeaPoolCycleDO();
         snapshot.setId(3L); snapshot.setLeadId(2L); snapshot.setStatus("assigned");
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(snapshot);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(snapshot);
-        when(agingPoolService.canRead(snapshot, 20L)).thenReturn(false);
+        when(publicSeaPoolService.canRead(snapshot, 20L)).thenReturn(false);
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.create(3L, 20L,
-                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                                 .setIdempotencyKey("transfer-2").setReason("持续跟进")));
 
         assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
@@ -136,17 +136,17 @@ class LeadTransferRequestServiceImplTest {
 
     @Test
     void createRejectsVisibleSalesWhoAreNotCurrentCollaborator() {
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
-        when(agingPoolService.canRead(cycle, 30L)).thenReturn(true);
+        when(publicSeaPoolService.canRead(cycle, 30L)).thenReturn(true);
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.create(3L, 30L,
-                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                                 .setIdempotencyKey("transfer-not-b").setReason("持续跟进")));
 
         assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
@@ -155,15 +155,15 @@ class LeadTransferRequestServiceImplTest {
 
     @Test
     void createAllowsEligibleSalesToRequestTransferFromWaitingCycle() {
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("waiting_assignment");
         cycle.setOriginalOwnerUserId(10L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setLeadNo("KZ202608160000000002"); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
-        when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
-        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
         when(requestMapper.selectByIdempotencyKey("waiting-transfer")).thenReturn(null);
         AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setDeptId(100L);
         AdminUserRespDTO requester = new AdminUserRespDTO(); requester.setId(20L); requester.setDeptId(100L);
@@ -176,7 +176,7 @@ class LeadTransferRequestServiceImplTest {
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-waiting-transfer");
 
         Long result = service.create(3L, 20L,
-                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                         .setIdempotencyKey("waiting-transfer").setReason("持续跟进"));
 
         assertEquals(9L, result);
@@ -185,7 +185,7 @@ class LeadTransferRequestServiceImplTest {
 
     @Test
     void createRejectsIdempotencyReplayFromAnotherCycleAfterAuthorization() {
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         LeadTransferRequestDO replay = new LeadTransferRequestDO();
@@ -193,17 +193,17 @@ class LeadTransferRequestServiceImplTest {
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
-        when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
-        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
         when(requestMapper.selectByIdempotencyKey("transfer-replay")).thenReturn(replay);
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.create(3L, 20L,
-                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                                 .setIdempotencyKey("transfer-replay").setReason("持续跟进")));
 
-        assertEquals(LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
-        verify(agingPoolService).canRead(cycle, 20L);
+        assertEquals(LEAD_PUBLIC_SEA_POOL_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
+        verify(publicSeaPoolService).canRead(cycle, 20L);
     }
 
     @Test
@@ -216,7 +216,7 @@ class LeadTransferRequestServiceImplTest {
         when(requestMapper.selectByIdempotencyKeyForUpdate("transfer-race", 1L)).thenReturn(replay);
 
         Long result = service.create(3L, 20L,
-                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                         .setIdempotencyKey("transfer-race").setReason("持续跟进"));
 
         assertEquals(9L, result);
@@ -235,10 +235,10 @@ class LeadTransferRequestServiceImplTest {
 
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.create(3L, 20L,
-                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                                 .setIdempotencyKey("transfer-collision").setReason("持续跟进")));
 
-        assertEquals(LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
+        assertEquals(LEAD_PUBLIC_SEA_POOL_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
         verifyNoInteractions(processInstanceApi, notifyEventPublisher);
     }
 
@@ -250,7 +250,7 @@ class LeadTransferRequestServiceImplTest {
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-1");
 
         Long result = service.create(3L, 20L,
-                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO()
                         .setIdempotencyKey("transfer-number").setReason("持续跟进"));
 
         assertEquals(9L, result);
@@ -263,14 +263,14 @@ class LeadTransferRequestServiceImplTest {
     }
 
     private void prepareCreateThroughInsert(String idempotencyKey) {
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setLeadNo("KZ202608160000000002"); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
-        when(agingPoolService.canRead(cycle, 20L)).thenReturn(true);
-        when(agingPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRead(cycle, 20L)).thenReturn(true);
+        when(publicSeaPoolService.canRequestTransfer(cycle, 20L)).thenReturn(true);
         when(requestMapper.selectByIdempotencyKey(idempotencyKey)).thenReturn(null);
         AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setDeptId(100L);
         AdminUserRespDTO requester = new AdminUserRespDTO(); requester.setId(20L); requester.setDeptId(100L);

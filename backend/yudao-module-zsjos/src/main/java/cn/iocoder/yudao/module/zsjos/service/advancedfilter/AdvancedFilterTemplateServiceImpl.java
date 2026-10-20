@@ -27,6 +27,7 @@ public class AdvancedFilterTemplateServiceImpl implements AdvancedFilterTemplate
     @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     private void checkMediaScene(String scene, Long userId) {
+        if ("education_team".equals(scene) && !permissionApi.hasAnyPermissions(userId,"zsjos:education-team:query")) throw new org.springframework.security.access.AccessDeniedException("无权使用教务团队筛选模板");
         if ("media_student".equals(scene) && !permissionApi.hasAnyPermissions(userId, "zsjos:media-student:query-my")) {
             throw new org.springframework.security.access.AccessDeniedException("无权使用媒体学员筛选模板");
         }

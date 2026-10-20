@@ -14,7 +14,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCycleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import org.junit.jupiter.api.Test;
@@ -191,7 +191,7 @@ class LeadNotifySceneProviderTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
     @Mock private DeptApi deptApi;
-    @Mock private LeadAgingPoolCycleMapper agingPoolCycleMapper;
+    @Mock private LeadPublicSeaPoolCycleMapper publicSeaPoolCycleMapper;
     @Mock private LeadAssignmentService assignmentService;
     @Mock private PartnerAccountMapper partnerAccountMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper partnerMapper;

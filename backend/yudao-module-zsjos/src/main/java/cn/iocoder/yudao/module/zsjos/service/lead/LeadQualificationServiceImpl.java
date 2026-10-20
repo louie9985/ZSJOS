@@ -324,9 +324,9 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="释放到抢单池", target="lead", id=0, actor=1, actorType="ADMIN")
     public void releaseToClaimPool(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
-        if (teamTransferPolicy.isEducation(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         String key = dispositionKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_RELEASED)) return;
+        if (teamTransferPolicy.isEducation(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         boolean suspended = STATUS_SUSPENDED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
         boolean recycled = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus());
         if (!suspended && !recycled) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
@@ -392,9 +392,9 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="释放到抢单池", target="lead", id=0, actor=1, actorType="ADMIN")
     public void supervisorReleaseOwnedToClaimPool(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
-        if (teamTransferPolicy.isEducation(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         String key = dispositionKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_RELEASED)) return;
+        if (teamTransferPolicy.isEducation(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         if (!STATUS_SUBMITTED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }

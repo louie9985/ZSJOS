@@ -32,9 +32,9 @@ class SubordinateSalesCommandServiceTest {
     @Mock private SubordinateSalesCommandMapper commandMapper;
     @Mock private LeadDispatchService dispatchService;
     @Mock private LeadObjectPermissionService permissionService;
-    @Mock private LeadAgingPoolService agingPoolService;
+    @Mock private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock private LeadQualificationService qualificationService;
-    @Mock private LeadTeamTransferPolicy teamTransferPolicy;
+    @Mock private SubordinateSalesScope scope;
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
@@ -43,33 +43,21 @@ class SubordinateSalesCommandServiceTest {
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
-    @Test
-    void educationRestoreRequiresManagedOwnerAndCurrentTenant() {
-        LeadDO lead = lead(1L, 20L); lead.setStatus("suspended"); lead.setAssignmentStatus("owned");
-        lead.setOwnerIdentity("education"); lead.setSourceType("education_self_sourced");
-        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
-        service.restoreOne(1L, 10L, "恢复", "education-restore");
-        verify(qualificationService).restore(eq(1L), eq(10L), any());
-        assertEquals("education", lead.getOwnerIdentity());
-        assertEquals(20L, lead.getOwnerUserId());
-        clearInvocations(qualificationService);
-        assertThrows(ServiceException.class, () -> service.restoreOne(1L, 30L, "越部门", "wrong-manager"));
-        assertThrows(ServiceException.class, () -> service.restoreOne(1L, 20L, "自行恢复", "owner"));
-        TenantContextHolder.setTenantId(2L);
-        assertThrows(ServiceException.class, () -> service.restoreOne(1L, 10L, "跨租户", "wrong-tenant"));
-        verify(leadMapper).selectByIdForUpdate(1L, 2L);
-        verifyNoInteractions(qualificationService);
+    @Test void educationRestoreIsRejectedBeforeBusinessWrites() {
+        var lead = lead(1L,20L); lead.setOwnerIdentity("education");
+        when(leadMapper.selectByIdForUpdate(1L,1L)).thenReturn(lead);
+        doThrow(new ServiceException(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SUBORDINATE_LEAD_OWNER_CHANGED)).when(scope).requireManagedLead(lead,10L);
+        assertThrows(ServiceException.class, () -> service.restoreOne(1L,10L,"恢复","education-restore"));
+        verifyNoInteractions(qualificationService,dispatchService);
     }
 
     @Test
     void manualPublicSeaPreservesLeadOwnershipAndStates() {
         LeadDO lead = lead(1L, 20L); lead.setStatus("valid"); lead.setAssignmentStatus("owned");
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
         service.releasePublicSeaOne(1L, 30L, 10L, "协同跟进");
 
-        verify(agingPoolService).enterManually(eq(1L), eq(30L), eq(10L), eq("协同跟进"),
+        verify(publicSeaPoolService).enterManually(eq(1L), eq(30L), eq(10L), eq("协同跟进"),
                 startsWith("supervisor-public-sea:"));
         assertEquals(20L, lead.getOwnerUserId());
         assertEquals("valid", lead.getStatus());
@@ -81,7 +69,6 @@ class SubordinateSalesCommandServiceTest {
     void transferRejectsCurrentOwnerAsTarget() {
         LeadDO lead = lead(1L, 20L);
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
         assertThrows(ServiceException.class, () -> service.transferOne(1L, 20L, 10L, "无变化"));
         verifyNoInteractions(dispatchService);
     }
@@ -90,7 +77,6 @@ class SubordinateSalesCommandServiceTest {
     void manualPublicSeaRejectsUnqualifiedLead() {
         LeadDO lead = lead(1L, 20L); lead.setStatus("submitted"); lead.setAssignmentStatus("owned");
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
 
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.releasePublicSeaOne(1L, 30L, 10L, "协同跟进"));
@@ -100,7 +86,7 @@ class SubordinateSalesCommandServiceTest {
         org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("无法执行“释放至公海池”"));
         org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("已提交 / 已归属"));
         org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("有效或已转化 / 已归属且未关闭"));
-        verifyNoInteractions(agingPoolService);
+        verifyNoInteractions(publicSeaPoolService);
     }
 
     @Test
@@ -122,17 +108,12 @@ class SubordinateSalesCommandServiceTest {
         assertEquals(Propagation.REQUIRES_NEW, transactional.propagation());
     }
 
-    @Test
-    void educationTransferUsesEducationChainAndRejectsSalesPool() {
-        LeadDO lead = lead(1L, 20L); lead.setOwnerIdentity("education");
-        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
-        when(teamTransferPolicy.isEducation(lead)).thenReturn(true);
-        service.transferOne(1L, 30L, 10L, "团队转派", "education-transfer");
-        verify(dispatchService).transferEducation(1L, 30L, 10L, "团队转派", "education-transfer");
-        verify(dispatchService, never()).adminTransfer(anyLong(), anyLong(), anyLong(), anyString(), anyString());
-        assertThrows(ServiceException.class, () -> service.releaseClaimPoolOne(1L, 10L, "禁止进入销售池", "education-pool"));
-        verifyNoInteractions(qualificationService);
+    @Test void educationTransferIsRejectedBeforeDispatch() {
+        var lead = lead(1L,20L); lead.setOwnerIdentity("education");
+        when(leadMapper.selectByIdForUpdate(1L,1L)).thenReturn(lead);
+        doThrow(new ServiceException(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SUBORDINATE_LEAD_OWNER_CHANGED)).when(scope).requireManagedLead(lead,10L);
+        assertThrows(ServiceException.class, () -> service.transferOne(1L,30L,10L,"转派","education-transfer"));
+        verifyNoInteractions(dispatchService,qualificationService);
     }
 
     private static LeadDO lead(Long id, Long owner) {
@@ -142,7 +123,6 @@ class SubordinateSalesCommandServiceTest {
     @Test void staleVersionRejectsBeforeBusinessWrites() {
         var lead=lead(1L,20L);lead.setVersion(2);
         when(leadMapper.selectByIdForUpdate(1L,1L)).thenReturn(lead);
-        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
         assertThrows(ServiceException.class,()->service.transferOne(1L,30L,10L,"test","stale",1));
         verifyNoInteractions(dispatchService,qualificationService,auditLogMapper);
         verify(leadMapper,never()).updateById(any(LeadDO.class));

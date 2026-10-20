@@ -10,6 +10,7 @@ import java.util.Map;
 @Data
 public class StudentContactContextRespVO {
     private Long serviceRelationId;
+    private StudentFirstContactProgressVO firstContactProgress;
     private String acceptanceStatus;
     private LocalDateTime acceptedAt;
     private Integer version;

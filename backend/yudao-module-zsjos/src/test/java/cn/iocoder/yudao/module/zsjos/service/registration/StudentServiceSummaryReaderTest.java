@@ -51,7 +51,7 @@ class StudentServiceSummaryReaderTest {
         verifyNoInteractions(forms, rounds, leads, leadPermission);
     }
     @Test void deniedOrderDoesNotExposeHandoffOrLoadForms() {
-        var relation=relation(1);relation.setOrderId(4L);
+        var relation=relation(1);relation.setOrderId(4L); relation.setRegistrationCaseId(5L);
         var order=new SalesOrderDO();order.setId(4L);order.setLeadId(9L);order.setRemark("restricted");order.setCurrentApprovalRoundId(6L);
         when(orders.selectBatchIds(List.of(4L))).thenReturn(List.of(order));
         var summary=reader.read(7L,List.of(relation),LocalDateTime.now()).get(1L);
@@ -63,21 +63,17 @@ class StudentServiceSummaryReaderTest {
         assertTrue(reader.read(7L,List.of(),LocalDateTime.now()).isEmpty());
         verifyNoInteractions(tasks,contacts,orders,forms,permission);
     }
-    @Test void submittedFormWinsOverNewerDraftAndOnlyMetadataIsSelected() {
-        var relation=relation(1); relation.setOrderId(4L);
+    @Test void currentRegistrationFormOnlyMetadataIsSelected() {
+        var relation=relation(1); relation.setOrderId(4L); relation.setRegistrationCaseId(5L);
         var order=new SalesOrderDO(); order.setId(4L); order.setLeadId(9L);
         when(orders.selectBatchIds(List.of(4L))).thenReturn(List.of(order));
         when(permission.hasAnyPermissions(7L, "zsjos:student-info-form:read")).thenReturn(true);
         doReturn(false).when(permission).hasAnyPermissions(7L, "zsjos:sales-order:query", "zsjos:sales-order:query-management", "zsjos:sales-order:query-team", "zsjos:sales-order:review", "zsjos:sales-order:supervisor-confirm", "zsjos:sales-order:create");
-        var lead=new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO(); lead.setId(9L);
-        when(leads.selectBatchIds(List.of(9L))).thenReturn(List.of(lead));
-        when(leadPermission.filterReadableDetails(List.of(lead),7L)).thenReturn(Set.of(9L));
-        var draft=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO(); draft.setId(20L);draft.setLeadId(9L);draft.setStatus("DRAFT");
-        var submitted=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO(); submitted.setId(10L);submitted.setLeadId(9L);submitted.setStatus("SUBMITTED");submitted.setSubmittedAt(LocalDateTime.of(2026,10,1,12,0));
+        var submitted=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO(); submitted.setId(10L);submitted.setRegistrationCaseId(5L);submitted.setStatus("SUBMITTED");submitted.setSubmittedAt(LocalDateTime.of(2026,10,1,12,0));
         when(forms.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenAnswer(invocation -> {
             var query=(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<?>)invocation.getArgument(0);
             assertFalse(query.getSqlSelect().contains("token")); assertFalse(query.getSqlSelect().contains("value"));
-            return List.of(draft,submitted);
+            return List.of(submitted);
         });
         var info=reader.read(7L,List.of(relation),LocalDateTime.now()).get(1L).getInfoSubmission();
         assertEquals("readable",info.getAccess());assertEquals("SUBMITTED",info.getStatus());assertEquals(submitted.getSubmittedAt(),info.getSubmittedAt());

@@ -4,7 +4,7 @@
     <p v-if="notice.audienceType === 'TARGET'">此公告原为指定部门／人员可见，开启后外部访问不受原接收范围限制。</p>
     <p v-if="notice.audienceType === 'TARGET'">原内部接收范围：{{ notice.targetDeptIds?.length || 0 }} 个部门，{{ notice.targetUserIds?.length || 0 }} 名指定人员<span v-if="notice.recipientCount != null">，发布时接收人数 {{ notice.recipientCount }}</span>。</p>
     <p>关闭后不能收回已保存的内容；已签发的文件地址可能暂时有效。调整附件需关闭后重新开启，旧二维码不会恢复。</p>
-    <details><summary>预览对外正文</summary><h3>{{ notice.title }}</h3><div v-dompurify-html="notice.content || ''" class="share-preview"></div></details>
+    <details><summary>预览对外正文</summary><h3>{{ notice.title }}</h3><NoticeContent :html="notice.content || ''" class="share-preview" /></details>
     <el-alert v-if="error" type="error" :title="error" :closable="false"><el-button :disabled="busy" @click="load">刷新重试</el-button></el-alert>
     <p v-if="feedback" role="status">{{ feedback }}</p>
     <div v-loading="busy" class="share-controls">
@@ -33,6 +33,7 @@
 </template>
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import NoticeContent from './NoticeContent.vue'
 import { Qrcode } from '@/components/Qrcode'
 import download from '@/utils/download'
 import type { NoticeVO } from '@/api/system/notice'

@@ -22,7 +22,7 @@ public class LeadOwnerCommandService {
     @Resource private LeadMapper leadMapper;
     @Resource private SalesOrderMapper salesOrderMapper;
     @Resource private LeadDispatchService dispatchService;
-    @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private LeadAssignmentService assignmentService;
 
     public List<LeadAssignmentUserRespVO> getTransferCandidates() {
@@ -48,7 +48,7 @@ public class LeadOwnerCommandService {
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="释放至公海", target="lead", id=0, actor=1, actorType="ADMIN")
     public void releaseToPublicSea(Long leadId, Long ownerUserId, String reason, String idempotencyKey) {
         requireOwnedLead(leadId, ownerUserId);
-        agingPoolService.enterManually(leadId, null, ownerUserId, reason, idempotencyKey);
+        publicSeaPoolService.enterManually(leadId, null, ownerUserId, reason, idempotencyKey);
     }
 
     private LeadDO requireOwnedLead(Long leadId, Long ownerUserId) {

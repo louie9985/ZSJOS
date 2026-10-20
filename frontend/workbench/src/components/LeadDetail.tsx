@@ -26,9 +26,7 @@ import EmployeeSelect from './EmployeeSelect'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import LeadSubmitterFeedbackPanel from './LeadSubmitterFeedbackPanel'
 import LeadSubmitterAssistHistoryPanel from './LeadSubmitterAssistHistoryPanel'
-import StudentInfoPanel from './StudentInfoPanel'
 import SubjectAvatar from './SubjectAvatar'
-import StudentInfoLinkModal from './StudentInfoLinkModal'
 
 type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release' | 'releasePublicSea'
 
@@ -66,7 +64,6 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   const [overturnToken, setOverturnToken] = useState<string>()
   useEffect(() => { setOverturnToken(undefined) }, [lead.id])
   // Read-only planners still need the server-authorized sales follow-up history.
-  const [studentInfoLinkMode, setStudentInfoLinkMode] = useState<'generate' | 'view'>()
   const visibleTabs = resolveVisibleLeadDetailTabs(baseTabs, lead.visibleTabs)
   const requestedInitialTab = initialTab || defaultLeadDetailTab(autoExpandFollowUp)
   const visibleTabKey = visibleTabs.join(',')
@@ -281,8 +278,6 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
 
   const toolbarActions: ToolbarAction[] = [
     actions.has('SUPERVISOR_OVERTURN_VALID') && { key: 'supervisor-overturn-valid', icon: <CheckOutlined/>, label: '改判有效', disabled: !actions.get('SUPERVISOR_OVERTURN_VALID')?.enabled || !actions.get('SUPERVISOR_OVERTURN_VALID')?.qualificationToken, onClick: () => setOverturnToken(actions.get('SUPERVISOR_OVERTURN_VALID')?.qualificationToken) },
-    actions.has('GENERATE_STUDENT_INFO_FORM') && { key: 'student-info-generate', icon: <FileAddOutlined/>, label: '生成信息收集表', onClick: () => setStudentInfoLinkMode('generate') },
-    actions.has('VIEW_STUDENT_INFO_FORM_LINK') && { key: 'student-info-link', icon: <FileAddOutlined/>, label: '收集表链接', onClick: () => setStudentInfoLinkMode('view') },
     actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpModalOpen(true) },
     actions.has('JUDGE_VALID') && { key: 'judge-valid', icon: <CheckOutlined/>, label: '判有效', onClick: () => void openValid() },
     actions.has('JUDGE_INVALID') && { key: 'judge-invalid', icon: <CloseOutlined/>, label: '判无效', danger: true, onClick: () => void openInvalid() },
@@ -300,7 +295,6 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   ].filter(Boolean) as ToolbarAction[]
 
   const tabItems: LeadDetailExtraTab[] = visibleTabs.map<LeadDetailExtraTab>(tab => {
-    if (tab === 'student-info') return { key: tab, label: '学员信息', children: <StudentInfoPanel key={lead.id} leadId={lead.id}/> }
     if (tab === 'submitter-feedback') return { key: tab, label: '销售反馈', children: <LeadSubmitterFeedbackPanel key={lead.id} lead={lead} canCreate={!readOnly && actions.has('REPLY_SUBMITTER')} onChanged={onChanged} onDirtyChange={setFeedbackDirty}/> }
     if (tab === 'assist-history') return { key: tab, label: '协助历史', children: <LeadSubmitterAssistHistoryPanel key={lead.id} lead={lead} canReply={!readOnly && actions.has('SUBMITTER_ASSIST_REPLY')} onChanged={onChanged}/> }
     if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview onViewAppeal={visibleTabs.includes('appeals') ? () => { setInternalActiveTab('appeals'); onTabChange?.('appeals') } : undefined} followUpRefreshVersion={refreshVersion + followUpRefreshVersion} lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner} profileVariant={profileVariant}/>}</div> }
@@ -316,7 +310,6 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     ? controlledActiveTab : fallbackTab
 
   return <div className="lead-inbox-detail">
-    {studentInfoLinkMode && <StudentInfoLinkModal key={lead.id} leadId={lead.id} mode={studentInfoLinkMode} onClose={() => setStudentInfoLinkMode(undefined)}/>}
     <div className="lead-detail-hero">
       <SubjectAvatar className="lead-detail-hero-avatar" seed={lead.leadNo} subjectType="lead" size={44} label={lead.submittedName || '客资'} />
       <Typography.Title level={4}>{lead.submittedName}</Typography.Title>

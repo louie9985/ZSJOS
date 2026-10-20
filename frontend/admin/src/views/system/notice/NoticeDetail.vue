@@ -21,7 +21,7 @@
           <el-descriptions-item label="发布时间">{{ notice.publishTime ? formatDate(notice.publishTime) : '-' }}</el-descriptions-item>
           <el-descriptions-item label="高亮截止时间">{{ notice.highlightUntil ? formatDate(notice.highlightUntil) : '-' }}</el-descriptions-item>
         </el-descriptions>
-        <div v-dompurify-html="notice.content || ''" class="notice-detail-content"></div>
+        <NoticeContent :html="notice.content || ''" class="notice-detail-content" />
         <template v-if="notice.attachments?.length">
           <h3>附件</h3>
           <div v-for="file in notice.attachments" :key="file.infraFileId">
@@ -38,6 +38,7 @@
 <script setup lang="ts">
 import * as NoticeApi from '@/api/system/notice'
 import NoticeReadStatistics from './NoticeReadStatistics.vue'
+import NoticeContent from './NoticeContent.vue'
 import { DICT_TYPE } from '@/utils/dict'
 import { formatDate } from '@/utils/formatTime'
 

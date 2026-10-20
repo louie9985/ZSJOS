@@ -24,7 +24,7 @@ class ConfigSecretSupportTest {
         assertFalse(row.getVisible());
         var view=ConfigConvert.INSTANCE.convert(row); assertEquals("",view.getValue()); assertTrue(view.getConfigured());
         var blank=secret().setValue("").setSensitive(false);support.prepare(blank,row);
-        assertEquals(row.getValue(),blank.getValue());assertTrue(blank.getSensitive());
+        assertNull(blank.getValue());assertTrue(blank.getSensitive());
         assertEquals("",ConfigConvert.INSTANCE.convertList(java.util.List.of(row)).getFirst().getValue());
     }
     @Test void cannotConvertPlaintextWithoutNewValueOrRenameSecret() {

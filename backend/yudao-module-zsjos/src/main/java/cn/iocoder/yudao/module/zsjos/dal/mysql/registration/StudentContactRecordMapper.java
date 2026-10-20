@@ -11,6 +11,12 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 
 @Mapper
 public interface StudentContactRecordMapper extends BaseMapperX<StudentContactRecordDO> {
+    default StudentContactRecordDO selectLatestSuccessful(Long relationId, String type) {
+        return selectOne(new LambdaQueryWrapperX<StudentContactRecordDO>()
+                .eq(StudentContactRecordDO::getServiceRelationId, relationId)
+                .eq(StudentContactRecordDO::getContactType, type).eq(StudentContactRecordDO::getSuccessful, true)
+                .orderByDesc(StudentContactRecordDO::getSubmittedAt).orderByDesc(StudentContactRecordDO::getId).last("LIMIT 1"));
+    }
     default StudentContactRecordDO selectByIdempotencyKey(String key) {
         return selectOne(StudentContactRecordDO::getIdempotencyKey, key);
     }

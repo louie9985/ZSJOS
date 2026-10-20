@@ -68,7 +68,7 @@
         <el-button
           type="danger"
           plain
-          :disabled="checkedIds.length === 0"
+          :disabled="checkedIds.length === 0 || !canDeleteChecked"
           @click="handleDeleteBatch"
           v-hasPermi="['infra:config:delete']"
         >
@@ -131,6 +131,7 @@
             link
             type="danger"
             @click="handleDelete(scope.row.id)"
+            v-if="!scope.row.sensitive || checkPermi(['infra:config:secret-update'])"
             v-hasPermi="['infra:config:delete']"
           >
             删除
@@ -222,7 +223,12 @@ const handleDelete = async (id: number) => {
 
 /** 批量删除按钮操作 */
 const checkedIds = ref<number[]>([])
+const checkedRows = ref<ConfigApi.ConfigVO[]>([])
+const canDeleteChecked = computed(() =>
+  checkedRows.value.every((row) => !row.sensitive || checkPermi(['infra:config:secret-update']))
+)
 const handleRowCheckboxChange = (rows: ConfigApi.ConfigVO[]) => {
+  checkedRows.value = rows
   checkedIds.value = rows.map((row) => row.id!).filter(Boolean)
 }
 

@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.hrm.dal.mysql.employee.info.HrmEmployeeMapper;
 import cn.iocoder.yudao.module.hrm.dal.mysql.employee.employment.HrmEmployeeChangeRecordMapper;
 import cn.iocoder.yudao.module.hrm.enums.employee.employment.HrmEmployeeChangeTypeEnum;
 import cn.iocoder.yudao.module.hrm.enums.employee.info.HrmEmployeeStatusEnum;
+import cn.iocoder.yudao.module.hrm.enums.employee.info.HrmEmployeeEntryStatusEnum;
 import cn.iocoder.yudao.module.hrm.service.employee.api.HrmEmployeeLifecycleEventPublisher;
 import cn.iocoder.yudao.module.hrm.service.recruit.candidate.HrmRecruitCandidateService;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
@@ -198,6 +199,10 @@ public class HrmEmployeeManualLifecycle {
 
     private void validateBusiness(HrmEmployeeSaveReqVO r, HrmEmployeeDO before, HrmEmployeeDO after) {
         if (r.getActualTime() == null || r.getActualTime().isAfter(LocalDateTime.now())) throw exception(INVALID, "实际发生日期不能缺失或在未来");
+        if (Set.of(4, 5, 6, 7, 8).contains(r.getChangeType())
+                && !HrmEmployeeEntryStatusEnum.ACTIVE_STATUSES.contains(before.getEntryStatus())) {
+            throw exception(INVALID, "员工当前不在职，不能执行该人事变更");
+        }
         switch (r.getChangeType()) {
             case 4 -> { if (!Objects.equals(before.getStatus(), 2) || !Objects.equals(after.getStatus(), 1)
                     || !Objects.equals(after.getType(), 1)) throw exception(INVALID, "转正应从试用变为正式"); after.setRegularTime(r.getActualTime()); }

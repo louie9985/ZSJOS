@@ -1,7 +1,7 @@
 import request from '@/config/axios'
 import type { Timestamp } from '../types'
 
-export type LeadFilterAudience = 'submitter' | 'owner' | 'reviewer' | 'agingPool' | 'management'
+export type LeadFilterAudience = 'submitter' | 'owner' | 'reviewer' | 'publicSeaPool' | 'management'
 export interface LeadFilterConditionVO {
   field: string
   values: string[]

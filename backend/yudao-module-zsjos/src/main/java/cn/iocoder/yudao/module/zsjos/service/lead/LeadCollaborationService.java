@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCompatibilityRecordMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -23,25 +23,25 @@ public class LeadCollaborationService {
         }
     }
 
-    @Resource private LeadAgingPoolService agingPoolService;
-    @Resource private LeadPublicSeaRecordMapper publicSeaRecordMapper;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
+    @Resource private LeadPublicSeaPoolCompatibilityRecordMapper publicSeaPoolCompatibilityRecordMapper;
     @Resource private LeadMapper leadMapper;
 
     public OperationContext requireCanOperateForUpdate(LeadDO lead, Long operatorUserId) {
         if (operatorUserId == null) throw exception(LEAD_PERMISSION_DENIED);
-        var cycle = agingPoolService.getActiveCycle(lead.getId());
-        var manual = publicSeaRecordMapper.selectByLeadIdForUpdate(
+        var cycle = publicSeaPoolService.getActiveCycle(lead.getId());
+        var manual = publicSeaPoolCompatibilityRecordMapper.selectByLeadIdForUpdate(
                 lead.getId(), TenantContextHolder.getRequiredTenantId());
         if (cycle != null && manual != null) {
             throw exception(LEAD_COLLABORATION_POOL_CONFLICT);
         }
         if (cycle != null) {
-            agingPoolService.requireCanOperateForUpdate(lead.getId(), lead.getOwnerUserId(), operatorUserId);
-            return new OperationContext(true, "aging_pool", lead.getOwnerUserId());
+            publicSeaPoolService.requireCanOperateForUpdate(lead.getId(), lead.getOwnerUserId(), operatorUserId);
+            return new OperationContext(true, "public_sea_pool", lead.getOwnerUserId());
         }
         if (manual != null && Objects.equals(manual.getOwnerUserId(), lead.getOwnerUserId())
                 && Objects.equals(manual.getCollaboratorUserId(), operatorUserId)) {
-            return new OperationContext(true, "manual_public_sea", lead.getOwnerUserId());
+            return new OperationContext(true, "public_sea_pool", lead.getOwnerUserId());
         }
         if (manual == null && Objects.equals(lead.getOwnerUserId(), operatorUserId)) {
             return OperationContext.owner(lead.getOwnerUserId());
@@ -55,8 +55,8 @@ public class LeadCollaborationService {
      */
     public void requireCanEnterDealForUpdate(LeadDO lead, Long operatorUserId) {
         if (Objects.equals(lead.getOwnerUserId(), operatorUserId)) {
-            var cycle = agingPoolService.getActiveCycle(lead.getId());
-            var manual = publicSeaRecordMapper.selectByLeadIdForUpdate(
+            var cycle = publicSeaPoolService.getActiveCycle(lead.getId());
+            var manual = publicSeaPoolCompatibilityRecordMapper.selectByLeadIdForUpdate(
                     lead.getId(), TenantContextHolder.getRequiredTenantId());
             if (cycle != null || manual != null) {
                 throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_POOL_EXIT);

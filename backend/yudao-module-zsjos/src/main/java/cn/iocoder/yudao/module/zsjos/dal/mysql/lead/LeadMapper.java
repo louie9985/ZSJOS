@@ -184,14 +184,14 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
               AND COALESCE((SELECT MAX(ofu.occurred_at) FROM zsjos_opportunity_follow_up_record ofu
                     WHERE ofu.opportunity_id=o.id AND ofu.tenant_id=l.tenant_id AND ofu.deleted=b'0'),
                     o.create_time) <= #{cutoff}
-              AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
+              AND NOT EXISTS (SELECT 1 FROM zsjos_lead_public_sea_pool_cycle c WHERE c.lead_id=l.id
                 AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
                 AND c.status IN ('waiting_assignment','assigned','deal_pending'))
               AND NOT EXISTS (SELECT 1 FROM zsjos_order so WHERE so.lead_id=l.id
                 AND so.tenant_id=l.tenant_id AND so.deleted=b'0' AND so.status='pending_approval')
             ORDER BY o.create_time ASC,l.id ASC LIMIT 200
             """)
-    List<LeadDO> selectAgingPoolCandidates(@Param("tenantId") Long tenantId,
+    List<LeadDO> selectPublicSeaPoolCandidates(@Param("tenantId") Long tenantId,
                                            @Param("cutoff") LocalDateTime cutoff);
     @Select("""
             SELECT l.* FROM zsjos_lead l
@@ -202,14 +202,14 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
               AND COALESCE((SELECT MAX(ofu.occurred_at) FROM zsjos_opportunity_follow_up_record ofu
                     WHERE ofu.opportunity_id=o.id AND ofu.tenant_id=l.tenant_id AND ofu.deleted=b'0'),
                     o.create_time) <= #{latestStart}
-              AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
+              AND NOT EXISTS (SELECT 1 FROM zsjos_lead_public_sea_pool_cycle c WHERE c.lead_id=l.id
                 AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
                 AND c.status IN ('waiting_assignment','assigned','deal_pending'))
               AND NOT EXISTS (SELECT 1 FROM zsjos_order so WHERE so.lead_id=l.id
                 AND so.tenant_id=l.tenant_id AND so.deleted=b'0' AND so.status='pending_approval')
             ORDER BY o.create_time ASC,l.id ASC LIMIT 500
             """)
-    List<LeadDO> selectAgingPoolReminderCandidates(@Param("tenantId") Long tenantId,
+    List<LeadDO> selectPublicSeaPoolReminderCandidates(@Param("tenantId") Long tenantId,
                                                    @Param("latestStart") LocalDateTime latestStart);
 
     default List<Long> selectIdsByContactKeyword(String keyword) {
@@ -248,6 +248,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
+        if (reqVO.isSalesOnly()) query.apply(SubordinateSalesIdentitySql.CONDITION);
         applySubmitterFilters(query, reqVO);
         if (inboxFilter != null && inboxFilter.matchNone()) {
             query.eq(LeadDO::getId, -1L);
@@ -305,6 +306,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getProviderOwnerId, reqVO.getProviderOwnerId())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
+        if (reqVO.isSalesOnly()) query.apply(SubordinateSalesIdentitySql.CONDITION);
         applySubmitterFilters(query, reqVO);
         if (inboxFilter != null && inboxFilter.matchNone()) {
             query.eq(LeadDO::getId, -1L);

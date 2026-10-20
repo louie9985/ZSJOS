@@ -49,5 +49,17 @@
     "zsjos_media_account_bak_create_time_20261008",
     "zsjos_media_account_bak_create_time_20261008_pt2",
     "zsjos_person_bak_mobile_20261008"
-  ]
+  ],
+  "baselineNamingUpgrade": {
+    "migration": "V329",
+    "replacements": {
+      "zsjos_lead_aging_pool_cycle": "zsjos_lead_public_sea_pool_cycle",
+      "zsjos_lead_aging_pool_event": "zsjos_lead_public_sea_pool_event",
+      "zsjos_lead_aging_pool_notify_stage": "zsjos_lead_public_sea_pool_notify_stage",
+      "zsjos_lead_public_sea_record": "zsjos_lead_public_sea_pool_compatibility_record",
+      "aging_pool_timeout_days": "public_sea_pool_timeout_days",
+      "idx_tenant_aging_pool_scan": "idx_tenant_public_sea_pool_scan",
+      "agingPool": "publicSeaPool"
+    }
+  }
 }

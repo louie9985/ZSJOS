@@ -3,7 +3,7 @@ import type { Timestamp } from './time'
 
 export type CalendarDay = { date: string; count: number }
 export type CalendarCard = { lead: ManagedLead; deadline: Timestamp; lastFollowUp?: LeadFollowUp; canReadFollowUp: boolean }
-export type CalendarSort = 'deadline' | 'category'
+export type CalendarSort = 'deadline' | 'category' | 'ownershipStartedAt'
 export type CalendarDirection = 'asc' | 'desc'
 const BASE = '/zsjos/lead-follow-up-calendar'
 export const leadCalendarApi = {

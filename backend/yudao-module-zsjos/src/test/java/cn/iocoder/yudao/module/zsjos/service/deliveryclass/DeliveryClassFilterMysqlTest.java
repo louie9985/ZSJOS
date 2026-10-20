@@ -34,6 +34,16 @@ class DeliveryClassFilterMysqlTest {
             session.getConnection().setReadOnly(true);var mapper=session.getMapper(DeliveryClassMapper.class);
             var req=new DeliveryClassPageReqVO();req.setPageSize(3);
             var all=mapper.selectList(mapper.classQuery(req,Set.of(),null,true,true));
+            if (!all.isEmpty()) {
+                Long owner = all.stream().filter(row -> row.getHomeroomUserId() != null)
+                        .map(row -> row.getHomeroomUserId()).findFirst().orElse(999999999L);
+                var own = all.stream().filter(row -> owner.equals(row.getHomeroomUserId())
+                        && !Boolean.TRUE.equals(row.getSystemClass())).map(row -> row.getId()).toList();
+                assertEquals(own.size(), mapper.selectDeliveryClassPage(req, Set.of(), owner, false, false).getTotal());
+                var pendingAndOwn = all.stream().filter(row -> Boolean.TRUE.equals(row.getSystemClass())
+                        || owner.equals(row.getHomeroomUserId())).map(row -> row.getId()).toList();
+                assertEquals(pendingAndOwn.size(), mapper.selectDeliveryClassPage(req, Set.of(), owner, false, true).getTotal());
+            }
             assertEquals(all.size(),mapper.selectDeliveryClassPage(req,Set.of(),null,true,true).getTotal());
             req.setExcludeSystemClass(true);
             var formal=all.stream().filter(row->!Boolean.TRUE.equals(row.getSystemClass())).toList();

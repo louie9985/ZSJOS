@@ -14,7 +14,8 @@ type AdminMenuRoute = {
 export const filterAdminRoutes = <T extends AdminMenuRoute>(routes: T[]): T[] =>
   routes.flatMap((route) => {
     if (['zsjos-workbench', 'zsjos/salesPerformance/index', 'zsjos/salesPerformanceTarget/index',
-      'zsjos/leadFollowUpCalendar/index', 'zsjos/mediaLeadAnalysis/index', 'zsjos/mediaLeadTarget/index'].includes(route.component || '')) {
+      'zsjos/leadFollowUpCalendar/index', 'zsjos/mediaLeadAnalysis/index', 'zsjos/mediaLeadTarget/index',
+      'zsjos/educationTeam/index'].includes(route.component || '')) {
       return []
     }
     if (!route.children) {

@@ -64,7 +64,7 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         copy.setVersionNo(published.getVersionNo() + 1); copy.setStatus("draft");
         copy.setFirstContactTimeoutMinutes(published.getFirstContactTimeoutMinutes());
         copy.setStudyPlanTimeoutMinutes(published.getStudyPlanTimeoutMinutes());
-        copy.setChecklistJson(published.getChecklistJson()); copy.setQuickNotesJson(published.getQuickNotesJson());
+        copy.setChecklistJson(withoutRetiredChecklist(published.getChecklistJson())); copy.setQuickNotesJson(published.getQuickNotesJson());
         copy.setCollaboratorTabsJson(published.getCollaboratorTabsJson()); copy.setVersion(0);
         copy.setFormsJson(published.getFormsJson());
         mapper.insert(copy);
@@ -76,6 +76,7 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void updateDraft(StudentContactConfigSaveReqVO request) {
+        request.setChecklist(request.getChecklist().stream().filter(item -> !StudentContactConstants.RETIRED_PLAN_CHECKLIST_KEY.equals(item.getKey())).toList());
         validate(request);
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("firstContactTimeoutMinutes", request.getFirstContactTimeoutMinutes());
@@ -106,6 +107,12 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         String fingerprint = fingerprint(Map.of("id", id, "version", version));
         CommandClaim claim = claimCommand("publish", idempotencyKey, id, version, fingerprint);
         if (!claim.created()) return;
+        StudentContactConfigVersionDO publishing = mapper.selectById(id);
+        if (publishing == null || !"draft".equals(publishing.getStatus())) throw exception(STUDENT_CONTACT_CONFIG_INVALID);
+        mapper.update(null, new LambdaUpdateWrapper<StudentContactConfigVersionDO>()
+                .eq(StudentContactConfigVersionDO::getId, id).eq(StudentContactConfigVersionDO::getVersion, version)
+                .eq(StudentContactConfigVersionDO::getStatus, "draft")
+                .set(StudentContactConfigVersionDO::getChecklistJson, withoutRetiredChecklist(publishing.getChecklistJson())));
         if (mapper.publishDraft(id, version) != 1) {
             throw exception(STUDENT_CONTACT_CONFIG_INVALID);
         }
@@ -119,6 +126,11 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         StudentContactConfigVersionDO value = mapper.selectPublished();
         if (value == null) throw exception(STUDENT_CONTACT_CONFIG_INVALID);
         return value;
+    }
+
+    private String withoutRetiredChecklist(String json) {
+        return JsonUtils.toJsonString(JsonUtils.parseArray(json, StudentContactConfigRespVO.ChecklistItemVO.class).stream()
+                .filter(item -> !StudentContactConstants.RETIRED_PLAN_CHECKLIST_KEY.equals(item.getKey())).toList());
     }
 
     private void validate(StudentContactConfigSaveReqVO request) {
@@ -136,6 +148,7 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
                 throw exception(STUDENT_CONTACT_CONFIG_INVALID);
             }
             fields.forEach(field -> {
+                if ("studyPlanCompletedAtFirstContact".equals(field.getKey())) throw exception(STUDENT_CONTACT_CONFIG_INVALID);
                 if (!FORM_TYPES.contains(field.getType())) {
                     throw exception(STUDENT_CONTACT_CONFIG_INVALID);
                 }
@@ -197,7 +210,7 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         result.setId(source.getId()); result.setVersionNo(source.getVersionNo()); result.setVersion(source.getVersion());
         result.setFirstContactTimeoutMinutes(source.getFirstContactTimeoutMinutes());
         result.setStudyPlanTimeoutMinutes(source.getStudyPlanTimeoutMinutes());
-        result.setChecklist(JsonUtils.parseArray(source.getChecklistJson(), StudentContactConfigRespVO.ChecklistItemVO.class));
+        result.setChecklist(JsonUtils.parseArray(withoutRetiredChecklist(source.getChecklistJson()), StudentContactConfigRespVO.ChecklistItemVO.class));
         result.setQuickNotes(JsonUtils.parseArray(source.getQuickNotesJson(), String.class));
         Map<String, List<String>> tabs = JsonUtils.parseObject(source.getCollaboratorTabsJson(), Map.class);
         result.setCollaboratorTabs(tabs == null ? Map.of() : tabs);

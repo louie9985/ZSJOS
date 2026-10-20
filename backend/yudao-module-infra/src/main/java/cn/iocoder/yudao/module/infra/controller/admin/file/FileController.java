@@ -109,7 +109,19 @@ public class FileController {
     @Parameter(name = "id", description = "编号", required = true)
     @PreAuthorize("@ss.hasPermission('infra:file:query')")
     public CommonResult<FileRespVO> getFile(@RequestParam("id") Long id) {
-        return success(BeanUtils.toBean(fileService.getFile(id), FileRespVO.class));
+        FileDO file = fileService.getFile(id);
+        FileRespVO response = BeanUtils.toBean(file, FileRespVO.class);
+        // The persisted URL may be an expired object-storage signature from an
+        // earlier storage configuration. Resolve it from the file ID on every
+        // metadata read so callers receive the current public or signed URL.
+        try {
+            response.setUrl(fileService.presignGetUrl(file.getId(), null));
+        } catch (UnsupportedOperationException ignored) {
+            // Local and DB clients expose stable controller URLs and do not
+            // implement object-storage presigning.
+            response.setUrl(file.getUrl());
+        }
+        return success(response);
     }
 
     @DeleteMapping("/delete")

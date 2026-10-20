@@ -7,7 +7,7 @@ import cn.iocoder.yudao.module.system.service.notify.NotifyTemplateServiceImpl;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackServiceImpl;
 import cn.iocoder.yudao.module.zsjos.service.cashback.FinanceTraceService;
-import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolServiceImpl;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolServiceImpl;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadObjectPermissionService;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -46,7 +46,7 @@ class NotifyStartupContextTest {
             NotifySceneRegistry.class, SalesOrderNotifySceneProvider.class, CashbackServiceImpl.class,
             cn.iocoder.yudao.module.zsjos.service.cashback.CashbackSearchService.class,
             AdvancedFilterService.class, FinanceTraceService.class, LeadObjectPermissionService.class,
-            SalesOrderObjectPermissionService.class, LeadAgingPoolServiceImpl.class,
+            SalesOrderObjectPermissionService.class, LeadPublicSeaPoolServiceImpl.class,
             NotifyRuleApiImpl.class, NotifyRuleServiceImpl.class, NotifyTemplateServiceImpl.class
     };
 
@@ -78,7 +78,7 @@ class NotifyStartupContextTest {
             context.refresh();
             assertThat(context.getBean(NotifySceneRegistry.class).getScenes()).hasSize(8);
             assertThat(AopUtils.isAopProxy(context.getBean(FinanceTraceService.class))).isTrue();
-            assertThat(AopUtils.isAopProxy(context.getBean(LeadAgingPoolServiceImpl.class))).isTrue();
+            assertThat(AopUtils.isAopProxy(context.getBean(LeadPublicSeaPoolServiceImpl.class))).isTrue();
             verifyCashbackResolution(context);
         }
     }

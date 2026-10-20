@@ -1,6 +1,6 @@
 # 知识库文档附件
 
-在线富文本文档在编辑正文下方添加附件，阅读页位于正文之后、互动之前。最多 10 个，每个非空且不超过 100 MB；支持 PNG/JPG/JPEG/GIF/WebP、Office、PDF、ZIP，以及剪贴板截图。独立文件条目和模板不增加附件。图片/PDF 使用现有预览，Office/ZIP 下载后查看。
+在线富文本文档在编辑正文下方添加附件，阅读页位于正文之后、互动之前。最多 10 个，每个非空且不超过 100 MB；支持 PNG/JPG/JPEG/GIF/WebP、Office、PDF、ZIP，以及剪贴板截图。独立文件条目和模板不增加附件。图片/PDF 使用现有预览，XLS/XLSX 支持 [Excel 只读预览](pms-knowledge-excel-preview.md)，其他 Office/ZIP 下载后查看。Excel 的 10 MB 预览上限不改变附件上传上限。
 
 ## 权限与保存
 

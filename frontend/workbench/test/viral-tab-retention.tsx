@@ -5,7 +5,7 @@ import { App, Button, Space } from 'antd'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { APP_ROUTES } from '../src/constants'
 import { getRetainedPageMenus } from '../src/retainedPagePaths'
-import { http, type WorkbenchMenu } from '../src/services/api'
+import { ApiError, http, type WorkbenchMenu } from '../src/services/api'
 import { materialApi } from '../src/services/materialApi'
 import TabBar, { type TabItem } from '../src/components/TabBar'
 import { WorkbenchPageNavigation, useWorkbenchPageNavigation } from '../src/components/WorkbenchPageNavigation'
@@ -29,7 +29,11 @@ const fields = (index: number) => [
 const types = ['viral_account', 'viral_content'].map((code, index) => ({ id: index + 1, code, name: code, status: 0, currentSchema: { fields: fields(index) } }))
 const materials = types.map((type, index) => ({ id: index + 41, materialTypeId: type.id, materialNo: `TEST-${index}`, title: `已保存${index}`, version: 1,
   coverFileId: 99, coverPreviewUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect width="80" height="80" fill="lightblue"/%3E%3C/svg%3E',
-  availableActions: ['UPDATE'], currentVersion: { status: 'DRAFT', fields: type.currentSchema.fields, values: { [index ? 'work_title' : 'account_name']: `已保存${index}` } } }))
+  availableActions: ['UPDATE', 'DELETE_DRAFT'], currentVersion: { status: 'DRAFT', fields: type.currentSchema.fields, values: { [index ? 'work_title' : 'account_name']: `已保存${index}` } } }))
+if (new URLSearchParams(location.search).has('draftManagement')) {
+  materials.push(...materials.map(item => ({ ...structuredClone(item), id: item.id + 100, materialNo: item.materialNo + '-OTHER', title: '另一份草稿' })))
+  materials.push(...materials.slice(0, 2).map(item => ({ ...structuredClone(item), id: item.id + 200, materialNo: item.materialNo + '-READONLY', title: '无删除权限草稿', availableActions: [] })))
+}
 let release: (() => void) | undefined
 let fail = false
 let loads = 0
@@ -43,7 +47,24 @@ http.defaults.adapter = async config => {
   const url = config.url || ''
   let data: unknown
   if (url.endsWith('/material-type/list')) { data = types; document.documentElement.dataset.loads = String(++loads) }
-  else if (url.endsWith('/material/page')) data = { list: materials.filter(item => item.materialTypeId === Number(config.params.materialTypeId)), total: 1 }
+  else if (url.endsWith('/material/page')) {
+    if (document.documentElement.dataset.listError) throw new ApiError(Number(document.documentElement.dataset.listError), '验收列表加载失败')
+    const list = materials.filter(item => item.materialTypeId === Number(config.params.materialTypeId))
+    data = { list, total: list.length }
+  }
+  else if (config.method === 'delete' && /\/material\/\d+\/draft$/.test(url)) {
+    const count = Number(document.documentElement.dataset.deletes || 0) + 1
+    document.documentElement.dataset.deletes = String(count)
+    if (document.documentElement.dataset.deleteError) throw new ApiError(1900020010, '草稿已被其他人修改，请刷新后重试')
+    if (document.documentElement.dataset.delayDelete) {
+      document.documentElement.dataset.pending = 'delete'
+      await new Promise<void>(resolve => { release = resolve })
+      delete document.documentElement.dataset.pending
+    }
+    const index = materials.findIndex(item => url.endsWith(`/${item.id}/draft`))
+    if (index < 0 || materials[index].version !== Number(config.params.expectedVersion)) throw new Error('Unexpected draft/version')
+    materials.splice(index, 1); data = true
+  }
   else if (config.method === 'get' && /\/material\/\d+$/.test(url)) data = materials.find(item => url.endsWith(`/${item.id}`))
   else if (config.method === 'get') data = []
   else if (config.method === 'put' || url.endsWith('/material')) {

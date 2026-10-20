@@ -42,6 +42,42 @@ class LeadCalendarServiceTest {
     @Test void usesAuthenticatedUserAndTenantForCounts() { rows(row(1, 9, "A"), row(2, 10, "S")); var days = service.days(query(), 7L); assertEquals(2, days.getFirst().count()); assertEquals(start, days.getFirst().date()); verifyNoInteractions(managementService, followUpService); }
     @Test void emptyMonthHasNoInventedCounts() { rows(); assertTrue(service.days(query(), 7L).isEmpty()); }
     @Test void deadlineSortHasStableTieBreakerAndReverse() { var rows = new ArrayList<>(List.of(row(3, 9, "S"), row(1, 9, "A"), row(2, 10, "B"))); rows.sort(LeadCalendarService.comparator("deadline", "asc", Map.of())); assertEquals(List.of(1L, 3L, 2L), rows.stream().map(LeadCalendarMapper.DueLead::getId).toList()); rows.sort(LeadCalendarService.comparator("deadline", "desc", Map.of())); assertEquals(2L, rows.getFirst().getId()); }
+    @Test void ownershipSortKeepsMissingDatesLastAndTiesStableInBothDirections() {
+        var older = row(1, 11, "A"); older.setOwnershipStartedAt(start.minusDays(2).atStartOfDay());
+        var newer = row(2, 10, "A"); newer.setOwnershipStartedAt(start.minusDays(1).atStartOfDay());
+        var sameTimeEarlierDeadline = row(3, 9, "S"); sameTimeEarlierDeadline.setOwnershipStartedAt(newer.getOwnershipStartedAt());
+        var sameTimeAndDeadline = row(4, 9, "S"); sameTimeAndDeadline.setOwnershipStartedAt(newer.getOwnershipStartedAt());
+        var missing = row(5, 8, "A");
+        var rows = new ArrayList<>(List.of(missing, newer, sameTimeAndDeadline, older, sameTimeEarlierDeadline));
+        rows.sort(LeadCalendarService.comparator("ownershipStartedAt", "asc", Map.of()));
+        assertEquals(List.of(1L, 3L, 4L, 2L, 5L), rows.stream().map(LeadCalendarMapper.DueLead::getId).toList());
+        rows.sort(LeadCalendarService.comparator("ownershipStartedAt", "desc", Map.of()));
+        assertEquals(List.of(3L, 4L, 2L, 1L, 5L), rows.stream().map(LeadCalendarMapper.DueLead::getId).toList());
+    }
+    @Test void ownershipSortAppliesBeforePagination() {
+        var older = row(1, 11, "A"); older.setOwnershipStartedAt(start.minusDays(2).atStartOfDay());
+        var newer = row(2, 9, "A"); newer.setOwnershipStartedAt(start.minusDays(1).atStartOfDay());
+        rows(newer, row(3, 8, "S"), older);
+        var q = query(); q.setSort("ownershipStartedAt"); q.setPageSize(1); q.setPageNo(2);
+        var lead = new LeadManagementRespVO(); lead.setId(2L);
+        when(managementService.getLead(2L, 7L)).thenReturn(lead);
+        var page = service.cards(q, 7L);
+        assertEquals(3, page.getTotal());
+        assertEquals(2L, page.getList().getFirst().lead().getId());
+        verify(managementService, never()).getLead(1L, 7L);
+        verify(managementService, never()).getLead(3L, 7L);
+    }
+    @Test void queryValidationAcceptsOwnershipSortAndRejectsUnknownSort() {
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator = factory.getValidator();
+            var q = query(); q.setSort("ownershipStartedAt");
+            assertTrue(validator.validate(q).isEmpty());
+            q.setDirection("desc");
+            assertTrue(validator.validate(q).isEmpty());
+            q.setSort("submittedAt");
+            assertTrue(validator.validate(q).stream().anyMatch(v -> v.getPropertyPath().toString().equals("sort")));
+        }
+    }
     @Test void categoriesUseConfiguredPriorityAndDeadlineWithinCategory() { var rows = new ArrayList<>(List.of(row(1, 8, null), row(2, 7, "A"), row(3, 10, "S"), row(4, 9, "S"))); rows.sort(LeadCalendarService.comparator("category", "asc", Map.of("S", -1, "A", 1))); assertEquals(List.of(4L, 3L, 2L, 1L), rows.stream().map(LeadCalendarMapper.DueLead::getId).toList()); }
     @Test void existingVerboseSCategoryIsPrioritizedWithoutMatchingOtherWords() { assertTrue(LeadCalendarService.isPriorityCategory("S类【重点客户-待成交】", null)); assertTrue(LeadCalendarService.isPriorityCategory("custom", "S级")); assertFalse(LeadCalendarService.isPriorityCategory("stage", "销售类")); }
     @Test void pageOnlyHydratesSelectedRowsAndHidesHistoryWithoutPermission() { rows(row(1, 9, "S"), row(2, 8, "A")); var q=query(); q.setPageSize(1); q.setPageNo(2); var lead=new LeadManagementRespVO(); lead.setId(1L); when(managementService.getLead(1L,7L)).thenReturn(lead); var page=service.cards(q,7L); assertEquals(2,page.getTotal()); assertEquals(1L,page.getList().getFirst().lead().getId()); assertFalse(page.getList().getFirst().canReadFollowUp()); verifyNoInteractions(followUpService,objectPermissionService); verify(managementService,never()).getLead(2L,7L); }

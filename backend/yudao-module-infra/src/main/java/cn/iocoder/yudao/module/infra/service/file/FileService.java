@@ -81,6 +81,7 @@ public interface FileService {
      */
     Long createFile(FileCreateReqVO createReqVO);
     FileDO getFile(Long id);
+    FileDO getRegisteredFileByUrl(String url);
     List<FileDO> getFiles(Collection<Long> ids);
 
     /**

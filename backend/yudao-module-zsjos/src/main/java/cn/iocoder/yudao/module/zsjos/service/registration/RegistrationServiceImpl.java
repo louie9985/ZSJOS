@@ -75,6 +75,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             "xls", "application/vnd.ms-excel",
             "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     @Resource private RegistrationCaseMapper caseMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper informationForms;
     @Resource private RegistrationCaseChecklistItemMapper caseItemMapper;
     @Resource private RegistrationChecklistTemplateMapper templateMapper;
     @Resource private RegistrationChecklistTemplateItemMapper templateItemMapper;
@@ -487,6 +488,8 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (STATUS_PENDING_APPROVAL.equals(order.getStatus())) throw exception(REGISTRATION_FINANCE_PENDING);
         if (STATUS_REVISION_REQUIRED.equals(order.getStatus())) throw exception(REGISTRATION_FINANCE_REVISION_REQUIRED);
         if (!STATUS_EFFECTIVE.equals(order.getStatus())) throw exception(REGISTRATION_ORDER_NOT_EFFECTIVE);
+        var information=informationForms.byCase(caseId);
+        if (information==null || information.getSentAt()==null) throw exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请生成收集表链接并确认已发送");
         List<RegistrationCaseChecklistItemDO> items = caseItemMapper.selectByCaseId(caseId);
         if (items.isEmpty() || items.stream().anyMatch(item -> ITEM_TYPE_CHECKBOX.equals(item.getItemType())
                 && !Boolean.TRUE.equals(item.getChecked()))) {
@@ -859,6 +862,12 @@ public class RegistrationServiceImpl implements RegistrationService {
         result.setStudyPlannerUserId(registrationCase.getStudyPlannerUserId()); result.setRegistrationApprovedAt(registrationCase.getRegistrationApprovedAt());
         result.setCompletedAt(registrationCase.getCompletedAt()); result.setCancelledAt(registrationCase.getCancelledAt());
         result.setCancelReason(registrationCase.getCancelReason()); result.setVersion(registrationCase.getVersion());
+        var information=informationForms.byCase(registrationCase.getId());
+        result.setInformationSent(information!=null && information.getSentAt()!=null);
+        result.setInformationSentAt(information==null ? null : information.getSentAt());
+        result.setInformationSentByUserId(information==null ? null : information.getSentByUserId());
+        result.setInformationSubmissionStatus(information==null ? "NONE" : "DRAFT".equals(information.getStatus()) &&
+                (information.getRevokedAt()!=null || information.getExpiresAt()==null || !information.getExpiresAt().isAfter(LocalDateTime.now())) ? "EXPIRED" : information.getStatus());
         if (order != null) {
             result.setOrderNo(order.getOrderNo()); result.setOrderStatus(order.getStatus()); result.setOrderStatusLabel(orderStatusLabel(order.getStatus())); result.setStudentName(order.getStudentName());
             result.setStudentMobile(order.getStudentMobile()); LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
@@ -989,6 +998,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             code = COMPLETION_BLOCK_FINANCE_REVISION_REQUIRED; reason = "财务审核未通过，订单补正并重新审核通过后才能完成报名履约";
         } else if (!STATUS_EFFECTIVE.equals(order.getStatus())) {
             code = COMPLETION_BLOCK_ORDER_NOT_EFFECTIVE; reason = "订单尚未生效，暂时无法完成报名履约";
+        } else if (!Boolean.TRUE.equals(result.getInformationSent())) {
+            code = "information_not_sent"; reason = "请生成学员信息收集表链接并勾选已发送";
         } else if (result.getItems() == null || result.getItems().isEmpty()
                 || result.getItems().stream().anyMatch(item -> ITEM_TYPE_CHECKBOX.equals(item.getItemType())
                 && !Boolean.TRUE.equals(item.getChecked()))) {

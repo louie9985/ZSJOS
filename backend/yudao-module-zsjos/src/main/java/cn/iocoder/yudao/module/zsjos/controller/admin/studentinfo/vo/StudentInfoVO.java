@@ -19,6 +19,10 @@ public final class StudentInfoVO {
         @Size(max=500) private String note;
         @Size(max=100) private String dictType;
         private Boolean sensitive;
+        @NotBlank private String group;
+        @Min(2) @Max(9) private Integer maxImages;
+        @Min(1) @Max(10) private Integer maxSizeMb;
+        private List<String> allowedExtensions;
     }
     @Data public static class Config {
         private Version draft;
@@ -32,21 +36,27 @@ public final class StudentInfoVO {
         private String status;
         private LocalDateTime publishedAt;
         private List<Field> fields;
+        private List<Long> educationCategoryIds;
     }
     @Data public static class Save {
         private Long id;
         @NotNull @Min(0) private Integer revision;
-        @NotNull @Size(min=16,max=16) private List<@Valid Field> fields;
+        @NotNull @Size(min=30,max=32) private List<@Valid Field> fields;
+        @NotNull private List<Long> educationCategoryIds = List.of();
+        private Long productId;
     }
     @Data public static class Publish {
         @NotNull private Long id;
         @NotNull private Integer revision;
     }
     @Data public static class Command {
-        @NotNull private Long formId;
+        private Long formId;
+        @NotNull private Integer version;
+        @NotBlank @Size(max=64) private String idempotencyKey;
+        private Boolean sent;
     }
     @Data public static class Submit {
-        @NotNull @Size(max=16) private Map<String, Object> values;
+        @NotNull @Size(max=32) private Map<String, Object> values;
     }
     @Data public static class Option {
         private String value;
@@ -57,6 +67,8 @@ public final class StudentInfoVO {
         private String status;
         private Long tenantId;
         private Integer configVersion;
+        private String productName;
+        private List<Image> images = List.of();
         private List<Field> fields = List.of();
         private Map<String,List<Option>> options = Map.of();
     }
@@ -71,6 +83,7 @@ public final class StudentInfoVO {
         private Map<String,String> values = Map.of();
         private Boolean canReadSensitive;
         private Boolean canExport;
+        private List<Image> images = List.of();
     }
     @Data public static class Link {
         private Long formId;
@@ -80,5 +93,13 @@ public final class StudentInfoVO {
         private LocalDateTime expiresAt;
         private Boolean canRegenerate;
         private Boolean canRevoke;
+        private Long sentByUserId;
+        private LocalDateTime sentAt;
+        private Integer registrationVersion;
+    }
+    @Data public static class Image {
+        private Long id;
+        private String fieldKey, side, contentType, name;
+        private Long size;
     }
 }

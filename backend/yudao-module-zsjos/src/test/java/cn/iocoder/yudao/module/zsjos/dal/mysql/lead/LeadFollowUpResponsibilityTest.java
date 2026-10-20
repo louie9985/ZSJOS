@@ -12,8 +12,8 @@ class LeadFollowUpResponsibilityTest {
     @BeforeEach void setup() throws Exception {
         db = DriverManager.getConnection("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL");
         exec("CREATE TABLE zsjos_lead(id BIGINT PRIMARY KEY,tenant_id BIGINT,deleted INT,owner_user_id BIGINT,lead_category VARCHAR,lead_no VARCHAR,submitted_name VARCHAR,submitted_mobile VARCHAR,submitted_wechat_id VARCHAR)");
-        exec("CREATE TABLE zsjos_lead_aging_pool_cycle(id BIGINT PRIMARY KEY,lead_id BIGINT,tenant_id BIGINT,deleted INT,status VARCHAR,collaborator_user_id BIGINT)");
-        exec("CREATE TABLE zsjos_lead_public_sea_record(id BIGINT PRIMARY KEY,lead_id BIGINT,tenant_id BIGINT,deleted INT,owner_user_id BIGINT,collaborator_user_id BIGINT)");
+        exec("CREATE TABLE zsjos_lead_public_sea_pool_cycle(id BIGINT PRIMARY KEY,lead_id BIGINT,tenant_id BIGINT,deleted INT,status VARCHAR,collaborator_user_id BIGINT)");
+        exec("CREATE TABLE zsjos_lead_public_sea_pool_compatibility_record(id BIGINT PRIMARY KEY,lead_id BIGINT,tenant_id BIGINT,deleted INT,owner_user_id BIGINT,collaborator_user_id BIGINT)");
         exec("CREATE TABLE zsjos_business_task(id BIGINT PRIMARY KEY,biz_id BIGINT,tenant_id BIGINT,deleted INT,biz_type VARCHAR,task_type VARCHAR,status VARCHAR,assignee_type VARCHAR,assignee_id BIGINT,due_at TIMESTAMP)");
         exec("INSERT INTO zsjos_lead VALUES(1,1,0,10,'A','LD-fixture','fixture','','')");
         exec("INSERT INTO zsjos_business_task VALUES(1,1,1,0,'lead','lead_follow_up_reminder','pending','user',10,'2026-10-13 12:00:00')");
@@ -23,12 +23,13 @@ class LeadFollowUpResponsibilityTest {
         exec("ALTER TABLE zsjos_lead ADD provider_owner_id BIGINT DEFAULT 10");
         exec("ALTER TABLE zsjos_lead ADD recycle_source_owner_user_id BIGINT");
         exec("ALTER TABLE zsjos_lead ADD last_activity_at TIMESTAMP");
+        exec("ALTER TABLE zsjos_lead ADD ownership_started_at TIMESTAMP");
         exec("CREATE TABLE zsjos_opportunity(id BIGINT,lead_id BIGINT,tenant_id BIGINT,deleted INT,type VARCHAR,status VARCHAR)");
     }
     @AfterEach void close() throws Exception { db.close(); }
     private void exec(String sql) throws Exception { try (var s=db.createStatement()) { s.execute(sql); } }
     private Long scalar(String sql) throws Exception { try(var s=db.createStatement(); var r=s.executeQuery(sql)) { assertTrue(r.next()); return (Long) r.getObject(1, Long.class); } }
-    private void pool(String status, String user) throws Exception { exec("INSERT INTO zsjos_lead_aging_pool_cycle VALUES(1,1,1,0,'"+status+"',"+user+")"); }
+    private void pool(String status, String user) throws Exception { exec("INSERT INTO zsjos_lead_public_sea_pool_cycle VALUES(1,1,1,0,'"+status+"',"+user+")"); }
     private Long responsible() throws Exception { return scalar("SELECT " + LeadFollowUpResponsibilitySql.responsible("l") + " FROM zsjos_lead l WHERE id=1"); }
     private Long assignee() throws Exception { return scalar("SELECT " + LeadFollowUpResponsibilitySql.taskAssignee("t") + " FROM zsjos_business_task t WHERE id=1"); }
     private int calendar(long user) throws Exception {
@@ -36,6 +37,21 @@ class LeadFollowUpResponsibilityTest {
                 .replace("#{start}","'2026-10-13 00:00:00'").replace("#{end}","'2026-10-14 00:00:00'");
         CCJSqlParserUtil.parse(sql);
         try(var s=db.createStatement();var r=s.executeQuery(sql)) { int count=0;while(r.next())count++;return count; }
+    }
+    @Test void calendarProjectsCurrentOwnershipTimeWithoutInventingMissingHistory() throws Exception {
+        String sql = LeadCalendarSearchSql.due().replace("#{tenantId}", "1").replace("#{userId}", "10")
+                .replace("#{start}", "'2026-10-13 00:00:00'").replace("#{end}", "'2026-10-14 00:00:00'");
+        try (var s = db.createStatement(); var r = s.executeQuery(sql)) {
+            assertTrue(r.next());
+            assertNull(r.getTimestamp("ownershipStartedAt"));
+        }
+        exec("UPDATE zsjos_lead SET ownership_started_at='2026-10-12 08:00:00' WHERE id=1");
+        try (var s = db.createStatement(); var r = s.executeQuery(sql)) {
+            assertTrue(r.next());
+            assertEquals(Timestamp.valueOf("2026-10-12 08:00:00"), r.getTimestamp("ownershipStartedAt"));
+            assertEquals(Timestamp.valueOf("2026-10-13 12:00:00"), r.getTimestamp("deadline"));
+            assertFalse(r.next());
+        }
     }
     @Test void waitingPoolPausesOwnerTasksAndCalendar() throws Exception {
         pool("waiting_assignment","NULL"); assertNull(responsible()); assertNull(assignee());
@@ -48,9 +64,9 @@ class LeadFollowUpResponsibilityTest {
         assertEquals(10L,scalar("SELECT assignee_id FROM zsjos_business_task WHERE id=1"));
     }
     @Test void reassignmentImmediatelyMovesResponsibilityAndExitRestoresOwner() throws Exception {
-        pool("assigned","20"); exec("UPDATE zsjos_lead_aging_pool_cycle SET collaborator_user_id=30");
+        pool("assigned","20"); exec("UPDATE zsjos_lead_public_sea_pool_cycle SET collaborator_user_id=30");
         assertEquals(0,calendar(20)); assertEquals(1,calendar(30));
-        exec("UPDATE zsjos_lead_aging_pool_cycle SET status='exited'");
+        exec("UPDATE zsjos_lead_public_sea_pool_cycle SET status='exited'");
         assertEquals(10L,responsible()); assertEquals(1,calendar(10)); assertEquals(0,calendar(30));
     }
     @Test void completedAndCancelledTasksKeepTheirHistoricalAssignee() throws Exception {
@@ -61,14 +77,14 @@ class LeadFollowUpResponsibilityTest {
         }
     }
     @Test void legacyPoolAndOverlappingPoolAreHandledWithoutOwnerFallback() throws Exception {
-        exec("INSERT INTO zsjos_lead_public_sea_record VALUES(1,1,1,0,10,20)");
+        exec("INSERT INTO zsjos_lead_public_sea_pool_compatibility_record VALUES(1,1,1,0,10,20)");
         assertEquals(20L,responsible()); assertEquals(1,calendar(20));
         pool("assigned","30"); assertNull(responsible()); assertNull(assignee());
     }
     @Test void otherTenantAndDeletedCyclesCannotChangeResponsibility() throws Exception {
-        pool("assigned","20"); exec("UPDATE zsjos_lead_aging_pool_cycle SET tenant_id=2");
+        pool("assigned","20"); exec("UPDATE zsjos_lead_public_sea_pool_cycle SET tenant_id=2");
         assertEquals(10L,responsible()); assertEquals(1,calendar(10));
-        exec("UPDATE zsjos_lead_aging_pool_cycle SET tenant_id=1,deleted=1"); assertEquals(10L,responsible());
+        exec("UPDATE zsjos_lead_public_sea_pool_cycle SET tenant_id=1,deleted=1"); assertEquals(10L,responsible());
         exec("UPDATE zsjos_lead SET deleted=1"); assertNull(assignee()); assertEquals(0,calendar(10));
     }
     @Test void unrelatedAndHistoricalPendingDealSemanticsArePreserved() throws Exception {
@@ -91,7 +107,7 @@ class LeadFollowUpResponsibilityTest {
         assertEquals(1L,leadCount(10,null,null));
         assertEquals(0L,leadCount(20,null,null));
         assertEquals(1L,leadCount(10,"following","submitted"));
-        exec("UPDATE zsjos_lead_aging_pool_cycle SET status='waiting_assignment',collaborator_user_id=NULL");
+        exec("UPDATE zsjos_lead_public_sea_pool_cycle SET status='waiting_assignment',collaborator_user_id=NULL");
         assertEquals(0L,leadCount(10,"following",null));
         assertEquals(0L,leadCount(20,"following",null));
     }
@@ -136,7 +152,7 @@ class LeadFollowUpResponsibilityTest {
     @Test void personalTaskCountsExcludeAAndWaitingCyclesButKeepDoneHistory() throws Exception {
         pool("assigned","20");
         assertEquals(0L, taskCount(10,"pending")); assertEquals(1L,taskCount(20,"pending"));
-        exec("UPDATE zsjos_lead_aging_pool_cycle SET status='waiting_assignment',collaborator_user_id=NULL");
+        exec("UPDATE zsjos_lead_public_sea_pool_cycle SET status='waiting_assignment',collaborator_user_id=NULL");
         assertEquals(0L,taskCount(10,"pending")); assertEquals(0L,taskCount(20,"pending"));
         exec("UPDATE zsjos_business_task SET status='completed'");
         assertEquals(1L,taskCount(10,"done")); assertEquals(0L,taskCount(20,"done"));

@@ -1,15 +1,16 @@
 package cn.iocoder.yudao.module.zsjos.service.studentinfo;
-
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.tenant.core.service.TenantFrameworkService;
-import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Submit;
+import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.*;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.*;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.*;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.*;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -19,113 +20,38 @@ import java.time.LocalDateTime;
 import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 class StudentInfoFormServiceTest {
-    @InjectMocks StudentInfoFormService service;
-    @Mock StudentInfoFormMapper forms;
-    @Mock StudentInfoFormValueMapper values;
-    @Mock StudentInfoFormConfigMapper configs;
-    @Mock StudentInfoConfigService configService;
-    @Spy StudentInfoFields fields=new StudentInfoFields();
-    @Mock LeadMapper leads;
-    @Mock StudentInfoPermissionProvider permission;
-    @Mock SecurityFrameworkService security;
-    @Mock cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
-    @Mock TenantFrameworkService tenants;
-    private final String token="a".repeat(43);
-    @BeforeEach void setup() {
-        TenantContextHolder.setTenantId(7L); TenantContextHolder.setIgnore(false);
-        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
-                new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "student-info-test"),
-                StudentInfoFormDO.class);
-    }
-    @AfterEach void cleanup() { TenantContextHolder.clear(); }
-    private StudentInfoFormDO form(String status) {
-        var row=new StudentInfoFormDO(); row.setId(12L); row.setLeadId(5L); row.setTenantId(8L);
-        row.setStatus(status); row.setTokenHash(StudentInfoFormService.hash(token)); row.setTokenCiphertext(token);
-        row.setConfigVersionId(3L); row.setExpiresAt(LocalDateTime.now().plusDays(1)); return row;
-    }
-    @Test void terminalPublicResponseOmitsFieldsAndRestoresTenant() {
-        when(forms.byToken(anyString())).thenReturn(form("SUBMITTED"));
-        var result=service.publicDetail(token);
-        assertEquals("SUBMITTED",result.getStatus()); assertTrue(result.getFields().isEmpty()); assertNull(result.getTenantId());
-        assertEquals(7L,TenantContextHolder.getTenantId()); assertFalse(TenantContextHolder.isIgnore());
-        verify(tenants).validTenant(8L); verifyNoInteractions(configs,values);
-    }
-    @Test void failedLookupRestoresIgnoreFlag() {
-        assertThrows(ServiceException.class, () -> service.publicDetail(token));
-        assertEquals(7L,TenantContextHolder.getTenantId()); assertFalse(TenantContextHolder.isIgnore());
-        assertThrows(ServiceException.class, () -> service.publicDetail("short"));
-    }
-    @Test void duplicateSubmitRejectsBeforeValueWrites() {
-        var row=form("SUBMITTED"); when(forms.byToken(anyString())).thenReturn(row);
-        when(leads.selectByIdForUpdate(5L,8L)).thenReturn(new LeadDO().setId(5L).setStatus("won"));
-        when(forms.lock(12L)).thenReturn(row);
-        assertThrows(ServiceException.class, () -> service.submit(token,new Submit()));
-        verifyNoInteractions(values,configs);
-        assertEquals(7L,TenantContextHolder.getTenantId());
-    }
-    @Test void validSubmissionWritesInTokenTenantAndLocksLeadBeforeForm() {
-        var row=form("DRAFT"); when(forms.byToken(anyString())).thenReturn(row);
-        when(leads.selectByIdForUpdate(5L,8L)).thenReturn(new LeadDO().setId(5L).setStatus("won"));
-        when(forms.lock(12L)).thenReturn(row);
-        var config=new StudentInfoFormConfigDO(); config.setStatus("PUBLISHED");
-        var name=fields.presets().stream().filter(f -> "name".equals(f.getKey())).findFirst().orElseThrow();
-        config.setFieldsJson(JsonUtils.toJsonString(List.of(name))); when(configs.selectById(3L)).thenReturn(config);
-        when(values.insert(any(StudentInfoFormValueDO.class))).thenAnswer(invocation -> {
-            var answer=invocation.getArgument(0,StudentInfoFormValueDO.class);
-            assertEquals(8L,TenantContextHolder.getTenantId()); assertFalse(TenantContextHolder.isIgnore());
-            assertEquals(8L,answer.getTenantId()); assertEquals(12L,answer.getFormId()); return 1;
-        });
-        when(forms.update(isNull(),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
-        var req=new Submit(); req.setValues(Map.of("name","测试填写")); service.submit(token,req);
-        var order=inOrder(leads,forms,values);
-        order.verify(leads).selectByIdForUpdate(5L,8L); order.verify(forms).lock(12L);
-        order.verify(values).insert(any(StudentInfoFormValueDO.class));
-        assertEquals(7L,TenantContextHolder.getTenantId()); assertFalse(TenantContextHolder.isIgnore());
-    }
-    @Test void repeatedGenerationKeepsExistingLinkAndVersion() {
-        when(leads.selectByIdForUpdate(5L,7L)).thenReturn(new LeadDO().setId(5L).setStatus("won"));
-        when(forms.byLead(5L)).thenReturn(form("DRAFT"));
-        ReflectionTestUtils.setField(service,"publicBaseUrl","https://example.test");
-        assertEquals(12L,service.generate(5L).getFormId());
-        verifyNoInteractions(configService); verify(forms,never()).insert(any(StudentInfoFormDO.class));
-    }
-    @Test void missingPublicUrlReturnsBusinessError() {
-        when(forms.byLead(5L)).thenReturn(form("DRAFT"));
-        ReflectionTestUtils.setField(service,"publicBaseUrl","");
-        assertEquals(1_900_090_010,assertThrows(ServiceException.class, () -> service.getLink(5L)).getCode());
-    }
-
-    @Test void positioningPublicUrlCanBeUsedForCollectionLink() {
-        when(forms.byLead(5L)).thenReturn(form("DRAFT"));
-        ReflectionTestUtils.setField(service,"publicBaseUrl","https://h5.example.test");
-        assertEquals("https://h5.example.test/student-info-form#token=" + token, service.getLink(5L).getUrl());
-    }
-    @Test void nonWonLeadCannotGenerateAndStaleRotationCannotInvalidateLink() {
-        when(leads.selectByIdForUpdate(5L,7L)).thenReturn(new LeadDO().setId(5L).setStatus("valid"));
-        assertThrows(ServiceException.class, () -> service.generate(5L));
-        verifyNoInteractions(forms);
-        when(leads.selectByIdForUpdate(5L,7L)).thenReturn(new LeadDO().setId(5L).setStatus("won"));
-        when(forms.byLead(5L)).thenReturn(form("DRAFT"));
-        assertEquals(1_900_090_003,assertThrows(ServiceException.class, () -> service.regenerate(5L,99L)).getCode());
-        verify(forms,never()).updateById(any(StudentInfoFormDO.class));
-    }
-    @Test void detailUsesStoredLabelsAndHandlesOptionalNulls() {
-        when(forms.submitted(5L)).thenReturn(form("SUBMITTED"));
-        var config=new StudentInfoFormConfigDO(); config.setStatus("ARCHIVED"); config.setVersionNo(1);
-        config.setFieldsJson(JsonUtils.toJsonString(fields.presets())); when(configs.selectById(3L)).thenReturn(config);
-        var value=new StudentInfoFormValueDO(); value.setFieldKey("gender"); value.setValueLabelSnapshot("历史标签");
-        var blank=new StudentInfoFormValueDO(); blank.setFieldKey("school");
-        when(values.byForm(12L)).thenReturn(List.of(value,blank));
-        var result=service.detail(5L);
-        assertEquals("历史标签",result.getValues().get("gender")); assertEquals("",result.getValues().get("school"));
-    }
-    @Test void expiredLinkStateAndHashValidation() {
-        var row=form("DRAFT"); row.setExpiresAt(LocalDateTime.now().minusSeconds(1));
-        assertEquals("EXPIRED",StudentInfoFormService.state(row));
-        assertEquals(64,StudentInfoFormService.hash(token).length());
-        assertThrows(ServiceException.class, () -> StudentInfoFormService.hash(null));
-    }
+ @InjectMocks StudentInfoFormService service;
+ @Mock StudentInfoFormMapper forms; @Mock StudentInfoFormValueMapper values; @Mock StudentInfoFormConfigMapper configs;
+ @Mock StudentInfoConfigService configService; @Spy StudentInfoFields fields=new StudentInfoFields();
+ @Mock RegistrationCaseMapper cases; @Mock SalesOrderMapper orders; @Mock RegistrationCommandMapper commands;
+ @Mock StudentInfoImageService images; @Mock SecurityFrameworkService security; @Mock TenantFrameworkService tenants;
+ final String token="a".repeat(43);
+ @Test void pendingLegacyFormsUseCurrentAttachmentPolicyWithoutRewritingHistory(){
+  var legacy=new StudentInfoFields().presets().stream().filter(field->"application_images".equals(field.getKey())).findFirst().orElseThrow();
+  legacy.setAllowedExtensions(null);var draft=form("DRAFT");draft.setFieldsSnapshot(JsonUtils.toJsonString(List.of(legacy)));String snapshot=draft.getFieldsSnapshot();
+  assertTrue(service.definitions(draft).getFirst().getAllowedExtensions().containsAll(List.of("pdf","doc","docx")));
+  assertEquals(snapshot,draft.getFieldsSnapshot());draft.setStatus("SUBMITTED");assertNull(service.definitions(draft).getFirst().getAllowedExtensions());
+  legacy.setAllowedExtensions(List.of("jpg","jpeg","png"));draft.setStatus("DRAFT");draft.setFieldsSnapshot(JsonUtils.toJsonString(List.of(legacy)));
+  assertTrue(service.definitions(draft).getFirst().getAllowedExtensions().contains("docx"));
+ }
+ @BeforeEach void setup(){TenantContextHolder.setTenantId(1L);TenantContextHolder.setIgnore(false);com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(),"test"),StudentInfoFormDO.class);}
+ @AfterEach void cleanup(){TenantContextHolder.clear();}
+ StudentInfoFormDO form(String status){var f=new StudentInfoFormDO();f.setId(12L);f.setRegistrationCaseId(5L);f.setTenantId(1L);f.setStatus(status);f.setTokenHash(StudentInfoFormService.hash(token));f.setTokenCiphertext(token);f.setConfigVersionId(3L);f.setExpiresAt(LocalDateTime.now().plusDays(1));f.setFieldsSnapshot(JsonUtils.toJsonString(List.of(new StudentInfoFields().presets().getFirst())));return f;}
+ RegistrationCaseDO task(String status){var c=new RegistrationCaseDO();c.setId(5L);c.setOrderId(10L);c.setStatus(status);c.setVersion(2);return c;}
+ void context(String status){var c=task(status);when(cases.selectById(5L)).thenReturn(c);when(cases.selectByIdForUpdate(5L,1L)).thenReturn(c);var o=new SalesOrderDO();o.setId(10L);o.setStatus("effective");lenient().when(orders.selectById(10L)).thenReturn(o);}
+ Command command(){var c=new Command();c.setVersion(2);c.setFormId(12L);c.setIdempotencyKey("test-key");return c;}
+ @Test void terminalResponseOmitsAnswers(){when(forms.byToken(anyString())).thenReturn(form("SUBMITTED"));var r=service.publicDetail(token);assertEquals("SUBMITTED",r.getStatus());assertTrue(r.getFields().isEmpty());assertTrue(r.getImages().isEmpty());assertNull(r.getTenantId());assertEquals(1L,TenantContextHolder.getTenantId());assertFalse(TenantContextHolder.isIgnore());}
+ @Test void lookupFailureRestoresContext(){assertThrows(ServiceException.class,()->service.publicDetail(token));assertFalse(TenantContextHolder.isIgnore());assertEquals(1L,TenantContextHolder.getTenantId());assertThrows(ServiceException.class,()->service.publicDetail("short"));}
+ @Test void duplicateSubmitIsSuccessfulWithoutWrites(){context("completed");var f=form("SUBMITTED");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);service.submit(token,new Submit());verifyNoInteractions(values,images);}
+ @Test void completedFulfillmentStillAcceptsSubmission(){context("completed");var f=form("DRAFT");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);var req=new Submit();req.setValues(Map.of("name","合成测试"));service.submit(token,req);verify(values).insert(any(StudentInfoFormValueDO.class));var order=inOrder(orders,cases,forms,values);order.verify(orders).selectByIdForUpdate(10L,1L);order.verify(cases).selectByIdForUpdate(5L,1L);order.verify(forms).lock(12L);assertEquals(1L,TenantContextHolder.getTenantId());}
+ @Test void endedTaskRejectsSubmission(){context("ended");var f=form("DRAFT");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);assertThrows(ServiceException.class,()->service.submit(token,new Submit()));verifyNoInteractions(values);}
+ @Test void generationRetryKeepsToken(){context("processing");when(forms.byCase(5L)).thenReturn(form("DRAFT"));ReflectionTestUtils.setField(service,"publicBaseUrl","https://h5.example.test");assertEquals(12L,service.generate(5L,command()).getFormId());verifyNoInteractions(configService);verify(forms,never()).insert(any(StudentInfoFormDO.class));}
+ @Test void staleVersionCannotRotate(){context("processing");var req=command();req.setVersion(1);assertThrows(ServiceException.class,()->service.regenerate(5L,req));verify(forms,never()).updateById(any(StudentInfoFormDO.class));}
+ @Test void sentConfirmationDoesNotRequireSubmission(){context("processing");var f=form("DRAFT");when(forms.byCase(5L)).thenReturn(f);when(forms.lock(12L)).thenReturn(f);ReflectionTestUtils.setField(service,"publicBaseUrl","https://h5.example.test");var req=command();req.setSent(true);service.confirmSent(5L,req);verify(forms).update(isNull(),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));verify(cases).updateById(any(RegistrationCaseDO.class));verifyNoInteractions(values);}
+ @Test void differentTaskCannotReuseCommand(){context("processing");var old=new RegistrationCommandDO();old.setRegistrationCaseId(99L);when(commands.selectByIdempotencyKey("test-key")).thenReturn(old);assertThrows(ServiceException.class,()->service.generate(5L,command()));}
+ @Test void oldTokenCannotCommitAfterRotation(){context("processing");when(forms.byToken(anyString())).thenReturn(form("DRAFT"));var rotated=form("DRAFT");rotated.setTokenHash("different");when(forms.lock(12L)).thenReturn(rotated);assertThrows(ServiceException.class,()->service.submit(token,new Submit()));verifyNoInteractions(values);}
+ @Test void expiryAndTokenFormat(){var f=form("DRAFT");f.setExpiresAt(LocalDateTime.now().minusSeconds(1));assertEquals("EXPIRED",StudentInfoFormService.state(f));assertThrows(ServiceException.class,()->StudentInfoFormService.hash(null));}
+ @Test void terminatedOrderCannotGenerate(){context("processing");var order=new SalesOrderDO();order.setStatus("terminated");when(orders.selectById(10L)).thenReturn(order);assertThrows(ServiceException.class,()->service.generate(5L,command()));verify(forms,never()).insert(any(StudentInfoFormDO.class));}
 }

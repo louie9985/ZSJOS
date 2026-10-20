@@ -9,7 +9,7 @@ public class LeadFollowUpRuleRespVO {
     private String name;
     private Integer firstFollowUpTimeoutMinutes;
     private Integer qualificationTimeoutMinutes;
-    private Integer agingPoolTimeoutDays;
+    private Integer publicSeaPoolTimeoutDays;
     private Integer notificationPopupDurationMinutes;
     private Boolean duplicateAutoResolutionEnabled;
     private Integer status;

@@ -12,16 +12,16 @@
 .home-calendar-heading { display: flex; align-items: center; gap: 8px; }
 .home-calendar-heading h4 { white-space: nowrap; }
 .home-calendar-actions { margin-inline-start: auto; }
-.home-rest-manage.ant-btn-link { color: #1677ff; }
-.home-rest-manage.ant-btn-link:not(:disabled):hover { color: #4096ff; }
+.home-rest-manage.ant-btn-link { color: var(--crm-color-primary); }
+.home-rest-manage.ant-btn-link:not(:disabled):hover { color: var(--crm-color-primary-hover); }
 .home-rest-toolbar { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; }
 .home-rest-date { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 50%; line-height: 24px; }
-.home-rest-date.is-rest { background: #cf1322; color: #fff; }
-.home-rest-date.is-today { outline: 1px solid var(--ant-color-primary, #1677ff); outline-offset: 2px; }
-.home-rest-date.is-selected { box-shadow: 0 0 0 3px var(--ant-color-primary, #1677ff); }
+.home-rest-date.is-rest { background: var(--crm-color-error); color: var(--crm-text-on-fill); }
+.home-rest-date.is-today { outline: 1px solid var(--crm-color-primary); outline-offset: 2px; }
+.home-rest-date.is-selected { box-shadow: 0 0 0 3px var(--crm-color-primary); }
 .home-rest-manager .home-rest-date { width: 30px; height: 30px; }
-.home-rest-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
-.home-rest-legend i { width: 10px; height: 10px; border-radius: 50%; background: #cf1322; }
+.home-rest-legend { display: flex; align-items: center; gap: 6px; font-size: var(--crm-font-sm); white-space: nowrap; }
+.home-rest-legend i { width: 10px; height: 10px; border-radius: 50%; background: var(--crm-color-error); }
 .home-rest-manager .ant-picker-cell { padding: 6px 0; }
 .home-rest-changes { max-height: 160px; overflow-y: auto; }
 .home-rest-changes > div { display: flex; justify-content: space-between; align-items: center; }

@@ -108,11 +108,11 @@ public interface LeadConstants {
     String INBOX_AUDIENCE_SUBMITTER = "submitter";
     String INBOX_AUDIENCE_OWNER = "owner";
     String INBOX_AUDIENCE_REVIEWER = "reviewer";
-    String INBOX_AUDIENCE_AGING_POOL = "agingPool";
+    String INBOX_AUDIENCE_PUBLIC_SEA_POOL = "publicSeaPool";
     /** 统一客资管理页视角：不按提交人/负责人拆分，只要求 zsjos:lead:query。 */
     String INBOX_AUDIENCE_MANAGEMENT = "management";
-    String AGING_POOL_RELATION_OWNED = "owned";
-    String AGING_POOL_RELATION_FOLLOWING = "following";
+    String PUBLIC_SEA_POOL_RELATION_OWNED = "owned";
+    String PUBLIC_SEA_POOL_RELATION_FOLLOWING = "following";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
     String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
     String PERMISSION_SUBMIT_SPECIFY = "zsjos:lead:submit:specify";
@@ -154,21 +154,21 @@ public interface LeadConstants {
     String STRATEGY_GLOBAL_ROUND_ROBIN = "global_round_robin";
     String SALES_POST_CODE = "sales_specialist";
 
-    String AGING_POOL_WAITING_ASSIGNMENT = "waiting_assignment";
-    String AGING_POOL_ASSIGNED = "assigned";
-    String AGING_POOL_DEAL_PENDING = "deal_pending";
-    String AGING_POOL_EXITED = "exited";
-    String AGING_POOL_CONVERTED = "converted";
-    String AGING_POOL_EVENT_ENTERED = "entered";
-    String AGING_POOL_EVENT_ASSIGNED = "assigned";
-    String AGING_POOL_EVENT_REASSIGNED = "reassigned";
-    String AGING_POOL_EVENT_COLLABORATOR_CLEARED = "collaborator_cleared";
-    String AGING_POOL_EVENT_EXITED = "exited";
-    String AGING_POOL_EVENT_DEAL_PENDING = "deal_pending";
-    String AGING_POOL_EVENT_CONVERTED = "converted";
-    String PERMISSION_AGING_POOL_QUERY = "zsjos:lead-aging-pool:query";
-    String PERMISSION_AGING_POOL_MANAGE = "zsjos:lead-aging-pool:manage";
-    String PERMISSION_AGING_POOL_MANAGE_ALL = "zsjos:lead-aging-pool:manage-all";
+    String PUBLIC_SEA_POOL_WAITING_ASSIGNMENT = "waiting_assignment";
+    String PUBLIC_SEA_POOL_ASSIGNED = "assigned";
+    String PUBLIC_SEA_POOL_DEAL_PENDING = "deal_pending";
+    String PUBLIC_SEA_POOL_EXITED = "exited";
+    String PUBLIC_SEA_POOL_CONVERTED = "converted";
+    String PUBLIC_SEA_POOL_EVENT_ENTERED = "entered";
+    String PUBLIC_SEA_POOL_EVENT_ASSIGNED = "assigned";
+    String PUBLIC_SEA_POOL_EVENT_REASSIGNED = "reassigned";
+    String PUBLIC_SEA_POOL_EVENT_COLLABORATOR_CLEARED = "collaborator_cleared";
+    String PUBLIC_SEA_POOL_EVENT_EXITED = "exited";
+    String PUBLIC_SEA_POOL_EVENT_DEAL_PENDING = "deal_pending";
+    String PUBLIC_SEA_POOL_EVENT_CONVERTED = "converted";
+    String PERMISSION_PUBLIC_SEA_POOL_QUERY = "zsjos:lead-public-sea-pool:query";
+    String PERMISSION_PUBLIC_SEA_POOL_MANAGE = "zsjos:lead-public-sea-pool:manage";
+    String PERMISSION_PUBLIC_SEA_POOL_MANAGE_ALL = "zsjos:lead-public-sea-pool:manage-all";
 
     String ACTION_DISPATCH = "dispatch";
     String ACTION_ACCEPT = "accept";

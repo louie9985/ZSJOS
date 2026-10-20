@@ -12,7 +12,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadTransferRequestMapper;
 import cn.iocoder.yudao.module.bpm.api.approvalcontent.BpmApprovalBusinessKey;
 import cn.iocoder.yudao.module.bpm.api.approvalcontent.BpmApprovalContentProvider;
 import cn.iocoder.yudao.module.bpm.api.approvalcontent.BpmApprovalFormat;
-import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -40,7 +40,7 @@ public class LeadTransferContentProvider implements BpmApprovalContentProvider {
     @Resource
     private LeadMapper leadMapper;
     @Resource
-    private LeadAgingPoolService agingPoolService;
+    private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource
     private AdminUserApi adminUserApi;
     @Resource
@@ -132,7 +132,7 @@ public class LeadTransferContentProvider implements BpmApprovalContentProvider {
         }
         try {
             if (permissionApi.hasTenantReadAllAccess(viewerId) && leadMapper.selectById(row.getLeadId()) != null) return true;
-            return agingPoolService.canRead(row.getLeadId(), viewerId);
+            return publicSeaPoolService.canRead(row.getLeadId(), viewerId);
         } catch (Exception ex) {
             return false;
         }

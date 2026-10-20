@@ -69,7 +69,7 @@ class AdvancedFilterTemplateControllerPermissionTest {
                 "订单管理页需要 query-management，缺失会让该页取预置直接 403");
         assertTrue(guard.contains("'zsjos:media-student:query-my'"));
         assertTrue(guard.contains("'zsjos:lead:query-all'"));
-        assertTrue(guard.contains("'zsjos:lead-aging-pool:query'"));
+        assertTrue(guard.contains("'zsjos:lead-public-sea-pool:query'"));
     }
 
     // 守卫按 scene 分支，而不是一串静态权限的并集：预置接口的 scene 参数决定需要哪一页的权限。

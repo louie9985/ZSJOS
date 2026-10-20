@@ -14,32 +14,42 @@
     </div>
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <Dialog v-model="visible" title="附件" width="min(900px, 94vw)">
-      <AttachmentItem v-if="selected && url" :url="url" :name="selected.fileName" />
+      <el-alert v-if="error" :title="error" type="error" :closable="false" />
+      <template v-if="selected && visible">
+        <KnowledgeExcelPreview v-if="isKnowledgeExcel(selected.fileName, selected.mimeType)"
+          :document-id="documentId" :file-id="selected.fileId" :record-id="recordId" :share-token="shareToken" />
+        <AttachmentItem v-if="url" :url="url" :name="selected.fileName" />
+      </template>
     </Dialog>
   </section>
 </template>
 <script setup lang="ts">
 import AttachmentItem from '@/components/UploadFile/src/AttachmentItem.vue'
+import KnowledgeExcelPreview from './KnowledgeExcelPreview.vue'
+import { isKnowledgeExcel } from '@/api/pms/kb/content/excel'
 import { knowledgeAttachmentUrl, type KnowledgeAttachment } from '@/api/pms/kb/content/document'
 import { formatKnowledgeFileSize } from '@/views/pms/kb/utils/format'
-const props = defineProps<{ files: KnowledgeAttachment[]; documentId: number; recordId?: number }>()
+const props = defineProps<{ files: KnowledgeAttachment[]; documentId: number; recordId?: number; shareToken?: string }>()
 const selected = ref<KnowledgeAttachment>()
 const url = ref('')
 const visible = ref(false)
 const busy = ref<number>()
 const error = ref('')
+let requestGeneration = 0
 async function open(file: KnowledgeAttachment) {
+  const generation = ++requestGeneration
   busy.value = file.fileId
   error.value = ''
+  selected.value = file
+  url.value = ''
+  visible.value = true
   try {
-    url.value =
-      file.url || (await knowledgeAttachmentUrl(props.documentId, file.fileId, props.recordId))
-    selected.value = file
-    visible.value = true
+    const result = file.url || (await knowledgeAttachmentUrl(props.documentId, file.fileId, props.recordId))
+    if (generation === requestGeneration) url.value = result
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : '附件暂时无法访问，请重试或联系文档编辑者'
+    if (generation === requestGeneration) error.value = cause instanceof Error ? cause.message : '附件暂时无法访问，请重试或联系文档编辑者'
   } finally {
-    busy.value = undefined
+    if (generation === requestGeneration) busy.value = undefined
   }
 }
 </script>

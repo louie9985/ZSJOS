@@ -1,0 +1,158 @@
+package cn.iocoder.yudao.module.zsjos.service.deliveryperformance;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryperformance.DeliveryPerformanceOrgMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryperformance.DeliveryPerformanceOrgDO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.deliveryperformance.vo.DeliveryPerformanceVO.Query;
+import cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.*;
+import org.mockito.junit.jupiter.MockitoExtension;
+import java.util.*;
+import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
+@ExtendWith(MockitoExtension.class) class DeliveryPerformanceAccessTest {
+ @InjectMocks DeliveryPerformanceAccess access;
+ @Mock cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryperformance.DeliveryPerformanceDetailMapper detailMapper;
+ @Mock PermissionApi permissionApi; @Mock AdminUserApi userApi; @Mock DeliveryPerformanceOrgMapper orgMapper;
+ @Mock cn.iocoder.yudao.module.system.api.dept.PostApi postApi;
+ @Mock cn.iocoder.yudao.module.system.api.dept.DeptApi deptApi;
+ MockedStatic<SecurityFrameworkUtils> security;
+ @BeforeEach void setup(){cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);security=mockStatic(SecurityFrameworkUtils.class);security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(1L);
+ lenient().when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,9,"DEPT")));
+ lenient().when(userApi.getUser(1L)).thenReturn(person(1,0));}
+ @AfterEach void close(){security.close();cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();}
+ Query q(String type,long id){var q=new Query();q.setScopeType(type);q.setScopeId(id);return q;}
+ AdminUserRespDTO person(long id,Integer status){var u=new AdminUserRespDTO();u.setId(id);u.setStatus(status);u.setDeptId(10L);return u;}
+ @Test void bothTreesExcludeDisabledAndUnknownStatusUsers(){
+  var enabled=person(2,0);
+  when(userApi.getUserListByStatus(0)).thenReturn(List.of(enabled,person(3,1),person(4,null)));
+  when(userApi.getUser(2L)).thenReturn(enabled);
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance-target:query")).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:department")).thenReturn(true);
+  assertEquals(List.of(2L),access.tree(true).stream().map(n->n.scopeId()).toList());
+  assertEquals(List.of(2L),access.tree(false).stream().map(n->n.scopeId()).toList());
+  verify(userApi,never()).getUser(3L);verify(userApi,never()).getUser(4L);
+  var post=new cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO();post.setId(7L);
+  when(postApi.getPostByCode("study_planner")).thenReturn(post);
+  when(userApi.getUserListByPostIds(List.of(7L))).thenReturn(List.of(enabled));
+  assertEquals(List.of(2L),access.planners().stream().map(AdminUserRespDTO::getId).toList());
+ }
+ @Test void enabledHistoricalContributorsNeedNotStillHoldSalesPost(){
+  when(userApi.getUserList(Set.of(2L,3L,4L))).thenReturn(List.of(person(2,0),person(3,1)));
+  assertEquals(Set.of(2L),access.enabledUserIds(Set.of(2L,3L,4L)));
+  assertTrue(access.enabledUserIds(Set.of()).isEmpty());verifyNoInteractions(postApi);
+ }
+ @Test void disabledTargetCannotBeSavedDespiteReadAndWritePermissions(){
+  when(userApi.getUser(2L)).thenReturn(person(2,1));
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance-target:query")).thenReturn(true);
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  var ex=assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->access.targetWriteObject("USER",2L));
+  assertTrue(ex.getMessage().contains("停用"));
+ }
+ DeliveryPerformanceOrgDO org(long id,long center,String kind){var o=new DeliveryPerformanceOrgDO();o.setDeptId(id);o.setCenterId(center);o.setKind(kind);o.setBusinessDomain("delivery");return o;}
+ @Test void currentFollowUpUsesEnabledSalesCurrentDepartmentsAndDeduplicatesCenter(){
+
+
+  var moved=person(3,0);moved.setDeptId(11L);
+  when(userApi.getUserListByStatus(0)).thenReturn(List.of(person(2,0),moved,person(4,1),person(2,0)));
+  when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,20,"DEPT"),org(11,20,"DEPT"),org(20,20,"CENTER")));
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(eq(1L),anyString())).thenReturn(true);
+  assertEquals(Set.of(2L),access.currentFollowUpAssignees(q("DEPT",10)));
+  assertEquals(Set.of(3L),access.currentFollowUpAssignees(q("DEPT",11)));
+  assertEquals(Set.of(2L,3L),access.currentFollowUpAssignees(q("CENTER",20)));
+  when(userApi.getUser(4L)).thenReturn(person(4,1));
+  when(userApi.getUser(5L)).thenReturn(person(5,0));
+  assertTrue(access.currentFollowUpAssignees(q("USER",4)).isEmpty());
+  assertTrue(access.currentFollowUpAssignees(q("USER",5)).isEmpty());
+  when(userApi.getUserListByStatus(0)).thenThrow(new IllegalStateException("user API unavailable"));
+  assertThrows(IllegalStateException.class,()->access.currentFollowUpAssignees(q("DEPT",10)));
+ }
+ @Test void currentSelfIsBoundWithoutSalesMembership(){
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:self")).thenReturn(true);
+  assertEquals(Set.of(1L),access.currentFollowUpAssignees(q("SELF",999)));
+  verifyNoInteractions(postApi,userApi);
+ }
+ @Test void currentTasksStillRejectUnauthorizedDepartment(){
+  when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,20,"DEPT")));
+  assertThrows(RuntimeException.class,()->access.currentFollowUpAssignees(q("DEPT",10)));
+  verifyNoInteractions(postApi,userApi);
+ }
+ @Test void currentDepartmentWithNoSalesPostReturnsEmpty(){
+  when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,20,"DEPT")));
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:department")).thenReturn(true);
+  assertTrue(access.currentFollowUpAssignees(q("DEPT",10)).isEmpty());
+ }
+ @Test void selfCannotSpoofUser(){when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:self")).thenReturn(true);assertEquals(1L,access.authorize(q("SELF",999),false).getScopeId());}
+ @Test void selfNeedsViewPermission(){assertThrows(RuntimeException.class,()->access.authorize(q("SELF",1),false));}
+ @Test void featurePermissionDoesNotBypassDataScope(){when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,9,"DEPT")));when(permissionApi.getDeptDataPermission(1L)).thenReturn(new DeptDataPermissionRespDTO());assertThrows(RuntimeException.class,()->access.authorize(q("DEPT",10),false));}
+ @Test void scopedDepartmentAllowed(){when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,9,"DEPT")));var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(10L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:department")).thenReturn(true);assertDoesNotThrow(()->access.authorize(q("DEPT",10),false));}
+ @Test void tenantReadAllStillNeedsFeature(){when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(10,9,"DEPT")));when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);assertThrows(RuntimeException.class,()->access.authorize(q("DEPT",10),false));}
+ @Test void centerCannotIncludeUnauthorizedChild(){when(orgMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(org(9,9,"CENTER"),org(10,9,"DEPT")));var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(9L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:center")).thenReturn(true);assertThrows(RuntimeException.class,()->access.authorize(q("CENTER",9),false));}
+ @Test void userOutsideDataScopeRejected(){var user=new AdminUserRespDTO();user.setId(2L);user.setDeptId(10L);when(userApi.getUser(2L)).thenReturn(user);when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:department")).thenReturn(true);when(permissionApi.getDeptDataPermission(1L)).thenReturn(new DeptDataPermissionRespDTO());assertThrows(RuntimeException.class,()->access.authorize(q("USER",2),false));}
+ @Test void tenantReadAllNeverAuthorizesTargetWrites(){when(permissionApi.getDeptDataPermission(1L)).thenReturn(new DeptDataPermissionRespDTO());assertFalse(access.commandDepartmentAllowed(10L));verify(permissionApi,never()).hasTenantReadAllAccess(any());}
+ @Test void currentMembershipDoesNotGrantPreviousDepartmentHistory(){var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(10L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);assertTrue(access.historicalRowAllowed(q("USER",2),10L));assertFalse(access.historicalRowAllowed(q("USER",2),20L));assertFalse(access.historicalRowAllowed(q("USER",2),null));}
+ @Test void tenantWideReaderCanReadUnattributedPersonalHistory(){when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);assertTrue(access.historicalRowAllowed(q("USER",2),null));}
+ @Test void allDepartmentScopeCanReadUnattributedPersonalHistory(){var scope=new DeptDataPermissionRespDTO();scope.setAll(true);when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);assertTrue(access.historicalRowAllowed(q("USER",2),null));}
+ @Test void missingScopeCannotReadUnattributedPersonalHistory(){assertFalse(access.historicalRowAllowed(q("USER",2),null));}
+ @Test void tenantWideReaderCannotInventTeamAttribution(){assertFalse(access.historicalRowAllowed(q("DEPT",10),null));assertFalse(access.historicalRowAllowed(q("CENTER",9),null));}
+ @Test void tenantWidePersonalQueryStillNeedsFeaturePermission(){var user=new AdminUserRespDTO();user.setId(2L);user.setDeptId(10L);when(userApi.getUser(2L)).thenReturn(user);assertThrows(RuntimeException.class,()->access.authorize(q("USER",2),false));}
+
+ @Test void sqlHistoricalScopeMatchesPerRowAuthorization() {
+  for (boolean tenantAll : List.of(false,true)) for (boolean dataAll : List.of(false,true))
+   for (boolean ownPermission : List.of(false,true)) for (boolean present : List.of(false,true)) {
+    lenient().when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(tenantAll);
+    var data=new DeptDataPermissionRespDTO(); data.setAll(dataAll); data.setDeptIds(Set.of(10L));
+    lenient().when(permissionApi.getDeptDataPermission(1L)).thenReturn(present?data:null);
+    lenient().when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:self")).thenReturn(ownPermission);
+    var targetPolicy=access.targetVisibility();
+    for(long person:List.of(1L,2L))for(Long department:Arrays.asList(null,10L,20L))
+     assertEquals(access.historicalRowAllowed(q("USER",person),department),targetPolicy.test(person,department),"Target snapshot policy");
+    for(String type:List.of("SELF","USER","DEPT","CENTER")) for(long id:List.of(1L,2L)) {
+     var query=q(type,id);var projected=access.historicalScope(query);
+     for(Long dept:Arrays.asList(null,10L,20L)) {
+      boolean sqlAllowed=projected.allDepartments()?(dept!=null||projected.missingDepartment()):dept!=null && projected.departments().contains(dept);
+      assertEquals(access.historicalRowAllowed(query,dept),sqlAllowed,type+" historical projection");
+     }
+    }
+   }
+ }
+ @Test void transferredDisabledUserHistoryUsesFrozenScopeNotCurrentDomain() {
+  var moved=person(2,1);moved.setDeptId(999L);when(userApi.getUser(2L)).thenReturn(moved);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:department")).thenReturn(true);
+  var scope=new DeptDataPermissionRespDTO();scope.setDeptIds(Set.of(10L));when(permissionApi.getDeptDataPermission(1L)).thenReturn(scope);
+  assertDoesNotThrow(()->access.authorize(q("USER",2),false));
+  assertEquals(Set.of(10L),access.reportScope(q("USER",2)).departments());
+  assertFalse(access.reportScope(q("USER",2)).missingDepartment());
+  verify(orgMapper,never()).selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+ }
+ @Test void personalKnownDomainCanRetainMissingDepartment() {
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:self")).thenReturn(true);
+  assertTrue(access.reportScope(q("USER",1)).missingDepartment());
+ }
+ @Test void unclassifiedRequiresAllThreePermissionsAndTenantPrivilegeForOthers() {
+  for(String action:List.of("query","self","detail"))when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:"+action)).thenReturn(true);
+  assertEquals(1L,access.authorizeUnclassified(null));
+  assertThrows(RuntimeException.class,()->access.authorizeUnclassified(2L));
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  assertEquals(2L,access.authorizeUnclassified(2L));
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:delivery-performance:detail")).thenReturn(false);
+  assertThrows(RuntimeException.class,()->access.authorizeUnclassified(1L));
+ }
+ @Test void deliveryCurrentFollowUpIncludesEnabledEmployeesWithoutTargetPostRequirement(){
+  
+  try {
+   when(permissionApi.hasAnyPermissions(eq(1L),anyString())).thenReturn(true);
+   when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+   when(userApi.getUserListByStatus(0)).thenReturn(List.of(person(2,0),person(3,1)));
+   assertEquals(Set.of(2L),access.currentFollowUpAssignees(q("DEPT",10)));
+   verifyNoInteractions(postApi);
+  } finally {}
+ }
+}

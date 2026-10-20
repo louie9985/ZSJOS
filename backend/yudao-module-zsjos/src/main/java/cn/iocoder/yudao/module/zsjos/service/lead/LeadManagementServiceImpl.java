@@ -21,7 +21,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadRem
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
@@ -80,8 +80,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Resource private LeadTeamTransferPolicy teamTransferPolicy;
     @Resource
-    private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
-    @Resource
     private LeadIntendedProductMapper intendedProductMapper;
     @Resource
     private LeadAttachmentMapper attachmentMapper;
@@ -99,7 +97,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadBasicInfoService leadBasicInfoService;
     @Resource private SalesOrderMapper salesOrderMapper;
-    @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService salesOrderPermissionService;
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private PartnerMapper partnerMapper;
@@ -568,10 +566,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private List<String> resolveVisibleTabs(LeadDO lead, Long userId) {
         List<String> tabs = new ArrayList<>();
         tabs.add(DETAIL_TAB_OVERVIEW);
-        if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.READ)
-                && leadObjectPermissionService.canReadDetail(lead, userId)) {
-            tabs.add(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.TAB);
-        }
         if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.READ_PERMISSION)
                 && submitterFeedbackPermission.canRead(lead, userId)) {
             tabs.add(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.TAB);
@@ -616,18 +610,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,
                                                                 SalesOrderDO activeOrder,
                                                                 Long currentUserId) {
-        LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
-        boolean activePublicSea = agingPoolCycle != null || agingPoolService.hasActiveManualPublicSea(lead.getId());
+        LeadPublicSeaPoolCycleDO publicSeaPoolCycle = publicSeaPoolService.getActiveCycle(lead.getId());
+        boolean activePublicSea = publicSeaPoolCycle != null || publicSeaPoolService.hasCompatibilityPublicSeaPoolRecord(lead.getId());
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
-        if (STATUS_WON.equals(lead.getStatus()) && leadObjectPermissionService.canReadAsOwnerOrManager(lead, currentUserId)) {
-            if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.CREATE)
-                    && studentInfoForms.submitted(lead.getId()) == null) {
-                actions.add(new LeadManagementRespVO.ActionVO(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.ACTION, true));
-            }
-            if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.LINK)) {
-                actions.add(new LeadManagementRespVO.ActionVO("VIEW_STUDENT_INFO_FORM_LINK", true));
-            }
-        }
         if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.CREATE_PERMISSION)
                 && submitterFeedbackPermission.canCreate(lead, currentUserId)) {
             actions.add(new LeadManagementRespVO.ActionVO(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.ACTION, true));
@@ -665,7 +650,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         }
         if (Objects.equals(currentUserId, lead.getOwnerUserId())
                 && securityFrameworkService.hasPermission(PERMISSION_OWNER_RELEASE_PUBLIC_SEA)
-                && agingPoolService.canEnterManually(lead.getId())) {
+                && publicSeaPoolService.canEnterManually(lead.getId())) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_OWNER_RELEASE_PUBLIC_SEA, true));
         }
         if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
@@ -682,7 +667,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_COMPLAINT, true));
             }
         }
-        if (!agingPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
+        if (!publicSeaPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
                 || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return actions;
         boolean canUpdate = securityFrameworkService.hasPermission("zsjos:lead:update");
         boolean canFollow = securityFrameworkService.hasPermission("zsjos:lead-follow-up:create");
@@ -697,9 +682,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         } else if (STATUS_VALID.equals(lead.getStatus())
                 && (opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                 .contains(opportunity.getStatus()))) {
-            if (agingPoolCycle == null && canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
+            if (publicSeaPoolCycle == null && canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
             if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
-            if (agingPoolCycle == null && canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
+            if (publicSeaPoolCycle == null && canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
             if (!activePublicSea) {
                 boolean canCreateOrder = securityFrameworkService.hasPermission("zsjos:sales-order:create");
                 boolean formalOwner = Objects.equals(lead.getOwnerUserId(), currentUserId);
@@ -714,7 +699,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
             boolean enabled = securityFrameworkService.hasPermission("zsjos:sales-order:create")
                     && lead.getSuspendedAt() == null
-                    && agingPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
+                    && publicSeaPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
                     && salesOrderMapper.hasEffectiveOrder(lead.getPersonId())
                     && salesOrderMapper.selectActiveRepurchaseByPersonId(lead.getPersonId(),
                     cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES) == null;
@@ -752,7 +737,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         }
         if (salesPoolAllowed(lead) && SupervisorLeadActionPolicy.isAllowed(RELEASE_PUBLIC_SEA, lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_PUBLIC_SEA)
-                && agingPoolService.canEnterManually(lead.getId())) {
+                && publicSeaPoolService.canEnterManually(lead.getId())) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA, true));
         }
         if (SupervisorLeadActionPolicy.isAllowed(RESTORE, lead)

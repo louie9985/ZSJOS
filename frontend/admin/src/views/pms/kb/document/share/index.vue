@@ -14,8 +14,10 @@
       <div v-else class="min-h-240px">
         <div class="mb-24px text-24px font-600 leading-[1.4]">{{ document.title }}</div>
         <div class="min-h-180px">
+          <KnowledgeExcelPreview v-if="isKnowledgeExcel(document.title, document.fileType)"
+            :document-id="document.id" :share-token="String(route.params.token)" />
           <FilePreview
-            v-if="document.previewUrl"
+            v-else-if="document.previewUrl"
             :downloadable="false"
             :file-name="document.title"
             :file-type="document.fileType"
@@ -24,7 +26,7 @@
           <el-empty v-else description="文件未上传" />
         </div>
       </div>
-      <KnowledgeAttachments :files="document.attachments || []" :document-id="document.id" />
+      <KnowledgeAttachments :files="document.attachments || []" :document-id="document.id" :share-token="String(route.params.token)" />
     </el-card>
   </div>
 </template>
@@ -33,6 +35,8 @@
 import KnowledgeAttachments from '../KnowledgeAttachments.vue'
 import * as KnowledgeDocumentShareApi from '@/api/pms/kb/interaction/share'
 import { FilePreview } from '@/components/FilePreview'
+import KnowledgeExcelPreview from '../KnowledgeExcelPreview.vue'
+import { isKnowledgeExcel } from '@/api/pms/kb/content/excel'
 import { PmsKnowledgeDocumentType } from '@/views/pms/kb/utils/constants'
 
 defineOptions({ name: 'PmsKnowledgeDocumentShare' })

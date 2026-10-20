@@ -328,7 +328,7 @@ SELECT 'business_notification_identifier_repair_migration' AS check_name,
 -- `zsjos.registration.planner_assigned` (RegistrationNotifySceneProvider supplies both
 -- `student.name` and `student.no`; the contract renders 学员姓名 + personNo). So the durable
 -- check covers only the Lead and order scenes, where the payload exposes `lead.no`/`order.no`
--- and never a name. V254 restores the aging-pool templates that V159 had regressed.
+-- and never a name. V254 restores the public-sea-pool templates that V159 had regressed.
 SELECT 'business_notification_templates_no_customer_name_variables' AS check_name,
        IF(NOT EXISTS (
             SELECT 1 FROM system_notify_template
@@ -410,7 +410,7 @@ SELECT 'claim_pool_v003' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V003'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_schemes' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
--- The baseline seeds five audiences: submitter, owner, reviewer (V005), agingPool (V034's
+-- The baseline seeds five audiences: submitter, owner, reviewer (V005), publicSeaPool (V034's
 -- public-sea view) and management (unified Lead management graded filtering). Each publishes
 -- exactly one version-1 snapshot, so five schemes produce five rows here.
 SELECT 'lead_filter_versions' AS check_name,
@@ -961,8 +961,8 @@ FROM (
   UNION ALL SELECT 'zsjos_lead_follow_up_rule' UNION ALL SELECT 'zsjos_business_task'
   UNION ALL SELECT 'zsjos_business_task_notify_stage'
   UNION ALL SELECT 'zsjos_lead_follow_up_record' UNION ALL SELECT 'zsjos_lead_follow_up_image'
-  UNION ALL SELECT 'zsjos_lead_aging_pool_cycle' UNION ALL SELECT 'zsjos_lead_aging_pool_event'
-  UNION ALL SELECT 'zsjos_lead_aging_pool_notify_stage'
+  UNION ALL SELECT 'zsjos_lead_public_sea_pool_cycle' UNION ALL SELECT 'zsjos_lead_public_sea_pool_event'
+  UNION ALL SELECT 'zsjos_lead_public_sea_pool_notify_stage'
   UNION ALL SELECT 'system_notify_rule' UNION ALL SELECT 'system_area'
   UNION ALL SELECT 'crm_owner_record' UNION ALL SELECT 'crm_performance_config'
   UNION ALL SELECT 'zsjos_work_plan' UNION ALL SELECT 'zsjos_work_task'
@@ -1318,8 +1318,8 @@ SELECT 'V092 subordinate sales pause-all permission' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'collaboration pools mutually exclusive' AS check_name,
        IF(NOT EXISTS (
-            SELECT 1 FROM zsjos_lead_aging_pool_cycle cycle
-            JOIN zsjos_lead_public_sea_record manual
+            SELECT 1 FROM zsjos_lead_public_sea_pool_cycle cycle
+            JOIN zsjos_lead_public_sea_pool_compatibility_record manual
               ON manual.tenant_id=cycle.tenant_id AND manual.lead_id=cycle.lead_id
              AND manual.deleted=b'0'
             WHERE cycle.deleted=b'0'
@@ -1558,8 +1558,8 @@ SELECT 'V139 supervisor permissions and public-sea route' AS check_name,
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V139')
           AND EXISTS (SELECT 1 FROM system_menu
-            WHERE permission='zsjos:lead-aging-pool:query' AND type=2
-              AND path='lead-aging-pool' AND deleted=b'0')
+            WHERE permission='zsjos:lead-public-sea-pool:query' AND type=2
+              AND path='lead-public-sea-pool' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND permission IN (
             'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
             'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
@@ -1814,30 +1814,30 @@ SELECT 'V159 public sea terminology' AS check_name,
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V159')
           AND EXISTS (SELECT 1 FROM system_menu
-               WHERE id=6794 AND name='公海' AND permission='zsjos:lead-aging-pool:query'
+               WHERE id=6794 AND name='公海' AND permission='zsjos:lead-public-sea-pool:query'
                  AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu
-               WHERE id=6795 AND name='管理部门公海' AND permission='zsjos:lead-aging-pool:manage'
+               WHERE id=6795 AND name='管理部门公海' AND permission='zsjos:lead-public-sea-pool:manage'
                  AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu
-               WHERE id=6796 AND name='管理全部公海' AND permission='zsjos:lead-aging-pool:manage-all'
+               WHERE id=6796 AND name='管理全部公海' AND permission='zsjos:lead-public-sea-pool:manage-all'
                  AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu
                WHERE deleted=b'0' AND id IN (6794,6795,6796)
                  AND name REGEXP '超期公海|超期协同公海|商机公海|人工公海')
           AND NOT EXISTS (SELECT 1 FROM zsjos_lead_inbox_filter_scheme
-               WHERE deleted=b'0' AND audience='agingPool'
+               WHERE deleted=b'0' AND audience='publicSeaPool'
                  AND name REGEXP '超期公海|超期协同公海|商机公海|人工公海')
           AND NOT EXISTS (SELECT 1 FROM system_notify_template
                WHERE deleted=b'0' AND code IN (
-                 'ZSJOS_AGING_POOL_REMINDER','ZSJOS_AGING_POOL_DUE','ZSJOS_AGING_POOL_ASSIGNED',
-                 'ZSJOS_AGING_POOL_REASSIGNED','ZSJOS_AGING_POOL_REASSIGN_REQUIRED','ZSJOS_AGING_POOL_EXITED')
+                 'ZSJOS_PUBLIC_SEA_POOL_REMINDER','ZSJOS_PUBLIC_SEA_POOL_DUE','ZSJOS_PUBLIC_SEA_POOL_ASSIGNED',
+                 'ZSJOS_PUBLIC_SEA_POOL_REASSIGNED','ZSJOS_PUBLIC_SEA_POOL_REASSIGN_REQUIRED','ZSJOS_PUBLIC_SEA_POOL_EXITED')
                  AND CONCAT_WS('|',name,title,summary,content,remark) REGEXP '超期公海|超期协同公海|商机公海|人工公海')
           AND NOT EXISTS (SELECT 1 FROM system_notify_rule
                WHERE deleted=b'0' AND scene_code IN (
-                 'zsjos.lead.aging_pool_reminder','zsjos.lead.aging_pool_due',
-                 'zsjos.lead.aging_pool_assigned','zsjos.lead.aging_pool_reassigned',
-                 'zsjos.lead.aging_pool_reassign_required','zsjos.lead.aging_pool_exited')
+                 'zsjos.lead.public_sea_pool_reminder','zsjos.lead.public_sea_pool_due',
+                 'zsjos.lead.public_sea_pool_assigned','zsjos.lead.public_sea_pool_reassigned',
+                 'zsjos.lead.public_sea_pool_reassign_required','zsjos.lead.public_sea_pool_exited')
                  AND name REGEXP '超期公海|超期协同公海|商机公海|人工公海'),
           'PASS','FAIL') AS result;
 

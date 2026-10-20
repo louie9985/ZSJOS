@@ -42,6 +42,7 @@ export const APP_CONFIG = {
 } as const
 
 export const STORAGE_KEYS = {
+  MATERIAL_BROWSE_LAYOUT: 'zsjos.material.browse.layout',
   // 与 Vue Admin 共享同源 localStorage。不要把令牌放进 iframe URL 或 postMessage。
   ACCESS_TOKEN: 'ACCESS_TOKEN',
   REFRESH_TOKEN: 'REFRESH_TOKEN',
@@ -72,7 +73,7 @@ export const APP_ROUTES = {
   LEAD_ASSIGNMENT: '/zsjos/leads/assignment-relations',
   LEAD_DUPLICATE_REVIEW: '/zsjos/leads/duplicate-review',
   LEAD_CLAIM_POOL: '/zsjos/claim-pool',
-  LEAD_AGING_POOL: '/zsjos/lead-aging-pool',
+  LEAD_PUBLIC_SEA_POOL: '/zsjos/lead-public-sea-pool',
   LEAD_RULE: '/zsjos/lead-rule',
   LEAD_FILTER: '/zsjos/lead-filter',
   LEAD_FOLLOW_UP_RULE: '/zsjos/lead-follow-up-rule',
@@ -87,6 +88,7 @@ export const APP_ROUTES = {
   STUDENT_CONTACT_CONFIG: '/zsjos/student-contact-config',
   STUDENT_CONTACT_EXCEPTIONS: '/zsjos/student-contact-exceptions',
   SUBORDINATE_SALES: '/zsjos/subordinate-sales',
+  EDUCATION_TEAM: '/zsjos/education-team',
   DELIVERY_PERFORMANCE: '/zsjos/delivery-performance',
   DELIVERY_PERFORMANCE_TARGET: '/zsjos/delivery-performance-target',
   SALES_PERFORMANCE: '/zsjos/sales-performance',
@@ -116,6 +118,7 @@ export const APP_ROUTES = {
   POINTS_PACKAGES: '/zsjos/points-packages',
   USER_RELATION: '/system/user-relation',
   MAINTENANCE: '/system/maintenance',
+  MESSAGE_CENTER: '/messages',
   NOTIFY_RULE: '/messages/notify/notify-rule',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread',
@@ -179,7 +182,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.LEAD_ASSIGNMENT,
   APP_ROUTES.LEAD_DUPLICATE_REVIEW,
   APP_ROUTES.LEAD_CLAIM_POOL,
-  APP_ROUTES.LEAD_AGING_POOL,
+  APP_ROUTES.LEAD_PUBLIC_SEA_POOL,
   APP_ROUTES.LEAD_RULE,
   APP_ROUTES.LEAD_FILTER,
   APP_ROUTES.LEAD_FOLLOW_UP_RULE,
@@ -198,6 +201,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.BPM_DONE,
   APP_ROUTES.WORK_PLANS,
   APP_ROUTES.SUBORDINATE_SALES,
+  APP_ROUTES.EDUCATION_TEAM,
   APP_ROUTES.DELIVERY_PERFORMANCE,
   APP_ROUTES.DELIVERY_PERFORMANCE_TARGET,
   APP_ROUTES.SALES_PERFORMANCE,

@@ -6,10 +6,18 @@ import { flatMultiLevelRoutes, generateRoute } from '@/utils/routerHelper'
 import { CACHE_KEY, useCache } from '@/hooks/web/useCache'
 import { getAuthenticatedLandingPath } from '@/utils/authenticatedLanding'
 import { filterAdminRoutes } from '@/utils/adminRouteFilter'
+import { getNavigationPreference } from '@/api/zsjos/navigationPreference'
+import {
+  applyNavigationOrder,
+  NAVIGATION_QUERY,
+  type NavigationNode
+} from '@/utils/navigationOrder'
+import { useUserStore } from './user'
 
 const { wsCache } = useCache()
 
 export interface PermissionState {
+  navigationSource: NavigationNode[]
   routers: AppRouteRecordRaw[]
   addRouters: AppRouteRecordRaw[]
   menuTabRouters: AppRouteRecordRaw[]
@@ -19,6 +27,7 @@ export interface PermissionState {
 
 export const usePermissionStore = defineStore('permission', {
   state: (): PermissionState => ({
+    navigationSource: [],
     routers: [],
     addRouters: [],
     menuTabRouters: [],
@@ -51,6 +60,16 @@ export const usePermissionStore = defineStore('permission', {
         if (roleRouters) {
           res = filterAdminRoutes(roleRouters as AppCustomRouteRecordRaw[])
         }
+        this.navigationSource = cloneDeep(res) as unknown as NavigationNode[]
+        let displayRoutes = cloneDeep(res)
+        const permissions = useUserStore().getPermissions
+        if (permissions.has(NAVIGATION_QUERY) || permissions.has('*:*:*')) {
+          try {
+            displayRoutes = applyNavigationOrder(displayRoutes, await getNavigationPreference())
+          } catch {
+            // A personal preference failure must not block authorized navigation.
+          }
+        }
         const routerMap: AppRouteRecordRaw[] = generateRoute(res)
         this.defaultLandingPath = getAuthenticatedLandingPath(res)
         // 动态路由，404一定要放到最后面
@@ -68,7 +87,7 @@ export const usePermissionStore = defineStore('permission', {
           }
         ])
         // 渲染菜单的所有路由
-        this.routers = cloneDeep(remainingRouter).concat(routerMap)
+        this.routers = cloneDeep(remainingRouter).concat(generateRoute(displayRoutes))
         resolve()
       })
     },

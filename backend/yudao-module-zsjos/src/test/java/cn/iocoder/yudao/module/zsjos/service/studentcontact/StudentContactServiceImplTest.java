@@ -102,7 +102,7 @@ class StudentContactServiceImplTest {
 
     @BeforeEach
     void grantDeliveryStagePermissionForServiceContractTests() {
-        lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq("zsjos:student-info-form:read"))).thenReturn(false);
+        lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq("zsjos:student-archive:read"))).thenReturn(false);
         lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PERMISSION_DELIVERY_STAGE_SUBMIT))).thenReturn(true);
         lenient().when(directorConfigService.interviewAppointmentHours()).thenReturn(96);
         lenient().when(directorConfigService.trialDays()).thenReturn(14);
@@ -188,16 +188,14 @@ class StudentContactServiceImplTest {
     }
 
     @Test
-    void collectionTabRequiresFeaturePermissionAndLeadVisibility() {
+    void archiveTabRequiresFeaturePermissionAndExactServiceVisibility() {
         prepareContext();
-        ServiceRelationDO relation = relation("accepted"); relation.setOrderId(100L);
+        ServiceRelationDO relation = relation("accepted");
         when(relationMapper.selectById(10L)).thenReturn(relation);
-        when(permissionApi.hasAnyPermissions(7L, "zsjos:student-info-form:read")).thenReturn(true);
-        var order = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO(); order.setLeadId(5L);
-        when(orderMapper.selectById(100L)).thenReturn(order);
-        when(studentInfoPermission.hasPermission(5L, "read", 7L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(7L, "zsjos:student-archive:read")).thenReturn(true);
+        when(serviceReadPermission.hasPermission(10L, "read", 7L)).thenReturn(true);
         assertEquals(true, service.getContext(10L, 7L).getVisibleTabs().contains("student-info"));
-        when(studentInfoPermission.hasPermission(5L, "read", 7L)).thenReturn(false);
+        when(serviceReadPermission.hasPermission(10L, "read", 7L)).thenReturn(false);
         assertFalse(service.getContext(10L, 7L).getVisibleTabs().contains("student-info"));
     }
 
@@ -419,7 +417,7 @@ class StudentContactServiceImplTest {
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
         when(recordMapper.selectByIdempotencyKey("study-submit")).thenReturn(null);
         when(taskMapper.selectByIdForUpdate(20L, 1L)).thenReturn(task);
-        when(configMapper.selectById(30L)).thenReturn(config());
+        lenient().when(configMapper.selectById(30L)).thenReturn(config());
         when(taskCommandService.create(any())).thenReturn(21L);
         when(relationMapper.advanceDeliveryStage(10L, 7L, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
                 null, 2)).thenReturn(1);
@@ -507,6 +505,7 @@ class StudentContactServiceImplTest {
     }
 
     private void prepareContext(String taskType) {
+        lenient().when(configService.requirePublished()).thenReturn(config());
         ServiceRelationDO relation = relation("accepted");
         lenient().when(relationMapper.selectById(10L)).thenReturn(relation);
 
@@ -516,10 +515,10 @@ class StudentContactServiceImplTest {
         task.setStatus("pending");
         task.setDueAt(LocalDateTime.now().plusHours(1));
         task.setPayload("{\"configVersionId\":30}");
-        when(taskMapper.selectPendingByRelationAndType(eq(10L), anyString()))
+        lenient().when(taskMapper.selectPendingByRelationAndType(eq(10L), anyString()))
                 .thenAnswer(invocation -> taskType.equals(invocation.getArgument(1)) ? task : null);
 
-        when(configMapper.selectById(30L)).thenReturn(config());
+        lenient().when(configMapper.selectById(30L)).thenReturn(config());
         lenient().when(adminUserApi.getUserMap(List.of(-1L, -1L))).thenReturn(new HashMap<>());
     }
 
@@ -677,6 +676,18 @@ class StudentContactServiceImplTest {
         assertEquals(STUDENT_SERVICE_NOT_EXISTS.getCode(), error.getCode());
         verify(relationMapper).selectByIdForUpdate(10L, 2L);
         verifyNoInteractions(assignmentLogMapper, positioningCardMapper, mediaAccountMapper);
+    }
+
+    @Test
+    void followUpEntryRemainsAvailableWithoutPendingTaskAfterPlan() {
+        prepareContext(TYPE_CONTACT);
+        var relation=relation("accepted");relation.setDeliveryStage(STAGE_SUPERVISION);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(taskMapper.selectPendingByRelationAndType(eq(10L),anyString())).thenReturn(null);
+        when(permissionApi.hasAnyPermissions(7L,PERMISSION_CONTACT_SUBMIT)).thenReturn(true);
+        assertTrue(service.getContext(10L,7L).getAvailableActions().contains(CONTEXT_ACTION_FOLLOW_UP));
+        when(permissionApi.hasAnyPermissions(7L,PERMISSION_CONTACT_SUBMIT)).thenReturn(false);
+        assertFalse(service.getContext(10L,7L).getAvailableActions().contains(CONTEXT_ACTION_FOLLOW_UP));
     }
 
 }

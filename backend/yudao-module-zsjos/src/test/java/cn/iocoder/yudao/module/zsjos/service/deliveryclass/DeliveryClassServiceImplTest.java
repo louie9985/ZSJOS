@@ -79,6 +79,40 @@ class DeliveryClassServiceImplTest {
     }
 
     @Test
+    void classStudentReadRestrictsServicesBeforePaginationEvenWhenClassIsReadable() throws Exception {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "class-student-scope"), ServiceRelationDO.class);
+        when(permissionApi.hasAnyPermissions(7L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        when(scopeService.resolveRead(7L)).thenReturn(new DeliveryClassScopeService.Scope(false, java.util.Set.of()));
+        var query = service.studentReadQuery(91L, 7L);
+        String sql = query.getSqlSegment();
+        org.junit.jupiter.api.Assertions.assertTrue(sql.contains("owner_user_id"));
+        org.junit.jupiter.api.Assertions.assertTrue(sql.contains("career_planner_user_id"));
+        verifyNoInteractions(adminUserApi);
+        if (!"true".equals(System.getenv("ZSJOS_CLASS_MYSQL_VERIFY"))) return;
+        String fixture = "WITH zsjos_service_relation AS ("
+                + "SELECT 10 id,91 class_id,7 owner_user_id,NULL content_director_user_id,NULL career_planner_user_id,'active' status,'accepted' acceptance_status,NOW() activated_at "
+                + "UNION ALL SELECT 11,91,8,NULL,NULL,'active','accepted',NOW() "
+                + "UNION ALL SELECT 12,91,8,NULL,7,'active','accepted',NOW() "
+                + "UNION ALL SELECT 13,91,8,NULL,7,'paused','accepted',NOW()) SELECT id FROM zsjos_service_relation WHERE ";
+        var pattern = java.util.regex.Pattern.compile("#\\{ew.paramNameValuePairs.([A-Za-z0-9]+)}");
+        var matcher = pattern.matcher(sql); var bound = new StringBuffer(); var values = new java.util.ArrayList<Object>();
+        while(matcher.find()) { values.add(query.getParamNameValuePairs().get(matcher.group(1))); matcher.appendReplacement(bound, "?"); }
+        matcher.appendTail(bound);
+        try(var db=java.sql.DriverManager.getConnection(System.getenv("ZSJOS_CLASS_MYSQL_URL"),
+                System.getenv("ZSJOS_CLASS_MYSQL_USER"),System.getenv("ZSJOS_CLASS_MYSQL_PASSWORD"))) {
+            db.setReadOnly(true);
+            try(var statement=db.prepareStatement(fixture+bound)) {
+                for(int i=0;i<values.size();i++)statement.setObject(i+1,values.get(i));
+                try(var result=statement.executeQuery()) {
+                    var ids=new java.util.HashSet<Long>(); while(result.next())ids.add(result.getLong(1));
+                    assertEquals(java.util.Set.of(10L,12L),ids);
+                }
+            }
+        }
+    }
+
+    @Test
     void pendingTransferSucceedsAcrossProductCategoriesAndPreservesServiceState() {
         plannerRole(20L);
         ServiceRelationDO relation = relation(10L, 100L, 3);
@@ -147,6 +181,26 @@ class DeliveryClassServiceImplTest {
         verify(taskCommandService, times(2)).reassignPending(anyCollection(), anyLong(), eq(20L));
         verifyNoInteractions(productSkuService, categoryMapper);
         assertEquals("新班级", current.getClassName());
+    }
+
+    @Test
+    void metadataEditPreservesExistingExamScheduleAndSnapshot() {
+        plannerRole(20L);
+        DeliveryClassDO current = deliveryClass(100L, false, 8L, 20L);
+        current.setExamScheduleId(70L).setExamScheduleSnapshot("原考期 · 2026-12-01").setVersion(2);
+        when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
+        when(adminUserApi.getUser(9L)).thenReturn(enabledUser(9L).setDeptId(80L));
+        when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L).setDeptId(80L));
+        when(classMapper.update(eq(current), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
+
+        DeliveryClassSaveReqVO request = new DeliveryClassSaveReqVO();
+        request.setClassName("改名后的班级"); request.setHomeroomUserId(20L);
+        request.setPreserveExamDate(true); request.setVersion(2);
+
+        service.update(100L, request, 9L);
+
+        assertEquals(70L, current.getExamScheduleId());
+        assertEquals("原考期 · 2026-12-01", current.getExamScheduleSnapshot());
     }
 
 

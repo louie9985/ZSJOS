@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
-import { Alert, Button, Empty, Modal, Popconfirm, QRCode, Space, Spin, Tag, Typography } from 'antd'
-import { CopyOutlined, ReloadOutlined, StopOutlined } from '@ant-design/icons'
+import { Alert, Button, Empty, Modal, Popconfirm, Space, Spin, Tag, Typography } from 'antd'
+import StudentInfoQrCard from './StudentInfoQrCard'
+import ResourceLink from './ResourceLink'
+import { ReloadOutlined, StopOutlined } from '@ant-design/icons'
 import { studentInfoApi, studentInfoError, studentInfoStatus, type StudentInfoLink } from '../services/studentInfo'
 import { formatTimestamp } from '../services/time'
 
-export default function StudentInfoLinkModal({ leadId, mode, onClose }: {
-  leadId: number; mode: 'generate' | 'view'; onClose: () => void
+export default function StudentInfoLinkModal({ caseId, version, mode, onClose, onChanged }: {
+  caseId: number; version: number; mode: 'generate' | 'view'; onClose: () => void; onChanged?: () => void
 }) {
   const [data, setData] = useState<StudentInfoLink | null>(null)
   const [error, setError] = useState('')
@@ -15,22 +17,24 @@ export default function StudentInfoLinkModal({ leadId, mode, onClose }: {
     const sequence = ++requestSequence.current
     setBusy(true); setError('')
     try {
-      const result = mode === 'generate' ? await studentInfoApi.generate(leadId) : await studentInfoApi.link(leadId)
+      const result = mode === 'generate' ? await studentInfoApi.generate(caseId, { version, idempotencyKey: crypto.randomUUID() }) : await studentInfoApi.link(caseId)
       if (sequence === requestSequence.current) setData(result)
+      if (mode === 'generate') onChanged?.()
     }
     catch (e) { if (sequence === requestSequence.current) setError(studentInfoError(e)) }
     finally { if (sequence === requestSequence.current) setBusy(false) }
   }
-  useEffect(() => { void load(); return () => { requestSequence.current++ } }, [leadId, mode])
+  useEffect(() => { void load(); return () => { requestSequence.current++ } }, [caseId, mode])
   const mutate = async (revoke: boolean) => {
     if (!data) return
     requestSequence.current++
     setBusy(true); setError('')
     try {
-      if (revoke) { await studentInfoApi.revoke(leadId, data.formId); setData({ ...data, status: 'REVOKED', url: undefined, canRevoke: false }) }
-      else setData(await studentInfoApi.regenerate(leadId, data.formId))
+      const command = { version: data.registrationVersion, formId: data.formId, idempotencyKey: crypto.randomUUID() }
+      if (revoke) setData(await studentInfoApi.revoke(caseId, command))
+      else setData(await studentInfoApi.regenerate(caseId, command))
     } catch (e) { setError(studentInfoError(e)) }
-    finally { setBusy(false) }
+    finally { setBusy(false); onChanged?.() }
   }
   return <Modal title="信息收集表" open onCancel={onClose} footer={<Button onClick={onClose}>关闭</Button>} width={480}>
     {error && <Alert type="error" title={error} action={<Button onClick={() => void load()}>重试</Button>} />}
@@ -39,9 +43,8 @@ export default function StudentInfoLinkModal({ leadId, mode, onClose }: {
       <Typography.Text>生成时间：{formatTimestamp(data.createdAt)}</Typography.Text>
       <Typography.Text>有效期至：{formatTimestamp(data.expiresAt)}</Typography.Text>
       {data.url && <>
-        <QRCode value={data.url} size={200} />
-        <Typography.Paragraph style={{ overflowWrap: 'anywhere' }}>{data.url}</Typography.Paragraph>
-        <Button icon={<CopyOutlined />} onClick={() => void navigator.clipboard.writeText(data.url!).catch(() => setError('复制失败，请选中链接复制'))}>复制链接</Button>
+        <StudentInfoQrCard url={data.url} onError={setError} />
+        <ResourceLink href={data.url} title="学员报名信息收集表" variant="resource" />
       </>}
       <Space wrap>
         {data.canRegenerate && <Popconfirm title="重新生成后，旧链接立即失效" onConfirm={() => mutate(false)}><Button icon={<ReloadOutlined />}>重新生成链接</Button></Popconfirm>}

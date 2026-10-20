@@ -2,8 +2,27 @@
 import { ref, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
+import { ImagePreview as VanImagePreview } from 'vant'
+import 'vant/es/image-preview/style'
 import { getPublicNotice, getPublicNoticeAttachmentUrl, NoticeShareError, type PublicNotice } from '@/api/noticeShare'
 const route = useRoute()
+const imagePreview = ref<{ images: string[]; index: number }>()
+const openImage = (event: MouseEvent | KeyboardEvent) => {
+  if (!(event.target instanceof HTMLImageElement) || !event.target.getAttribute('src')) return
+  if ('key' in event && event.key !== 'Enter' && event.key !== ' ') return
+  const images = Array.from((event.currentTarget as HTMLElement).querySelectorAll<HTMLImageElement>('img[src]')).filter(image => image.getAttribute('src'))
+  event.preventDefault()
+  event.stopPropagation()
+  imagePreview.value = { images: images.map(image => image.currentSrc || image.src), index: images.indexOf(event.target) }
+}
+const vPreviewImages = { mounted: decorateImages, updated: decorateImages }
+function decorateImages(root: HTMLElement) {
+  root.querySelectorAll<HTMLImageElement>('img[src]').forEach(image => {
+    image.tabIndex = 0
+    image.setAttribute('role', 'button')
+    image.setAttribute('aria-label', `预览图片：${image.alt || '公告图片'}`)
+  })
+}
 const notice = ref<PublicNotice>()
 const loading = ref(false)
 const error = ref('')
@@ -14,6 +33,7 @@ const fileBusy = ref<Record<number, boolean>>({})
 let generation = 0
 const token = () => new URLSearchParams(route.hash.replace(/^#/, '')).get('token') || ''
 const load = async () => {
+  imagePreview.value = undefined
   const current = ++generation
   notice.value = undefined; loading.value = true; error.value = ''; invalid.value = false
   fileErrors.value = {}; fileUrls.value = {}; fileBusy.value = {}
@@ -59,7 +79,8 @@ onBeforeUnmount(() => generation++)
       <h1>{{ notice.title }}</h1>
       <p class="notice-public-date">{{ dayjs(notice.publishTime).format('YYYY-MM-DD HH:mm') }}</p>
       <!-- Only the anonymous System endpoint's allowlist-cleaned HTML is rendered here. -->
-      <div class="notice-public-body" v-html="notice.content"></div>
+      <div v-preview-images class="notice-public-body" @click="openImage" @keydown="openImage" v-html="notice.content"></div>
+      <VanImagePreview :show="!!imagePreview" :images="imagePreview?.images || []" :start-position="imagePreview?.index || 0" closeable teleport="body" @update:show="show => { if (!show) imagePreview = undefined }" />
       <section v-if="notice.attachments.length" class="notice-public-files">
         <h2>附件</h2>
         <div v-for="file in notice.attachments" :key="file.id" class="notice-public-file">
@@ -85,6 +106,7 @@ onBeforeUnmount(() => generation++)
 .notice-public.norem .notice-public-date, .notice-public.norem .notice-public-note { color: var(--h5-text-secondary, #666); font-size: 13px; }
 .notice-public.norem .notice-public-body { font-size: 16px; line-height: 1.85; margin-top: 28px; }
 .notice-public.norem .notice-public-body :deep(img), .notice-public.norem .notice-public-body :deep(video) { max-width: 100%; height: auto; }
+.notice-public.norem .notice-public-body :deep(img[src]) { cursor: zoom-in; }
 .notice-public.norem .notice-public-body :deep(pre) { display: block; overflow-x: auto; max-width: 100%; }
 .notice-public.norem .notice-public-body :deep(.notice-table-scroll) { width: 100%; max-width: 100%; overflow-x: auto; margin: 12px 0; }
 .notice-public.norem .notice-public-body :deep(.notice-table-scroll:focus-visible) { outline: 2px solid var(--van-primary-color); outline-offset: 2px; }

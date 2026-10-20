@@ -11,6 +11,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 public interface StudentContactService {
     StudentContactContextRespVO getContext(Long relationId, Long userId);
     PageResult<StudentContactRecordRespVO> getRecords(Long relationId, PageParam page, Long userId);
+    void updateFirstContactChecklist(Long relationId, StudentFirstContactChecklistUpdateReqVO request, Long userId);
     void accept(Long relationId, StudentServiceAcceptReqVO request, Long userId);
     void updateBasicInfo(Long relationId, StudentBasicInfoUpdateReqVO request, Long userId);
     Long submitFirstContact(Long relationId, StudentFirstContactSubmitReqVO request, Long userId);

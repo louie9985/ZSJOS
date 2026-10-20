@@ -370,7 +370,7 @@ const save = async () => {
       homeroomUserId: editor.homeroomUserId!
     }
     if (editing.value)
-      await Api.updateDeliveryClass(editing.value.id, { ...value, version: editing.value.version })
+      await Api.updateDeliveryClass(editing.value.id, { ...value, preserveExamDate: true, version: editing.value.version })
     else await Api.createDeliveryClass(value)
     ElMessage.success('班级已保存')
     editorOpen.value = false

@@ -2,16 +2,16 @@ import MaterialCover from '../components/MaterialCover'
 import MaterialSearchContent, { MaterialHighlight } from '../components/MaterialSearchContent'
 import ResourceLink from '../components/ResourceLink'
 import {
+  AppstoreOutlined,
+  BarsOutlined,
   BookOutlined,
   CloseOutlined,
-  EditOutlined,
   HeartFilled,
   HeartOutlined,
   HistoryOutlined,
   LikeFilled,
   LikeOutlined,
   LinkOutlined,
-  PlusOutlined,
   ReloadOutlined,
   SearchOutlined
 } from '@ant-design/icons'
@@ -28,6 +28,7 @@ import {
   List,
   Modal,
   Select,
+  Segmented,
   Skeleton,
   Space,
   Tabs,
@@ -38,14 +39,12 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DateTimeText from '../components/DateTimeText'
+import { STORAGE_KEYS } from '../constants'
 import SafeRichText from '../components/SafeRichText'
-import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
 import ViralAccountMaterialForm from '../components/ViralAccountMaterialForm'
 import ViralContentMaterialForm from '../components/ViralContentMaterialForm'
 import { api, ApiError, type DictData } from '../services/api'
 import { hasPermission } from '../services/managementAccess'
-import { materialApprovalApi } from '../services/materialApprovalApi'
-import { materialLifecycleApi } from '../services/materialLifecycleApi'
 import {
   materialApi,
   type Material,
@@ -58,6 +57,7 @@ import {
 
 const PAGE_SIZE = 20
 type ViewKey = 'all' | 'favorite' | 'mine'
+type LayoutMode = 'large' | 'compact'
 
 const statusLabel: Record<string, string> = {
   DRAFT: '草稿／待提交',
@@ -406,6 +406,15 @@ function ReferenceDialog({ material, open, onClose, onSuccess }: {
 export default function MaterialLibraryPage({ permissions = [] }: { permissions?: string[]; management?: boolean }) {
   const [searchParams] = useSearchParams()
   const { message } = App.useApp()
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
+    try { return localStorage.getItem(STORAGE_KEYS.MATERIAL_BROWSE_LAYOUT) === 'compact' ? 'compact' : 'large' }
+    catch { return 'large' }
+  })
+  const changeLayout = (value: LayoutMode) => {
+    setLayoutMode(value)
+    try { localStorage.setItem(STORAGE_KEYS.MATERIAL_BROWSE_LAYOUT, value) }
+    catch { /* Browsing remains available when storage is disabled. */ }
+  }
   const [view, setView] = useState<ViewKey>(searchParams.get('view') === 'mine' ? 'mine' : 'all')
   const [keywordInput, setKeywordInput] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -414,21 +423,11 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setKeywordInput(value.trim()); setKeyword(value.trim())
     setSearchRevision(current => current + 1)
   }
-  const [versionStatus, setVersionStatus] = useState<MaterialVersion['status']>()
-  const [cancelOpen, setCancelOpen] = useState(false)
-  const [cancelReason, setCancelReason] = useState('')
-  const [cancelSaving, setCancelSaving] = useState(false)
-  const [cancelError, setCancelError] = useState('')
   const [materialTypeId, setMaterialTypeId] = useState<number>()
   const [types, setTypes] = useState<MaterialType[]>([])
   const [rows, setRows] = useState<Material[]>([])
   const [selectedId, setSelectedId] = useState<number>()
   const [selected, setSelected] = useState<Material>()
-  const [approvalTaskId, setApprovalTaskId] = useState<string>()
-  const [approvalVersionId, setApprovalVersionId] = useState<number>()
-  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>()
-  const [approvalReason, setApprovalReason] = useState('')
-  const [approvalSaving, setApprovalSaving] = useState(false)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -443,8 +442,6 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   const [versionsLoading, setVersionsLoading] = useState(false)
   const [versionsError, setVersionsError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
-  const [formMode, setFormMode] = useState<'create' | 'edit' | 'view'>('create')
-  const [formTypeCode, setFormTypeCode] = useState<'viral_account' | 'viral_content'>('viral_account')
   const [dicts, setDicts] = useState<Record<string, Array<{ value: string; label: string }>>>({})
   const [dictError, setDictError] = useState('')
   const [dictLoading, setDictLoading] = useState(false)
@@ -496,7 +493,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setDetailLoading(true)
     setDetailError('')
     try {
-      const result = await materialApi.get(id)
+      const result = await materialApi.browse(id)
       if (requestId === detailRequestRef.current) setSelected(result)
     } catch (cause) {
       if (requestId !== detailRequestRef.current) return
@@ -509,11 +506,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
 
   useEffect(() => {
     const materialId = Number(searchParams.get('materialId'))
-    const taskId = searchParams.get('taskId') || undefined
-    const versionId = Number(searchParams.get('versionId')) || undefined
-    if (materialId) void loadDetail(materialId)
-    setApprovalTaskId(taskId)
-    setApprovalVersionId(versionId)
+    if (materialId) { setFormOpen(true); void loadDetail(materialId) }
   }, [loadDetail, searchParams])
 
   const load = useCallback(async (targetPage = 1, preferredId?: number) => {
@@ -521,15 +514,14 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setLoading(true)
     setError('')
     try {
-      const result = await materialApi.page({
+      const result = await materialApi.browsePage({
         pageNo: targetPage,
         pageSize: PAGE_SIZE,
         keyword: keyword || undefined,
         materialTypeId,
         favorite: view === 'favorite' || undefined,
         mine: view === 'mine' || undefined,
-        sortBy: view === 'all' || view === 'mine' ? 'createTime' : undefined,
-        versionStatus: view === 'mine' ? versionStatus : undefined
+        sortBy: view === 'all' || view === 'mine' ? 'createTime' : undefined
       })
       if (requestId !== listRequestRef.current) return
       setRows(targetPage === 1 ? result.list : current => [...current, ...result.list.filter(item => !current.some(existing => existing.id === item.id))])
@@ -545,7 +537,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     } finally {
       if (requestId === listRequestRef.current) setLoading(false)
     }
-  }, [keyword, loadDetail, materialTypeId, view, versionStatus, searchRevision])
+  }, [keyword, loadDetail, materialTypeId, view, searchRevision])
 
   useEffect(() => { setRows([]); setHasMore(false); void load(1) }, [load])
   useEffect(() => {
@@ -586,82 +578,25 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setVersions([])
     setVersionsLoading(true)
     setVersionsError('')
-    try { setVersions(await materialApi.versions(selected.id)) }
+    try { setVersions(await materialApi.browseVersions(selected.id)) }
     catch (cause) { setVersionsError(errorText(cause)) }
     finally { setVersionsLoading(false) }
   }
 
   const viralType = types.find(type => type.code === 'viral_account')
   const viralContentType = types.find(type => type.code === 'viral_content')
-  const openCreate = () => {
-    if (!viralType) return message.warning('爆款账号模板尚未发布')
-    setSelected(undefined)
-    setFormTypeCode('viral_account')
-    setFormMode('create')
-    setFormOpen(true)
-  }
-  const openContentCreate = () => {
-    if (!viralContentType) return message.warning('爆款内容模板尚未发布')
-    setSelected(undefined); setFormTypeCode('viral_content'); setFormMode('create'); setFormOpen(true)
-  }
-  const openEdit = () => {
-    if (!selected || !canUpdate) return
-    if (selected.materialTypeId === viralContentType?.id) setFormTypeCode('viral_content')
-    else if (selected.materialTypeId === viralType?.id) setFormTypeCode('viral_account')
-    else return
-    setFormMode('edit')
-    setFormOpen(true)
-  }
-  const openView = () => {
-    if (!selected || !viralType || selected.materialTypeId !== viralType.id) return
-    setFormTypeCode('viral_account')
-    setFormMode('view')
-    setFormOpen(true)
-  }
-  const canUpdate = selected?.availableActions.includes('UPDATE') && hasPermission(permissions, 'zsjos:material:update')
-  const displayedTypeCode = formMode === 'create' ? formTypeCode
-    : types.find(type => type.id === selected?.materialTypeId)?.code
+  const displayedTypeCode = types.find(type => type.id === selected?.materialTypeId)?.code
   const onFormSaved = async () => {
     setFormOpen(false)
     await load(1, selectedId)
   }
 
   const currentVersion = selected?.currentVersion
-  const canCancel = Boolean(selected?.availableActions.includes('CANCEL') && currentVersion?.processInstanceId
-    && hasPermission(permissions, 'bpm:process-instance:cancel'))
-  const cancelReview = async () => {
-    if (!currentVersion?.processInstanceId || !cancelReason.trim() || !canCancel) return
-    setCancelSaving(true); setCancelError('')
-    try {
-      await materialLifecycleApi.cancel(currentVersion.processInstanceId, cancelReason.trim())
-      setCancelOpen(false)
-      message.success('已撤回审批，可继续编辑草稿；已有生效版本保持可用')
-      await load(1)
-      if (selectedId) await loadDetail(selectedId)
-    } catch (cause) { setCancelError(errorText(cause)) }
-    finally { setCancelSaving(false) }
-  }
-  const canApprove = Boolean(approvalTaskId && approvalVersionId && selected &&
-    permissions.includes('zsjos:material-approval:approve'))
-  const canReject = Boolean(approvalTaskId && approvalVersionId && selected &&
-    permissions.includes('zsjos:material-approval:reject'))
-  const decideApproval = async () => {
-    if (!approvalAction || !approvalTaskId || !approvalVersionId || !approvalReason.trim()) return
-    setApprovalSaving(true)
-    try {
-      await materialApprovalApi.decide(approvalAction, approvalVersionId, approvalTaskId, approvalReason.trim())
-      message.success(approvalAction === 'approve' ? '审批已通过' : '素材已驳回')
-      setApprovalAction(undefined); setApprovalReason('')
-      await loadDetail(selectedId || selected?.id || 0)
-    } catch (cause) { message.error(errorText(cause)) }
-    finally { setApprovalSaving(false) }
-  }
   const openMaterial = async (id: number) => {
-    setFormMode('view')
     setFormOpen(true)
     await loadDetail(id)
   }
-  return <section className={`workspace-page material-library-page${view === 'mine' ? ' material-library-mine' : ''}`}>
+  return <section className={`workspace-page material-library-page material-library-${layoutMode}${view === 'mine' ? ' material-library-mine' : ''}`}>
     <header className="material-library-filter-shell">
       <div className="material-library-toolbar">
         <Tabs className="material-library-view-tabs" activeKey={view} onChange={key => setView(key as ViewKey)} items={[
@@ -675,14 +610,13 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           loading={metadataLoading} disabled={metadataLoading || Boolean(metadataError)}
           options={types.map(type => ({ value: type.id, label: type.name }))} />
         <Tooltip title="刷新"><Button aria-label="刷新素材" className="material-library-refresh" icon={<ReloadOutlined />} onClick={() => void load(1, selectedId)} /></Tooltip>
-        {hasPermission(permissions, 'zsjos:material:create') && <Space className="material-library-actions"><Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>创建爆款账号</Button><Button type="primary" icon={<PlusOutlined />} onClick={openContentCreate}>创建爆款内容</Button></Space>}
+        <Segmented<LayoutMode> className="material-library-layout-switch" aria-label="素材布局" value={layoutMode} onChange={changeLayout}
+          options={[
+            { value: 'large', label: <span title="大图布局" aria-label="大图布局"><AppstoreOutlined /><span className="material-layout-label">大图</span></span> },
+            { value: 'compact', label: <span title="紧凑布局" aria-label="紧凑布局"><BarsOutlined /><span className="material-layout-label">紧凑</span></span> }
+          ]} />
       </div>
     </header>
-    {view === 'mine' && <div className="material-mine-filters">
-      <Select aria-label="审核状态" allowClear placeholder="全部审核状态" value={versionStatus} onChange={setVersionStatus}
-        options={(['DRAFT', 'IN_APPROVAL', 'EFFECTIVE', 'REJECTED'] as const).map(value => ({ value, label: statusLabel[value] }))} />
-      <Typography.Text type="secondary">按当前修订版本筛选；新版本审核期间，旧生效版本仍可浏览。</Typography.Text>
-    </div>}
     {metadataError && <Alert type="error" showIcon message={`素材类型加载失败：${metadataError}`}
       action={<Button size="small" onClick={() => void loadMetadata()}>重试</Button>} />}
     {dictError && <Alert type="error" showIcon message={dictError}
@@ -700,12 +634,10 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
                   <strong><MaterialHighlight text={item.currentVersion?.title || item.title} keyword={keyword} /></strong>
                 </button>
                 <span className="material-card-status"><Tag color={item.currentVersion?.status === 'IN_APPROVAL' ? 'processing' : item.currentVersion?.status === 'REJECTED' ? 'error' : item.currentVersion?.status === 'EFFECTIVE' ? 'success' : 'default'}>{statusLabel[item.currentVersion?.status || item.status]}</Tag>
-                  {item.currentEffectiveVersionId && item.currentDraftVersionId && <Tag>旧版已生效</Tag>}</span>
+                  </span>
                 <span>{item.materialTypeName} · {item.materialNo}</span>
                 {view === 'mine' ? <>
-                  <span>审核人：{item.currentVersion?.status === 'IN_APPROVAL' ? item.currentVersion.pendingApproverNames?.join('、') || '等待流程分配' : '—'}</span>
-                  {item.currentVersion?.submittedAt && <span>最近提交：<DateTimeText value={item.currentVersion.submittedAt} /></span>}
-                  {item.currentVersion?.rejectionReason && <span title={item.currentVersion.rejectionReason}>驳回原因：{item.currentVersion.rejectionReason}</span>}
+                  {item.currentVersion?.effectiveAt && <span>生效时间：<DateTimeText value={item.currentVersion.effectiveAt} /></span>}
                 </> : <span><LikeOutlined /> {item.likeCount}　<LinkOutlined /> {item.referenceCount}</span>}
                 <MaterialSearchContent material={item} keyword={keyword} onSearch={searchMaterials}
                   onLocate={() => void openMaterial(item.id)} />
@@ -728,53 +660,23 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           </Space>} />
       </List.Item>} />}
     </Drawer>
-    <Modal open={Boolean(approvalAction)} title={approvalAction === 'approve' ? '通过素材审批' : '驳回素材'} confirmLoading={approvalSaving}
-      onCancel={() => !approvalSaving && setApprovalAction(undefined)} onOk={() => void decideApproval()}>
-      <Input.TextArea value={approvalReason} onChange={event => setApprovalReason(event.target.value)} maxLength={1000} rows={4} placeholder="请填写审批意见" />
-    </Modal>
-    <Modal open={cancelOpen} title="撤回素材审批" okText="确认撤回" confirmLoading={cancelSaving}
-      okButtonProps={{ disabled: !cancelReason.trim() }} onCancel={() => !cancelSaving && setCancelOpen(false)} onOk={() => void cancelReview()}>
-      <Typography.Paragraph>撤回后可继续编辑并重新提交，已有生效版本保持可用。能否撤回由当前流程配置决定。</Typography.Paragraph>
-      {cancelError && <Alert type="error" showIcon title={cancelError} />}
-      <Input.TextArea aria-label="撤回原因" value={cancelReason} onChange={event => setCancelReason(event.target.value)} maxLength={500} rows={3} placeholder="请填写撤回原因" />
-    </Modal>
     <Drawer
-      title={formMode === 'create' ? (formTypeCode === 'viral_content' ? '创建爆款内容拆解' : '创建爆款账号拆解') : formMode === 'edit' ? '编辑爆款拆解' : '查看爆款拆解'}
+      title="查看爆款拆解"
       open={formOpen} onClose={() => setFormOpen(false)} width="min(1480px, 100vw)" destroyOnClose>
-      {detailLoading && formMode !== 'create' ? <Skeleton active /> : detailError && formMode !== 'create'
+      {detailLoading ? <Skeleton active /> : detailError
         ? <Alert type="error" showIcon message={detailError} action={<Button onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>} />
         : <>
-      {formMode === 'view' && selected && <div className="material-layout-summary">
+      {selected && <div className="material-layout-summary">
         <div className="material-layout-summary-info"><Tag>{statusLabel[currentVersion?.status || selected.status]}</Tag><span>负责人：{selected.ownerName || '未记录'}</span><span>当前版本：V{currentVersion?.versionNo || '-'}</span>
-          {currentVersion?.status === 'IN_APPROVAL' && <span>审核人：{currentVersion.pendingApproverNames?.join('、') || '等待流程分配'}</span>}
-          {currentVersion?.rejectionReason && <span>驳回原因：{currentVersion.rejectionReason}</span>}
-          {selected.currentEffectiveVersionId && selected.currentDraftVersionId && <span>旧生效版本继续可用</span>}</div>
+        </div>
         <div className="material-layout-summary-actions">
           <Button icon={<HistoryOutlined />} onClick={() => void openVersions()}>版本记录</Button>
-          {canCancel && <Button onClick={() => { setCancelReason(''); setCancelError(''); setCancelOpen(true) }}>撤回审批</Button>}
-          {canUpdate && ['viral_account', 'viral_content'].includes(displayedTypeCode || '') && <Button type="primary" icon={<EditOutlined />} onClick={openEdit}>{currentVersion?.status === 'EFFECTIVE' ? '修改并重新送审' : '继续编辑'}</Button>}
-          {canApprove && <Button type="primary" onClick={() => setApprovalAction('approve')}>通过审批</Button>}
-          {canReject && <Button danger onClick={() => setApprovalAction('reject')}>驳回审批</Button>}
         </div>
       </div>}
-      {/* 只读流程轨迹：编导需要看到自己的件走到哪个节点、由谁在审。与素材审批页同款接入，
-          同样受 bpm:process-instance:query 约束（面板走 BPM 审批详情接口）。
-          canUpdate=false 与 users=[] 的理由见 MaterialApprovalPage：审批结论由本页的
-          「通过审批 / 驳回审批」按钮经 zsjos/material-approval 接口产生，不从这里推进。 */}
-      {formMode === 'view' && currentVersion?.processInstanceId && currentVersion.status === 'IN_APPROVAL'
-        && hasPermission(permissions, 'bpm:process-instance:query') && <BpmProcessPanel
-        compact
-        decisionOnly
-        allowDecision={false}
-        canUpdate={false}
-        users={[]}
-        processInstanceId={currentVersion.processInstanceId}
-        taskId={approvalTaskId}
-      />}
       {displayedTypeCode === 'viral_content'
-        ? viralContentType && <ViralContentMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralContentType}
+        ? viralContentType && <ViralContentMaterialForm key={selected?.id} mode="view" type={viralContentType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />
-        : displayedTypeCode === 'viral_account' && viralType && <ViralAccountMaterialForm key={`${formMode}-${selected?.id || 'new'}`} mode={formMode} type={viralType}
+        : displayedTypeCode === 'viral_account' && viralType && <ViralAccountMaterialForm key={selected?.id} mode="view" type={viralType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />}
       </>}
     </Drawer>

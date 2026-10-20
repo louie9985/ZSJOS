@@ -59,11 +59,13 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
         if ("read".equals(action)
                 && Set.of("active", "paused", "completed").contains(relation.getStatus())
                 && hasManagedStudentReadPermission(userId)) {
-            DeliveryClassScopeService.Scope scope = deliveryClassScopeService.resolve(userId);
+            DeliveryClassScopeService.Scope scope = deliveryClassScopeService.resolveRead(userId);
             if (scope.allDepartments() || Objects.equals(relation.getOwnerUserId(), userId)) return true;
-            return !scope.deptIds().isEmpty() && adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
+            Long pendingClassId = deliveryClassScopeService.readablePendingClassId(userId);
+            if (pendingClassId != null && Objects.equals(pendingClassId, relation.getClassId())) return true;
+            if (!scope.deptIds().isEmpty() && adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
                     .map(AdminUserRespDTO::getId).filter(Objects::nonNull)
-                    .anyMatch(ownerId -> Objects.equals(ownerId, relation.getOwnerUserId()));
+                    .anyMatch(ownerId -> Objects.equals(ownerId, relation.getOwnerUserId()))) return true;
         }
         // Responsibility is cumulative: the service owner can also be its director.
         if (Set.of("director-precheck", "director-interview").contains(action)) {

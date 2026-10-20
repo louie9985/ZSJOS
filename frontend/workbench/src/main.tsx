@@ -1,4 +1,5 @@
 import DeliveryReminder from "./components/DeliveryReminder";
+import { readEducationNavigationContext, replaceDeliveryEmployeeEntry } from './services/educationTeamNavigation'
 import DiagnosisReminder from "./components/DiagnosisReminder";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -55,7 +56,8 @@ import { RealtimeProvider } from './components/RealtimeProvider'
 import { NotifyMessageProvider } from './components/NotifyMessageProvider'
 import MenuTaskBadgeProvider, { useMenuTaskBadges } from './components/MenuTaskBadgeProvider'
 import MessageCenter from './components/MessageCenter'
-import { AnnouncementProvider } from './components/AnnouncementProvider'
+import { AnnouncementProvider, useAnnouncements } from './components/AnnouncementProvider'
+import { useNotifyMessages } from './components/NotifyMessageProvider'
 import { ForcedFormProvider } from './components/ForcedFormProvider'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { SalesDispatchStatusProvider } from './components/SalesDispatchStatusProvider'
@@ -63,6 +65,8 @@ import SalesDispatchStatusAlert from './components/SalesDispatchStatusAlert'
 import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/EmployeeAvatar'
 import ThemeProvider from './components/Theme/ThemeProvider'
 import SettingsDrawer from './components/SettingsDrawer'
+import { getNavigationPreference } from './services/navigationPreference'
+import { applyNavigationOrder, NAVIGATION_QUERY, type NavigationOrder } from './services/navigationOrder'
 import TabBar, { type TabItem } from './components/TabBar'
 import { useTheme } from './components/Theme/ThemeContext'
 import LoginPage from './layouts/LoginPage'
@@ -73,7 +77,9 @@ import { getRetainedPageMenus } from './retainedPagePaths'
 import { WorkbenchPageNavigation, useWorkbenchPageNavigation } from './components/WorkbenchPageNavigation'
 import AdminEmbedFrame, { type AdminEmbedFrameHandle } from './layouts/AdminEmbedPage'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
-import { buildHierarchicalSecondaryItems, buildNavMenuItems } from './layouts/navItems'
+import { buildHierarchicalSecondaryItems, buildNavMenuItems, withMenuLabelBadge } from './layouts/navItems'
+import { createNavigationBadgeResolver } from './services/navigationUnread'
+import type { MenuTaskBadgeResolver } from './services/menuTaskBadge'
 import UserProfilePage from './pages/UserProfilePage'
 import WecomClickPage from './pages/WecomClickPage'
 import LeadManagementPage from './pages/LeadManagementPage'
@@ -100,10 +106,10 @@ class RuntimeBoundary extends React.Component<React.PropsWithChildren, { error?:
   }
 }
 
-function toPrimaryItems(items: PrimaryNavigationItem[], badgeResolver?: (path: string) => { count: number } | undefined): MenuItem[] {
+function toPrimaryItems(items: PrimaryNavigationItem[], badgeResolver?: MenuTaskBadgeResolver): MenuItem[] {
   return items.map(item => ({
     key: item.key,
-    label: badgeResolver?.(item.menu.path)?.count ? <Badge className="menu-task-badge" count={badgeResolver(item.menu.path)?.count} overflowCount={99}><span className="menu-task-text">{item.label}</span></Badge> : item.label,
+    label: withMenuLabelBadge(item.label, badgeResolver?.(item.menu.path)),
     title: item.label,
     icon: <BackendMenuIcon icon={item.icon}/>
   }))
@@ -128,7 +134,7 @@ function MobileEntryReloadGuard({ platform }: { platform: AuthPlatform }) {
   return null
 }
 
-type ShellProps = { info: PermissionInfo; authPlatform: AuthPlatform; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }
+type ShellProps = { info: PermissionInfo; navigationOrder: NavigationOrder; authPlatform: AuthPlatform; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }
 
 function Shell(props: ShellProps) {
   const { tabs: tabsEnabled } = useTheme()
@@ -144,7 +150,7 @@ function Shell(props: ShellProps) {
   </WorkbenchPageNavigation>
 }
 
-function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMenus, retainedMenus, retainedPaths }: ShellProps & {
+function ShellContent({ info, navigationOrder, authPlatform, onLogout, onUserChange, authorizedMenus, retainedMenus, retainedPaths }: ShellProps & {
   authorizedMenus: WorkbenchMenu[]; retainedMenus: WorkbenchMenu[]; retainedPaths: readonly string[]
 }) {
   const navigate = useNavigate()
@@ -153,6 +159,15 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
   const { token } = theme.useToken()
   const { isDark, backgroundValue, layoutMode, watermark: watermarkEnabled, headerFixed, tabs: tabsEnabled, tabStyle } = useTheme()
   const { resolve: resolveMenuTaskBadge } = useMenuTaskBadges()
+  const { unreadCount: announcementUnreadCount } = useAnnouncements()
+  const { unreadCount: notifyUnreadCount } = useNotifyMessages()
+  const resolveNavigationBadge = useMemo(
+    () => createNavigationBadgeResolver(resolveMenuTaskBadge, {
+      announcement: announcementUnreadCount,
+      message: notifyUnreadCount
+    }),
+    [announcementUnreadCount, notifyUnreadCount, resolveMenuTaskBadge]
+  )
   const [primaryCollapsed, setPrimaryCollapsed] = useState(false)
 
   // 调试日志：检查权限信息
@@ -183,13 +198,14 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
 
   // 移动端侧栏由 layout.css 在整个 ≤768px 视口隐藏（抽屉成为唯一导航入口），
   // 无需再用 matchMedia 同步 primarySider 的 collapsed 状态。
-  const navigationMenus = useMemo(() => {
+  const navigationSource = useMemo(() => {
     const renderableRoutes = authPlatform === 'MOBILE' ? MOBILE_RENDERABLE_APP_ROUTES : RENDERABLE_APP_ROUTES
     if (!info.workbenchMenus || info.workbenchLayoutMeta?.fallback) {
       return filterRenderableMenus(authorizedMenus, renderableRoutes)
     }
     return filterRenderableMenus(buildMenuTree(info.workbenchMenus, '/', true), renderableRoutes)
   }, [authPlatform, authorizedMenus, info.workbenchLayoutMeta?.fallback, info.workbenchMenus])
+  const navigationMenus = useMemo(() => applyNavigationOrder(navigationSource, navigationOrder), [navigationSource, navigationOrder])
   const navigation = useMemo(() => buildTwoLevelNavigation(navigationMenus), [navigationMenus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const leadDetailDeepLink = useMemo(() => {
@@ -286,14 +302,14 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
   const showTopSecondary = layoutMode === 'top-only'
 
   const singleSiderItems: MenuItem[] = useMemo(
-    () => showSingleSider ? buildNavMenuItems(navigation, { popupClassName: NAV_POPUP_CLASS_NAME, badgeResolver: resolveMenuTaskBadge }) : [],
-    [navigation, resolveMenuTaskBadge, showSingleSider]
+    () => showSingleSider ? buildNavMenuItems(navigation, { popupClassName: NAV_POPUP_CLASS_NAME, badgeResolver: resolveNavigationBadge }) : [],
+    [navigation, resolveNavigationBadge, showSingleSider]
   )
   const miniSiderItems: MenuItem[] = useMemo(
     () => showMiniSider
-      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: `${NAV_POPUP_CLASS_NAME} mini-flyout`, badgeResolver: resolveMenuTaskBadge })
+      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: `${NAV_POPUP_CLASS_NAME} mini-flyout`, badgeResolver: resolveNavigationBadge })
       : [],
-    [navigation, resolveMenuTaskBadge, showMiniSider]
+    [navigation, resolveNavigationBadge, showMiniSider]
   )
   const topOnlyItems: MenuItem[] = useMemo(
     () => showTopSecondary
@@ -301,10 +317,10 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
           childIcons: false,
           expandSuffix: <DownOutlined style={{ fontSize: 10, marginLeft: 2 }}/>,
           popupClassName: NAV_POPUP_CLASS_NAME
-          , badgeResolver: resolveMenuTaskBadge
+          , badgeResolver: resolveNavigationBadge
         })
       : [],
-    [navigation, resolveMenuTaskBadge, showTopSecondary]
+    [navigation, resolveNavigationBadge, showTopSecondary]
   )
 
   const layoutClass = [
@@ -332,6 +348,7 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
       activePrimaryKey={activePrimary?.key}
       activePagePath={currentMenu?.path}
       onSelect={go}
+      badgeResolver={resolveNavigationBadge}
     />
 
     {/* 一级侧栏：仅 side 模式渲染 */}
@@ -351,7 +368,10 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <span className="primary-nav-icon"><BackendMenuIcon icon={item.icon}/></span>
-                  {!primaryCollapsed && <span className="primary-nav-label"><span className="menu-task-text">{item.label}</span>{(resolveMenuTaskBadge(item.menu.path)?.count ?? 0) > 0 && <Badge className="menu-task-badge" count={resolveMenuTaskBadge(item.menu.path)?.count} overflowCount={99} />}</span>}
+                  {!primaryCollapsed && <span className="primary-nav-label"><span className="menu-task-text">{item.label}</span></span>}
+                  {resolveNavigationBadge(item.menu.path)?.count
+                    ? <Badge className="menu-task-badge primary-nav-badge" count={resolveNavigationBadge(item.menu.path)?.count} overflowCount={99}/>
+                    : null}
                 </button>
               )
               return primaryCollapsed
@@ -383,7 +403,7 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
             inlineIndent={NAV_INLINE_INDENT}
             inlineCollapsed={secondaryCollapsed}
             selectedKeys={currentMenu ? [currentMenu.path] : []}
-            items={buildHierarchicalSecondaryItems(activePrimary?.menu, { popupClassName: NAV_POPUP_CLASS_NAME, badgeResolver: resolveMenuTaskBadge })}
+            items={buildHierarchicalSecondaryItems(activePrimary?.menu, { popupClassName: NAV_POPUP_CLASS_NAME, badgeResolver: resolveNavigationBadge })}
             onClick={({ key }) => go(String(key))}
             className="transparent-menu"
           />
@@ -448,7 +468,7 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
           <Menu
             mode="horizontal"
             selectedKeys={activePrimary ? [activePrimary.key] : []}
-            items={toPrimaryItems(navigation, resolveMenuTaskBadge)}
+            items={toPrimaryItems(navigation, resolveNavigationBadge)}
             onClick={({ key }) => selectPrimary(String(key))}
             className="top-primary-menu"
           />
@@ -465,7 +485,7 @@ function ShellContent({ info, authPlatform, onLogout, onUserChange, authorizedMe
         )}
         <Space size={8} className="header-actions">
           <span className="header-dispatch-control"><SalesDispatchStatusControl/></span>
-          <SettingsDrawer/>
+          <SettingsDrawer menus={navigationSource} permissions={info.permissions || []}/>
           <Tooltip title="全局刷新">
             <Button type="text" aria-label="全局刷新" icon={<ReloadOutlined/>} onClick={() => window.location.reload()}/>
           </Tooltip>
@@ -546,6 +566,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
     return Boolean(getAuthAccessToken(authPlatform))
   })
   const [info, setInfo] = useState<PermissionInfo>()
+  const [navigationOrder, setNavigationOrder] = useState<NavigationOrder>({ groups: [] })
   const [error, setError] = useState('')
   const [permissionAttempt, setPermissionAttempt] = useState(0)
 
@@ -571,8 +592,18 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
 
   useEffect(() => {
     if (!logged) return
+    let active = true
     api.permissionInfo()
-      .then(permissionInfo => {
+      .then(async permissionInfo => {
+        const navigationContext = await readEducationNavigationContext()
+        permissionInfo = { ...permissionInfo,
+          menus: replaceDeliveryEmployeeEntry(permissionInfo.menus || [], navigationContext.delivery),
+          workbenchMenus: permissionInfo.workbenchMenus
+            ? replaceDeliveryEmployeeEntry(permissionInfo.workbenchMenus, navigationContext.delivery) : undefined }
+        const canReadNavigation = permissionInfo.permissions?.includes(NAVIGATION_QUERY) || permissionInfo.permissions?.includes('*:*:*')
+        const order = canReadNavigation ? await getNavigationPreference().catch(() => ({ groups: [] })) : { groups: [] }
+        if (!active) return
+        setNavigationOrder(order)
         console.log('[Root] permissionInfo response:', permissionInfo)
         console.log('[Root] permissions array:', permissionInfo.permissions)
         console.log('[Root] roles array:', permissionInfo.roles)
@@ -591,6 +622,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
         setInfo(permissionInfo)
       })
       .catch(permissionError => {
+        if (!active) return
         setInfo(undefined)
         if (permissionError instanceof AuthenticationError) {
           clearAuthStorage(authPlatform)
@@ -601,6 +633,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
         }
         setError(permissionError.response?.data?.msg || permissionError.message || '权限信息加载失败')
       })
+    return () => { active = false }
   }, [authPlatform, logged, permissionAttempt])
 
   if (!logged) return location.pathname === APP_ROUTES.WECOM_CLICK && !publicLoginRedirect
@@ -609,7 +642,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
   if (error) return <div className="center-page"><Result status={error === SERVER_CONNECTION_ERROR_MESSAGE ? '500' : 'error'} title={error} subTitle={error === SERVER_CONNECTION_ERROR_MESSAGE ? '权限信息暂时无法加载，请检查网络后重试。' : '权限信息加载失败，请重试或返回登录。'} extra={<Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }}>返回登录</Button></Space>}/></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
   return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><RealtimeProvider platform={authPlatform}><ForcedFormProvider><DiagnosisReminder enabled={(info.permissions || []).some(p => ["zsjos:media-account:edit", "zsjos:media-account:maintenance"].includes(p))}/><DeliveryReminder enabled={(info.permissions || []).includes("zsjos:student-delivery:query")}/><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider><MenuTaskBadgeProvider>
-    <Shell authPlatform={authPlatform} info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
+    <Shell authPlatform={authPlatform} info={info} navigationOrder={navigationOrder} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)
       await api.logout(authPlatform)

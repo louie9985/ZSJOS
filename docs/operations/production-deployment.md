@@ -2,6 +2,11 @@
 
 ## 一键完整发布
 
+Flowable 四字节字符升级由 `V331__flowable_utf8mb4.sql` 随下述完整 `deploy` 执行，
+不是由 `build` 或单独重启执行。更新前停止该数据库的全部其他后端实例、Flowable 执行器和写入入口；
+本脚本只负责其配置的后端。迁移失败时保持停机并按同一脚本恢复，不能把应用回退当成数据库回退。
+详见 [Flowable utf8mb4 升级](flowable-utf8mb4.md)。
+
 生产发布统一由仓库脚本执行，发布用户需要能够无交互运行 `sudo systemctl`：
 
 ```bash

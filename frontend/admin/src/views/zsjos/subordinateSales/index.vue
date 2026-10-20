@@ -1,8 +1,8 @@
 <template>
   <WorkbenchListPage
-    title="下属员工"
+    title="下属销售"
     endpoint="/zsjos/subordinate-sales/page"
-    description="下属员工与业绩概览"
+    description="下属销售与业绩概览"
     advanced-scene="subordinate_sales"
     advanced-search-endpoint="/zsjos/subordinate-sales/search-page"
     advanced-placeholder="姓名 / 账号 / 手机号"
@@ -19,7 +19,6 @@
       <el-button
         link
         v-hasPermi="['zsjos:subordinate-sales:dispatch-mode']"
-        v-if="row.salesDispatchSupported !== false"
         @click="changeDispatch(row, reload)"
         >{{ row.accepting ? '暂停接单' : '开启接单' }}</el-button
       >
@@ -77,7 +76,7 @@
   >
     <el-alert :title="`已选择 ${selected.length} 条客资`" type="info" show-icon class="mb-12px" />
     <el-form label-width="90px">
-      <el-form-item v-if="batchMode === 'transfer'" label="目标员工" required
+      <el-form-item v-if="batchMode === 'transfer'" label="目标销售" required
         ><el-select v-model="targetUserId" filterable class="w-100%"
           ><el-option
             v-for="item in candidates"
@@ -172,14 +171,14 @@ const openBatch = async (mode: 'transfer' | 'public-sea') => {
     try {
       candidates.value = await Api.subordinateBatchTransferCandidates(selected.value.map(item => item.id))
     } catch (error: any) {
-      message.error(error?.msg || error?.message || '目标员工加载失败')
+      message.error(error?.msg || error?.message || '目标销售加载失败')
     }
   }
 }
 const submitBatch = async () => {
   if (!reason.value.trim()) return message.warning('请填写操作原因')
   if (batchMode.value === 'transfer' && !targetUserId.value)
-    return message.warning('请选择目标员工')
+    return message.warning('请选择目标销售')
   batchSaving.value = true
   try {
     const leadIds = selected.value.map((item) => item.id)

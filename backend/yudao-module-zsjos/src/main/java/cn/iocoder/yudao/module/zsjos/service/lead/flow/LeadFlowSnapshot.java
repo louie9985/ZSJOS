@@ -19,6 +19,11 @@ public record LeadFlowSnapshot(int version, String operationKey, String title, S
         return java.util.Objects.equals(left.state(), right.state()) && java.util.Objects.equals(left.code(), right.code())
                 && java.util.Objects.equals(left.identityType(), right.identityType()) && java.util.Objects.equals(left.identityId(), right.identityId());
     }
+    /** Normalize old coverage keys while reading; immutable workflow evidence remains unchanged. */
+    public static String canonicalRecordKey(String key) {
+        return key != null && key.startsWith("aging:") ? "public-sea-pool:" + key.substring(6) : key;
+    }
+
     public record Change(String field, String label, Value before, Value after) {}
     public static List<Change> diff(Map<String, Value> before, Map<String, Value> after, Map<String, String> labels) {
         return labels.entrySet().stream().filter(e -> !sameSelection(before.get(e.getKey()), after.get(e.getKey())))

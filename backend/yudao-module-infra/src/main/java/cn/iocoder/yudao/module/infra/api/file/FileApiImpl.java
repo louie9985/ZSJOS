@@ -23,6 +23,10 @@ import java.util.Map;
 @Validated
 public class FileApiImpl implements FileApi {
     @Override
+    public FileInfoRespDTO getRegisteredFileByUrl(String url) {
+        return BeanUtils.toBean(fileService.getRegisteredFileByUrl(url), FileInfoRespDTO.class);
+    }
+    @Override
     public byte[] getFileContent(Long fileId) throws Exception {
         var file = fileService.getFile(fileId);
         if (file == null) throw new IllegalArgumentException("File unavailable");

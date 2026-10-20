@@ -109,8 +109,8 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
     <Modal title={`${day?.format('YYYY年M月D日')} · 待跟进客资`} open={Boolean(day)} onCancel={() => setDay(undefined)} footer={null}
       mask={{ closable: false }} width="min(1440px, calc(100vw - 32px))" destroyOnHidden className="lead-calendar-modal">
       <div className="lead-calendar-toolbar"><Typography.Text type="secondary">共 {total} 个客资</Typography.Text><Space wrap>
-        <Select aria-label="客资排序字段" value={sort} options={[{ value: 'deadline', label: '跟进截止时间' }, { value: 'category', label: '客资分类等级' }]} onChange={value => { setSort(value); setPage(1) }} />
-        <Select aria-label="排序方向" value={direction} options={[{ value: 'asc', label: sort === 'category' ? 'S级优先' : '最早优先' }, { value: 'desc', label: '倒序' }]} onChange={value => { setDirection(value); setPage(1) }} />
+        <Select aria-label="客资排序字段" value={sort} options={[{ value: 'deadline', label: '跟进截止时间' }, { value: 'category', label: '客资分类等级' }, { value: 'ownershipStartedAt', label: '归属开始时间' }]} onChange={value => { setSort(value); setPage(1) }} />
+        <Select aria-label="排序方向" value={direction} options={[{ value: 'asc', label: sort === 'category' ? 'S级优先' : '最早优先' }, { value: 'desc', label: sort === 'ownershipStartedAt' ? '最新优先' : '倒序' }]} onChange={value => { setDirection(value); setPage(1) }} />
         <Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button>
       </Space></div>
       {cardError ? <Alert type="error" showIcon title={cardError} action={<Button onClick={refresh}>重试</Button>} /> : <Spin spinning={cardLoading}>

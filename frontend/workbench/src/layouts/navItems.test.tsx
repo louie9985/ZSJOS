@@ -64,6 +64,25 @@ describe('buildNavMenuItems', () => {
     expect(item.icon).toBeDefined()
   })
 
+  it('keeps counts in the navigation item while preserving the icon', () => {
+    const built = items([primary(1, '消息中心', '/messages', [['通知公告', '/messages/notice']])], {
+      badgeResolver: path => path === '/messages' ? { count: 15 } : { count: 3 }
+    })
+    expect(built[0].icon).toBeDefined()
+    expect(built[0].label.props.className).toBe('menu-task-label')
+    expect(built[0].children[0].icon).toBeDefined()
+    expect(built[0].children[0].label.props.className).toBe('menu-task-label')
+  })
+
+  it('keeps a text badge only when child icons are intentionally disabled', () => {
+    const [item] = items([primary(1, '消息中心', '/messages', [['未读消息', '/messages/unread']])], {
+      childIcons: false,
+      badgeResolver: () => ({ count: 12 })
+    })
+    expect(item.children[0].icon).toBeUndefined()
+    expect(item.children[0].label.props.className).toBe('menu-task-label')
+  })
+
   it('passes popupClassName through only for submenus', () => {
     const built = items(
       [primary(1, '客资', '/lead', [['我的客资', '/lead/mine']]), primary(2, '工作台', '/dashboard', [])],

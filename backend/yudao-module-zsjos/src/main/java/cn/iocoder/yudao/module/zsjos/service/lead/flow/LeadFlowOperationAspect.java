@@ -20,7 +20,7 @@ import java.util.*;
 public class LeadFlowOperationAspect {
     @Resource private LeadFlowRecorder recorder;
     @Resource private TransactionTemplate transactionTemplate;
-    @Resource private LeadAgingPoolCycleMapper cycleMapper;
+    @Resource private LeadPublicSeaPoolCycleMapper cycleMapper;
     @Resource private LeadAppealMapper appealMapper;
     @Resource private LeadComplaintMapper complaintMapper;
     @Resource private LeadTransferRequestMapper transferMapper;

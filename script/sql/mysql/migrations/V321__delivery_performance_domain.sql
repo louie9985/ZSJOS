@@ -12,6 +12,17 @@ DELIMITER $$
 CREATE PROCEDURE zsjos_v321_apply()
 BEGIN
  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+ IF (EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V321')
+      XOR EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V321')) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V321 ledger marker is one-sided';
+ END IF;
+ IF EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V321'
+      AND (description<>'独立交付业绩域' OR checksum<>SHA2('V321__delivery_performance_domain.sql',256)))
+    OR EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V321'
+      AND (description<>'独立交付业绩域' OR checksum<>SHA2('V321__delivery_performance_domain.sql',256)
+           OR release_version<>'baseline')) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V321 ledger identity conflict';
+ END IF;
  IF NOT EXISTS(SELECT 1 FROM system_menu WHERE permission='zsjos:sales-performance:query' AND deleted=0)
  OR NOT EXISTS(SELECT 1 FROM system_menu WHERE permission='zsjos:sales-performance-target:query' AND deleted=0)
  OR NOT EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V276') THEN
@@ -50,6 +61,14 @@ BEGIN
  WHERE s.type=3 AND s.deleted=0 AND s.permission LIKE 'zsjos:sales-performance%'
  AND NOT EXISTS(SELECT 1 FROM system_menu x WHERE x.permission=REPLACE(s.permission,'zsjos:sales-performance','zsjos:delivery-performance') AND x.deleted=0);
  IF (SELECT COUNT(*) FROM system_menu WHERE deleted=0 AND permission LIKE 'zsjos:delivery-performance%')<>8
+ OR (SELECT COUNT(*) FROM system_menu m JOIN system_menu root ON root.id=m.parent_id
+     WHERE m.deleted=0 AND root.deleted=0 AND root.path='/zsjos' AND root.parent_id=0
+       AND m.type=2 AND m.permission='zsjos:delivery-performance:query'
+       AND m.path='delivery-performance' AND m.component='zsjos/deliveryPerformance/index')<>1
+ OR (SELECT COUNT(*) FROM system_menu m JOIN system_menu root ON root.id=m.parent_id
+     WHERE m.deleted=0 AND root.deleted=0 AND root.path='/zsjos' AND root.parent_id=0
+       AND m.type=2 AND m.permission='zsjos:delivery-performance-target:query'
+       AND m.path='delivery-performance-target' AND m.component='zsjos/deliveryPerformanceTarget/index')<>1
  OR EXISTS(SELECT 1 FROM zsjos_performance_org WHERE business_domain NOT IN ('sales','delivery'))
  OR EXISTS(SELECT 1 FROM zsjos_performance_target WHERE business_domain NOT IN ('sales','delivery')) THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V321 domain/menu postcondition failed';

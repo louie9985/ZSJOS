@@ -1116,7 +1116,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
         ].map(([label, value]) => <div className="lead-profile-row" key={label}><span className="lead-field-label">{label}</span><span className="lead-field-value">{value}</span></div>)}
       </div>
       <StudentOverviewBackground key={`${selectedService?.serviceRelationId}-${selectedService?.leadId}-${hasPermission(permissions, 'zsjos:student-info-form:read')}`}
-        leadId={selectedService?.leadId ?? detail?.student.leadId}
+        caseId={selectedService?.registrationCaseId}
         allowed={hasPermission(permissions, 'zsjos:student-info-form:read') && !!directorContext?.visibleTabs.includes('student-info')} />
       <div className="student-overview-subheading"><Typography.Text strong>当前课程服务</Typography.Text></div>
       <dl className="student-overview-fields">{[

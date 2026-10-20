@@ -36,6 +36,7 @@ class SupervisorLeadOverturnServiceTest {
     @Mock LeadAttachmentService attachmentService;
     @Mock CashbackService cashbackService;
     @Mock LeadNotifyEventPublisher notifyEventPublisher;
+    @Mock SubordinateSalesScope salesScope;
     LeadDO lead;
     @BeforeAll static void mapping() {
         var configuration = new com.baomidou.mybatisplus.core.MybatisConfiguration();
@@ -47,13 +48,14 @@ class SupervisorLeadOverturnServiceTest {
     @BeforeEach void setup() {
         TenantContextHolder.setTenantId(9L);
         lead = new LeadDO(); lead.setId(1L); lead.setTenantId(9L); lead.setPersonId(5L);
-        lead.setOwnerUserId(20L); lead.setStatus("invalid"); lead.setAssignmentStatus("owned");
+        lead.setOwnerUserId(20L); lead.setOwnerIdentity("sales"); lead.setStatus("invalid"); lead.setAssignmentStatus("owned");
         lead.setQualifiedAt(LocalDateTime.of(2026,10,8,10,0)); lead.setVersion(1);
         lead.setInvalidReason("unreachable"); lead.setInvalidReasonLabelSnapshot("原无效分类");
         lead.setInvalidDescription("原无效说明"); lead.setInvalidEvidenceRefs("[]");
         lead.setLeadCategory("A"); lead.setLeadCategoryLabelSnapshot("历史分类");
         lenient().when(leadMapper.selectByIdForUpdate(1L,9L)).thenReturn(lead);
-        lenient().when(permissionService.getManagedUserIds(30L)).thenReturn(Set.of(20L));
+        var member = new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO(); member.setId(20L);
+        lenient().when(salesScope.managed(30L)).thenReturn(List.of(member));
         lenient().when(securityFrameworkService.hasPermission(PERMISSION)).thenReturn(true);
     }
     @AfterEach void cleanup() { TenantContextHolder.clear(); }
@@ -99,7 +101,7 @@ class SupervisorLeadOverturnServiceTest {
         lead.setStatus(status); assertThrows(ServiceException.class,()->service.overturn(1L,30L,request()));
     }
     @Test void rejectsUnownedAndWrongDepartmentDespiteReadAll() {
-        when(permissionService.getManagedUserIds(30L)).thenReturn(Set.of());
+        when(salesScope.managed(30L)).thenReturn(List.of());
         assertNull(service.action(lead,30L));
         assertEquals(LEAD_PERMISSION_DENIED.getCode(),assertThrows(ServiceException.class,()->service.overturn(1L,30L,request())).getCode());
         lead.setOwnerUserId(null); assertThrows(ServiceException.class,()->service.overturn(1L,30L,request()));
@@ -116,8 +118,9 @@ class SupervisorLeadOverturnServiceTest {
         verify(leadMapper).selectByIdForUpdate(1L,10L); verifyNoInteractions(eventMapper);
     }
     @Test void rejectsOldOwnerOrNewInvalidDecision() {
-        var r=request(); lead.setOwnerUserId(21L); when(permissionService.getManagedUserIds(30L)).thenReturn(Set.of(20L,21L));
+        var r=request(); lead.setOwnerUserId(21L); var member = new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO(); member.setId(21L); when(salesScope.managed(30L)).thenReturn(List.of(member));
         assertEquals(STALE.getCode(),assertThrows(ServiceException.class,()->service.overturn(1L,30L,r)).getCode());
+        var original = new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO(); original.setId(20L); when(salesScope.managed(30L)).thenReturn(List.of(original));
         lead.setOwnerUserId(20L); var event=new BusinessEventDO();event.setId(100L);event.setEventType("lead_qualified_invalid");
         when(eventMapper.selectByLeadId(1L)).thenReturn(List.of(event));
         assertEquals(STALE.getCode(),assertThrows(ServiceException.class,()->service.overturn(1L,30L,r)).getCode());

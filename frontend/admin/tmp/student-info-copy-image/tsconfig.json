@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "rootDir": "../..", "types": [], "typeRoots": ["../../node_modules/@types", "../../types"] },
+  "include": ["../../src/views/zsjos/components/StudentInfoQrCard.vue", "../../types/**/*.d.ts", "../../src/types/auto-imports.d.ts", "../../src/types/auto-components.d.ts"],
+  "exclude": ["../../node_modules", "../../dist"]
+}

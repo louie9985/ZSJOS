@@ -6,7 +6,7 @@ export interface LeadFollowUpRuleVO {
   name: string
   firstFollowUpTimeoutMinutes: number
   qualificationTimeoutMinutes: number
-  agingPoolTimeoutDays: number
+  publicSeaPoolTimeoutDays: number
   notificationPopupDurationMinutes: number
   duplicateAutoResolutionEnabled: boolean
   status: number
@@ -17,7 +17,7 @@ export interface LeadFollowUpRuleUpdateReqVO {
   version: number
   firstFollowUpTimeoutMinutes: number
   qualificationTimeoutMinutes: number
-  agingPoolTimeoutDays: number
+  publicSeaPoolTimeoutDays: number
   notificationPopupDurationMinutes: number
   duplicateAutoResolutionEnabled: boolean
 }

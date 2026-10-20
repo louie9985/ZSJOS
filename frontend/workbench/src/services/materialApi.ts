@@ -307,12 +307,20 @@ export type PartnerStudentInvitationContext = {
 export type MediaStudentPartnerContext = PartnerStudentInvitationContext & { canInviteStudent: boolean }
 
 export const materialApi = {
+  browsePage: async (params: MaterialPageParams) =>
+    unwrap<PageResult<Material>>(await http.get('/zsjos/material/browse/page', { params })),
+  browse: async (id: number) => unwrap<Material>(await http.get(`/zsjos/material/browse/${id}`)),
+  browseVersions: async (id: number) =>
+    unwrap<MaterialVersion[]>(await http.get(`/zsjos/material/browse/${id}/version/list`)),
   types: async () => unwrap<MaterialType[]>(await http.get('/zsjos/material-type/list')),
   page: async (params: MaterialPageParams) =>
     unwrap<PageResult<Material>>(await http.get('/zsjos/material/page', { params })),
   get: async (id: number) => unwrap<Material>(await http.get(`/zsjos/material/${id}`)),
   create: async (data: MaterialSaveRequest) => unwrap<number>(await http.post('/zsjos/material', data)),
   update: async (id: number, data: MaterialSaveRequest) => unwrap<number>(await http.put(`/zsjos/material/${id}`, data)),
+  deleteDraft: async (id: number, expectedVersion: number) => unwrap<boolean>(
+    await http.delete(`/zsjos/material/${id}/draft`, { params: { expectedVersion } })
+  ),
   submit: async (id: number, expectedVersion: number) => unwrap<boolean>(
     await http.post(`/zsjos/material/${id}/submit`, { expectedVersion })
   ),

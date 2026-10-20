@@ -15,20 +15,32 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class LeadFlowRecorderTest {
+    @Test
+    void normalizesHistoricalPoolCoverageWithoutChangingRecordedSnapshot() {
+        var snapshot = new cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowSnapshot(1,
+                "historic-key", "historical operation", "SYSTEM", null, "system", null, null, null, null, null,
+                List.of(), List.of("aging:11", "event:81"));
+        var normalized = snapshot.coveredRecords().stream()
+                .map(cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowSnapshot::canonicalRecordKey).toList();
+        assertEquals(List.of("public-sea-pool:11", "event:81"), normalized);
+        assertEquals(List.of("aging:11", "event:81"), snapshot.coveredRecords());
+    }
+
+
     @Test void recordsPersistedClearKeepsOldEventAndIgnoresReplay() {
         var recorder=new LeadFlowRecorder();
         var leads=mock(LeadMapper.class); var events=mock(BusinessEventMapper.class);
         var products=mock(LeadIntendedProductMapper.class);
-        var cycles=mock(LeadAgingPoolCycleMapper.class);
+        var cycles=mock(LeadPublicSeaPoolCycleMapper.class);
         var assignments=mock(LeadAssignmentHistoryMapper.class);
-        var aging=mock(LeadAgingPoolEventMapper.class);
+        var publicSeaPool=mock(LeadPublicSeaPoolEventMapper.class);
         var evidence=mock(LeadFlowEvidence.class);
         ReflectionTestUtils.setField(recorder,"leadMapper",leads);
         ReflectionTestUtils.setField(recorder,"eventMapper",events);
         ReflectionTestUtils.setField(recorder,"productMapper",products);
         ReflectionTestUtils.setField(recorder,"cycleMapper",cycles);
         ReflectionTestUtils.setField(recorder,"assignmentMapper",assignments);
-        ReflectionTestUtils.setField(recorder,"agingMapper",aging);
+        ReflectionTestUtils.setField(recorder,"publicSeaPoolEventMapper",publicSeaPool);
         ReflectionTestUtils.setField(recorder,"evidenceService",evidence);
         when(evidence.capture(anyLong(),anyString(),anyLong(),anyString(),anyCollection(),anyBoolean()))
                 .thenReturn(new LeadFlowEvidence.Evidence(null,List.of()));

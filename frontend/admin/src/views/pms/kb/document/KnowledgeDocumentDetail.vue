@@ -118,7 +118,8 @@
           当前角色仅可在线预览
         </span>
       </div>
-      <FilePreview
+      <KnowledgeExcelPreview v-if="isKnowledgeExcel(document.title, document.fileType)" :document-id="document.id" />
+      <FilePreview v-else
         :downloadable="document.downloadStatus"
         :file-name="document.title"
         :file-type="document.fileType"
@@ -165,6 +166,8 @@ import KnowledgeAttachments from './KnowledgeAttachments.vue'
 import * as KnowledgeDocumentApi from '@/api/pms/kb/content/document'
 import type { PmsKnowledgeDocumentLabelVO } from '@/api/pms/kb/content/document/label'
 import { FilePreview } from '@/components/FilePreview'
+import KnowledgeExcelPreview from './KnowledgeExcelPreview.vue'
+import { isKnowledgeExcel } from '@/api/pms/kb/content/excel'
 import { useUserStore } from '@/store/modules/user'
 import { formatDate } from '@/utils/formatTime'
 import KnowledgeDocumentComment from './KnowledgeDocumentComment.vue'

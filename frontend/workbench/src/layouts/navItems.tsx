@@ -4,9 +4,15 @@ import type { PrimaryNavigationItem, SecondaryNavigationItem } from '../services
 import type { WorkbenchMenu } from '../services/api'
 import BackendMenuIcon from './BackendMenuIcon'
 import { Badge } from 'antd'
-import type { MenuTaskBadgeResolver } from '../services/menuTaskBadge'
+import type { MenuTaskBadge, MenuTaskBadgeResolver } from '../services/menuTaskBadge'
 
 type MenuItem = Required<MenuProps>['items'][number]
+
+export function withMenuLabelBadge(label: string, badge: MenuTaskBadge | undefined) {
+  return badge && badge.count > 0
+    ? <span className="menu-task-label"><span className="menu-task-text">{label}</span><Badge className="menu-task-badge" count={badge.count} overflowCount={99}/></span>
+    : label
+}
 
 /**
  * 服务端递归导航 → antd Menu items。
@@ -33,40 +39,49 @@ export function buildNavMenuItems(
   } = {}
 ): MenuItem[] {
   const { childIcons = true, expandSuffix, groupChildren = false, popupClassName, badgeResolver } = options
-  const labelFor = (label: string, path: string) => { const badge = badgeResolver?.(path); return badge?.count ? <Badge className="menu-task-badge" count={badge.count} overflowCount={99}><span className="menu-task-text">{label}</span></Badge> : label }
   const buildChildren = (nodes: SecondaryNavigationItem[]): MenuItem[] => nodes.map(node => {
+    const badge = badgeResolver?.(node.menu.path)
     const icon = childIcons ? <BackendMenuIcon icon={node.icon}/> : undefined
     if (node.children.length === 0) {
-      return { key: node.menu.path, label: labelFor(node.label, node.menu.path), title: node.label, ...(icon ? { icon } : {}) }
+      return { key: node.menu.path, label: withMenuLabelBadge(node.label, badge), title: node.label, ...(icon ? { icon } : {}) }
     }
     const childCount = node.children.reduce((sum, child) => sum + (badgeResolver?.(child.menu.path)?.count ?? 0), 0)
+    const nodeBadge = badge ?? (childCount > 0 ? { count: childCount } : undefined)
     return {
       key: node.key,
-      label: childCount ? <Badge className="menu-task-badge" count={childCount} overflowCount={99}><span className="menu-task-text">{node.label}</span></Badge> : node.label,
+      label: withMenuLabelBadge(node.label, nodeBadge),
       title: node.label,
-      ...(icon ? { icon } : {}),
+      ...(childIcons ? { icon: <BackendMenuIcon icon={node.icon}/> } : {}),
       ...(popupClassName ? { popupClassName } : {}),
       children: buildChildren(node.children)
     }
   })
 
   return navigation.map(primary => {
-    const icon = <BackendMenuIcon icon={primary.icon}/>
+    const primaryBadge = badgeResolver?.(primary.menu.path)
     // 自身即页面：叶子项，key 用 path
     if (primary.pages.length === 0) {
-      return { key: primary.menu.path, label: labelFor(primary.label, primary.menu.path), title: primary.label, icon }
+      return {
+        key: primary.menu.path,
+        label: withMenuLabelBadge(primary.label, primaryBadge),
+        title: primary.label,
+        icon: <BackendMenuIcon icon={primary.icon}/>
+      }
     }
     const pages = buildChildren(primary.pages)
     const primaryCount = primary.pages.reduce((sum, page) => sum + (badgeResolver?.(page.menu.path)?.count ?? 0), 0)
+    const badge = primaryBadge ?? (primaryCount > 0 ? { count: primaryCount } : undefined)
     const children = groupChildren
       ? [{ type: 'group' as const, key: `${primary.key}-group`, label: primary.label, children: pages }]
       : pages
     return {
       key: primary.key,
       // 展开标记只加在真有二级的项上
-      label: expandSuffix ? <span>{primaryCount ? <Badge className="menu-task-badge" count={primaryCount} overflowCount={99}><span className="menu-task-text">{primary.label}</span></Badge> : primary.label}{expandSuffix}</span> : (primaryCount ? <Badge className="menu-task-badge" count={primaryCount} overflowCount={99}><span className="menu-task-text">{primary.label}</span></Badge> : primary.label),
+      label: expandSuffix
+        ? <span>{withMenuLabelBadge(primary.label, badge)}{expandSuffix}</span>
+        : withMenuLabelBadge(primary.label, badge),
       title: primary.label,
-      icon,
+      icon: <BackendMenuIcon icon={primary.icon}/>,
       ...(popupClassName ? { popupClassName } : {}),
       children
     }
@@ -84,16 +99,22 @@ function buildHierarchicalItems(menus: WorkbenchMenu[], options: HierarchicalMen
   const { childIcons = true, expandSuffix, popupClassName, badgeResolver } = options
   return menus.filter(menu => !menu.hidden).map(menu => {
     const children = buildHierarchicalItems(menu.children, options)
-    const icon = childIcons ? <BackendMenuIcon icon={menu.icon}/> : undefined
+    const badge = badgeResolver?.(menu.path)
     if (children.length === 0) {
-      const badge = badgeResolver?.(menu.path)
-      return { key: menu.path, label: badge?.count ? <Badge className="menu-task-badge" count={badge.count} overflowCount={99}><span className="menu-task-text">{menu.name}</span></Badge> : menu.name, title: menu.name, ...(icon ? { icon } : {}) }
+      return {
+        key: menu.path,
+        label: withMenuLabelBadge(menu.name, badge),
+        title: menu.name,
+        ...(childIcons ? { icon: <BackendMenuIcon icon={menu.icon}/> } : {})
+      }
     }
+    const childCount = menu.children.reduce((sum, child) => sum + (badgeResolver?.(child.path)?.count ?? 0), 0)
+    const menuBadge = badge ?? (childCount > 0 ? { count: childCount } : undefined)
     return {
       key: menu.path,
-      label: expandSuffix ? <span>{menu.name}{expandSuffix}</span> : menu.name,
+      label: expandSuffix ? <span>{withMenuLabelBadge(menu.name, menuBadge)}{expandSuffix}</span> : withMenuLabelBadge(menu.name, menuBadge),
       title: menu.name,
-      ...(icon ? { icon } : {}),
+      ...(childIcons ? { icon: <BackendMenuIcon icon={menu.icon}/> } : {}),
       ...(popupClassName ? { popupClassName } : {}),
       children
     }
@@ -107,15 +128,15 @@ export function buildHierarchicalNavMenuItems(
 ): MenuItem[] {
   return navigation.map(primary => {
     const children = buildHierarchicalItems(primary.menu.children, options)
-    const icon = <BackendMenuIcon icon={primary.icon}/>
+    const badge = options.badgeResolver?.(primary.menu.path)
     if (children.length === 0) {
-      return { key: primary.menu.path, label: primary.label, title: primary.label, icon }
+      return { key: primary.menu.path, label: withMenuLabelBadge(primary.label, badge), title: primary.label, icon: <BackendMenuIcon icon={primary.icon}/> }
     }
     return {
       key: primary.key,
-      label: options.expandSuffix ? <span>{primary.label}{options.expandSuffix}</span> : primary.label,
+      label: options.expandSuffix ? <span>{withMenuLabelBadge(primary.label, badge)}{options.expandSuffix}</span> : withMenuLabelBadge(primary.label, badge),
       title: primary.label,
-      icon,
+      icon: <BackendMenuIcon icon={primary.icon}/>,
       ...(options.popupClassName ? { popupClassName: options.popupClassName } : {}),
       children
     }

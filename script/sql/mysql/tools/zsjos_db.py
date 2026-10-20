@@ -814,10 +814,20 @@ def static_check() -> None:
             if not path.is_file():
                 fail(f"Missing {code} database file: {path}")
         if baseline_path and schema_path.read_bytes() != baseline_path.read_bytes():
-            fail(
-                f"Desired schema differs from the fresh baseline for {code}; run `zsjos-db make {code} <name>` "
-                "or synchronize the reviewed migration"
-            )
+            upgrade = manifest.get("baselineNamingUpgrade")
+            baseline_text = baseline_path.read_text(encoding="utf-8")
+            if upgrade:
+                version = upgrade.get("migration")
+                migration = next((item for item in migrations if item.version == version), None)
+                if migration is None:
+                    fail(f"Missing reviewed baseline naming upgrade {version} for {code}")
+                migration_text = migration.path.read_text(encoding="utf-8")
+                for old_name, canonical_name in upgrade.get("replacements", {}).items():
+                    if old_name not in migration_text or canonical_name not in migration_text:
+                        fail(f"Naming upgrade {version} does not cover {old_name} -> {canonical_name}")
+                    baseline_text = baseline_text.replace(old_name, canonical_name)
+            if not upgrade or schema_path.read_text(encoding="utf-8") != baseline_text:
+                fail(f"Desired schema differs from the fresh baseline for {code}; synchronize the reviewed migration")
         if not migrations:
             fail(f"Module {code} has no migrations")
         for migration in migrations:

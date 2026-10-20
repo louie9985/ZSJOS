@@ -114,5 +114,12 @@ public interface ErrorCodeConstants {
     ErrorCode KNOWLEDGE_LIBRARY_DIRECT_MEMBER_NOT_EXISTS = new ErrorCode(1_053_130_086,
             "当前账号不是该知识库的直接成员");
     ErrorCode KNOWLEDGE_LIBRARY_TEMPLATE_NAME_DUPLICATE = new ErrorCode(1_053_130_087, "知识库模板名称已存在");
+    ErrorCode KNOWLEDGE_EXCEL_UNAVAILABLE = new ErrorCode(1_053_130_100, "文件未登记或不可读取，暂不支持表格预览");
+    ErrorCode KNOWLEDGE_EXCEL_UNSUPPORTED = new ErrorCode(1_053_130_101, "仅支持 XLS、XLSX 表格预览");
+    ErrorCode KNOWLEDGE_EXCEL_TOO_LARGE = new ErrorCode(1_053_130_102, "文件超过 10 MB 或解压内容超过预览限制，请下载后查看");
+    ErrorCode KNOWLEDGE_EXCEL_ENCRYPTED = new ErrorCode(1_053_130_103, "加密表格暂不支持在线预览，请下载后查看");
+    ErrorCode KNOWLEDGE_EXCEL_INVALID = new ErrorCode(1_053_130_104, "表格文件损坏或格式不受支持");
+    ErrorCode KNOWLEDGE_EXCEL_BUSY = new ErrorCode(1_053_130_105, "表格预览繁忙，请稍后重试");
+    ErrorCode KNOWLEDGE_EXCEL_SHEET_INVALID = new ErrorCode(1_053_130_106, "工作表不存在或不可预览，请重新打开文件");
 
 }

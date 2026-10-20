@@ -297,7 +297,7 @@ describe('workbench menu conversion', () => {
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/positioning')
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/appeals')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES] as string[]).not.toContain('/zsjos/leads/qualification-exceptions')
-    expect(RENDERABLE_APP_ROUTES.has('/zsjos/lead-aging-pool')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/lead-public-sea-pool')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/sales-orders')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/leads/appeals')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/opportunity-public-sea')

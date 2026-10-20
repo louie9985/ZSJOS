@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 const inboxSources = [
   'components/SalesOrderDetailCards.tsx',
   'components/SalesOrderSupervisorInbox.tsx',
-  'pages/LeadAgingPoolPage.tsx',
+  'pages/LeadPublicSeaPoolPage.tsx',
   'pages/LeadAppealPage.tsx',
   'pages/LeadDuplicateReviewPage.tsx',
   'pages/LeadManagementPage.tsx',

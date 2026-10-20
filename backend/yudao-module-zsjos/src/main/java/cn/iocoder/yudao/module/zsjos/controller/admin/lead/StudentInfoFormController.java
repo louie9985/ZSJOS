@@ -17,55 +17,71 @@ import java.io.IOException;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @RestController
-@RequestMapping("/zsjos/lead")
+@RequestMapping("/zsjos/registration")
 public class StudentInfoFormController {
     @Resource private StudentInfoFormService service;
     @ModelAttribute
     public void disableCache(HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
     }
-    @PostMapping("/{leadId}/student-info-form")
+    @PostMapping("/{caseId}/student-info-form")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:create')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    public CommonResult<Link> generate(@PathVariable Long leadId) { return success(service.generate(leadId)); }
+    public CommonResult<Link> generate(@PathVariable Long caseId,@Valid @RequestBody Command request) { return success(service.generate(caseId,request)); }
 
-    @GetMapping("/{leadId}/student-info-form/link")
+    @GetMapping("/{caseId}/student-info-form/link")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:link-read')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
-    public CommonResult<Link> link(@PathVariable Long leadId) { return success(service.getLink(leadId)); }
+    public CommonResult<Link> link(@PathVariable Long caseId) { return success(service.getLink(caseId)); }
 
-    @PostMapping("/{leadId}/student-info-form/regenerate")
+    @PostMapping("/{caseId}/student-info-form/regenerate")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:regenerate')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    public CommonResult<Link> regenerate(@PathVariable Long leadId,@Valid @RequestBody Command request) {
-        return success(service.regenerate(leadId,request.getFormId()));
+    public CommonResult<Link> regenerate(@PathVariable Long caseId,@Valid @RequestBody Command request) {
+        return success(service.regenerate(caseId,request));
     }
-    @PostMapping("/{leadId}/student-info-form/revoke")
+    @PostMapping("/{caseId}/student-info-form/revoke")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:revoke')")
-    public CommonResult<Boolean> revoke(@PathVariable Long leadId,@Valid @RequestBody Command request) {
-        service.revoke(leadId,request.getFormId()); return success(true);
+    public CommonResult<Link> revoke(@PathVariable Long caseId,@Valid @RequestBody Command request) {
+        return success(service.revoke(caseId,request));
     }
-    @GetMapping("/{leadId}/student-info-form/detail")
+    @PostMapping("/{caseId}/student-info-form/sent")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:sent')")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    public CommonResult<Link> sent(@PathVariable Long caseId,@Valid @RequestBody Command request) {
+        return success(service.confirmSent(caseId,request));
+    }
+    @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoImageService images;
+    @GetMapping("/{caseId}/student-info-form/images/{imageId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:read') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    public byte[] image(@PathVariable Long caseId,@PathVariable Long imageId,HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store");
+        response.setHeader("X-Content-Type-Options","nosniff");
+        response.setContentType("application/octet-stream");
+        return images.internalRead(caseId,imageId);
+    }
+    @GetMapping("/{caseId}/student-info-form/detail")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:read')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    public CommonResult<Detail> detail(@PathVariable Long leadId) { return success(service.detail(leadId)); }
+    public CommonResult<Detail> detail(@PathVariable Long caseId) { return success(service.detail(caseId)); }
 
-    @GetMapping("/{leadId}/student-info-form/sensitive")
+    @GetMapping("/{caseId}/student-info-form/sensitive")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:read') && @studentInfoFormService.canReadSensitive()")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
-    public CommonResult<Detail> sensitive(@PathVariable Long leadId) { return success(service.sensitiveDetail(leadId)); }
+    public CommonResult<Detail> sensitive(@PathVariable Long caseId) { return success(service.sensitiveDetail(caseId)); }
 
-    @GetMapping("/{leadId}/student-info-form/export")
+    @GetMapping("/{caseId}/student-info-form/export")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:read') && @ss.hasPermission('zsjos:student-info-form:export')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
-    public void export(@PathVariable Long leadId,HttpServletResponse response) throws IOException {
-        Detail detail=service.exportDetail(leadId);
+    public void export(@PathVariable Long caseId,HttpServletResponse response) throws IOException {
+        Detail detail=service.exportDetail(caseId);
         var rows=detail.getFields().stream().map(f -> {
             ExportRow row=new ExportRow(); row.setField(f.getLabel());
-            row.setValue(detail.getValues().getOrDefault(f.getKey(),"")); return row;
+            row.setValue("images".equals(f.getType()) ? detail.getImages().stream().filter(i->f.getKey().equals(i.getFieldKey())).map(i->i.getName()).collect(java.util.stream.Collectors.joining("；")) : detail.getValues().getOrDefault(f.getKey(),"")); return row;
         }).toList();
         ExcelUtils.write(response,"学员信息.xlsx","学员信息",ExportRow.class,rows);
     }

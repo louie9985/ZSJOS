@@ -16,6 +16,7 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = true)
 public class ServiceRelationDO extends TenantBaseDO {
     @TableId private Long id;
+    private String firstContactProgressJson;
     /** Explicit collaboration-group boundary; legacy rows are backfilled by V218. */
     private Long collaborationGroupId;
     private Long personId;

@@ -47,9 +47,9 @@ UPDATE zsjos_lead_follow_up_record SET deleted=1 WHERE deleted=0 AND lead_id IN
   (SELECT id FROM t_kz_lead);
 UPDATE zsjos_lead_appeal SET deleted=1 WHERE deleted=0 AND lead_id IN
   (SELECT id FROM t_kz_lead);
-UPDATE zsjos_lead_aging_pool_event SET deleted=1 WHERE deleted=0 AND lead_id IN
+UPDATE zsjos_lead_public_sea_pool_event SET deleted=1 WHERE deleted=0 AND lead_id IN
   (SELECT id FROM t_kz_lead);
-UPDATE zsjos_lead_aging_pool_cycle SET deleted=1 WHERE deleted=0 AND lead_id IN
+UPDATE zsjos_lead_public_sea_pool_cycle SET deleted=1 WHERE deleted=0 AND lead_id IN
   (SELECT id FROM t_kz_lead);
 UPDATE zsjos_lead_urge SET deleted=1 WHERE deleted=0 AND lead_id IN
   (SELECT id FROM t_kz_lead);

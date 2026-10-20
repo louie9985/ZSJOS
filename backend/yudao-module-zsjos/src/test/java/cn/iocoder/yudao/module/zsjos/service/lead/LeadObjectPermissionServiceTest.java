@@ -4,11 +4,11 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCompatibilityRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
@@ -51,12 +51,12 @@ class LeadObjectPermissionServiceTest {
     private SecurityFrameworkService securityFrameworkService;
     @Mock private DeptApi deptApi;
     @Mock private AdminUserApi adminUserApi;
-    @Mock private LeadAgingPoolCycleMapper agingPoolCycleMapper;
+    @Mock private LeadPublicSeaPoolCycleMapper publicSeaPoolCycleMapper;
     @Mock private ServiceRelationMapper serviceRelationMapper;
-    @Mock private LeadPublicSeaRecordMapper publicSeaRecordMapper;
+    @Mock private LeadPublicSeaPoolCompatibilityRecordMapper publicSeaPoolCompatibilityRecordMapper;
     @Mock private SalesOrderMapper salesOrderMapper;
     @Mock private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
-    @Mock private LeadAgingPoolService leadAgingPoolService;
+    @Mock private LeadPublicSeaPoolService leadPublicSeaPoolService;
     @Mock private MediaAccountMapper mediaAccountMapper;
 
     @BeforeEach
@@ -256,11 +256,11 @@ class LeadObjectPermissionServiceTest {
         LeadDO lead = lead(10L, 20L);
         lead.setStatus("valid");
         lead.setAssignmentStatus("owned");
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setLeadId(1L); cycle.setOriginalOwnerUserId(20L); cycle.setCollaboratorUserId(30L);
         cycle.setStatus("assigned");
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(agingPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+        when(publicSeaPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
 
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
@@ -276,10 +276,10 @@ class LeadObjectPermissionServiceTest {
     void waitingPoolPausesFollowUpForOwnerAndOtherVisibleUsers() {
         LeadDO lead = lead(10L, 20L);
         lead.setStatus("valid"); lead.setAssignmentStatus("owned");
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setLeadId(1L); cycle.setOriginalOwnerUserId(20L); cycle.setStatus("waiting_assignment");
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(agingPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+        when(publicSeaPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
 
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
@@ -295,10 +295,10 @@ class LeadObjectPermissionServiceTest {
     @Test
     void assignedAndHistoricalPendingPoolsAllowOnlyConfiguredCollaboratorFollowUp() {
         LeadDO lead = lead(10L, 20L); lead.setStatus("valid");
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setLeadId(1L); cycle.setOriginalOwnerUserId(20L); cycle.setCollaboratorUserId(30L);
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(agingPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+        when(publicSeaPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             for (String status : List.of("assigned", "deal_pending")) {
                 cycle.setStatus(status);
@@ -315,13 +315,13 @@ class LeadObjectPermissionServiceTest {
     @Test
     void publicSeaSubmitterAssistOnlyAllowsOwnerAndCollaborator() {
         LeadDO lead = lead(10L, 20L);
-        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setLeadId(1L);
         cycle.setOriginalOwnerUserId(20L);
         cycle.setCollaboratorUserId(30L);
         cycle.setStatus("assigned");
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(agingPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+        when(publicSeaPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
 
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);

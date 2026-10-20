@@ -1,6 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
-import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.publicseapool.LeadTransferRequestCreateReqVO;
 
 public interface LeadTransferRequestService {
     Long create(Long cycleId, Long requesterUserId, LeadTransferRequestCreateReqVO request);

@@ -88,6 +88,12 @@ import static org.mockito.Mockito.verifyNoInteractions;
 class RegistrationServiceImplTest {
 
     @InjectMocks private RegistrationServiceImpl service;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper informationForms;
+    @org.junit.jupiter.api.BeforeEach void sentInformationFixture() {
+        var form=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
+        form.setStatus("DRAFT"); form.setSentAt(java.time.LocalDateTime.now());
+        org.mockito.Mockito.lenient().when(informationForms.byCase(org.mockito.ArgumentMatchers.anyLong())).thenReturn(form);
+    }
     @Mock private RegistrationCaseMapper caseMapper;
     @Mock private RegistrationCaseChecklistItemMapper caseItemMapper;
     @Mock private SalesOrderMapper orderMapper;

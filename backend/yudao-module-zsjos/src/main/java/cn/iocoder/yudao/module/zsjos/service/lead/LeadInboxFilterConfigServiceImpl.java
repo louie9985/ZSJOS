@@ -39,7 +39,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_I
 public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigService {
 
     private static final Set<String> AUDIENCES = Set.of(INBOX_AUDIENCE_SUBMITTER, INBOX_AUDIENCE_OWNER,
-            INBOX_AUDIENCE_REVIEWER, INBOX_AUDIENCE_AGING_POOL, INBOX_AUDIENCE_MANAGEMENT);
+            INBOX_AUDIENCE_REVIEWER, INBOX_AUDIENCE_PUBLIC_SEA_POOL, INBOX_AUDIENCE_MANAGEMENT);
     private static final Pattern CONFIG_KEY_PATTERN = Pattern.compile("[a-z][a-z0-9_]{1,63}");
     private static final Set<String> LEAD_FIELDS = Set.of(INBOX_FILTER_FIELD_STATUS,
             INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, INBOX_FILTER_FIELD_HANDLING_STAGE,
@@ -50,7 +50,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             INBOX_AUDIENCE_OWNER, LEAD_FIELDS,
             INBOX_AUDIENCE_MANAGEMENT, LEAD_FIELDS,
             INBOX_AUDIENCE_REVIEWER, Set.of(INBOX_FILTER_FIELD_HANDLED, INBOX_FILTER_FIELD_TASK_DEFINITION_KEY),
-            INBOX_AUDIENCE_AGING_POOL, Set.of(INBOX_FILTER_FIELD_POOL_STATUS));
+            INBOX_AUDIENCE_PUBLIC_SEA_POOL, Set.of(INBOX_FILTER_FIELD_POOL_STATUS));
     private static final Map<String, LinkedHashSet<String>> ALLOWED_VALUES = Map.of(
             // suspended 参与一级“待判定客资”：判定超时挂起的客资业务上仍属待判定。
             INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "suspended", "valid",
@@ -73,8 +73,8 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                     FOLLOW_UP_CONDITION_TRANSFERRED_PENDING)),
             INBOX_FILTER_FIELD_HANDLED, new LinkedHashSet<>(List.of("todo", "done")),
             INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, new LinkedHashSet<>(List.of("registrationReview", "financeReview")),
-            INBOX_FILTER_FIELD_POOL_STATUS, new LinkedHashSet<>(List.of(AGING_POOL_WAITING_ASSIGNMENT,
-                    AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING)));
+            INBOX_FILTER_FIELD_POOL_STATUS, new LinkedHashSet<>(List.of(PUBLIC_SEA_POOL_WAITING_ASSIGNMENT,
+                    PUBLIC_SEA_POOL_ASSIGNED, PUBLIC_SEA_POOL_DEAL_PENDING)));
 
     @Resource
     private LeadInboxFilterSchemeMapper schemeMapper;
@@ -159,10 +159,10 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                             value("registrationReview", registrationLabel + "审批"),
                             value("financeReview", financeLabel + "审批"))));
         }
-        if (INBOX_AUDIENCE_AGING_POOL.equals(audience)) {
+        if (INBOX_AUDIENCE_PUBLIC_SEA_POOL.equals(audience)) {
             return List.of(capability(INBOX_FILTER_FIELD_POOL_STATUS, "公海状态", List.of(
-                    value(AGING_POOL_WAITING_ASSIGNMENT, "待指派"), value(AGING_POOL_ASSIGNED, "协同跟进中"),
-                    value(AGING_POOL_DEAL_PENDING, "成交审批中"))));
+                    value(PUBLIC_SEA_POOL_WAITING_ASSIGNMENT, "待指派"), value(PUBLIC_SEA_POOL_ASSIGNED, "协同跟进中"),
+                    value(PUBLIC_SEA_POOL_DEAL_PENDING, "成交审批中"))));
         }
         return List.of(
                 capability(INBOX_FILTER_FIELD_STATUS, "客资主状态", List.of(
@@ -388,11 +388,11 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
     private static void normalizeLegacySections(LeadInboxFilterConfigVO.GroupVO group, String audience) {
         List<LeadInboxFilterConfigVO.SectionVO> sections = nonNull(group.getSections());
         if (sections.isEmpty() && group.getOptions() != null && !group.getOptions().isEmpty()) {
-            boolean agingPool = INBOX_AUDIENCE_AGING_POOL.equals(audience);
+            boolean publicSeaPool = INBOX_AUDIENCE_PUBLIC_SEA_POOL.equals(audience);
             LeadInboxFilterConfigVO.SectionVO migrated = new LeadInboxFilterConfigVO.SectionVO();
-            migrated.setKey(agingPool ? INBOX_FILTER_SECTION_POOL_STATUS : INBOX_FILTER_SECTION_CURRENT_STAGE);
+            migrated.setKey(publicSeaPool ? INBOX_FILTER_SECTION_POOL_STATUS : INBOX_FILTER_SECTION_CURRENT_STAGE);
             migrated.setLabel(group.getSectionLabel() == null || group.getSectionLabel().isBlank()
-                    ? agingPool ? "公海状态" : "当前环节" : group.getSectionLabel());
+                    ? publicSeaPool ? "公海状态" : "当前环节" : group.getSectionLabel());
             migrated.setSort(0);
             migrated.setOptions(new ArrayList<>(group.getOptions()));
             sections = new ArrayList<>(List.of(migrated));

@@ -92,8 +92,10 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             return new ReadScope(Set.of(), subject, subject == null, subject == null);
         }
         DeliveryClassScopeService.Scope scope = permissionApi.hasTenantReadAllAccess(userId)
-                ? new DeliveryClassScopeService.Scope(true, Set.of()) : scopeService.resolve(userId);
-        return new ReadScope(scope.deptIds(), null, scope.allDepartments(), true);
+                ? new DeliveryClassScopeService.Scope(true, Set.of()) : scopeService.resolveRead(userId);
+        boolean pending = permissionApi.hasTenantReadAllAccess(userId)
+                || permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_MANAGED);
+        return new ReadScope(scope.deptIds(), scope.allDepartments() ? null : userId, scope.allDepartments(), pending);
     }
 
     @Override
@@ -142,11 +144,29 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @ZsjosPermission(bizType = BIZ_TYPE, bizId = "#id", action = "read")
     public PageResult<DeliveryClassStudentRespVO> students(Long id, Long userId, PageParam pageParam) {
         require(id);
-        PageResult<ServiceRelationDO> page = relationMapper.selectPage(pageParam,
-                new LambdaQueryWrapperX<ServiceRelationDO>().eq(ServiceRelationDO::getClassId, id)
-                        .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
-                        .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId));
+        PageResult<ServiceRelationDO> page = relationMapper.selectPage(pageParam, studentReadQuery(id, userId));
         return new PageResult<>(page.getList().stream().map(this::student).toList(), page.getTotal());
+    }
+
+    LambdaQueryWrapperX<ServiceRelationDO> studentReadQuery(Long classId, Long userId) {
+        var query = new LambdaQueryWrapperX<ServiceRelationDO>().eq(ServiceRelationDO::getClassId, classId)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"));
+        if (!permissionApi.hasTenantReadAllAccess(userId)) {
+            boolean managed = permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query", PERMISSION_QUERY_MANAGED);
+            var scope = managed ? scopeService.resolveRead(userId) : new DeliveryClassScopeService.Scope(false, Set.of());
+            if (!scope.allDepartments() && !Objects.equals(classId, scopeService.readablePendingClassId(userId))) {
+                Set<Long> owners = new LinkedHashSet<>(); owners.add(userId);
+                if (!scope.deptIds().isEmpty()) adminUserApi.getUserListByDeptIds(scope.deptIds()).stream()
+                        .map(AdminUserRespDTO::getId).filter(Objects::nonNull).forEach(owners::add);
+                // Class access alone cannot expose a service whose owner moved outside the readable scope.
+                query.and(visible -> visible.in(ServiceRelationDO::getOwnerUserId, owners)
+                        .or(personal -> personal.eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                                .eq(ServiceRelationDO::getStatus, "active")
+                                .and(collaborator -> collaborator.eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))));
+            }
+        }
+        return query.orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId);
     }
 
     @Override
@@ -245,12 +265,14 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             throw exception(DELIVERY_CLASS_STATE_INVALID);
         }
         if (!Objects.equals(req.getVersion(), current.getVersion())) throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
-        String snapshot = validate(req);
+        boolean preserveExamDate = Boolean.TRUE.equals(req.getPreserveExamDate());
+        String snapshot = preserveExamDate ? current.getExamScheduleSnapshot() : validate(req);
         AdminUserRespDTO homeroom = requireHomeroom(req.getHomeroomUserId());
         requireSameDepartment(userId, homeroom);
         if (!Objects.equals(homeroom.getDeptId(), current.getDeptId())) throw exception(DELIVERY_CLASS_USER_INVALID);
         Long oldOwner = current.getHomeroomUserId();
-        current.setClassName(req.getClassName().trim()).setExamScheduleId(req.getStartDate() == null ? req.getExamScheduleId() : null)
+        current.setClassName(req.getClassName().trim()).setExamScheduleId(preserveExamDate ? current.getExamScheduleId()
+                        : req.getStartDate() == null ? req.getExamScheduleId() : null)
                 .setExamScheduleSnapshot(snapshot).setHomeroomUserId(homeroom.getId())
                 .setHomeroomUserNameSnapshot(homeroom.getNickname()).setVersion(current.getVersion() + 1);
         // updateById ignores nulls; independent dates must explicitly clear the previous calendar association.

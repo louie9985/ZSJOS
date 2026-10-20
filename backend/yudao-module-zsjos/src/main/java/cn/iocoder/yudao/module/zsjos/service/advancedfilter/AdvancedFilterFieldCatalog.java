@@ -8,7 +8,7 @@ import static cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilte
 final class AdvancedFilterFieldCatalog {
     private AdvancedFilterFieldCatalog() {}
 
-    static final Set<String> SCENES = Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "student_service", "media_student", "subordinate_sales", "cashback", "withdrawal");
+    static final Set<String> SCENES = Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "student_service", "media_student", "subordinate_sales", "education_team", "cashback", "withdrawal");
 
     static Map<String, Field> fields() {
         Map<String, Field> result = new LinkedHashMap<>();
@@ -22,6 +22,7 @@ final class AdvancedFilterFieldCatalog {
         StudentFilterFields.register(result);
         MediaStudentFilterFields.register(result);
         SubordinateSalesFilterFields.register(result);
+        EducationTeamFilterFields.register(result);
         CashbackFilterFields.register(result);
         WithdrawalFilterFields.register(result);
         // The service query joins exactly one person/order/item/lead. Reuse field identities
