@@ -615,7 +615,19 @@ def fk_rules_equivalent(
     )
 
 
-def schema_drift(client: MysqlClient, manifests: dict[str, dict]) -> list[str]:
+def pending_naming_replacements(manifests: dict[str, dict], pending: Iterable[Migration]) -> dict[str, str]:
+    pending_versions = {(migration.module, migration.version) for migration in pending}
+    replacements: dict[str, str] = {}
+    for code, manifest in manifests.items():
+        upgrade = manifest.get("baselineNamingUpgrade", {})
+        if (code, upgrade.get("migration")) in pending_versions:
+            replacements.update({old.lower(): new.lower()
+                                 for old, new in upgrade.get("replacements", {}).items()})
+    return replacements
+
+
+def schema_drift(client: MysqlClient, manifests: dict[str, dict], *,
+                 pending: Iterable[Migration] = ()) -> list[str]:
     desired_columns: dict[tuple[str, str], tuple[str, str]] = {}
     desired_indexes: dict[tuple[str, str], tuple[int, tuple[str, ...]]] = {}
     desired_foreign_keys: dict[tuple[str, str], tuple[tuple[str, ...], str, tuple[str, ...], str, str]] = {}
@@ -682,6 +694,41 @@ def schema_drift(client: MysqlClient, manifests: dict[str, dict]) -> list[str]:
             )
 
     drift: list[str] = []
+    replacements = pending_naming_replacements(manifests, pending)
+    actual_tables = {table for table, _ in actual_columns}
+    table_names: dict[str, str] = {}
+    for old, canonical in replacements.items():
+        if old not in actual_tables:
+            continue
+        if canonical in actual_tables:
+            drift.append(f"naming conflict tables {old} and {canonical}")
+        else:
+            table_names[old] = canonical
+
+    def renamed_objects(objects: dict, label: str) -> dict:
+        # Only reviewed, still-pending renames identify old objects with new ones.
+        # Preserve their signatures: an existing old name proves no field/index health.
+        renamed = {(table_names.get(table, table), name): value
+                   for (table, name), value in objects.items()}
+        result = {}
+        for (table, name), value in renamed.items():
+            canonical = replacements.get(name, name)
+            if canonical != name and (table, canonical) in renamed:
+                drift.append(f"naming conflict {label} {table}.{name} and {table}.{canonical}")
+                canonical = name
+            result[(table, canonical)] = value
+        return result
+
+    actual_columns = renamed_objects(actual_columns, "columns")
+    actual_indexes = {key: (non_unique, tuple(replacements.get(column, column) for column in columns))
+                      for key, (non_unique, columns) in renamed_objects(actual_indexes, "indexes").items()}
+    actual_foreign_keys = {
+        key: (tuple(replacements.get(column, column) for column in columns),
+              table_names.get(ref_table, ref_table),
+              tuple(replacements.get(column, column) for column in ref_columns), delete_rule, update_rule)
+        for key, (columns, ref_table, ref_columns, delete_rule, update_rule)
+        in renamed_objects(actual_foreign_keys, "foreign keys").items()
+    }
     desired_tables = {table for table, _ in desired_columns}
     for key, signature in sorted(desired_columns.items()):
         actual = actual_columns.get(key)
@@ -721,8 +768,15 @@ def schema_drift(client: MysqlClient, manifests: dict[str, dict]) -> list[str]:
     return drift
 
 
-def drift_explained_by_pending(message: str, pending: Iterable[Migration]) -> bool:
+def drift_explained_by_pending(message: str, pending: Iterable[Migration], *,
+                               naming_replacements: dict[str, str] | None = None) -> bool:
     tokens = set(re.findall(r"[a-z][a-z0-9_]+", message.lower()))
+    # Renamed objects have already been compared under their canonical identities.
+    # SQL mentioning a table/field must not excuse a genuinely broken old structure.
+    if message.startswith("naming conflict ") or (
+        naming_replacements and tokens & (naming_replacements.keys() | set(naming_replacements.values()))
+    ):
+        return False
     for migration in pending:
         text = migration.path.read_text(encoding="utf-8").lower()
         significant = [token for token in tokens if "_" in token]
@@ -948,8 +1002,11 @@ def print_plan(environment: str, *, allow_pending_drift: bool = True) -> tuple[M
     else:
         info("  None")
     empty_database = client.table_count() == 0
-    drift = [] if empty_database else schema_drift(client, manifests)
-    unexplained = [item for item in drift if not (allow_pending_drift and drift_explained_by_pending(item, pending))]
+    drift = [] if empty_database else schema_drift(
+        client, manifests, pending=pending if allow_pending_drift else ())
+    replacements = pending_naming_replacements(manifests, pending)
+    unexplained = [item for item in drift if not (allow_pending_drift and drift_explained_by_pending(
+        item, pending, naming_replacements=replacements))]
     info("Unexpected schema drift:")
     if unexplained:
         for item in unexplained:

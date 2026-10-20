@@ -20,7 +20,14 @@
 --       重复执行会被唯一键吞掉（脚本用 NOT EXISTS 预过滤 + INSERT IGNORE 双保险）。
 --
 -- 执行：先跑 0)预览，再跑 1)备份，最后 2)apply
+-- 修订范围：导入时已成交且已逾期的历史提醒不再补入；未到期提醒和新系统主动跟进不变。
+-- 已导入数据不会因重跑自动取消；116 条确认清理使用独立受控修复，详见
+-- docs/operations/legacy-won-overdue-cleanup.md。此脚本不是 bootstrap/版本迁移。
+-- 只在已准备的旧库暂存副本及授权目标执行；mig_plan 会重建，业务表不删除。
+-- 先备份目标任务和客资冗余字段；DDL 非原子，失败停止并检查实际状态后重跑。
+-- 唯一键防止重复任务；已取消任务保留唯一键，不会被重建；恢复须核对备份后单独授权。
 -- =============================================================================
+SET NAMES utf8mb4;
 
 -- -----------------------------------------------------------------------------
 -- 0) 预览：迁移计划与逾期口径分布（apply 前后都应跑，apply 后 actionable 应为 0）
@@ -40,8 +47,9 @@ SELECT r.id                AS old_reminder_id,
        r.remind_at         AS old_remind_at,
        r.overdue_at        AS old_overdue_at,
        r.created_at        AS old_created_at,
-       -- 是否还有意义：新系统 canFollow() 只接受 valid/won，或 submitted+owned+有分配历史
-       CASE WHEN nl.status IN ('valid', 'won') THEN 1
+       -- 旧库 pending 不能证明已成交客资仍需追补逾期任务；运行时主动跟进不受影响。
+       CASE WHEN nl.status = 'won' AND r.overdue_at < NOW() THEN 0
+            WHEN nl.status IN ('valid', 'won') THEN 1
             WHEN nl.status = 'submitted' AND nl.assignment_status = 'owned'
                  AND nl.current_assignment_history_id IS NOT NULL THEN 1
             ELSE 0 END      AS actionable,
@@ -73,7 +81,7 @@ WHERE r.reminder_type = 'next_follow'
 SELECT '计划总数' k, COUNT(*) v FROM oldcrm_scratch.mig_plan
 UNION ALL SELECT '待写入(可跟进且未被取代)', COUNT(*) FROM oldcrm_scratch.mig_plan
           WHERE actionable = 1 AND superseded = 0 AND already_pending = 0 AND new_followup_id IS NOT NULL
-UNION ALL SELECT '跳过-线索已失效(invalid/converted)', COUNT(*) FROM oldcrm_scratch.mig_plan WHERE actionable = 0
+UNION ALL SELECT '跳过-状态不可跟进或已成交历史逾期', COUNT(*) FROM oldcrm_scratch.mig_plan WHERE actionable = 0
 UNION ALL SELECT '跳过-已有更新的跟进', COUNT(*) FROM oldcrm_scratch.mig_plan WHERE superseded = 1
 UNION ALL SELECT '跳过-新系统已有待办', COUNT(*) FROM oldcrm_scratch.mig_plan WHERE already_pending = 1
 UNION ALL SELECT '异常-无关联跟进记录', COUNT(*) FROM oldcrm_scratch.mig_plan WHERE new_followup_id IS NULL

@@ -1,0 +1,20 @@
+# Test order receipt attribution repair
+
+## Registration — 2026-10-16
+- ID test-order-receipt-repair-20261016; owner /root; environment test from /etc/zsjos/agent-environment.
+- Goal: user-authorized repair of the 11 audited ORDER attribution receipt links/timestamps and prevent new snapshots copying legacy `other` events.
+- Non-goals: order status/amount/owner, Lead ownership/current link, service relationships, source/amount/time conversion rules, schema, permissions, production, deployment/restart, commits/push.
+- Branch main; worktree /opt/zsjos; base 29f8f5b5ee7b0cfd3fe4539f640289e9783f51c8; target/integration None.
+- Ownership: this record; script/sql/mysql/repairs/repair_order_receipts_20261016.py; docs/operations/order-receipt-repair-20261016.md; docs/api/sales-performance.md; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/performance/PerformanceSnapshotService.java; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadAssignmentHistoryMapper.java; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/performance/PerformanceSnapshotServiceTest.java.
+- Dependencies: test MySQL 8.4 zsjos-mysql-1/zsjos tenant 1; actual deployed performance mapper. Other dirty files remain owned by existing workstreams.
+- Verification: snapshot writer unit tests and compile; real MySQL temporary-table initial/repeat/failure rollback/partial recovery/stale refusal/restore; private fsynced preimages and guarded transaction; committed exact readback and deployed conversion recomputation for affected users/windows; unchanged scoped order/Lead/service dependencies and representative Chinese HEX.
+- Authorization: user “同步一起调整” follows exact 11-record scan and described statistical impact. No additional authorization for service restart or deployment inferred.
+
+## Delivery — 2026-10-16
+- Authorized test tenant-1 repair committed exactly 11 attribution updates; replay 0. Full images independently read back; scoped order/Lead/history/service/other attribution digests unchanged. Final ORDER-to-other links 0; representative UTF8 HEX verified.
+- Private plan /opt/zsjos-runtime/backups/order-receipts-20261016-11-v1/plan.json SHA256 b502817ed529bc59f4187e00f0fc9bcf10bde306de6dcf1fd5c713033721a14f. MySQL temporary initial11/repeat0/failure rollback/partial4+7/stale refusal/exact restore passed.
+- Deployed mapper/Population committed-data recomputation: September converted/denominator 3/214, 1/138, 18/419 for the three affected contributing accounts. All 8 effective repaired snapshots now match current receipt; remaining exclusions retain existing rules.
+- Prevention: ORDER snapshots resolve latest ownership transition at submission across all owners/unowned events, verify recipient, use saved ASSIGNMENT time or event time. Existing strict reader remains unchanged; no permission/API/source/amount/validity changes.
+- Java compile and 17 focused JUnit tests passed in /tmp/zsjos-order-receipt-check against existing release/dependency artifacts, including real MyBatis-Plus query with tenant and logical-delete filters in H2. Standard Maven stopped on existing root-owned target permissions; initial temporary JUnit classpath mismatch corrected to consistent 6.0.3 before passing run. No full reactor/build/startup/browser/HTTP acceptance claim.
+- Scope delivered in registered files; main HEAD unchanged; unrelated changes preserved. No commit/push/deployment/restart/production action. Database repair is live in test; prevention source awaits separately authorized deployment. Ownership released.
+- Reviewable deployment candidate prepared outside repository at /tmp/zsjos-order-receipt-check/yudao-server-order-receipt-candidate.jar, SHA256 3dd453cd9b2cd68e233e98b6e85bebb80afbf947463800238da8fd8f3dfb68b3. ZIP entry comparison: only ZSJOS module changed, only the two compiled production classes differ internally. Not a full Maven build; not published or startup-verified. Restart target if separately authorized: zsjos-backend.service (test), temporary API interruption, retain existing release for rollback.

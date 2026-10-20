@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceAttributionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.enums.LeadConstants;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import jakarta.annotation.Resource;
@@ -14,6 +15,7 @@ public class PerformanceSnapshotService {
  @Resource private PerformanceAttributionMapper mapper;
  @Resource private PerformanceAccess access;
  @Resource private LeadMapper leadMapper;
+ @Resource private LeadAssignmentHistoryMapper assignmentHistoryMapper;
  public void activity(String type,Long factId,Long leadId,Long userId) {
   if(factId==null||userId==null)return;insert(base(type,factId,userId,leadMapper.selectById(leadId)));
  }
@@ -27,6 +29,20 @@ public class PerformanceSnapshotService {
  public void order(SalesOrderDO order) {
   LeadDO lead=order.getLeadId()==null?null:leadMapper.selectById(order.getLeadId());
   var row=base("ORDER",order.getId(),order.getFormalSalesUserId(),lead);
+  // Imported Lead links/timestamps may describe an `other` event. Freeze only proven
+  // ownership at submission, never today's owner or a receipt preceding a recycle.
+  row.setAssignmentId(null);row.setReceivedAt(null);
+  if(lead!=null && order.getSubmittedAt()!=null && order.getFormalSalesUserId()!=null){
+   var receipt=assignmentHistoryMapper.selectLatestOwnershipAt(lead.getId(),order.getSubmittedAt());
+   if(receipt!=null && java.util.Objects.equals(receipt.getLeadId(),lead.getId())
+     && order.getFormalSalesUserId().equals(receipt.getToOwnerUserId())
+     && java.util.Set.of(LeadConstants.ACTION_ACCEPT,LeadConstants.ACTION_CLAIM,LeadConstants.ACTION_TRANSFER).contains(receipt.getActionType())){
+    var attribution=mapper.selectOne(new LambdaQueryWrapperX<PerformanceAttributionDO>()
+      .eq(PerformanceAttributionDO::getFactType,"ASSIGNMENT").eq(PerformanceAttributionDO::getFactId,receipt.getId()));
+    row.setAssignmentId(receipt.getId());
+    row.setReceivedAt(attribution!=null && attribution.getReceivedAt()!=null ? attribution.getReceivedAt() : receipt.getOccurredAt());
+   }
+  }
   if("repurchase".equals(order.getOrderType()))row.setSourceGroup("repurchase");
   insert(row);
  }
