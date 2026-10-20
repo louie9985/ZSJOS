@@ -177,8 +177,36 @@ def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_
             )
         return rel["id"]
 
-    # Historical service enrollment is not a sale. Keep its optional order chain empty.
-    order_id = item_id = case_id = None
+    oseq = next_daily_number(cur, tenant_id, "zsjos_order_no_daily_counter", now)
+    order_no = f"OD{seq_ts}{oseq:04d}"
+    cur.execute(
+        "INSERT INTO zsjos_order (order_no,person_id,order_type,status,submitter_user_id,"
+        "formal_sales_user_id,formal_owner_identity,buyer_name,student_name,student_mobile,"
+        "total_amount,discount_amount,payable_amount,customer_paid_at,student_source,"
+        "submitted_at,effective_at,version,creator,create_time,updater,update_time,deleted,tenant_id) "
+        "VALUES (%s,%s,'first_purchase','effective',%s,%s,'content_director',%s,%s,%s,"
+        "880.00,0.00,880.00,%s,'direct_enrollment',%s,%s,0,'seed-student',%s,'seed-student',%s,b'0',%s)",
+        (order_no, person_id, director_id, director_id, name, name, mobile,
+         now, now, now, now, now, tenant_id),
+    )
+    order_id = cur.lastrowid
+
+    cur.execute(
+        "INSERT INTO zsjos_order_item (order_id,product_ref,sku_ref,quantity,unit_price,"
+        "discount_amount,payable_amount,product_snapshot,creator,create_time,updater,update_time,deleted,tenant_id) "
+        "VALUES (%s,NULL,NULL,1.0000,880.00,0.00,880.00,CAST(%s AS JSON),'seed-student',%s,'seed-student',%s,b'0',%s)",
+        (order_id, UNKNOWN_COURSE_SNAPSHOT, now, now, tenant_id),
+    )
+    item_id = cur.lastrowid
+
+    cur.execute(
+        "INSERT INTO zsjos_registration_case (order_id,status,assignment_mode,study_planner_user_id,"
+        "registration_approved_at,completed_by_user_id,owner_user_id,started_at,completed_at,"
+        "version,creator,create_time,updater,update_time,deleted,tenant_id) "
+        "VALUES (%s,'completed','legacy_planner',%s,%s,%s,%s,%s,%s,0,'seed-student',%s,'seed-student',%s,b'0',%s)",
+        (order_id, director_id, now, director_id, director_id, now, now, now, now, tenant_id),
+    )
+    case_id = cur.lastrowid
 
     cur.execute(
         "INSERT INTO zsjos_service_relation (person_id,order_id,order_item_id,registration_case_id,"

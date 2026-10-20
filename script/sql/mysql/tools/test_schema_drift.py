@@ -160,5 +160,134 @@ class SchemaDriftTest(unittest.TestCase):
                 db.verify_database('production', self.client)
 
 
+class PendingNamingDriftTest(unittest.TestCase):
+    def setUp(self):
+        self.manifests = {'core': db.load_manifests()['core']}
+        self.migration = next(item for item in db.migrations_for('core', self.manifests['core'])
+                              if item.version == 'V329')
+        self.old = 'zsjos_lead_aging_pool_cycle'
+        self.canonical = 'zsjos_lead_public_sea_pool_cycle'
+        self.rule = 'zsjos_lead_follow_up_rule'
+        self.columns = {
+            (self.canonical, 'id'): ('bigint', 'NO'),
+            (self.canonical, 'lead_id'): ('bigint', 'NO'),
+            ('zsjos_lead', 'id'): ('bigint', 'NO'),
+            (self.rule, 'public_sea_pool_timeout_days'): ('int', 'NO'),
+        }
+        self.indexes = {
+            (self.canonical, 'primary'): (0, ('id',)),
+            (self.canonical, 'uk_tenant_lead_cycle'): (0, ('lead_id',)),
+            ('zsjos_lead', 'idx_tenant_public_sea_pool_scan'): (1, ('id',)),
+            (self.rule, 'timeout_lookup'): (1, ('public_sea_pool_timeout_days',)),
+        }
+        self.fks = {('zsjos_lead', 'cycle_ref'): (
+            ('id',), self.canonical, ('id',), 'RESTRICT', 'RESTRICT')}
+        self.actual_columns = {key: value for key, value in self.columns.items()}
+        self.actual_indexes = {key: value for key, value in self.indexes.items()}
+        self.actual_fks = dict(self.fks)
+        reverse = {new.lower(): old.lower() for old, new in
+                   self.manifests['core']['baselineNamingUpgrade']['replacements'].items()}
+        self.actual_columns = {(reverse.get(table, table), reverse.get(name, name)): value
+                               for (table, name), value in self.actual_columns.items()}
+        self.actual_indexes = {
+            (reverse.get(table, table), reverse.get(name, name)):
+                (unique, tuple(reverse.get(column, column) for column in columns))
+            for (table, name), (unique, columns) in self.actual_indexes.items()}
+        self.actual_fks = {key: (columns, reverse.get(table, table), refs, delete, update)
+                           for key, (columns, table, refs, delete, update) in self.actual_fks.items()}
+        self.client = Mock(spec=db.MysqlClient)
+        self.client.query.side_effect = self.query
+        self.client.table_count.return_value = 3
+        schema = patch.object(db, 'desired_schema', return_value=(self.columns, self.indexes, self.fks))
+        schema.start()
+        self.addCleanup(schema.stop)
+
+    def query(self, sql):
+        if 'information_schema.columns' in sql:
+            rows = [(*key, *value) for key, value in self.actual_columns.items()]
+        elif 'information_schema.statistics' in sql:
+            rows = [(*key, str(unique), ','.join(columns))
+                    for key, (unique, columns) in self.actual_indexes.items()]
+        elif 'information_schema.key_column_usage' in sql:
+            rows = [(*key, ','.join(columns), table, ','.join(refs), delete, update)
+                    for key, (columns, table, refs, delete, update) in self.actual_fks.items()]
+        else:
+            self.fail('Unexpected schema query: ' + sql)
+        return '\n'.join('\t'.join(row) for row in rows)
+
+    def plan(self, *, pending=True, strict=False):
+        with patch.object(db, 'enabled_manifests', return_value=self.manifests), \
+                patch.object(db, 'db_config'), patch.object(db, 'MysqlClient', return_value=self.client), \
+                patch.object(db, 'installed_versions', return_value={}), \
+                patch.object(db, 'migration_preflight', return_value=([self.migration] if pending else [], [])), \
+                patch.object(db, 'info'):
+            return db.print_plan('production', allow_pending_drift=not strict)[2]
+
+    def test_pending_rename_checks_old_signatures_without_writes(self):
+        self.assertEqual([], self.plan())
+        self.client.execute_file.assert_not_called()
+        self.client.backup.assert_not_called()
+
+    def test_absent_mapping_or_other_pending_version_does_not_normalize(self):
+        other = db.Migration('core', 'V328', 328, 'fixture', self.migration.path, '')
+        self.assertIn(f'missing column {self.canonical}.id',
+                      db.schema_drift(self.client, self.manifests, pending=[other]))
+        self.manifests['core'].pop('baselineNamingUpgrade')
+        self.assertIn(f'missing column {self.canonical}.id',
+                      db.schema_drift(self.client, self.manifests, pending=[self.migration]))
+
+    def test_installed_rename_and_strict_verification_reject_legacy_names(self):
+        for kwargs in ({'pending': False}, {'strict': True}):
+            with self.subTest(kwargs=kwargs):
+                self.assertIn(f'missing column {self.canonical}.id', self.plan(**kwargs))
+
+    def test_partial_table_rename_still_checks_old_column_and_index(self):
+        self.actual_columns = {(self.canonical if table == self.old else table, name): value
+                               for (table, name), value in self.actual_columns.items()}
+        self.actual_indexes = {(self.canonical if table == self.old else table, name): value
+                               for (table, name), value in self.actual_indexes.items()}
+        self.actual_fks[('zsjos_lead', 'cycle_ref')] = self.fks[('zsjos_lead', 'cycle_ref')]
+        self.assertEqual([], self.plan())
+
+    def test_wrong_old_column_type_is_not_excused_by_rename_sql(self):
+        self.actual_columns[(self.old, 'lead_id')] = ('varchar(20)', 'YES')
+        self.assertIn(f'column differs {self.canonical}.lead_id expected=bigint/NO actual=varchar(20)/YES',
+                      self.plan())
+
+    def test_missing_table_column_and_index_stay_blocked(self):
+        self.actual_columns.pop((self.old, 'lead_id'))
+        self.actual_indexes.pop((self.old, 'uk_tenant_lead_cycle'))
+        self.assertIn(f'missing column {self.canonical}.lead_id', self.plan())
+        self.assertIn(f'missing index {self.canonical}.uk_tenant_lead_cycle', self.plan())
+        self.actual_columns.pop((self.old, 'id'))
+        self.assertIn(f'missing column {self.canonical}.id', self.plan())
+
+    def test_duplicate_old_and_new_names_cannot_hide_each_other(self):
+        self.actual_columns[(self.canonical, 'id')] = ('bigint', 'NO')
+        self.assertIn(f'naming conflict tables {self.old} and {self.canonical}', self.plan())
+        self.actual_columns[(self.rule, 'public_sea_pool_timeout_days')] = ('int', 'NO')
+        self.assertIn(f'naming conflict columns {self.rule}.aging_pool_timeout_days '
+                      f'and {self.rule}.public_sea_pool_timeout_days', self.plan())
+        self.actual_indexes[('zsjos_lead', 'idx_tenant_public_sea_pool_scan')] = (1, ('id',))
+        self.assertIn('naming conflict indexes zsjos_lead.idx_tenant_aging_pool_scan '
+                      'and zsjos_lead.idx_tenant_public_sea_pool_scan', self.plan())
+
+    def test_wrong_index_and_foreign_key_remain_visible(self):
+        self.actual_indexes[(self.old, 'uk_tenant_lead_cycle')] = (1, ('id',))
+        self.actual_fks[('zsjos_lead', 'cycle_ref')] = (
+            ('id',), self.old, ('lead_id',), 'RESTRICT', 'RESTRICT')
+        messages = self.plan()
+        self.assertTrue(any(item.startswith(f'index differs {self.canonical}.uk_tenant_lead_cycle')
+                            for item in messages))
+        self.assertTrue(any(item.startswith('foreign key differs zsjos_lead.cycle_ref')
+                            for item in messages))
+
+    def test_unknown_columns_and_tables_are_not_suppressed(self):
+        self.actual_columns[(self.old, 'unreviewed')] = ('text', 'YES')
+        self.actual_columns[('unreviewed_table', 'id')] = ('int', 'NO')
+        self.assertIn(f'unexpected column {self.canonical}.unreviewed', self.plan())
+        self.assertIn('unexpected table unreviewed_table', self.plan())
+
+
 if __name__ == '__main__':
     unittest.main()
