@@ -128,11 +128,78 @@ upgrade checks and read-only target `db-verify` after rebuilding the migrator.
 Data-grade FAIL/MISSING warnings are separate business-data audits and require
 individual assessment; structural verification passing does not clear them.
 
-`check` compares `schema/core.sql` and `00-bootstrap-schema.sql` byte for byte,
-before `migrate` connects to the target database. A mismatch is a source-file
+`check` compares `schema/core.sql` and `00-bootstrap-schema.sql` before `migrate`
+connects to the target database. The manifest's reviewed V329 naming upgrade is
+the only permitted normalization; other definition differences fail. A mismatch is a source-file
 error, not evidence of database drift. When a reviewed numbered migration already
 exists, synchronize its intended final definitions in both files; do not generate
 a reverse migration from a stale desired schema.
+
+Core synchronization through V335 includes V323 registration-scoped form fields,
+configuration categories and image bindings; V325 personal navigation; V327 archive
+revisions and image `archive_only`; V328 first-contact progress and submission
+snapshots; V330 nullable `next_contact_at`; V332 exam/certificate revisions and
+attachments; and V335 field-visibility configuration. Both schema sources define
+their final columns and keys. They create empty tables only; numbered migrations
+still own configuration defaults, permission metadata and version registration.
+For the full historic migration sequence, fresh DDL retains pre-V329 public-sea
+table/column/index names. The fresh public-sea filter also starts as `agingPool`,
+so V034 reuses its existing default instead of inserting a duplicate. V329 then
+renames these objects and the single filter to their canonical names. This affects
+fresh initialization only; it never rewrites an installed filter or its history.
+The schema/seed synchronization adds no numbered migration or installed-checksum
+update. The separately confirmed V306 source correction below is the sole historical
+migration edit. Existing databases keep business rows, settings,
+role assignments and migration history, and follow their pending migration order.
+Do not replay bootstrap against an installed database. Application rollback retains
+the additive objects and nullable contact schedule; DDL cannot be transactionally
+undone after records use it.
+
+Run `python -B script/sql/mysql/tools/test_core_baseline.py` against the existing
+local `yudao-mysql` container for the complete baseline and all enabled module
+migrations, affected upgrades, failed-prerequisite/ledger recovery and replay,
+UTF-8 HEX, and read-only comparison with `ruoyi-vue-pro`. Verification creates
+uniquely named synthetic databases and retains them, including on failure; it
+never changes the application database or real account grants. `--target-only`
+performs only static checks and read-only target schema/version verification.
+`--upgrade-only` verifies the seven affected migration checkpoints in synthetic
+schemas using installed menu/version metadata, then repeats the read-only target
+check. It does not imply that the complete historic fresh chain has passed.
+
+### Reviewed V306 fresh-install correction (2026-10-20)
+
+V306 now reads the manifest count into a local variable before its target query,
+avoiding MySQL's temporary-table reopen restriction. After checking V305 in both
+ledgers and LONGTEXT repair storage, an empty tenant-1 order set with no V306
+repair evidence registers only V306 in the two ledgers, within one transaction.
+It creates no orders, identities or repair images. A nonempty installation still
+requires all 286 reviewed order/current-round targets and the existing before/after
+evidence and lifecycle guards. Failure rolls back success registration; replay
+preserves the first repair images. Retain schema, business history and evidence
+on rollback; this change has no destructive down operation.
+
+Apply through the normal migration sequence after V305 only when V306 is pending.
+Already-installed V306 is not replayed or reconciled automatically, and its stored
+checksum remains unchanged. The historical source edit was explicitly confirmed;
+an environment whose runner recorded the old file-byte checksum must keep its
+immutable applied release or follow a separately reviewed checksum rollout.
+Approval of this source correction does not change its version ledger.
+
+`test_core_baseline.py --v306-only` verifies empty and synthetic 286-target paths,
+missing prerequisites/repair-storage shape, second-ledger failure and recovery,
+replay and rejection of missing targets or conflicting later identity changes.
+The full command executes all module migrations and enforces zero schema drift
+and installed-checksum consistency. As in `verify_database`, historical data-grade
+FAIL/MISSING rows are printed separately; structural PASS does not clear those
+audits or imply complete release acceptance.
+
+The 2026-10-20 fresh run retained nine historical data-grade findings: eight checks
+contain obsolete module-ledger checksum allowlists (V114/V116/V136/V192/V193/
+V196/V208; V116 is checked twice), and the V159 terminology check still expects
+menu 6794 to be named `公海`, while V329 intentionally sets `公海池`. The legacy
+team-order check also expects an active menu later retired by V195. Their schema
+and migration execution passed; these audit results remain visible and were not
+cleared by changing data, grants, stored checksums or historical verification SQL.
 
 The V274 assistance reply fields, status index and history permission are present
 in both files. The six delivery-table definitions introduced by V214 and updated

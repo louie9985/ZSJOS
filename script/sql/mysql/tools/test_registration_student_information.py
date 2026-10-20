@@ -23,6 +23,14 @@ def clone(suffix,prerequisites=True):
         if table=='system_menu' or prerequisites and table in TABLES[3:5]:
             predicate=" WHERE version<>'V323'" if table in TABLES[3:5] else ''
             query(db,f'INSERT INTO {table} SELECT * FROM `{LOCAL}`.{table}'+predicate+';')
+    # Exercise the actual V322 predecessor independently of the current fresh
+    # baseline, which already contains the final V323 collection definitions.
+    query(db,'ALTER TABLE zsjos_student_info_form DROP INDEX uk_student_info_case, '
+          'DROP COLUMN registration_case_id, DROP COLUMN order_item_id, '
+          'DROP COLUMN person_id, DROP COLUMN product_id, DROP COLUMN sent_by_user_id, '
+          'DROP COLUMN sent_at, DROP COLUMN fields_snapshot, DROP COLUMN category_path_snapshot, '
+          'DROP COLUMN product_name, MODIFY COLUMN lead_id BIGINT NOT NULL; '
+          'ALTER TABLE zsjos_student_info_form_config DROP COLUMN education_category_ids_json;')
     return db
 def ledgers(db): return query(db,"SELECT version,checksum FROM zsjos_schema_version ORDER BY version; SELECT module_code,version,checksum FROM zsjos_module_schema_version ORDER BY module_code,version;")
 def verify(db):
@@ -35,7 +43,9 @@ def verify(db):
     expected_columns,expected_indexes,_=desired_schema(ROOT/'script/sql/mysql/schema/core.sql')
     for table in ['zsjos_student_info_form','zsjos_student_info_form_config','zsjos_student_info_image']:
         actual={tuple(row.split(chr(9))[:2]):tuple(row.split(chr(9))[2:]) for row in query(db,f"SELECT table_name,column_name,column_type,is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='{table}' ORDER BY ordinal_position;").splitlines()}
-        expected={key:value for key,value in expected_columns.items() if key[0]==table}
+        # archive_only belongs to V327 and is absent at this V323 checkpoint.
+        expected={key:value for key,value in expected_columns.items()
+                  if key[0]==table and key!=('zsjos_student_info_image','archive_only')}
         assert actual==expected,(table,actual,expected)
         for (owner,index),(unique,columns) in expected_indexes.items():
             if owner!=table:continue

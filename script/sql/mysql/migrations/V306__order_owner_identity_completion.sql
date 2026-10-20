@@ -1,4 +1,7 @@
 -- UTF-8. V306; requires V305 in both ledgers and LONGTEXT repair storage.
+-- 2026-10-20 reviewed correction: empty installations register only versions.
+-- Applied installations retain business data and recorded checksums; do not auto-replay/reconcile.
+-- Empty path is repeatable and both ledger writes roll back together on failure.
 -- User-confirmed tenant-1 order manifest: 2 education, 284 sales. No role inference.
 -- Only empty order identities/current-round identity JSON paths and modification audit change.
 -- No Lead/user/permission/financial/BPM/attribution writes. Departed and seed orders excluded.
@@ -16,12 +19,27 @@ DELIMITER $$
 CREATE PROCEDURE zsjos_v306_apply()
 apply_body: BEGIN
  DECLARE v_now DATETIME DEFAULT NOW();
+ DECLARE manifest_count INT;
  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
  IF NOT EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V305') OR NOT EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V305') THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V306 requires V305';
  END IF;
  IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_data_repair_backup' AND column_name='old_value' AND data_type='longtext') THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V306 requires LONGTEXT backup';
+ END IF;
+ -- Empty fresh installations have no historical order identities to repair.
+ -- Complete both ledgers without manufacturing orders or recovery evidence.
+ IF NOT EXISTS(SELECT 1 FROM zsjos_order WHERE tenant_id=1)
+ AND NOT EXISTS(SELECT 1 FROM zsjos_data_repair_backup WHERE repair_key='order-identity-v306') THEN
+  START TRANSACTION;
+  INSERT INTO zsjos_schema_version(version,description,checksum)
+  SELECT 'V306','Complete confirmed order owner identities',SHA2('V306__order_owner_identity_completion.sql',256)
+  WHERE NOT EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V306');
+  INSERT INTO zsjos_module_schema_version(module_code,version,description,checksum,release_version)
+  SELECT 'core','V306','Complete confirmed order owner identities',SHA2('V306__order_owner_identity_completion.sql',256),'baseline'
+  WHERE NOT EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V306');
+  COMMIT;
+  LEAVE apply_body;
  END IF;
  DROP TEMPORARY TABLE IF EXISTS v306_manifest;
  CREATE TEMPORARY TABLE v306_manifest(order_no VARCHAR(64) PRIMARY KEY, user_id BIGINT NOT NULL, identity_value VARCHAR(32) NOT NULL) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -312,7 +330,8 @@ apply_body: BEGIN
 ('OR202609200026',17,'sales'),
 ('OR202609200027',17,'sales'),
 ('OR202609200030',23,'sales');
- IF (SELECT COUNT(*) FROM v306_manifest) <> 286
+ SELECT COUNT(*) INTO manifest_count FROM v306_manifest;
+ IF manifest_count <> 286
   OR EXISTS(SELECT 1 FROM v306_manifest m
       LEFT JOIN zsjos_order o ON o.order_no=m.order_no AND o.tenant_id=1 AND o.deleted=0
       LEFT JOIN zsjos_order_approval_round r ON r.id=o.current_approval_round_id

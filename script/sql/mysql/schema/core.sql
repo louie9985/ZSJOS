@@ -5636,6 +5636,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `director_interview_snapshot_json` json DEFAULT NULL,
   `director_precheck_draft_version` int NOT NULL DEFAULT '0' COMMENT '编导资料预审草稿版本',
   `director_interview_draft_version` int NOT NULL DEFAULT '0' COMMENT '编导学员采访草稿版本',
+  `first_contact_progress_json` JSON NULL COMMENT '首联清单当前进度',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_order_item` (`tenant_id`,`order_item_id`),
   KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`),
@@ -5732,12 +5733,15 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_record` (
   `contact_type` varchar(64) NOT NULL, `successful` bit(1) NOT NULL, `unsuccessful_reason_value` varchar(100) DEFAULT NULL,
   `unsuccessful_reason_label_snapshot` varchar(100) DEFAULT NULL, `remark` varchar(2000) NOT NULL,
   `attachment_file_ids_json` json NOT NULL, `checklist_result_json` json NOT NULL,
-  `delivery_stage` varchar(64) DEFAULT NULL, `delivery_data_json` json DEFAULT NULL, `next_contact_at` datetime NOT NULL,
+  `delivery_stage` varchar(64) DEFAULT NULL, `delivery_data_json` json DEFAULT NULL, `next_contact_at` datetime NULL,
   `operator_user_id` bigint NOT NULL, `submitted_at` datetime NOT NULL, `idempotency_key` varchar(128) NOT NULL,
   `request_fingerprint` varchar(64) NOT NULL DEFAULT '',
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL, PRIMARY KEY (`id`),
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
+  `study_plan_completed_at_first_contact` BIT(1) NULL COMMENT '首联时是否已制定学习计划，历史未知为空',
+  `checklist_snapshot_json` JSON NULL COMMENT '首联清单提交快照',
+  PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`), UNIQUE KEY `uk_tenant_task` (`tenant_id`,`task_id`),
   KEY `idx_tenant_relation_submitted` (`tenant_id`,`service_relation_id`,`submitted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='不可变学员联系记录';
@@ -8183,5 +8187,67 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_image (
   infra_file_id BIGINT NOT NULL, content_type VARCHAR(32) NOT NULL, file_size BIGINT NOT NULL,
   creator VARCHAR(64) DEFAULT '', create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updater VARCHAR(64) DEFAULT '', update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  deleted BIT(1) NOT NULL DEFAULT b'0', PRIMARY KEY(id), KEY idx_student_info_image_form(tenant_id,form_id,deleted)
+  deleted BIT(1) NOT NULL DEFAULT b'0',
+  archive_only BIT(1) NOT NULL DEFAULT b'0' COMMENT '仅档案维护使用，不改变原提交',
+  PRIMARY KEY(id), KEY idx_student_info_image_form(tenant_id,form_id,deleted)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员收集表图片关联';
+
+-- V325 final structure; empty tables only, numbered migration owns upgrade and metadata.
+CREATE TABLE IF NOT EXISTS zsjos_navigation_preference (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  user_id BIGINT NOT NULL,
+  client VARCHAR(16) NOT NULL,
+  preference_json MEDIUMTEXT NOT NULL COMMENT '个人导航同级顺序',
+  creator VARCHAR(64) NOT NULL DEFAULT '',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater VARCHAR(64) NOT NULL DEFAULT '',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY(id), UNIQUE KEY uk_user_client(tenant_id,user_id,client,deleted)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='个人导航设置';
+
+-- V327 final structure; empty tables only, numbered migration owns upgrade and metadata.
+CREATE TABLE IF NOT EXISTS zsjos_student_archive_revision (
+  id BIGINT NOT NULL AUTO_INCREMENT, form_id BIGINT NOT NULL, person_id BIGINT NOT NULL,
+  revision INT NOT NULL, operator_user_id BIGINT NOT NULL, reason VARCHAR(500) NOT NULL,
+  idempotency_key VARCHAR(64) NOT NULL, request_hash CHAR(64) NOT NULL,
+  answers_json MEDIUMTEXT NOT NULL COMMENT '加密档案答案及字典地区快照', image_ids_json TEXT NOT NULL,
+  tenant_id BIGINT NOT NULL DEFAULT 1, creator VARCHAR(64) NOT NULL DEFAULT '', updater VARCHAR(64) NOT NULL DEFAULT '',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY(id), UNIQUE KEY uk_form_revision(tenant_id,form_id,revision), UNIQUE KEY uk_archive_command(tenant_id,idempotency_key),
+  KEY idx_person(tenant_id,person_id,form_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员档案维护记录';
+
+-- V332 final structure; empty tables only, numbered migration owns upgrade and metadata.
+CREATE TABLE IF NOT EXISTS zsjos_student_archive_extra_revision (
+  id BIGINT NOT NULL AUTO_INCREMENT, service_relation_id BIGINT NOT NULL, revision INT NOT NULL,
+  operator_user_id BIGINT NOT NULL, reason VARCHAR(500) NOT NULL,
+  idempotency_key VARCHAR(64) NOT NULL, request_hash CHAR(64) NOT NULL,
+  values_json MEDIUMTEXT NOT NULL COMMENT '加密的考试与证书信息快照',
+  tenant_id BIGINT NOT NULL DEFAULT 1, creator VARCHAR(64) NOT NULL DEFAULT '', updater VARCHAR(64) NOT NULL DEFAULT '',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0', PRIMARY KEY(id),
+  UNIQUE KEY uk_service_revision(tenant_id,service_relation_id,revision), UNIQUE KEY uk_extra_command(tenant_id,idempotency_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员考试与证书档案修订';
+CREATE TABLE IF NOT EXISTS zsjos_student_archive_attachment (
+  id BIGINT NOT NULL AUTO_INCREMENT, service_relation_id BIGINT NOT NULL, field_key VARCHAR(64) NOT NULL,
+  infra_file_id BIGINT NOT NULL, file_size BIGINT NOT NULL, content_type VARCHAR(150) NOT NULL,
+  tenant_id BIGINT NOT NULL DEFAULT 1, creator VARCHAR(64) NOT NULL DEFAULT '', updater VARCHAR(64) NOT NULL DEFAULT '',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0', PRIMARY KEY(id), KEY idx_service_field(tenant_id,service_relation_id,field_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员档案加密附件绑定';
+
+-- V335 final structure; empty tables only, numbered migration owns upgrade and metadata.
+CREATE TABLE IF NOT EXISTS zsjos_student_archive_extra_config (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  revision INT NOT NULL DEFAULT 0,
+  visibility_json MEDIUMTEXT NOT NULL COMMENT '考试字段教务可见性配置',
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  creator VARCHAR(64) NOT NULL DEFAULT '', updater VARCHAR(64) NOT NULL DEFAULT '',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (id), UNIQUE KEY uk_tenant (tenant_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员考试字段可见性配置';

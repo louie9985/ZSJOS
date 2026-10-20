@@ -93,12 +93,13 @@ FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = '
 SET @public_sea_pool_filter = '{"groups":[{"key":"all","label":"全部公海客资","sort":0,"enabled":true,"sectionLabel":"公海状态","conditions":[],"options":[{"key":"all","label":"全部","sort":0,"enabled":true,"conditions":[]},{"key":"waiting_assignment","label":"待指派","sort":10,"enabled":true,"conditions":[{"field":"pool_status","values":["waiting_assignment"]}]},{"key":"assigned","label":"协同跟进中","sort":20,"enabled":true,"conditions":[{"field":"pool_status","values":["assigned"]}]},{"key":"deal_pending","label":"成交审批中","sort":30,"enabled":true,"conditions":[{"field":"pool_status","values":["deal_pending"]}]}]}]}';
 INSERT IGNORE INTO `zsjos_lead_inbox_filter_scheme`
 (`audience`, `name`, `draft_config_json`, `published_config_json`, `published_version`, `published_by`, `published_at`, `version`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
-SELECT 'publicSeaPool', '公海视角', @public_sea_pool_filter, @public_sea_pool_filter, 1, 1, NOW(), 0, '1', NOW(), '1', NOW(), b'0', t.id
+-- V034 must recognize this fresh default; V329 renames its audience in place.
+SELECT 'agingPool', '公海视角', @public_sea_pool_filter, @public_sea_pool_filter, 1, 1, NOW(), 0, '1', NOW(), '1', NOW(), b'0', t.id
 FROM `system_tenant` t WHERE t.id = 1 AND t.deleted = b'0';
 INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
 (`scheme_id`, `version_no`, `config_json`, `published_by`, `published_at`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
 SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
-FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = 'publicSeaPool' AND s.deleted = b'0';
+FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = 'agingPool' AND s.deleted = b'0';
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V000_BASELINE', 'ZSJOS empty database baseline', 'bootstrap-v1');
