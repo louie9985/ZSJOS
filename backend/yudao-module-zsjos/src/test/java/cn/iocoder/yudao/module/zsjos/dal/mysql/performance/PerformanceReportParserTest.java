@@ -1,9 +1,13 @@
 package cn.iocoder.yudao.module.zsjos.dal.mysql.performance;
 
-import com.baomidou.mybatisplus.extension.plugins.handler.TenantLineHandler;
+import cn.iocoder.yudao.framework.tenant.config.TenantProperties;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantDatabaseInterceptor;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor;
-import net.sf.jsqlparser.expression.Expression;
-import net.sf.jsqlparser.expression.LongValue;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.junit.jupiter.api.AfterEach;
 import net.sf.jsqlparser.parser.CCJSqlParserUtil;
 import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
 import org.apache.ibatis.session.Configuration;
@@ -23,10 +27,30 @@ import org.apache.ibatis.mapping.BoundSql;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PerformanceReportParserTest {
+    @AfterEach void clearTenant() { TenantContextHolder.clear(); }
+
+    private TenantLineInnerInterceptor tenantInterceptor() {
+        TenantContextHolder.setTenantId(1L);
+        var assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "exception-query-fixture");
+        assistant.setCurrentNamespace("exception.query.fixture");
+        for (Class<?> entity : List.of(
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderItemDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalRoundDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderSupervisorConfirmationDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.performance.PerformanceAttributionDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.performance.PerformanceOrgDO.class,
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO.class)) {
+            TableInfoHelper.initTableInfo(assistant, entity);
+        }
+        // 与生产一致：实体表追加租户条件，CTE 别名没有实体元数据，不追加不存在的列。
+        return new TenantLineInnerInterceptor(new TenantDatabaseInterceptor(new TenantProperties()));
+    }
+
     @Test void currentFollowUpsBindAndParseWithEmptyAndPopulatedScopes() throws Exception {
-        var interceptor = new TenantLineInnerInterceptor(new TenantLineHandler() {
-            @Override public Expression getTenantId() { return new LongValue(1); }
-        });
+        var interceptor = tenantInterceptor();
         for (var ids : List.of(Set.<Long>of(), Set.of(1L,2L))) {
             var q=new PerformanceReportQuery();q.setTenant(1L);q.setAssigneeIds(ids);
             q.setNow(LocalDateTime.of(2026,10,15,12,0));q.setToday(q.getNow().toLocalDate().atStartOfDay());
@@ -48,9 +72,7 @@ class PerformanceReportParserTest {
     }
     @Test
     void everyAmountGroupingParsesThroughActualTenantInterceptor() throws Exception {
-        var interceptor = new TenantLineInnerInterceptor(new TenantLineHandler() {
-            @Override public Expression getTenantId() { return new LongValue(1); }
-        });
+        var interceptor = tenantInterceptor();
         for (String grouping : List.of("total", "source", "user", "contributor", "product")) {
             for (int scope = 0; scope < 3; scope++) {
                 var q = new PerformanceReportQuery();
@@ -67,6 +89,8 @@ class PerformanceReportParserTest {
                 String parsed = assertDoesNotThrow(() -> interceptor.parserSingle(sql, null), grouping + "/" + scope);
                 assertDoesNotThrow(() -> CCJSqlParserUtil.parse(parsed));
                 assertTrue(parsed.contains("tenant_id"));
+                assertFalse(parsed.contains("w.tenant_id"));
+                assertFalse(parsed.contains("f.tenant_id"));
                 if (scope == 2) assertTrue(parsed.contains("1 = 0"), parsed);
                 export("amounts-" + grouping + "-scope" + scope, config, bound, parsed, q);
             }
@@ -75,9 +99,7 @@ class PerformanceReportParserTest {
 
     @Test
     void supervisorPagingBindsPlainOffsetsThroughTenantParser() throws Exception {
-        var interceptor = new TenantLineInnerInterceptor(new TenantLineHandler() {
-            @Override public Expression getTenantId() { return new LongValue(1); }
-        });
+        var interceptor = tenantInterceptor();
         for (int offset : List.of(0, 20)) {
             var request = new SalesOrderSupervisorPageReqVO();
             request.setPageNo(offset / 20 + 1); request.setPageSize(20); request.setHandled(false);

@@ -321,19 +321,18 @@ public class StudentContactServiceImpl implements StudentContactService {
     public void updateBasicInfo(Long relationId, StudentBasicInfoUpdateReqVO request, Long userId) {
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
-        String name = request.getName().trim();
         String mobile = StrUtil.trimToNull(request.getMobile());
         String wechatId = StrUtil.trimToNull(request.getWechatId());
         if (mobile == null && wechatId == null) throw exception(LEAD_CONTACT_REQUIRED);
         if (mobile != null && !ValidationUtils.isMobile(mobile)) throw exception(LEAD_MOBILE_INVALID);
 
-        PersonDO before = personMapper.selectById(relation.getPersonId());
+        PersonDO before = personMapper.selectByIdForUpdate(relation.getPersonId(), TenantContextHolder.getRequiredTenantId());
         if (before == null) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         List<String> changedFields = new ArrayList<>();
-        if (!Objects.equals(before.getName(), name)) changedFields.add("name");
         if (!Objects.equals(before.getMobile(), mobile)) changedFields.add("mobile");
         if (!Objects.equals(before.getWechatId(), wechatId)) changedFields.add("wechatId");
-        personIdentityWriteService.update(relation.getPersonId(), name, mobile, wechatId);
+        // Student names are order-owned. Legacy callers may still send name, but cannot rename Person here.
+        personIdentityWriteService.update(relation.getPersonId(), before.getName(), mobile, wechatId);
 
         BusinessEventDO event = new BusinessEventDO();
         event.setEventType("student_basic_info_updated");
@@ -627,12 +626,11 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) {
             SalesOrderDO order = relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
             LeadDO lead = order == null || order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
-            PersonDO student = personMapper.selectById(relation.getPersonId());
             Map<String, Object> context = new LinkedHashMap<>();
             context.put("registrationCaseId", relation.getRegistrationCaseId());
             context.put("orderNo", order == null ? "" : order.getOrderNo());
             context.put("leadNo", lead == null || lead.getLeadNo() == null ? "" : lead.getLeadNo());
-            context.put("studentName", student == null || student.getName() == null ? "" : student.getName());
+            context.put("studentName", order == null || order.getStudentName() == null ? "" : order.getStudentName());
             context.put("contentDirectorUserId", request.getUserId());
             studentContactNotifyPublisher.publish(
                     cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.NOTIFY_SCENE_DIRECTOR_ASSIGNED,
@@ -932,12 +930,12 @@ public class StudentContactServiceImpl implements StudentContactService {
 
     private ServiceRelationDO requireOwned(Long id, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(id);
-        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        if (!cn.iocoder.yudao.module.zsjos.service.registration.StudentDeliveryParticipation.includes(relation) || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         if (!Objects.equals(relation.getOwnerUserId(), userId)) throw exception(STUDENT_PERMISSION_DENIED); return relation;
     }
     private ServiceRelationDO requireOwnedForUpdate(Long id, Long userId) {
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
-        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        if (!cn.iocoder.yudao.module.zsjos.service.registration.StudentDeliveryParticipation.includes(relation) || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         if (!Objects.equals(relation.getOwnerUserId(), userId)) throw exception(STUDENT_PERMISSION_DENIED); return relation;
     }
     private ServiceRelationDO requireReadable(Long id, Long userId) {
@@ -1315,10 +1313,10 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         collaborationNotify.send(MEDIA_STUDENT_COLLABORATOR_CHANGED, "student_service", selected.getId(), "", userId,
                 "operator-handover:" + selected.getPersonId() + ":" + request.getIdempotencyKey(), previousOperators, Map.of());
-        PersonDO student = personMapper.selectById(selected.getPersonId());
+        SalesOrderDO order = selected.getOrderId() == null ? null : orderMapper.selectById(selected.getOrderId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("operatorUserId", request.getUserId());
-        context.put("studentName", student == null || student.getName() == null ? "" : student.getName());
+        context.put("studentName", order == null || order.getStudentName() == null ? "" : order.getStudentName());
         studentContactNotifyPublisher.publish(NOTIFY_OPERATOR_ASSIGNED, selected.getId(),
                 "student-operator-assigned:" + selected.getPersonId() + ":" + request.getIdempotencyKey(),
                 null, LocalDateTime.now(), context);

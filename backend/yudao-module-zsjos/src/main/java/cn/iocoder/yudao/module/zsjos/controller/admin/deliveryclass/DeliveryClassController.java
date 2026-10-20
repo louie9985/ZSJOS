@@ -54,6 +54,8 @@ public class DeliveryClassController {
     public CommonResult<PageResult<DeliveryClassStudentRespVO>> students(@PathVariable Long id,@Valid PageParam pageParam){ return success(service.students(id,getLoginUserId(),pageParam)); }
     @PostMapping("/create") @PreAuthorize("@ss.hasPermission('zsjos:delivery-class:create')")
     public CommonResult<Long> create(@Valid @RequestBody DeliveryClassSaveReqVO req){ return success(service.create(req,getLoginUserId())); }
+    @PostMapping("/batch-create") @PreAuthorize("@ss.hasPermission('zsjos:delivery-class:create')")
+    public CommonResult<List<Long>> createBatch(@Valid @RequestBody DeliveryClassBatchCreateReqVO req){ return success(service.createBatch(req,getLoginUserId())); }
     @PutMapping("/{id}") @PreAuthorize("@ss.hasPermission('zsjos:delivery-class:update')")
     public CommonResult<Boolean> update(@PathVariable Long id,@Valid @RequestBody DeliveryClassSaveReqVO req){ service.update(id,req,getLoginUserId()); return success(true); }
     @PostMapping("/{id}/complete") @PreAuthorize("@ss.hasPermission('zsjos:delivery-class:complete')")

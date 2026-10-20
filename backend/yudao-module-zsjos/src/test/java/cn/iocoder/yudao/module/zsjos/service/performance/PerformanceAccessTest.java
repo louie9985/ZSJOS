@@ -47,6 +47,33 @@ import static org.junit.jupiter.api.Assertions.*;
   assertEquals(Set.of(2L),access.enabledUserIds(Set.of(2L,3L,4L)));
   assertTrue(access.enabledUserIds(Set.of()).isEmpty());verifyNoInteractions(postApi);
  }
+ @Test void historicalPersonnelCannotReintroduceDeliveryOrMissingUsers() {
+  var enabled=person(2,0);var delivery=person(3,0);delivery.setDeptId(20L);
+  var disabled=person(5,1);var unknown=person(6,null);
+  when(userApi.getUserList(Set.of(2L,3L,4L,5L,6L))).thenReturn(List.of(enabled,delivery,disabled,unknown));
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance:department")).thenReturn(true);
+  var a=new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceFact();a.setUserId(2L);a.setUserName("历史销售");
+  var b=new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceFact();b.setUserId(3L);b.setUserName("交付人员");
+  var c=new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceFact();c.setUserId(4L);c.setUserName("不存在人员");
+  var d=new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceFact();d.setUserId(5L);d.setUserName("停用人员");
+  var e=new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceFact();e.setUserId(6L);e.setUserName("状态未知人员");
+  when(detailMapper.historicalPeople(any())).thenReturn(List.of(a,b,c,d,e));
+  assertEquals(List.of(2L),access.tree(false).stream().filter(n->"USER".equals(n.scopeType())).map(n->n.scopeId()).toList());
+  enabled.setStatus(1);
+  assertTrue(access.tree(false).stream().noneMatch(n->"USER".equals(n.scopeType())));
+  enabled.setStatus(0);
+  assertEquals(List.of(2L),access.tree(false).stream().filter(n->"USER".equals(n.scopeType())).map(n->n.scopeId()).toList());
+ }
+ @Test void presentationMembershipUsesConfiguredDepartmentsAndPropagatesSystemFailures() {
+  var enabled=person(2,0);var unconfigured=person(3,0);unconfigured.setDeptId(999L);
+  when(userApi.getUserList(Set.of(2L,3L,4L))).thenReturn(List.of(enabled,unconfigured));
+  assertEquals(List.of(2L),access.presentationUsers(Set.of(2L,3L,4L)).stream().map(AdminUserRespDTO::getId).toList());
+  assertTrue(access.presentationUsers(Set.of()).isEmpty());
+  when(userApi.getUserList(Set.of(2L,3L,4L))).thenThrow(new IllegalStateException("System unavailable"));
+  assertThrows(IllegalStateException.class,()->access.presentationUsers(Set.of(2L,3L,4L)));
+  verifyNoInteractions(postApi);
+ }
  @Test void disabledTargetCannotBeSavedDespiteReadAndWritePermissions(){
   when(userApi.getUser(2L)).thenReturn(person(2,1));
   when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance-target:query")).thenReturn(true);

@@ -27,6 +27,7 @@ public class MyStudentRespVO {
         private String leadNo;
         private Long orderId;
         private String orderNo;
+        private String studentName;
         private String orderStatus;
         private String orderStatusLabel;
         private Long orderItemId;

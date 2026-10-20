@@ -5594,6 +5594,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `collaboration_group_id` bigint DEFAULT NULL COMMENT '编导运营协作组',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '学生服务关系编号',
   `person_id` bigint NOT NULL COMMENT '被服务 Person 编号',
+  `teaching_delivery` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否纳入教学交付',
   `order_id` bigint DEFAULT NULL COMMENT '来源有效订单编号',
   `order_item_id` bigint DEFAULT NULL COMMENT '来源订单项编号',
   `registration_case_id` bigint DEFAULT NULL COMMENT '激活报名服务单编号',

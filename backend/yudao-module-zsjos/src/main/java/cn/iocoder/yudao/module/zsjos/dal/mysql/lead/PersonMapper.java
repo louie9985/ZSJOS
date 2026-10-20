@@ -27,7 +27,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
         query.apply(MEDIA_PERSON_PREDICATE);
         applyMediaOperatorFilter(query, req, null, false);
         if (req.getClassId() != null || req.getServiceStatus() != null) {
-            query.apply(STUDENT_RELATION_PREDICATE
+            query.apply(MEDIA_SERVICE_RELATION_PREDICATE
                     + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1}) AND "
                     + cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper.MEDIA_RELATION_PREDICATE
                             .replace("zsjos_service_relation", "sr") + ")",
@@ -48,7 +48,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
                                                             boolean media) {
         QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
         if (media) applyMediaOperatorFilter(query, req, null, true);
-        query.apply(STUDENT_RELATION_PREDICATE
+        query.apply((media ? MEDIA_SERVICE_RELATION_PREDICATE : STUDENT_RELATION_PREDICATE)
                 + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1}))",
                 req.getClassId(), req.getServiceStatus());
         return selectPage(req, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
@@ -57,9 +57,11 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
      * Start of every student-page EXISTS clause: the person's live service relations. Each caller appends
      * its own scope clause (class id, then the owner list where one applies) and then the status condition.
      */
-    String STUDENT_RELATION_PREDICATE =
+    String MEDIA_SERVICE_RELATION_PREDICATE =
             "EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                     + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' ";
+
+    String STUDENT_RELATION_PREDICATE = MEDIA_SERVICE_RELATION_PREDICATE + "AND sr.teaching_delivery=1 ";
 
     /** A SQL fragment together with its positional arguments, kept in one value so the two cannot drift. */
     record StudentScopePredicate(String sql, Object[] args) {
@@ -102,14 +104,14 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
         String classPredicate = " AND ({1} IS NULL OR sr.class_id={1})";
         if (reqVO.getServiceStatus() == null) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
-                            + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
+                            + "AND sr.teaching_delivery=1 AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
                             + classPredicate
                             + "AND ((sr.owner_user_id={0} AND sr.status IN ('active','paused','completed')) "
                             + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0}) "
                             + "AND sr.status='active' AND sr.acceptance_status='accepted')))", userId, reqVO.getClassId());
         } else {
             query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
-                            + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
+                            + "AND sr.teaching_delivery=1 AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
                             + classPredicate
                             + "AND ((sr.owner_user_id={0} AND sr.status={2}) "
                             + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0}) "
@@ -145,7 +147,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     static void applyMediaOperatorFilter(QueryWrapperX<PersonDO> query, MyStudentPageReqVO req,
                                          Long subjectId, boolean explicitRead) {
         if (req.getOperatorUserId() == null) return;
-        String scope = STUDENT_RELATION_PREDICATE + "AND sr.operator_user_id={0} ";
+        String scope = MEDIA_SERVICE_RELATION_PREDICATE + "AND sr.operator_user_id={0} ";
         if (subjectId == null || explicitRead) {
             scope += "AND ({1} IS NULL OR sr.class_id={1}) AND ({2} IS NULL OR sr.status={2}) ";
             if (subjectId == null) {

@@ -38,8 +38,8 @@
 - `GET /zsjos/delivery-class/options?categoryId=&includePending=`：返回服务中的正式班，按
   可选 `categoryId` 过滤；不传时返回当前租户全部服务中班级。`includePending` 默认 true，包含并置顶服务中的租户待分班班级。报名分班不传分类参数，也不以产品、SKU、考期或分类匹配作为保存/完成前置条件；双端平铺展示。
   无分类请求仅按服务状态查询，不拼接系统班/正式班互斥条件。显式分类筛选使用“系统班或该分类”条件；MySQL 回归通过实际 Mapper 与租户拦截器核对结果，避免仅验证前端样本或未执行的 SQL。
-- `GET /zsjos/delivery-class/homeroom-candidates`：返回主管部门范围内启用且同时持有
-`zsjos:delivery-class:query-my`、`zsjos:student:query-my` 的用户。
+- `GET /zsjos/delivery-class/homeroom-candidates`：返回主管直接部门内账号启用且持有启用的
+`study_planner` 角色的用户。
 - `GET /zsjos/delivery-class/product-options`：返回教务端同源的启用产品、规格和 SKU。
 - `GET /zsjos/delivery-class/exam-options`：直接返回当前租户所有已发布、未结束考期，展示名称与日期。
   不需要分类、产品、规格或 SKU 参数；旧筛选参数不再限制结果。精确考期按 `exactDate`、多日考期按
@@ -47,12 +47,20 @@
 - `POST /zsjos/delivery-class/create`、`PUT /zsjos/delivery-class/{id}`、
   `POST /zsjos/delivery-class/{id}/complete`：创建、编辑和手动结课。
 
+### 主管多选班主任创建（2026-10-20）
+
+工作台新建班级支持多选班主任，确认按钮显示将创建的班级数量。每位学习规划师分别对应一个名称、考期日期相同的独立班级，各有独立编号；编辑已有班级仍为单选。候选使用现有 `homeroom-candidates`，资格沿用主管直接部门、账号启用且持有启用的 `study_planner` 角色，不由前端推断。
+
+`POST /zsjos/delivery-class/batch-create` 复用 `zsjos:delivery-class:create` 权限，请求为 `{className,startDate,homeroomUserIds}`，日期格式为 `YYYY-MM-DD`，班主任数组必填且至少一人、元素不可为空。服务端按人员 ID 去重并保留首次选择顺序，返回相同顺序的班级 ID 数组。名称去除首尾空格，每班独立生成编号，按既有租户机制保存。服务端先校验全部人员资格与直接部门，再在一个事务内创建；任一校验或保存失败，整批不落库。失败时工作台保留表单便于处理后重试，保存中禁用表单与关闭操作。
+
+原单条 `/create` 及编辑接口保持原请求和返回类型，Admin 继续调用原单条接口。此功能无表结构、角色授权或依赖变更；部署应先更新后端，再更新工作台。验证入口为 `DeliveryClassBatchCreateTest`（隔离 H2/JDBC 事务回滚和人员校验）、既有创建/日期测试以及工作台 `test/delivery-class-batch-browser.py`。浏览器测试使用合成接口响应，真实账号验收需另行执行。
+
 编辑班级时，新 Admin 客户端只修改名称或班主任会发送 `preserveExamDate=true`，服务端保留原考期关联和冻结日期快照。用户明确修改日期时发送完整 `startDate/endDate`，才切换为自主日期并清除旧关联；旧客户端省略该字段，继续按原日期契约处理。
 
 Admin 和 Workbench 的班级表单均只保留一个“考期日期”选择框。“选择已有考期”打开参考月历，按日期查看并点击已有考期，填入当前所选的日历日期，多日参考考期也只填入所选当天，填入后仍可修改。参考数据仅在打开弹窗时加载；加载失败、无权限或无候选不阻止返回手动填写。
 
 正式班编号为 `BJyyyyMMddHHmmss####`，由服务生成并依赖租户级唯一约束及冲突重试。
-班级名称 `className` 必须手工填写（非空白，最多 100 字）。新客户端提交 `className/startDate/homeroomUserId`，编辑附带 `version`。日期使用 `YYYY-MM-DD`；`startDate` 必填，前端不提供或提交结束日期。后端保留历史区间和旧客户端 `endDate` 的兼容校验，省略时按单日保存。自主日期不受考期日历是否存在、发布状态或是否结束限制。不关联产品、SKU 或分类，旧客户端提交的目录字段忽略。
+班级名称 `className` 必须手工填写（非空白，最多 100 字）。单条创建及编辑提交 `className/startDate/homeroomUserId`，编辑附带 `version`；工作台批量创建提交 `className/startDate/homeroomUserIds`。日期使用 `YYYY-MM-DD`；`startDate` 必填，前端不提供或提交结束日期。后端保留历史区间和旧客户端 `endDate` 的兼容校验，省略时按单日保存。自主日期不受考期日历是否存在、发布状态或是否结束限制。不关联产品、SKU 或分类，旧客户端提交的目录字段忽略。
 
 班级日期独立存入既有 `exam_schedule_snapshot`，格式为单日 `YYYY-MM-DD` 或区间 `YYYY-MM-DD~YYYY-MM-DD`，无需改表。只要提交自主日期，`examScheduleId` 即不参与校验或保存；编辑时显式清空旧关联。日历参考名称和关联 ID 不成为班级日期的事实来源。旧客户端仅提交 `examScheduleId` 的路径保持兼容，仍校验已发布、未结束并冻结其名称与日期快照；两种路径均受原有权限、部门、班主任资格和版本校验约束。
 
@@ -62,7 +70,7 @@ Admin 和 Workbench 的班级表单均只保留一个“考期日期”选择框
 
 班主任必须属于当前交付主管的直接部门、账号启用并拥有启用的 `study_planner` 角色。该角色
 资格是写命令的实时前置条件，而不只是候选列表过滤条件。班级创建/编辑、主管直调、
-BPM 调班通过、报名分班保存和报名完成都会重新确认账号启用且同时持有上述两项权限。
+BPM 调班通过、报名分班保存和报名完成都会重新确认账号启用且持有启用的学习规划师角色。
 
 班主任变更在一个事务中更新班级及其 `active/paused/completed` 服务关系 owner，并转派首联、
 学习计划、督学和协助类未完成业务待办。已完成待办、接收状态、联系/计划/督学历史和协作者

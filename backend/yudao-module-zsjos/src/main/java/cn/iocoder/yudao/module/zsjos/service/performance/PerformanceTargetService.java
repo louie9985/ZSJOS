@@ -60,7 +60,11 @@ public class PerformanceTargetService {
   var snapshot=batch(List.of(new Period(period,start)),List.of());
   Map<String,Node> nodes=new LinkedHashMap<>();
   access.tree(true).stream().filter(Node::selectable).forEach(n->nodes.put(n.scopeType()+":"+n.scopeId(),n));
-  for(var row:snapshot.rows)if(snapshot.visible.test("USER".equals(row.getScopeType())?row.getScopeId():null,row.getDeptId())) {
+  Set<Long> visibleUsers=nodes.values().stream().filter(n->"USER".equals(n.scopeType())).map(Node::scopeId)
+    .collect(java.util.stream.Collectors.toSet());
+  // Stored historical targets still aggregate, but cannot restore disabled personnel as editable rows.
+  for(var row:snapshot.rows)if((!"USER".equals(row.getScopeType())||visibleUsers.contains(row.getScopeId()))
+    &&snapshot.visible.test("USER".equals(row.getScopeType())?row.getScopeId():null,row.getDeptId())) {
    String key=row.getScopeType()+":"+row.getScopeId();
    nodes.putIfAbsent(key,new Node(key,null,snapshot.name(row.getScopeType(),row.getScopeId()),row.getScopeType(),row.getScopeId(),true));
   }

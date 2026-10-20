@@ -14,6 +14,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class AdvancedFilterFieldCatalogTest {
     private final AdvancedFilterService service = new AdvancedFilterService();
 
+    @Test void studentServiceNameUsesItsOrderAndLeadNameBindingIsUnchanged() {
+        var field = AdvancedFilterFieldCatalog.fields().get("person.name");
+        assertEquals("ro.student_name", field.bindings().get("student_service").expression());
+        assertNull(field.bindings().get("student_service").relation());
+        assertEquals("p.name", field.bindings().get("lead").expression());
+    }
+
     @Test void authoritativeOptionSourcesDoNotFallBackToEmbeddedChoices() {
         var fields = AdvancedFilterFieldCatalog.fields();
         Map.of("lead.status", "zsjos_lead_status", "lead.assignmentStatus", "zsjos_lead_assignment_status",

@@ -46,7 +46,7 @@ public class StudentServiceReadService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
     public StudentServiceRespVO detail(Long actor, Long relationId) {
         var relation = relationMapper.selectById(relationId);
-        if (relation == null) throw exception(STUDENT_NOT_EXISTS);
+        if (!StudentDeliveryParticipation.includes(relation)) throw exception(STUDENT_NOT_EXISTS);
         var req = new StudentServicePageReqVO();
         if (permissionApi.hasTenantReadAllAccess(actor)) req.setReadScope("ALL");
         var scoped = query(actor, req);
@@ -74,6 +74,7 @@ public class StudentServiceReadService {
         params.put("tenantId", TenantContextHolder.getRequiredTenantId());
         params.put("now", java.time.LocalDateTime.now());
         List<String> clauses = new ArrayList<>();
+        clauses.add("sr." + StudentDeliveryParticipation.SQL);
         clauses.add(filter == null ? "1=1" : "(" + filter.getWhereSql() + ")");
         Long subject = actor;
         boolean all = false;
@@ -117,7 +118,7 @@ public class StudentServiceReadService {
         add(clauses,params,"p.in_service_period","inServicePeriod",req.getInServicePeriod());
         if (req.getKeyword()!=null && !req.getKeyword().isBlank()) {
             params.put("keyword","%"+req.getKeyword().trim()+"%");
-            clauses.add("(p.name LIKE #{query.parameters.keyword} OR p.mobile LIKE #{query.parameters.keyword} OR p.wechat_id LIKE #{query.parameters.keyword} OR p.person_no LIKE #{query.parameters.keyword} OR rl.lead_no LIKE #{query.parameters.keyword})");
+            clauses.add("(ro.student_name LIKE #{query.parameters.keyword} OR p.mobile LIKE #{query.parameters.keyword} OR p.wechat_id LIKE #{query.parameters.keyword} OR p.person_no LIKE #{query.parameters.keyword} OR rl.lead_no LIKE #{query.parameters.keyword})");
         }
         params.put("sortField",req.getSortField()); params.put("sortOrder",req.getSortOrder());
         params.put("limit",req.getPageSize()); params.put("offset",(long)(req.getPageNo()-1)*req.getPageSize());

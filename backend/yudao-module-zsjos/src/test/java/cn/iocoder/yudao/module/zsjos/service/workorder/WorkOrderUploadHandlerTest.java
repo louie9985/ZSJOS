@@ -141,6 +141,48 @@ class WorkOrderUploadHandlerTest {
         assertThrows(IllegalArgumentException.class, () -> new WorkOrderUploadHandler(service, properties));
     }
 
+    @Test
+    void cancelledReadReleasesBudgetWithoutCallingStorage() throws Exception {
+        var properties = new WorkOrderUploadProperties();
+        properties.setMaxConcurrentRequests(1);
+        properties.setMaxInFlightBytes(1);
+        var handler = new WorkOrderUploadHandler(service, properties);
+        var cancelled = mock(MultipartFile.class);
+        when(cancelled.getSize()).thenReturn(1L);
+        when(cancelled.getInputStream()).thenReturn(new InputStream() {
+            @Override public int read() throws IOException {
+                throw new java.io.InterruptedIOException("fixture cancelled upload");
+            }
+        });
+        assertThrows(java.io.InterruptedIOException.class, () -> handler.upload(cancelled, 1L));
+        verifyNoInteractions(service);
+        handler.upload(file(1), 1L);
+        verify(service).upload(any(), any(), any(), eq(1L));
+    }
+
+    @Test
+    void repeatedFullBudgetUploadsRemainBoundedInControlledJvm() throws Exception {
+        var handler = new WorkOrderUploadHandler(service, new WorkOrderUploadProperties());
+        var pools = java.lang.management.ManagementFactory.getMemoryPoolMXBeans().stream()
+                .filter(pool -> pool.getType() == java.lang.management.MemoryType.HEAP).toList();
+        pools.forEach(java.lang.management.MemoryPoolMXBean::resetPeakUsage);
+        for (int attempt = 0; attempt < 12; attempt++) {
+            MultipartFile file = mock(MultipartFile.class);
+            when(file.getSize()).thenReturn(WorkOrderUploadProperties.MAX_FILE_BYTES);
+            when(file.getInputStream()).thenReturn(zeroStream(WorkOrderUploadProperties.MAX_FILE_BYTES));
+            handler.upload(file, 1L);
+            verify(service).upload(argThat(bytes -> bytes.length == WorkOrderUploadProperties.MAX_FILE_BYTES),
+                    isNull(), isNull(), eq(1L));
+            // Mockito 的调用记录不能持有生产存储已释放的缓冲区。
+            clearInvocations(service);
+        }
+        assertSaturation(2, WorkOrderUploadProperties.MAX_FILE_BYTES,
+                50 * 1024 * 1024, 50 * 1024 * 1024, 1);
+        long peak = pools.stream().mapToLong(pool -> pool.getPeakUsage().getUsed()).sum();
+        System.out.printf("UPLOAD_FIXTURE iterations=12 concurrent=2 reservedBytes=%d heapPoolPeakSumBytes=%d maxHeapBytes=%d%n",
+                WorkOrderUploadProperties.MAX_FILE_BYTES, peak, Runtime.getRuntime().maxMemory());
+    }
+
     private static MultipartFile file(int size) {
         return new MockMultipartFile("file", "attachment.bin", "application/octet-stream", new byte[size]);
     }

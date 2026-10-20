@@ -29,6 +29,14 @@ class StudentServiceReadServiceTest {
     @Mock StudentServiceSummaryReader summaryReader;
     @BeforeEach void before(){TenantContextHolder.setTenantId(1L);}
     @AfterEach void after(){TenantContextHolder.clear();}
+    @Test void nameKeywordAndSortUseCurrentOrder() {
+        var req = new StudentServicePageReqVO(); req.setKeyword("订单姓名"); req.setSortField("name"); req.setSortOrder("ascend");
+        var q = service.query(7L, req);
+        assertTrue(q.getWhereSql().contains("ro.student_name LIKE"));
+        assertFalse(q.getWhereSql().contains("p.name LIKE"));
+        assertEquals("%订单姓名%", q.getParameters().get("keyword"));
+        assertTrue(StudentServicePageSql.page(Map.of("query", q)).contains("ORDER BY ro.student_name ASC"));
+    }
     @Test void twoCoursesOfSamePersonRemainTwoRowsAndDatabaseTotal(){
         var a=new ServiceRelationDO();a.setId(11L);a.setPersonId(9L);
         var b=new ServiceRelationDO();b.setId(12L);b.setPersonId(9L);
@@ -117,6 +125,41 @@ class StudentServiceReadServiceTest {
             assertEquals(Set.of(1L,2L,4L,11L), mysqlIds(db, fixtures, service.query(7L,req)));
             req.setServiceStatus("terminated");
             assertTrue(mysqlIds(db, fixtures, service.query(7L,req)).isEmpty());
+        }
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="ZSJOS_CLASS_MYSQL_VERIFY", matches="true")
+    void mysqlNameSearchSortAndAdvancedFilterStayOnCurrentVisibleOrder() throws Exception {
+        String fixtures = "WITH service_rows AS ("
+                + "SELECT 1 id,1 tenant_id,0 deleted,9 person_id,81 order_id,7 owner_user_id "
+                + "UNION ALL SELECT 2,1,0,9,82,7 UNION ALL SELECT 3,1,0,9,83,99 "
+                + "UNION ALL SELECT 4,1,0,9,NULL,7 UNION ALL SELECT 5,1,0,9,84,7),"
+                + "zsjos_service_relation AS (SELECT service_rows.*,NULL class_id,NULL order_item_id,"
+                + "NULL content_director_user_id,NULL career_planner_user_id,'accepted' acceptance_status,'active' status,NOW() update_time FROM service_rows),"
+                + "zsjos_person AS (SELECT 9 id,1 tenant_id,0 deleted,'PersonOnly' name,'fixture' person_no,NULL mobile,NULL wechat_id),"
+                + "zsjos_order AS (SELECT 81 id,1 tenant_id,0 deleted,0 lead_id,'FirstOrder' student_name "
+                + "UNION ALL SELECT 82,1,0,0,'SecondOrder' UNION ALL SELECT 83,1,0,0,'HiddenOrder' UNION ALL SELECT 84,1,1,0,'DeletedOrder'),"
+                + "zsjos_order_item AS (SELECT 0 id,0 order_id,1 tenant_id,0 deleted),"
+                + "zsjos_lead AS (SELECT 0 id,1 tenant_id,0 deleted,NULL lead_no),"
+                + "zsjos_delivery_class AS (SELECT 0 id,1 tenant_id,0 deleted,0 system_class) ";
+        try (var db = java.sql.DriverManager.getConnection(System.getenv("ZSJOS_CLASS_MYSQL_URL"),
+                System.getenv("ZSJOS_CLASS_MYSQL_USER"), System.getenv("ZSJOS_CLASS_MYSQL_PASSWORD"))) {
+            db.setReadOnly(true);
+            var req = new StudentServicePageReqVO(); req.setKeyword("SecondOrder");
+            assertEquals(Set.of(2L), mysqlIds(db, fixtures, service.query(7L, req)));
+            for (String missing : List.of("PersonOnly", "HiddenOrder", "DeletedOrder")) {
+                req.setKeyword(missing); assertTrue(mysqlIds(db, fixtures, service.query(7L, req)).isEmpty());
+            }
+            req.setKeyword(null); req.setSortField("name"); req.setSortOrder("descend");
+            assertEquals(List.of(2L,1L,5L,4L), new ArrayList<>(mysqlIds(db, fixtures, service.query(7L, req))));
+            var group = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO();
+            var condition = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterConditionReqVO();
+            condition.setFieldKey("person.name"); condition.setOperator("eq"); condition.setValue("FirstOrder");
+            group.setLogic("AND"); group.setGroups(List.of()); group.setConditions(List.of(condition));
+            req.setAdvancedFilter(group);
+            when(filters.buildStudentServiceQuery(group)).thenReturn(new AdvancedFilterService().buildStudentServiceQuery(group));
+            assertEquals(Set.of(1L), mysqlIds(db, fixtures, service.query(7L, req)));
         }
     }
 

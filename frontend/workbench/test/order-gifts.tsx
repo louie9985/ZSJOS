@@ -15,7 +15,7 @@ import { noticeManagement } from '../src/services/noticeManagement'
 const gift = { code: 'old', name: '原礼品', path: ['原分类', '原礼品'], snapshotAt: '2026-01-01' }
 const order = {
   id: 100, orderNo: 'ORDER-TEST', orderType: 'first_purchase', status: 'revision_required', version: 1,
-  studentName: '测试学员', buyerName: '测试学员', studentMobile: '13800138000', personId: 10,
+  studentName: '测试学员', buyerName: '测试学员', studentMobile: '13800138000', studentWechatId: 'fixture-wechat', personId: 10,
   provinceCode: 'OTHER', provinceName: '其他省份', cityCode: 'OTHER', cityName: '其他城市',
   studentNature: 'test', studentNatureLabelSnapshot: '测试选项', servicePeriod: 'test', servicePeriodLabelSnapshot: '测试选项',
   studentSource: 'test', studentSourceLabelSnapshot: '测试选项', feeMode: 'test', feeModeLabelSnapshot: '测试选项',

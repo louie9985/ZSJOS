@@ -10,6 +10,7 @@ This is a SQL-level concurrency fixture, not a replay of the live application.
 import argparse
 import concurrent.futures
 import datetime as dt
+from decimal import Decimal
 import hashlib
 import json
 import re
@@ -192,10 +193,11 @@ class Checks:
                     rounds=30, mysql_error_codes=errors, schema=schema,
                     limitation='SQL-level synthetic task updates only; no actual Lead/claim transaction, outbox, or scheduler replay')
 
-    def query_fixture(self):
+    def query_fixture(self, query_dir=None):
         schema = self.create('queries')
         for name in ('zsjos_lead', 'zsjos_order', 'zsjos_order_item', 'zsjos_lead_assignment_history',
-                     'zsjos_performance_attribution', 'zsjos_order_supervisor_confirmation', 'zsjos_order_approval_round'):
+                     'zsjos_performance_attribution', 'zsjos_performance_org',
+                     'zsjos_order_supervisor_confirmation', 'zsjos_order_approval_round'):
             self.cli(schema, self.table(name))
         self.query(schema, "INSERT INTO zsjos_lead(id,lead_no,person_id,submitted_name,source_type,status,assignment_status,submitted_at,tenant_id,lead_category_label_snapshot) "
                    "VALUES(1,'LD-FIXTURE',1,'测试','internal_new_media','won','owned','2026-10-01',1,'测试分类')")
@@ -205,11 +207,87 @@ class Checks:
         for i, (kind, group, amount) in enumerate(cases, 1):
             self.query(schema, "INSERT INTO zsjos_order(id,order_no,person_id,lead_id,formal_sales_user_id,order_type,status,total_amount,payable_amount,submitted_at,tenant_id) "
                        "VALUES(%s,%s,1,1,1,%s,'effective',%s,%s,'2026-10-02',1)", (i, 'FIXTURE-'+str(i), kind, amount, amount))
-            self.query(schema, "INSERT INTO zsjos_performance_attribution(fact_type,fact_id,user_id,user_name,dept_id,center_id,lead_id,source_group,tenant_id) "
-                       "VALUES('ORDER',%s,1,'测试',10,10,1,%s,1)", (i, group))
+            self.query(schema, "INSERT INTO zsjos_performance_attribution(fact_type,fact_id,user_id,user_name,dept_id,center_id,lead_id,source_group,business_domain,org_source,tenant_id) "
+                       "VALUES('ORDER',%s,1,'测试',10,10,1,%s,'sales','frozen',1)", (i, group))
             self.query(schema, "INSERT INTO zsjos_order_item(order_id,unit_price,payable_amount,product_ref,product_snapshot,tenant_id) "
                        "VALUES(%s,%s,%s,'P1','{\"name\":\"测试课程\"}',1)", (i, amount, amount))
         self.record('query_fixture', status='READY', schema=schema, orders=len(cases))
+        assert self.query(schema, 'SELECT HEX(submitted_name) FROM zsjos_lead WHERE id=1')[0][0] == '测试'.encode().hex().upper()
+        if query_dir is None:
+            return
+        root = Path(query_dir).resolve(strict=True)
+        for i in range(1, 22):
+            order_id = 100 + i
+            self.query(schema, "INSERT INTO zsjos_order(id,order_no,person_id,lead_id,order_type,status,current_approval_round_id,total_amount,payable_amount,tenant_id) "
+                       "VALUES(%s,%s,%s,NULL,'repurchase','pending_approval',%s,0,0,1)",
+                       (order_id, 'PAGING-FIXTURE-' + str(i), order_id, order_id))
+            # MySQL's PAD SPACE unique index treats '' and spaces as equal; exercise them in sequence.
+            process_id = None if i <= 3 else '  ' if i == 4 else 'p' + str(i)
+            self.query(schema, "INSERT INTO zsjos_order_approval_round(id,order_id,round_no,status,order_snapshot,process_instance_id,"
+                       "process_definition_key,submitted_by_user_id,submitted_at,tenant_id) "
+                       "VALUES(%s,%s,1,'pending','{}',%s,'fixture',1,NOW(),1)", (order_id, order_id, process_id))
+            self.query(schema, "INSERT INTO zsjos_order_supervisor_confirmation(order_id,approval_round_id,task_definition_key,"
+                       "requester_user_id,supervisor_user_id,parent_task_id,supervisor_task_id,request_reason,status,requested_at,tenant_id) "
+                       "VALUES(%s,%s,'fixture',1,1,%s,%s,'fixture','pending',NOW(),1)",
+                       (order_id, order_id, 'parent' + str(i), 'supervisor' + str(i)))
+        files = sorted(root.glob('amounts-*.json')) + sorted(root.glob('supervisor-offset*.json'))
+        assert len(files) == 17, 'Expected all 15 amount scope/groupings and both paging exports'
+        pages = {}
+        for path in files:
+            exported = json.loads(path.read_text(encoding='utf-8'))
+            with self.connection(schema) as conn, conn.cursor(pymysql.cursors.DictCursor) as cur:
+                cur.execute(exported['sql'].replace('%', '%%').replace('?', '%s'), exported['parameters'])
+                rows = cur.fetchall()
+            if path.name.startswith('amounts-'):
+                expected = Decimal('0') if 'scope2' in path.name else Decimal('1000.01')
+                assert sum((row['amount'] for row in rows), Decimal(0)) == expected, path.name
+                if path.name == 'amounts-source-scope0.json':
+                    amounts = {row['group_key']: row['amount'] for row in rows}
+                    assert amounts == {'self': Decimal('400.01'), 'inbound': Decimal('200'), 'unknown': Decimal('400')}
+            else:
+                pages[path.stem] = [row['id'] for row in rows]
+            self.record(path.stem, status='PASS', schema=schema, rows=len(rows))
+        assert len(pages['supervisor-offset0']) == 20 and len(pages['supervisor-offset20']) == 1
+        assert not set(pages['supervisor-offset0']) & set(pages['supervisor-offset20'])
+        mapper = (ROOT / 'backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/order/SalesOrderApprovalRoundMapper.java').read_text(encoding='utf-8')
+        annotation = re.search(r'@Select\(("SELECT DISTINCT r\.process_instance_id[\s\S]+?)\)\s*List<String> selectProcessInstanceIdsByKeyword', mapper)
+        assert annotation
+        sql = ''.join(json.loads(part) for part in re.findall(r'"(?:[^"\\]|\\.)*"', annotation[1]))
+        sql = sql.replace('%', '%%').replace('#{tenantId}', '%s').replace('#{keyword}', '%s')
+        ids = self.query(schema, sql, (1, 'PAGING-FIXTURE', 'PAGING-FIXTURE', 'PAGING-FIXTURE'))
+        assert {row[0] for row in ids} == {'p' + str(i) for i in range(5, 22)}
+        self.query(schema, "UPDATE zsjos_order_approval_round SET process_instance_id='' WHERE id=104 AND tenant_id=1")
+        assert set(self.query(schema, sql, (1, 'PAGING-FIXTURE', 'PAGING-FIXTURE', 'PAGING-FIXTURE'))) == set(ids)
+        assert not self.query(schema, sql, (1, 'no-match', 'no-match', 'no-match'))
+        self.record('approval_keyword_null_blank_and_no_match', status='PASS', schema=schema, valid_ids=len(ids))
+
+    def diagnostics(self):
+        schema = self.create('diagnostics')
+        for name in ('infra_file', 'system_social_user', 'bpm_form'):
+            self.cli(schema, self.table(name))
+        self.query(schema, "INSERT INTO infra_file(name,path,url,size) VALUES('fixture','fixture',%s,1)", ('x' * 1024,))
+        self.query(schema, "INSERT INTO system_social_user(type,openid,raw_token_info,nickname,raw_user_info,code,tenant_id) "
+                   "VALUES(30,%s,'{}','fixture','{}','fixture',1)", ('x' * 32,))
+        for length, statement in (
+                (1025, "INSERT INTO infra_file(name,path,url,size) VALUES('fixture','fixture',%s,1)"),
+                (33, "INSERT INTO system_social_user(type,openid,raw_token_info,nickname,raw_user_info,code,tenant_id) "
+                     "VALUES(30,%s,'{}','fixture','{}','fixture',1)")):
+            try:
+                self.query(schema, statement, ('x' * length,))
+            except pymysql.err.DataError as error:
+                assert error.args[0] == 1406
+            else:
+                raise AssertionError('Baseline must reject overlength input without silent truncation')
+        for value in ('["field"]', '[{"field":"fixture"}]', '{broken', '{}', '[]'):
+            self.query(schema, "INSERT INTO bpm_form(name,status,conf,fields,tenant_id) VALUES('fixture',0,'{}',%s,1)", (value,))
+        source = (SQL / 'tools/exception_repair_diagnostics.sql').read_text(encoding='utf-8')
+        output = self.cli(schema, source).stdout.decode('utf-8')
+        assert 'INVALID\t1' in output and 'STRING\t1' in output and 'OBJECT\t1' in output
+        assert self.query(schema, 'SELECT COUNT(*) FROM infra_file')[0][0] == 1
+        assert self.query(schema, 'SELECT COUNT(*) FROM system_social_user')[0][0] == 1
+        self.record('readonly_diagnostics_and_url_openid_boundaries', status='PASS', schema=schema,
+                    url_characters=1024, openid_characters=32, json_shapes=5,
+                    limitation='Synthetic baseline only; no production identity or URL input was supplied')
 
 
 def main():
@@ -218,12 +296,13 @@ def main():
     parser.add_argument('--port', type=int, default=3306)
     parser.add_argument('--cases', default='numbers,tasks,hrm,v184')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--query-dir', type=Path, help='SQL exported by PerformanceReportParserTest')
     args = parser.parse_args()
     checks = Checks(args.container, args.port)
     try:
         for case in args.cases.split(','):
             {'numbers': checks.numbers, 'tasks': checks.task_concurrency, 'hrm': checks.hrm, 'v184': checks.v184,
-             'queries': checks.query_fixture}[case]()
+             'queries': lambda: checks.query_fixture(args.query_dir), 'diagnostics': checks.diagnostics}[case]()
     finally:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps({'schemas_retained': sorted(checks.created), 'results': checks.results},

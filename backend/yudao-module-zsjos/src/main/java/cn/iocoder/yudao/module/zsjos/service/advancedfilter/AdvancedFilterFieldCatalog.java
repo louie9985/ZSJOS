@@ -32,6 +32,7 @@ final class AdvancedFilterFieldCatalog {
             if (old == null) return field;
             var bindings = new LinkedHashMap<>(field.bindings());
             String expression = old.expression();
+            if ("person.name".equals(key)) expression = "ro.student_name";
             if ("lead.lastFollowUpAt".equals(key)) expression = "(SELECT MAX(cr.submitted_at) FROM zsjos_student_contact_record cr WHERE cr.service_relation_id=sr.id AND cr.tenant_id=sr.tenant_id AND cr.deleted=0)";
             if ("lead.nextFollowUpAt".equals(key)) expression = "(SELECT MIN(bt.due_at) FROM zsjos_business_task bt WHERE bt.biz_type='student_service' AND bt.biz_id=sr.id AND bt.tenant_id=sr.tenant_id AND bt.deleted=0 AND bt.status='pending')";
             if ("orderItem.product".equals(key)) expression = "COALESCE(oi.product_snapshot,sr.service_snapshot)";

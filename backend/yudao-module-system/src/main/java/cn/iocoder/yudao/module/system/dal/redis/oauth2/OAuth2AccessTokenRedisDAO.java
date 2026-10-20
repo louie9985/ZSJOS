@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.dal.redis.oauth2;
 import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
@@ -34,11 +35,12 @@ public class OAuth2AccessTokenRedisDAO {
 
     public void set(OAuth2AccessTokenDO accessTokenDO) {
         String redisKey = formatKey(accessTokenDO.getAccessToken());
-        // 清理多余字段，避免缓存
-        accessTokenDO.setUpdater(null).setUpdateTime(null).setCreateTime(null).setCreator(null).setDeleted(null);
         long time = LocalDateTimeUtil.between(LocalDateTime.now(), accessTokenDO.getExpiresTime(), ChronoUnit.SECONDS);
         if (time > 0) {
-            stringRedisTemplate.opsForValue().set(redisKey, JsonUtils.toJsonString(accessTokenDO), time, TimeUnit.SECONDS);
+            // 缓存省略审计字段，但不能清空调用方持有的持久化对象。
+            OAuth2AccessTokenDO cached = BeanUtils.toBean(accessTokenDO, OAuth2AccessTokenDO.class);
+            cached.setUpdater(null).setUpdateTime(null).setCreateTime(null).setCreator(null).setDeleted(null);
+            stringRedisTemplate.opsForValue().set(redisKey, JsonUtils.toJsonString(cached), time, TimeUnit.SECONDS);
         }
     }
 

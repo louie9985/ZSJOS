@@ -42,19 +42,20 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .in(ServiceRelationDO::getPersonId, personIds).eqIfPresent(ServiceRelationDO::getStatus, status)
                 .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId));
     }
-    @Select("SELECT * FROM zsjos_service_relation WHERE status='active' AND acceptance_status='accepted' "
+    @Select("SELECT * FROM zsjos_service_relation WHERE teaching_delivery=1 AND status='active' AND acceptance_status='accepted' "
             + "AND delivery_stage='supervision' AND exam_date IS NOT NULL AND exam_notice_sent_at IS NULL "
             + "AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     List<ServiceRelationDO> selectExamNoticeCandidates(@Param("tenantId") Long tenantId);
     @Select("SELECT * FROM zsjos_service_relation WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     ServiceRelationDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
-    @Select("SELECT * FROM zsjos_service_relation WHERE class_id=#{classId} AND tenant_id=#{tenantId} "
+    @Select("SELECT * FROM zsjos_service_relation WHERE teaching_delivery=1 AND class_id=#{classId} AND tenant_id=#{tenantId} "
             + "AND status IN ('active','paused','completed') AND deleted=b'0' FOR UPDATE")
     List<ServiceRelationDO> selectClassRelationsForUpdate(@Param("classId") Long classId,
                                                            @Param("tenantId") Long tenantId);
 
     default int transferClass(Long id, Long classId, Long ownerUserId, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getTeachingDelivery, true)
                 .eq(ServiceRelationDO::getId, id)
                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
                 .eq(ServiceRelationDO::getVersion, version)
@@ -117,6 +118,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
 
     default int accept(Long id, Long userId, LocalDateTime now, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getTeachingDelivery, true)
                 .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getStatus, "active")
                 .eq(ServiceRelationDO::getOwnerUserId, userId)
                 .eq(ServiceRelationDO::getAcceptanceStatus, "pending")
@@ -155,6 +157,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
 
     default int updateFirstContactProgress(Long id, Long ownerId, Integer version, String json) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getTeachingDelivery, true)
                 .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getOwnerUserId, ownerId)
                 .eq(ServiceRelationDO::getStatus, "active").eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .eq(ServiceRelationDO::getVersion, version)
@@ -165,6 +168,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
     default int advanceDeliveryStage(Long id, Long userId, String expectedStage, String nextStage,
                                      String deliveryDataJson, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getTeachingDelivery, true)
                 .eq(ServiceRelationDO::getId, id)
                 .eq(ServiceRelationDO::getStatus, "active")
                 .eq(ServiceRelationDO::getOwnerUserId, userId)
@@ -179,6 +183,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
     default int updateExamDate(Long id, Long userId, LocalDate examDate, Integer version,
                                String stage, LocalDateTime now) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getTeachingDelivery, true)
                 .eq(ServiceRelationDO::getId, id)
                 .eq(ServiceRelationDO::getStatus, "active").eq(ServiceRelationDO::getVersion, version)
                 .set(ServiceRelationDO::getExamDate, examDate)

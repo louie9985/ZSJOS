@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from 'vue'
 import { showImagePreview, showToast } from 'vant'
+import 'vant/es/image-preview/style'
 import { collectionApi, type CollectionImage, type CollectionField } from '@/api/studentInfo'
+import { createIdempotencyKey } from '@/utils/idempotency'
 const props = defineProps<{ token: string; field: CollectionField; images: CollectionImage[]; disabled: boolean }>()
 const emit = defineEmits<{ change: [CollectionImage[]]; busy: [boolean]; failed: [boolean] }>()
 type Pending = { uid: string; file: File; side: string; status: 'uploading' | 'error'; progress: number; error?: string }
@@ -32,7 +34,7 @@ function choose(event: Event, side: string, max: number) {
   for (const file of files.slice(0, available)) {
     if (!(props.field.allowedExtensions || ['jpg', 'jpeg', 'png']).includes(file.name.split('.').pop()?.toLowerCase() || '')) { showToast('附件格式不符合此字段要求'); continue }
     if (file.size > (props.field.maxSizeMb || 10) * 1024 * 1024) { showToast(`单个不能超过 ${props.field.maxSizeMb || 10}MB`); continue }
-    const item: Pending = { uid: crypto.randomUUID(), file, side, status: 'uploading', progress: 0 }; pending.value.push(item); void send(pending.value[pending.value.length - 1])
+    const item: Pending = { uid: createIdempotencyKey(), file, side, status: 'uploading', progress: 0 }; pending.value.push(item); void send(pending.value[pending.value.length - 1])
   }
 }
 async function remove(image: CollectionImage) {
@@ -49,7 +51,7 @@ watch(() => props.images, async images => {
   }
 }, { immediate: true, deep: true })
 async function preview(image: CollectionImage) {
-  try { if (!urls.value[image.id]) urls.value[image.id] = await collectionApi.image(props.token, image); if (image.contentType.startsWith('image/')) showImagePreview([urls.value[image.id]]); else { const a = document.createElement('a'); a.href = urls.value[image.id]; a.download = image.name; a.click() } }
+  try { if (!urls.value[image.id]) urls.value[image.id] = await collectionApi.image(props.token, image); if (image.contentType.startsWith('image/')) showImagePreview({ images: [urls.value[image.id]], closeable: true, className: 'collection-image-preview norem' }); else { const a = document.createElement('a'); a.href = urls.value[image.id]; a.download = image.name; a.click() } }
   catch (e) { showToast(e instanceof Error ? e.message : '图片加载失败') }
 }
 onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revokeObjectURL) })
@@ -74,5 +76,7 @@ onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revo
   </div>
 </template>
 <style scoped>
+/* The teleported image viewer must remain transparent over its own dark overlay. */
+:global(.collection-image-preview.norem.van-popup){border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
 .collection-images__list.norem{display:flex;flex-wrap:wrap;gap:8px}.collection-images__slot.norem{margin-top:8px}.collection-images__caption.norem,.collection-images__hint.norem{font-size:12px;color:var(--h5-text-secondary)}.collection-images__item.norem,.collection-images__add.norem{width:80px;height:80px;position:relative;border-radius:8px;background:var(--h5-glass-sunken);flex-shrink:0}.collection-images__preview.norem{width:100%;height:100%;border:0;background:transparent;padding:0;border-radius:8px;overflow:hidden;color:var(--h5-text-secondary)}.collection-images__preview img{width:100%;height:100%;object-fit:cover}.collection-images__delete.norem{position:absolute;right:-4px;top:-4px;min-width:28px;min-height:28px;border:0;border-radius:50%;background:var(--h5-text-primary);color:var(--h5-card-bg)}.collection-images__add.norem{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--h5-text-placeholder);font-size:12px;overflow:hidden}.collection-images__add input{position:absolute;inset:0;opacity:0;width:100%;height:100%}.collection-images__add.inactive{opacity:.5}.collection-images__pending.norem{max-width:180px;min-height:80px;padding:8px;background:var(--h5-primary-opacity);border-radius:8px;color:var(--h5-text-secondary);overflow-wrap:anywhere;font-size:12px}.collection-images__pending button{margin:6px;border:0;background:transparent;color:var(--h5-primary)}
 </style>

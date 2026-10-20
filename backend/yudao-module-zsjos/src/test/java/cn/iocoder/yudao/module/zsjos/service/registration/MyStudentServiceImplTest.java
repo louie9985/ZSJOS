@@ -71,7 +71,7 @@ class MyStudentServiceImplTest {
     void accountFilterIdsReachPersonalAndAllPaginationWithoutChangingTotal() {
         var req = new MyStudentPageReqVO();
         var filter = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO();
-        req.setAdvancedFilter(filter); req.setKeyword("name"); req.setInServicePeriod(true);
+        req.setAdvancedFilter(filter); req.setInServicePeriod(true);
         when(advancedFilterService.matchMediaStudentPersonIds(filter, 28L)).thenReturn(List.of(1L, 2L));
         when(personMapper.selectMediaStudentPage(req, 28L, List.of(1L, 2L)))
                 .thenReturn(new PageResult<>(List.of(), 2L));
@@ -170,7 +170,7 @@ class MyStudentServiceImplTest {
         relation.setRegistrationCaseId(15L); relation.setStatus("active"); relation.setActivatedAt(LocalDateTime.now());
         relation.setContentDirectorUserId(18L); relation.setAcceptanceStatus("accepted"); relation.setVersion(3);
         PersonDO person = new PersonDO(); person.setId(12L); person.setName("编导学员");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(13L); order.setOrderNo("OD202608180001");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(13L); order.setOrderNo("OD202608180001"); order.setStudentName("订单编导学员");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(14L); item.setOrderId(13L);
 
         when(relationMapper.selectByOwnerAndPersonIncludingHistory(18L, 12L)).thenReturn(List.of());
@@ -181,7 +181,7 @@ class MyStudentServiceImplTest {
 
         MyStudentRespVO result = service.getMyStudent(18L, 12L);
 
-        assertEquals("编导学员", result.getName());
+        assertEquals("订单编导学员", result.getName());
         assertEquals(1, result.getServices().size());
         assertEquals("accepted", result.getServices().getFirst().getAcceptanceStatus());
         assertEquals(false, result.getServices().getFirst().getOwner());
@@ -195,7 +195,7 @@ class MyStudentServiceImplTest {
         relation.setStatus("active"); relation.setAcceptanceStatus("accepted");
         relation.setActivatedAt(LocalDateTime.now()); relation.setContentDirectorUserId(28L);
         PersonDO person = new PersonDO(); person.setId(22L); person.setName("编导负责学员");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(23L); order.setOrderNo("OD202608200001");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(23L); order.setOrderNo("OD202608200001"); order.setStudentName("订单编导负责学员");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(24L); item.setOrderId(23L);
 
         when(relationMapper.selectActiveByContentDirectorAndPerson(28L, 22L)).thenReturn(List.of(relation));
@@ -205,7 +205,7 @@ class MyStudentServiceImplTest {
 
         MyStudentRespVO result = service.getDirectorStudent(28L, 22L);
 
-        assertEquals("编导负责学员", result.getName());
+        assertEquals("订单编导负责学员", result.getName());
         assertEquals(28L, result.getServices().getFirst().getContentDirectorUserId());
         assertEquals("accepted", result.getServices().getFirst().getAcceptanceStatus());
     }
@@ -302,7 +302,7 @@ class MyStudentServiceImplTest {
         PageResult<MyStudentRespVO> result = service.getMediaPage(28L, reqVO);
 
         assertEquals(1, result.getTotal());
-        assertEquals("媒体学员", result.getList().getFirst().getName());
+        org.junit.jupiter.api.Assertions.assertNull(result.getList().getFirst().getName());
         assertEquals(List.of(), result.getList().getFirst().getServices());
     }
 
@@ -408,6 +408,50 @@ class MyStudentServiceImplTest {
         var result = service.getMyPage(28L, req);
         assertEquals(1L, result.getTotal());
         assertEquals(71L, result.getList().getFirst().getServices().getFirst().getServiceRelationId());
+    }
+
+    @Test
+    void aggregateUsesFirstOrderButServiceDetailUsesSelectedOrderWithoutChangingVisibleCourses() {
+        var first = detailRelation(71L, 28L); first.setOrderId(81L);
+        var second = detailRelation(72L, 28L); second.setOrderId(82L);
+        var person = new PersonDO(); person.setId(70L); person.setName("客资主档姓名");
+        var oldOrder = new SalesOrderDO(); oldOrder.setId(81L); oldOrder.setStudentName("首次订单姓名");
+        oldOrder.setCreateTime(LocalDateTime.of(2026, 8, 1, 0, 0));
+        var newOrder = new SalesOrderDO(); newOrder.setId(82L); newOrder.setStudentName("第二订单姓名");
+        newOrder.setCreateTime(LocalDateTime.of(2026, 9, 1, 0, 0));
+        when(personMapper.selectById(70L)).thenReturn(person);
+        when(relationMapper.selectByOwnerAndPersonIncludingHistory(28L, 70L)).thenReturn(List.of(second, first));
+        when(relationMapper.selectById(72L)).thenReturn(second);
+        when(orderMapper.selectBatchIds(Set.of(81L, 82L))).thenReturn(List.of(newOrder, oldOrder));
+        assertEquals("首次订单姓名", service.getMyStudent(28L, 70L).getName());
+        assertEquals("第二订单姓名", service.getMyStudentByService(28L, 72L).getName());
+        assertEquals(2, service.getMyStudentByService(28L, 72L).getServices().size());
+        // Blank first names stay missing, even though the later order and Person both have names.
+        oldOrder.setStudentName("  ");
+        org.junit.jupiter.api.Assertions.assertNull(service.getMyStudent(28L, 70L).getName());
+        assertEquals("第二订单姓名", service.getMyStudentByService(28L, 72L).getName());
+        newOrder.setCreateTime(oldOrder.getCreateTime());
+        oldOrder.setStudentName("同时间按订单编号排序");
+        assertEquals("同时间按订单编号排序", service.getMyStudent(28L, 70L).getName());
+        verify(orderMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void aggregateKeywordFiltersProjectedNamesBeforeCountingAndPagination() {
+        var spy = org.mockito.Mockito.spy(service);
+        var first = new MyStudentRespVO(); first.setPersonId(1L); first.setName("首次订单甲");
+        var second = new MyStudentRespVO(); second.setPersonId(2L); second.setName("首次订单乙");
+        org.mockito.Mockito.doAnswer(call -> {
+            MyStudentPageReqVO request = call.getArgument(1);
+            org.junit.jupiter.api.Assertions.assertNull(request.getKeyword());
+            return new PageResult<>(List.of(first, second), 2L);
+        }).when(spy).getMediaPage(org.mockito.ArgumentMatchers.eq(28L),
+                org.mockito.ArgumentMatchers.argThat(req -> req != null && req.getKeyword() == null));
+        var req = new MyStudentPageReqVO(); req.setKeyword("订单"); req.setPageSize(1); req.setPageNo(2);
+        var page = spy.getMediaPage(28L, req);
+        assertEquals(2L, page.getTotal()); assertEquals(2L, page.getList().getFirst().getPersonId());
+        req.setKeyword("客资姓名");
+        assertEquals(0L, spy.getMediaPage(28L, req).getTotal());
     }
 
     private ServiceRelationDO detailRelation(Long id, Long owner) {

@@ -46,7 +46,9 @@
 
   <ContentWrap>
     <el-table v-loading="loading" :data="list" row-key="serviceRelationId" stripe>
-      <el-table-column label="学员姓名" prop="name" min-width="130" fixed="left" />
+      <el-table-column label="学员姓名" prop="name" min-width="130" fixed="left">
+        <template #default="{ row }">{{ row.name || '订单未填写姓名' }}</template>
+      </el-table-column>
       <el-table-column label="手机号" min-width="130">
         <template #default="{ row }">{{ row.mobile || '-' }}</template>
       </el-table-column>
@@ -100,7 +102,7 @@
         <el-tabs>
           <el-tab-pane label="概览">
             <el-descriptions :column="2" border>
-              <el-descriptions-item label="学员姓名">{{ detail.name }}</el-descriptions-item>
+              <el-descriptions-item label="学员姓名">{{ detail.name || '订单未填写姓名' }}</el-descriptions-item>
               <el-descriptions-item label="客资编号">{{
                 detail.leadNo || '客资编号暂未生成'
               }}</el-descriptions-item>

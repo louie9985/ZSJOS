@@ -629,7 +629,7 @@ export type LeadOverviewSlots = {
 
 export function studentProfileIdentity(lead?: ManagedLead, student?: MyStudent) {
   return {
-    name: student?.name || lead?.submittedName || '未填写姓名',
+    name: (student ? student.name : lead?.submittedName) || '未填写姓名',
     mobile: student?.mobile || lead?.submittedMobile,
     wechatId: student?.wechatId || lead?.submittedWechatId,
     numberLabel: lead ? '客资编号' : '学员编号',
@@ -657,7 +657,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
   const service = studentContext?.service || studentService
   const identity = studentProfileIdentity(lead, student)
   const contactRows = profileVariant === 'contact-rows'
-  const rawName = student?.name || lead?.submittedName
+  const rawName = student ? student.name : lead?.submittedName
   const copyField = (value: string, label: string) => contactRows
     ? <ProfileCopyButton key={`${lead?.id ?? student?.personId}:${label}:${value}`} value={value} label={label} />
     : <CopyButton value={value} />

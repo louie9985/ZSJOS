@@ -113,7 +113,9 @@ public class PerformanceStatisticsService {
    for(var user:access.sales()){var mapping=orgs.get(user.getDeptId());if(mapping!=null&&q.getScopeId().equals("DEPT".equals(q.getScopeType())?mapping.getDeptId():mapping.getCenterId())&&(r.isAllDepartments()||r.getDepartments().contains(user.getDeptId())))members.add(user.getId());}
   }
   byUser.values().stream().map(PerformanceAggregate::getUserId).filter(Objects::nonNull).forEach(members::add);
-  var people=access.users(members).stream().collect(Collectors.toMap(x->x.getId(),Function.identity()));
+  boolean personal=Set.of("SELF","USER").contains(q.getScopeType());
+  var people=(personal?access.users(members):access.presentationUsers(members)).stream().collect(Collectors.toMap(x->x.getId(),Function.identity()));
+  if(!personal)members.retainAll(people.keySet());
   String period=targetPeriod(q,w,n);Set<Long> targetUsers=new HashSet<>(members);if(Set.of("SELF","USER").contains(q.getScopeType()))targetUsers.add(q.getScopeId());
   var targetBatch=period==null?null:targets.batch(List.of(new PerformanceTargetService.Period(period,w.start().toLocalDate())),targetUsers);
   var orderGroups=orders.stream().filter(x->x.getUserId()!=null).collect(Collectors.groupingBy(PerformanceFact::getUserId));

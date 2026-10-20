@@ -65,6 +65,7 @@ public class MyStudentServiceImpl implements MyStudentService {
             });
         }
 
+        if (StrUtil.isNotBlank(reqVO.getKeyword())) return keywordPage(userId, reqVO, false);
         if (reqVO.getReadScope() != null || reqVO.getTargetUserId() != null) {
             return getExplicitReadPage(userId, reqVO, false);
         }
@@ -77,6 +78,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
         Map<Long, List<ServiceRelationDO>> groups = relationMapper
                 .selectAssignedByUserAndPersonIds(userId, personIds, reqVO.getServiceStatus()).stream()
+                .filter(StudentDeliveryParticipation::includes)
                 .filter(relation -> reqVO.getClassId() == null || Objects.equals(relation.getClassId(), reqVO.getClassId()))
                 .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
         return new PageResult<>(people.getList().stream().map(person -> convert(userId, person.getId(), groups.get(person.getId())))
@@ -112,6 +114,7 @@ public class MyStudentServiceImpl implements MyStudentService {
             relations = new ArrayList<>(visible.values());
         }
         Map<Long, List<ServiceRelationDO>> groups = relations.stream()
+                .filter(StudentDeliveryParticipation::includes)
                 .filter(relation -> reqVO.getClassId() == null || Objects.equals(relation.getClassId(), reqVO.getClassId()))
                 .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
         return new PageResult<>(people.getList().stream()
@@ -120,6 +123,7 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     @Override
     public PageResult<MyStudentRespVO> getMediaPage(Long userId, MyStudentPageReqVO reqVO) {
+        if (StrUtil.isNotBlank(reqVO.getKeyword())) return keywordPage(userId, reqVO, true);
         if (MediaStudentReadScope.canReadAll(permissionApi, userId)
                 && (reqVO.getReadScope() == null && reqVO.getTargetUserId() == null
                     || "ALL".equals(reqVO.getReadScope()) && reqVO.getTargetUserId() == null)) {
@@ -154,7 +158,8 @@ public class MyStudentServiceImpl implements MyStudentService {
     @Override
     @ZsjosPermission(bizType = "student", bizId = "#personId", action = "read")
     public MyStudentRespVO getMyStudent(Long userId, Long personId) {
-        List<ServiceRelationDO> relations = selectVisibleRelationsForPerson(userId, personId);
+        List<ServiceRelationDO> relations = selectVisibleRelationsForPerson(userId, personId).stream()
+                .filter(StudentDeliveryParticipation::includes).toList();
         if (relations.isEmpty()) throw exception(STUDENT_NOT_EXISTS);
         return convert(userId, personId, relations);
     }
@@ -185,15 +190,19 @@ public class MyStudentServiceImpl implements MyStudentService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
     public MyStudentRespVO getMyStudentByService(Long userId, Long relationId) {
         ServiceRelationDO relation = relationMapper.selectById(relationId);
-        if (relation == null || (!permissionApi.hasTenantReadAllAccess(userId)
+        if (!StudentDeliveryParticipation.includes(relation) || (!permissionApi.hasTenantReadAllAccess(userId)
                 && !Set.of("active", "paused", "completed").contains(relation.getStatus()))) {
             throw exception(STUDENT_NOT_EXISTS);
         }
-        List<ServiceRelationDO> relations = selectVisibleRelationsForPerson(userId, relation.getPersonId());
+        List<ServiceRelationDO> relations = selectVisibleRelationsForPerson(userId, relation.getPersonId()).stream()
+                .filter(StudentDeliveryParticipation::includes).toList();
         if (relations.stream().noneMatch(item -> Objects.equals(item.getId(), relationId))) {
             throw exception(STUDENT_NOT_EXISTS);
         }
-        return convert(userId, relation.getPersonId(), relations);
+        MyStudentRespVO result = convert(userId, relation.getPersonId(), relations);
+        result.setName(result.getServices().stream().filter(row -> Objects.equals(row.getServiceRelationId(), relationId))
+                .findFirst().orElseThrow().getStudentName());
+        return result;
     }
 
     private boolean hasManagedStudentReadPermission(Long userId) {
@@ -213,19 +222,19 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     private List<ServiceRelationDO> selectVisibleRelationsForPerson(Long userId, Long personId) {
         if (permissionApi.hasTenantReadAllAccess(userId)) {
-            return relationMapper.selectTenantReadByPersonIds(List.of(personId), null);
+            return relationMapper.selectTenantReadByPersonIds(List.of(personId), null).stream().filter(StudentDeliveryParticipation::includes).toList();
         }
         // A visible student does not make every course visible: match the managed list's owner scope.
         if (hasManagedStudentReadPermission(userId)) {
             DeliveryClassScopeService.Scope scope = classScopeService.resolveRead(userId);
-            if (scope.allDepartments()) return relationMapper.selectOwnedByPersonIds(List.of(personId), null);
+            if (scope.allDepartments()) return relationMapper.selectOwnedByPersonIds(List.of(personId), null).stream().filter(StudentDeliveryParticipation::includes).toList();
             Map<Long, ServiceRelationDO> visible = new LinkedHashMap<>();
             managedRelations(resolveManagedOwnerIds(userId, scope), List.of(personId), null,
                     classScopeService.readablePendingClassId(userId)).forEach(row -> visible.put(row.getId(), row));
             selectAssignedRelationsForPerson(userId, personId).forEach(row -> visible.put(row.getId(), row));
-            return new ArrayList<>(visible.values());
+            return visible.values().stream().filter(StudentDeliveryParticipation::includes).toList();
         }
-        return selectAssignedRelationsForPerson(userId, personId);
+        return selectAssignedRelationsForPerson(userId, personId).stream().filter(StudentDeliveryParticipation::includes).toList();
     }
 
     private List<ServiceRelationDO> managedRelations(Set<Long> ownerIds, List<Long> personIds,
@@ -260,6 +269,7 @@ public class MyStudentServiceImpl implements MyStudentService {
                 ? relationMapper.selectTenantReadByPersonIds(personIds, req.getServiceStatus())
                 : relationMapper.selectAssignedByUserAndPersonIds(subjectId, personIds, req.getServiceStatus());
         Map<Long, List<ServiceRelationDO>> groups = relations.stream()
+                .filter(row -> media || StudentDeliveryParticipation.includes(row))
                 .filter(row -> req.getClassId() == null || Objects.equals(row.getClassId(), req.getClassId()))
                 .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId));
         return new PageResult<>(page.getList().stream()
@@ -320,7 +330,12 @@ public class MyStudentServiceImpl implements MyStudentService {
                 .map(SalesOrderDO::getLeadId).filter(Objects::nonNull).findFirst().orElse(null);
         LeadDO relatedLead = relatedLeadId == null ? null : leadMapper.selectById(relatedLeadId);
         result.setLeadId(ownedLeadId);
-        result.setLeadNo(relatedLead == null ? null : relatedLead.getLeadNo()); result.setName(person.getName());
+        result.setLeadNo(relatedLead == null ? null : relatedLead.getLeadNo());
+        // Only authorized service orders participate; a missing first-order name is not replaced by a later one.
+        SalesOrderDO firstOrder = orders.values().stream()
+                .min(Comparator.comparing(SalesOrderDO::getCreateTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(SalesOrderDO::getId)).orElse(null);
+        result.setName(firstOrder == null ? null : StrUtil.trimToNull(firstOrder.getStudentName()));
         result.setMobile(person.getMobile()); result.setWechatId(person.getWechatId());
         result.setActivatedAt(relations.stream().map(ServiceRelationDO::getActivatedAt).filter(Objects::nonNull)
                 .max(Comparator.naturalOrder()).orElse(null));
@@ -332,6 +347,7 @@ public class MyStudentServiceImpl implements MyStudentService {
             row.setLeadId(serviceLead == null ? null : serviceLead.getId());
             row.setLeadNo(serviceLead == null ? null : serviceLead.getLeadNo());
             row.setOrderNo(order == null ? null : order.getOrderNo());
+            row.setStudentName(order == null ? null : StrUtil.trimToNull(order.getStudentName()));
             row.setOrderStatus(order == null ? null : order.getStatus());
             row.setOrderStatusLabel(order == null || order.getStatus() == null ? null : switch (order.getStatus()) {
                 case "pending_approval" -> "待财务审核";
@@ -365,6 +381,27 @@ public class MyStudentServiceImpl implements MyStudentService {
             return row;
         }).toList());
         return result;
+    }
+
+    /** Filter the authorized aggregate projection so hidden/later order names cannot match the displayed first name. */
+    private PageResult<MyStudentRespVO> keywordPage(Long actor, MyStudentPageReqVO req, boolean media) {
+        String keyword = req.getKeyword().trim().toLowerCase(Locale.ROOT);
+        Map<Long, MyStudentRespVO> matches = new LinkedHashMap<>();
+        for (int page = 1; ; page++) {
+            var batch = cn.iocoder.yudao.framework.common.util.object.BeanUtils.toBean(req, MyStudentPageReqVO.class);
+            batch.setKeyword(null); batch.setPageNo(page); batch.setPageSize(200);
+            var result = media ? getMediaPage(actor, batch) : getMyPage(actor, batch);
+            for (var row : result.getList()) {
+                if (java.util.stream.Stream.of(row.getName(), row.getMobile(), row.getWechatId(), row.getLeadNo(), row.getPersonNo())
+                        .filter(Objects::nonNull).anyMatch(value -> value.toLowerCase(Locale.ROOT).contains(keyword))) {
+                    matches.put(row.getPersonId(), row);
+                }
+            }
+            if (result.getList().isEmpty() || (long) page * 200 >= result.getTotal()) break;
+        }
+        var rows = new ArrayList<>(matches.values());
+        int start = (int) Math.min((long) (req.getPageNo() - 1) * req.getPageSize(), rows.size());
+        return new PageResult<>(rows.subList(start, Math.min(start + req.getPageSize(), rows.size())), (long) rows.size());
     }
 
     private void populateCourseRights(MyStudentRespVO.ServiceVO row, String productSnapshot) {

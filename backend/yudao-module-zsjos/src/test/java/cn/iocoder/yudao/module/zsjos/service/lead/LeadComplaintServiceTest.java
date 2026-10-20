@@ -41,6 +41,8 @@ class LeadComplaintServiceTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private FileApi fileApi;
     @Mock private LeadIdentityMaskingService identityMaskingService;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+    @Mock private LeadObjectPermissionService permissionService;
 
     @BeforeEach
     void setUp() {
@@ -129,6 +131,7 @@ class LeadComplaintServiceTest {
         row.setId(11L); row.setLeadId(1L); row.setComplainantUserId(complainantUserId); row.setPartnerId(partnerId);
         row.setSalesUserId(20L); row.setStatus("pending");
         when(complaintMapper.selectByIdForUpdate(11L, 1L)).thenReturn(row);
+        when(permissionService.getManagedUserIds(30L)).thenReturn(java.util.Set.of(20L));
         when(attachmentService.validateReferences(anyList(), eq(30L))).thenReturn(Map.of());
         LeadComplaintDecisionReqVO request = new LeadComplaintDecisionReqVO();
         request.setResult(result); request.setOpinion("处理意见"); request.setIdempotencyKey("decision-key");

@@ -3,7 +3,7 @@
 
 对齐应用侧的真实生成口径：
   person_no  = XY + yyyyMMddHHmmss + 4 位当日日序（zsjos_person_no_daily_counter）
-  学员补录直接创建独立服务关系，不创建订单、商品明细或报名单。
+  新媒体学员补录创建独立新媒体服务关系，由操作者明确确认是否纳入教学交付，不创建订单、商品明细或报名单。
   partner_no = PT + yyyyMMddHHmmss + 4 位随机数（PartnerInvitationServiceImpl）
   password   = BCrypt，强度 4（SecurityProperties.passwordEncoderLength 默认值）
 
@@ -28,7 +28,6 @@ UNKNOWN_COURSE_SNAPSHOT = (
     '"level2CategoryId": null, "level1CategoryName": null, "level2CategoryName": null, '
     '"selectedAttrValuesJson": null}'
 )
-PENDING_CLASS_ID = 1      # PENDING / 待分班 系统班
 DIRECTOR_STAGE = "precheck"
 MAX_DAILY_SEQUENCE = 9999
 
@@ -115,12 +114,12 @@ def mobile_taken_by_other(cur, person_id: int | None, mobile: str, tenant_id: in
     return cur.fetchone()
 
 
-def active_relation(cur, person_id: int, tenant_id: int) -> dict | None:
+def active_relation(cur, person_id: int, tenant_id: int, teaching_delivery: bool) -> dict | None:
     cur.execute(
         "SELECT id,content_director_user_id,operator_user_id,status,acceptance_status "
         "FROM zsjos_service_relation WHERE tenant_id=%s AND person_id=%s AND deleted=b'0' "
-        "AND status IN ('active','paused') ORDER BY id LIMIT 1",
-        (tenant_id, person_id),
+        "AND teaching_delivery=%s AND status IN ('active','paused') ORDER BY id LIMIT 1",
+        (tenant_id, person_id, teaching_delivery),
     )
     return cur.fetchone()
 
@@ -162,9 +161,9 @@ def ensure_claim(cur, person_id, mobile, tenant_id, now):
     )
 
 
-def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_id, now, seq_ts) -> int:
+def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_id, now, seq_ts, teaching_delivery: bool) -> int:
     """创建独立学员服务；已有 active 关系时只补齐编导/运营。"""
-    if rel := active_relation(cur, person_id, tenant_id):
+    if rel := active_relation(cur, person_id, tenant_id, teaching_delivery):
         if rel["operator_user_id"] is None and operator_id:
             cur.execute(
                 "UPDATE zsjos_service_relation SET operator_user_id=%s, version=version+1 WHERE id=%s",
@@ -177,17 +176,24 @@ def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_
             )
         return rel["id"]
 
+    class_id = None
+    if teaching_delivery:
+        cur.execute("SELECT id FROM zsjos_delivery_class WHERE tenant_id=%s AND system_class=b'1' AND deleted=b'0'", (tenant_id,))
+        pending_classes = cur.fetchall()
+        if len(pending_classes) != 1:
+            raise SeedError("教学交付需要唯一有效的系统待分班")
+        class_id = pending_classes[0]["id"]
     # Historical service enrollment is not a sale. Keep its optional order chain empty.
     order_id = item_id = case_id = None
 
     cur.execute(
         "INSERT INTO zsjos_service_relation (person_id,order_id,order_item_id,registration_case_id,"
-        "class_id,status,owner_user_id,acceptance_status,accepted_by_user_id,accepted_at,"
+        "teaching_delivery,class_id,status,owner_user_id,acceptance_status,accepted_by_user_id,accepted_at,"
         "content_director_user_id,operator_user_id,director_stage,service_snapshot,activated_at,"
         "version,creator,create_time,updater,update_time,deleted,tenant_id) "
-        "VALUES (%s,%s,%s,%s,%s,'active',NULL,'accepted',%s,%s,%s,%s,%s,CAST(%s AS JSON),%s,"
+        "VALUES (%s,%s,%s,%s,%s,%s,'active',NULL,'accepted',%s,%s,%s,%s,%s,CAST(%s AS JSON),%s,"
         "0,'seed-student',%s,'seed-student',%s,b'0',%s)",
-        (person_id, order_id, item_id, case_id, PENDING_CLASS_ID, operator_id, now,
+        (person_id, order_id, item_id, case_id, teaching_delivery, class_id, operator_id, now,
          director_id, operator_id, DIRECTOR_STAGE, UNKNOWN_COURSE_SNAPSHOT, now, now, now, tenant_id),
     )
     rel_id = cur.lastrowid
@@ -276,7 +282,7 @@ def run_one(cur, args, tenant_id, now, seq_ts):
     person_id, reused_person = ensure_person(cur, args.name, args.mobile, tenant_id, now, seq_ts)
     ensure_claim(cur, person_id, args.mobile, tenant_id, now)
     rel_id = ensure_chain(cur, person_id, args.name, args.mobile,
-                          director["id"], operator["id"], tenant_id, now, seq_ts)
+                          director["id"], operator["id"], tenant_id, now, seq_ts, args.teaching_delivery == "yes")
 
     cur.execute("SELECT id FROM zsjos_partner_student_link WHERE tenant_id=%s AND student_person_id=%s "
                 "AND deleted=b'0' LIMIT 1", (tenant_id, person_id))
@@ -328,6 +334,8 @@ def main() -> int:
     ap.add_argument("--db-password", dest="db_password", required=True)
     ap.add_argument("--database", default="zsjos")
     ap.add_argument("--tenant-id", type=int, default=1)
+    ap.add_argument("--teaching-delivery", required=True, choices=("yes", "no"),
+                    help="操作者确认是否纳入教学交付：yes 纳入，no 仅新媒体。无页面开关")
     ap.add_argument("--dry-run", action="store_true", help="只打印将要执行的操作，不提交")
     args = ap.parse_args()
 
@@ -348,7 +356,7 @@ def main() -> int:
         print(f"  person_id   = {result['person_id']}  ({'复用既有档案' if result['reused_person'] else '新建'})")
         print(f"  服务关系    = {result['relation_id']}")
         print(f"  partner_id  = {result['partner_id']}  ({'新建' if result['partner_created'] else '复用既有'})")
-        print(f"  登录账号    = {result['mobile']}  密码 = {args.password}")
+        print(f"  登录账号    = {result['mobile']}")
         return 0
     except SeedError as exc:
         conn.rollback()

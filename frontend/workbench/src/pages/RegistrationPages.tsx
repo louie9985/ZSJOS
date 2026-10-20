@@ -1311,7 +1311,7 @@ export function StudentPlannerOperations({ student, service, context, permission
     basicInfoForm.setFieldsValue({ name: student.name, mobile: student.mobile, wechatId: student.wechatId, reason: "" });
     setBasicInfoOpen(true);
   };
-  const saveBasicInfo = async (values: { name: string; mobile?: string; wechatId?: string; reason: string }) => {
+  const saveBasicInfo = async (values: { mobile?: string; wechatId?: string; reason: string }) => {
     if (!values.mobile?.trim() && !values.wechatId?.trim()) {
       message.warning("手机号和微信号至少填写一个");
       return;
@@ -1319,7 +1319,7 @@ export function StudentPlannerOperations({ student, service, context, permission
     setBasicInfoSaving(true);
     try {
       await api.studentUpdateBasicInfo(service.serviceRelationId, {
-        name: values.name.trim(), mobile: values.mobile?.trim() || undefined,
+        mobile: values.mobile?.trim() || undefined,
         wechatId: values.wechatId?.trim() || undefined, reason: values.reason.trim(),
       });
       message.success("学员基础信息已更新");
@@ -1469,8 +1469,8 @@ export function StudentPlannerOperations({ student, service, context, permission
     </Modal>
     <Modal title="修改学员信息" open={basicInfoOpen} confirmLoading={basicInfoSaving} okText="保存" onCancel={() => setBasicInfoOpen(false)} onOk={() => basicInfoForm.submit()} destroyOnHidden>
       <Form form={basicInfoForm} layout="vertical" onFinish={saveBasicInfo}>
-        <Alert type="info" showIcon title="修改基础资料将同步该学员的其他课程服务。" />
-        <Form.Item name="name" label="姓名" rules={[{ required: true, whitespace: true, max: 100 }]}><Input /></Form.Item>
+        <Alert type="info" showIcon title="姓名自动取自对应订单；联系方式修改将同步该学员的其他课程服务。" />
+        <Form.Item name="name" label="姓名"><Input readOnly placeholder="订单未填写姓名" /></Form.Item>
         <Form.Item name="mobile" label="手机号" rules={[{ pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号" }]}><Input maxLength={32} /></Form.Item>
         <Form.Item name="wechatId" label="微信号" rules={[{ max: 64 }]}><Input /></Form.Item>
         <Form.Item name="reason" label="修改原因" rules={[{ required: true, whitespace: true, max: 500 }]}><Input.TextArea rows={3} showCount maxLength={500} /></Form.Item>

@@ -6,7 +6,7 @@ public final class DeliveryClassFilterSql {
 
     public static final String PROJECT_FROM = " FROM zsjos_service_relation sr JOIN zsjos_order_item oi"
             + " ON oi.id=sr.order_item_id AND oi.tenant_id=sr.tenant_id AND oi.deleted=0"
-            + " WHERE sr.class_id=zsjos_delivery_class.id AND sr.tenant_id=zsjos_delivery_class.tenant_id"
+            + " WHERE sr.teaching_delivery=1 AND sr.class_id=zsjos_delivery_class.id AND sr.tenant_id=zsjos_delivery_class.tenant_id"
             + " AND sr.deleted=0 AND sr.status IN ('active','paused','completed')";
     public static final String SNAPSHOT = "IF(JSON_VALID(oi.product_snapshot),oi.product_snapshot,JSON_OBJECT())";
     public static final String CATEGORY = "JSON_UNQUOTE(JSON_EXTRACT(" + SNAPSHOT + ", '$.categoryId'))";

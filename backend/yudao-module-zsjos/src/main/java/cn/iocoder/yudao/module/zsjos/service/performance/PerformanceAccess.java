@@ -64,6 +64,13 @@ public class PerformanceAccess {
    .eq(PerformanceOrgDO::getBusinessDomain, PerformanceDomain.current()));}
  public AdminUserRespDTO user(Long id) {return userApi.getUser(id);}
  public List<AdminUserRespDTO> users(Collection<Long> ids) {return ids.isEmpty()?List.of():userApi.getUserList(ids);}
+ /** Historical facts cannot reintroduce disabled users into enabled-only personnel navigation. */
+ public List<AdminUserRespDTO> presentationUsers(Collection<Long> ids) {
+  if(ids.isEmpty())return List.of();
+  Set<Long> departments=domainDepartments();
+  return users(new HashSet<>(ids)).stream().filter(u->CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus()))
+    .filter(u->ids.contains(u.getId())&&u.getDeptId()!=null&&departments.contains(u.getDeptId())).toList();
+ }
  public List<DeptRespDTO> departments(Collection<Long> ids) {return ids.isEmpty()?List.of():deptApi.getDeptList(ids);}
  public java.util.function.BiPredicate<Long,Long> targetVisibility() {
   Long reader=getLoginUserId();boolean self=has("zsjos:sales-performance:self");
@@ -172,7 +179,10 @@ public class PerformanceAccess {
      .setBusinessDomain(PerformanceDomain.current()).setAllDepartments(scope.allDepartments())
      .setMissingDepartment(false).setDepartments(scope.departments());
    Set<Long> present=result.stream().filter(n->"USER".equals(n.scopeType())).map(Node::scopeId).collect(java.util.stream.Collectors.toSet());
-   for(var fact:detailMapper.historicalPeople(request))if(present.add(fact.getUserId()))
+   var historical=detailMapper.historicalPeople(request);
+   Set<Long> allowed=presentationUsers(historical.stream().map(PerformanceFact::getUserId).filter(Objects::nonNull).toList())
+     .stream().map(AdminUserRespDTO::getId).collect(java.util.stream.Collectors.toSet());
+   for(var fact:historical)if(allowed.contains(fact.getUserId())&&present.add(fact.getUserId()))
     result.add(new Node("USER:"+fact.getUserId(),null,Objects.toString(fact.getUserName(),"历史人员"),"USER",fact.getUserId(),true));
   }
   if(!targets&&has("zsjos:sales-performance:self"))result.addFirst(new Node("SELF",null,"我的业绩","SELF",getLoginUserId(),true));

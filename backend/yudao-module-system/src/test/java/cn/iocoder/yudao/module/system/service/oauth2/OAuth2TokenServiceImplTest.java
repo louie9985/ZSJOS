@@ -205,7 +205,12 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
         // 断言访问令牌的缓存
         OAuth2AccessTokenDO redisAccessTokenDO = oauth2AccessTokenRedisDAO.get(accessTokenDO.getAccessToken());
         // TODO @芋艿：expiresTime 被屏蔽，仅 win11 会复现，建议后续修复。
-        assertPojoEquals(accessTokenDO, redisAccessTokenDO, "expiresTime", "createTime", "updateTime", "deleted");
+        assertPojoEquals(accessTokenDO, redisAccessTokenDO, "expiresTime", "createTime", "updateTime", "deleted",
+                "creator", "updater");
+        assertNotNull(accessTokenDO.getCreator());
+        assertNotNull(accessTokenDO.getUpdater());
+        assertNull(redisAccessTokenDO.getCreator());
+        assertNull(redisAccessTokenDO.getUpdater());
         // 断言刷新令牌
         OAuth2RefreshTokenDO refreshTokenDO = oauth2RefreshTokenMapper.selectList().get(0);
         assertPojoEquals(accessTokenDO, refreshTokenDO, "id", "expiresTime", "createTime", "updateTime", "deleted");
@@ -303,7 +308,12 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
         // 断言，新的访问令牌的缓存
         OAuth2AccessTokenDO redisAccessTokenDO = oauth2AccessTokenRedisDAO.get(newAccessTokenDO.getAccessToken());
         // TODO @芋艿：expiresTime 被屏蔽，仅 win11 会复现，建议后续修复。
-        assertPojoEquals(newAccessTokenDO, redisAccessTokenDO, "expiresTime", "createTime", "updateTime", "deleted");
+        assertPojoEquals(newAccessTokenDO, redisAccessTokenDO, "expiresTime", "createTime", "updateTime", "deleted",
+                "creator", "updater");
+        assertNotNull(newAccessTokenDO.getCreator());
+        assertNotNull(newAccessTokenDO.getUpdater());
+        assertNull(redisAccessTokenDO.getCreator());
+        assertNull(redisAccessTokenDO.getUpdater());
     }
 
     @Test

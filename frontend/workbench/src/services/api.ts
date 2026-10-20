@@ -793,6 +793,7 @@ export type MyStudent = {
   activatedAt?: Timestamp;
   services: Array<{
     registrationCaseId?: number;
+    studentName?: string;
     serviceRelationId: number;
     leadId?: number;
     leadNo?: string;
@@ -3530,6 +3531,7 @@ export const api = {
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
       exams: async (categoryId?: number, productId?: number, selectedAttrs?: Record<string, string>, selectedSkuIds?: number[]) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}), selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })),
     create: async (data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId?: number; startDate?: string; endDate?: string; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
+    createBatch: async (data: { className: string; startDate: string; homeroomUserIds: number[] }) => unwrap<number[]>(await http.post('/zsjos/delivery-class/batch-create', data)),
     update: async (id: number, data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId?: number; startDate?: string; endDate?: string; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
     complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
     directTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/service/${relationId}/direct-transfer`, data)),
@@ -6084,7 +6086,7 @@ export const api = {
     ),
   studentUpdateBasicInfo: async (
     relationId: number,
-    data: { name: string; mobile?: string; wechatId?: string; reason: string },
+    data: { name?: string; mobile?: string; wechatId?: string; reason: string },
   ) =>
     unwrap<boolean>(
       await http.put(`/zsjos/student/service/${relationId}/basic-info`, data),

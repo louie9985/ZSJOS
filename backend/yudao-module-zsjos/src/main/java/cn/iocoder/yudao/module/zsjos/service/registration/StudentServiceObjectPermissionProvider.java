@@ -43,6 +43,9 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     public boolean hasPermission(Long bizId, String action, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(bizId);
         if (relation == null) return false;
+        if (!StudentDeliveryParticipation.includes(relation)
+                && (OWNER_ACTIONS.contains(action) && !Set.of("read", "assign").contains(action)
+                    || Set.of("direct-transfer", "class-transfer", "update-exam-date").contains(action))) return false;
         if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if ("positioning-interview-read".equals(action)) {
             if (MediaStudentReadScope.canReadAll(permissionApi, userId)) {

@@ -64,6 +64,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Resource private DeliveryClassNumberService numberService;
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private SalesOrderItemMapper orderItemMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper orderMapper;
     @Resource private ZsjosProductMapper productMapper;
     @Resource private PersonMapper personMapper;
     @Resource private BusinessTaskCommandService taskCommandService;
@@ -149,7 +150,8 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     LambdaQueryWrapperX<ServiceRelationDO> studentReadQuery(Long classId, Long userId) {
-        var query = new LambdaQueryWrapperX<ServiceRelationDO>().eq(ServiceRelationDO::getClassId, classId)
+        var query = new LambdaQueryWrapperX<ServiceRelationDO>().eq(ServiceRelationDO::getTeachingDelivery, true)
+                .eq(ServiceRelationDO::getClassId, classId)
                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"));
         if (!permissionApi.hasTenantReadAllAccess(userId)) {
             boolean managed = permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query", PERMISSION_QUERY_MANAGED);
@@ -239,6 +241,26 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         String snapshot = validate(req);
         AdminUserRespDTO homeroom = requireHomeroom(req.getHomeroomUserId());
         requireSameDepartment(userId, homeroom);
+        return insertClass(req, snapshot, homeroom);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public List<Long> createBatch(DeliveryClassBatchCreateReqVO req, Long userId) {
+        DeliveryClassSaveReqVO single = new DeliveryClassSaveReqVO();
+        single.setClassName(req.getClassName());
+        single.setStartDate(req.getStartDate());
+        String snapshot = validate(single);
+        // Validate every distinct planner before writing; one invalid selection rejects the whole batch.
+        List<AdminUserRespDTO> homerooms = new LinkedHashSet<>(req.getHomeroomUserIds()).stream().map(id -> {
+            AdminUserRespDTO homeroom = requireHomeroom(id);
+            requireSameDepartment(userId, homeroom);
+            return homeroom;
+        }).toList();
+        return homerooms.stream().map(homeroom -> insertClass(single, snapshot, homeroom)).toList();
+    }
+
+    private Long insertClass(DeliveryClassSaveReqVO req, String snapshot, AdminUserRespDTO homeroom) {
         DeptRespDTO dept = homeroom.getDeptId() == null ? null : deptApi.getDept(homeroom.getDeptId());
         for (int retry = 0; retry < 20; retry++) {
             String classNo = numberService.next();
@@ -347,7 +369,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         PersonDO person = personMapper.selectById(relation.getPersonId());
         DeliveryClassStudentRespVO row = new DeliveryClassStudentRespVO();
         row.setServiceRelationId(relation.getId()); row.setPersonId(relation.getPersonId());
-        if (person != null) { row.setPersonNo(person.getPersonNo()); row.setStudentName(person.getName()); }
+        if (person != null) row.setPersonNo(person.getPersonNo());
+        var order = relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
+        row.setStudentName(order == null ? null : cn.hutool.core.util.StrUtil.trimToNull(order.getStudentName()));
         SalesOrderItemDO orderItem = relation.getOrderItemId() == null ? null
                 : orderItemMapper.selectById(relation.getOrderItemId());
         ZsjosProductDO product = orderItem == null || orderItem.getProductId() == null ? null

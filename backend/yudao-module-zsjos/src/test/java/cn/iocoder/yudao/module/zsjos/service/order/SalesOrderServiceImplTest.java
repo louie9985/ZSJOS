@@ -977,8 +977,10 @@ class SalesOrderServiceImplTest {
         when(processTaskApi.getTodoTaskPage(eq(20L), any())).thenReturn(PageResult.empty());
         assertEquals(0L, service.getInboxPage(request, 20L).getTotal());
         var captor = ArgumentCaptor.forClass(BpmTaskPageReqDTO.class);
-        verify(processTaskApi).getTodoTaskPage(eq(20L), captor.capture());
-        assertEquals(List.of("p1"), captor.getValue().getProcessInstanceIds());
+        verify(processTaskApi, atLeastOnce()).getTodoTaskPage(eq(20L), captor.capture());
+        // 列表与计数都必须保留同一流程筛选，不能有一次回退为全量任务查询。
+        assertTrue(captor.getAllValues().stream()
+                .allMatch(query -> List.of("p1").equals(query.getProcessInstanceIds())));
     }
 
     @Test

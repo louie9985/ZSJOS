@@ -22,7 +22,7 @@ with sync_playwright() as p:
             expect(dialog.get_by_text('历史分类 / 历史礼品名称', exact=True)).to_be_visible()
             expect(dialog.get_by_label('礼品邮寄地址', exact=True)).to_have_value('原礼品邮寄地址')
             expect(dialog.get_by_role('button', name='重新提交', exact=True)).to_be_enabled()
-            page.screenshot(path=str(out / f'{scenario}-{width}.png'), full_page=True)
+            page.screenshot(path=str(out / f'{scenario}-{width}.png'), full_page=True, animations='disabled')
             dialog.get_by_role('button', name='重新提交', exact=True).click()
             page.wait_for_function('window.orderGiftFixture.submissions.length === 1')
             payload = page.evaluate('window.orderGiftFixture.submissions[0]')
@@ -69,6 +69,9 @@ with sync_playwright() as p:
         dialog = open_revision('loading')
         expect(dialog.get_by_role('button', name='重新提交', exact=True)).to_be_disabled()
         expect(dialog.get_by_role('button', name='重新提交', exact=True)).to_be_enabled()
+        page.goto('http://127.0.0.1:5298/test/order-revision-gifts.html?orderId=1&scenario=denied')
+        expect(page.get_by_text('FIXTURE-ORDER', exact=True)).to_be_visible()
+        expect(page.get_by_role('button', name='补正并重新提交', exact=True)).to_have_count(0)
         assert not failures, failures
         page.close()
     browser.close()

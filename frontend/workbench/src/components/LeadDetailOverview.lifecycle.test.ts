@@ -52,7 +52,13 @@ describe('student profile identity', () => {
     services: []
   }
 
-  it('uses Person contact fields while retaining a real Lead number', () => {
+  it('does not substitute Lead name when the order name is missing', () => {
+    expect(studentProfileIdentity(lead(), { ...student, name: undefined }).name).toBe('未填写姓名')
+    expect(studentProfileIdentity(lead(), { ...student, name: '' }).name).toBe('未填写姓名')
+    expect(studentProfileIdentity(lead()).name).toBe('测试客户')
+  })
+
+  it('uses order name and Person contact fields while retaining a real Lead number', () => {
     expect(studentProfileIdentity(lead(), student)).toEqual({
       name: '学员姓名',
       mobile: '13800000000',

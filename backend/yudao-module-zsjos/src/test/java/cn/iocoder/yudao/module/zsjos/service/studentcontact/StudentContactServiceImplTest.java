@@ -438,24 +438,25 @@ class StudentContactServiceImplTest {
     }
 
     @Test
-    void updateBasicInfoWritesPersonAndPiiFreeEvent() {
+    void updateBasicInfoPreservesPersonNameEvenForLegacyClientAndWritesPiiFreeEvent() {
         TenantContextHolder.setTenantId(1L);
         ServiceRelationDO relation = relation("accepted");
         relation.setPersonId(100L);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
         PersonDO before = new PersonDO();
         before.setId(100L); before.setName("旧姓名"); before.setMobile("13800000000"); before.setWechatId("old-wechat");
-        when(personMapper.selectById(100L)).thenReturn(before);
+        when(personMapper.selectByIdForUpdate(100L, 1L)).thenReturn(before);
         StudentBasicInfoUpdateReqVO request = new StudentBasicInfoUpdateReqVO();
         request.setName("新姓名"); request.setMobile("13900000000"); request.setWechatId("new-wechat"); request.setReason("学员要求更正");
 
         service.updateBasicInfo(10L, request, 7L);
 
-        verify(personIdentityWriteService).update(100L, "新姓名", "13900000000", "new-wechat");
+        verify(personIdentityWriteService).update(100L, "旧姓名", "13900000000", "new-wechat");
         ArgumentCaptor<BusinessEventDO> captor = ArgumentCaptor.forClass(BusinessEventDO.class);
         verify(eventMapper).insert(captor.capture());
         BusinessEventDO event = captor.getValue();
         assertEquals("student_basic_info_updated", event.getEventType());
+        assertFalse(event.getRelatedObjectRefs().contains("\"name\""));
         assertEquals("student_service", event.getAggregateType());
         assertEquals(10L, event.getAggregateId());
         assertFalse(event.getRelatedObjectRefs().contains("13900000000"));

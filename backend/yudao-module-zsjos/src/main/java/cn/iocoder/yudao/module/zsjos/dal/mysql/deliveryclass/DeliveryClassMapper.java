@@ -59,18 +59,18 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
     @Select({"<script>", "SELECT DISTINCT sr.class_id AS classId, oi.product_snapshot AS snapshot",
             "FROM zsjos_service_relation sr JOIN zsjos_order_item oi ON oi.id=sr.order_item_id",
             "AND oi.tenant_id=sr.tenant_id AND oi.deleted=0",
-            "WHERE sr.tenant_id=#{tenantId} AND sr.deleted=0 AND sr.status IN ('active','paused','completed')",
+            "WHERE sr.teaching_delivery=1 AND sr.tenant_id=#{tenantId} AND sr.deleted=0 AND sr.status IN ('active','paused','completed')",
             "AND sr.class_id IN", "<foreach collection='classIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
             "ORDER BY sr.class_id, oi.product_snapshot", "</script>"})
     List<Map<String, Object>> selectProjectSnapshots(@Param("tenantId") Long tenantId,
             @Param("classIds") Collection<Long> classIds);
-    @Select("SELECT COUNT(1) FROM zsjos_service_relation WHERE tenant_id=#{tenantId} AND class_id=#{classId} AND deleted=b'0' AND status IN ('active','paused','completed')")
+    @Select("SELECT COUNT(1) FROM zsjos_service_relation WHERE teaching_delivery=1 AND tenant_id=#{tenantId} AND class_id=#{classId} AND deleted=b'0' AND status IN ('active','paused','completed')")
     int countStudents(@Param("tenantId") Long tenantId, @Param("classId") Long classId);
     @Select("SELECT COUNT(1) FROM zsjos_service_relation WHERE tenant_id=#{tenantId} AND class_id=#{classId} AND deleted=b'0'")
     int countAllRelations(@Param("tenantId") Long tenantId, @Param("classId") Long classId);
 
     @Select({"<script>", "SELECT class_id AS classId, COUNT(1) AS studentCount FROM zsjos_service_relation",
-            "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND status IN ('active','paused','completed')",
+            "WHERE teaching_delivery=1 AND tenant_id=#{tenantId} AND deleted=b'0' AND status IN ('active','paused','completed')",
             "AND class_id IN", "<foreach collection='classIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
             "GROUP BY class_id", "</script>"})
     List<Map<String, Object>> countStudentsByClassIds(@Param("tenantId") Long tenantId,

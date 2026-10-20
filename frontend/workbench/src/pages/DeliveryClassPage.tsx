@@ -10,7 +10,7 @@ import { api, type DeliveryClass, type DeliveryClassFilterContext, type Homeroom
 import DeliveryClassFilters, { defaultClassFilters, type ClassFilters } from './DeliveryClassFilters'
 import DeliveryClassExamCalendar from './DeliveryClassExamCalendar'
 
-type ClassForm = { className: string; startDate: Dayjs; homeroomUserId: number }
+type ClassForm = { className: string; startDate: Dayjs; homeroomUserId?: number; homeroomUserIds?: number[] }
 const has = (permissions: string[], permission: string) => permissions.includes('*:*:*') || permissions.includes(permission)
 const CLASS_PAGE_SIZE = 12
 
@@ -43,6 +43,7 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
   const [calendarOpen, setCalendarOpen] = useState(false)
   const [candidates, setCandidates] = useState<HomeroomCandidate[]>([])
   const [form] = Form.useForm<ClassForm>()
+  const selectedHomerooms = Form.useWatch('homeroomUserIds', form) as number[] | undefined
   useEffect(() => { const timer = window.setTimeout(() => setSearch(keyword.trim()), 300); return () => window.clearTimeout(timer) }, [keyword])
   const query = useMemo(() => ({ status: status || undefined, keyword: search || undefined, projectCategoryId: filters.projectCategoryId,
     homeroomUserId: filters.homeroomUserId, examDateStart: filters.dateRange?.[0], examDateEnd: filters.dateRange?.[1] }),
@@ -94,14 +95,20 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
     finally { setSaving(false) }
   }
   const save = async () => {
+    if (saving) return
     const value = await form.validateFields().catch(() => undefined)
     if (!value) return
     setSaving(true)
     try {
-      const payload = { ...value, className: value.className.trim(), startDate: value.startDate.format('YYYY-MM-DD') }
-      if (editing) await api.deliveryClasses.update(editing.id, { ...payload, version: editing.version })
-      else await api.deliveryClasses.create(payload)
-      message.success(editing ? '班级已更新' : '班级已创建'); setEditOpen(false); form.resetFields(); await Promise.all([load(1), loadContext()])
+      const payload = { className: value.className.trim(), startDate: value.startDate.format('YYYY-MM-DD') }
+      if (editing) {
+        await api.deliveryClasses.update(editing.id, { ...payload, homeroomUserId: value.homeroomUserId!, version: editing.version })
+        message.success('班级已更新')
+      } else {
+        const ids = await api.deliveryClasses.createBatch({ ...payload, homeroomUserIds: value.homeroomUserIds! })
+        message.success(`已创建 ${ids.length} 个班级`)
+      }
+      setEditOpen(false); form.resetFields(); await Promise.all([load(1), loadContext()])
     } catch (e) { message.error(e instanceof Error ? e.message : '班级保存失败') }
     finally { setSaving(false) }
   }
@@ -160,12 +167,19 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
       {!useTableLayout && <div ref={sentinelRef} className="delivery-class-sentinel">{loading && rows.length > 0 ? '加载中…' : hasMore ? '加载更多' : rows.length ? '已加载全部班级' : ''}</div>}
       {contextLoading && !context && <Typography.Text type="secondary">筛选选项加载中…</Typography.Text>}
     </Space>
-    <Modal open={editOpen} title={editing ? '编辑班级' : '创建班级'} confirmLoading={saving} onOk={() => void save()} onCancel={() => setEditOpen(false)} destroyOnHidden>
-      <Form form={form} layout="vertical">
+    <Modal open={editOpen} title={editing ? '编辑班级' : '创建班级'} confirmLoading={saving}
+      okText={editing ? '保存' : selectedHomerooms?.length ? `确认创建 ${selectedHomerooms.length} 个班级` : '创建班级'}
+      onOk={() => void save()} onCancel={() => { if (!saving) setEditOpen(false) }} closable={!saving} keyboard={!saving} maskClosable={!saving} destroyOnHidden>
+      <Form form={form} layout="vertical" disabled={saving}>
         <Form.Item name="className" label="班级名称" rules={[{ required: true, whitespace: true, message: '请填写班级名称' }]}><Input maxLength={100} placeholder="请填写班级名称" /></Form.Item>
         <Form.Item name="startDate" label="考期日期" rules={[{ required: true, message: '请选择考期日期' }]}><DatePicker style={{ width: '100%' }} placeholder="选择日期" /></Form.Item>
         <Form.Item><Button onClick={() => setCalendarOpen(true)}>选择已有考期</Button></Form.Item>
-        <Form.Item name="homeroomUserId" label="班主任" rules={[{ required: true, message: '请选择班主任' }]}><Select showSearch optionFilterProp="label" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} /></Form.Item>
+        {editing ? <Form.Item name="homeroomUserId" label="班主任" rules={[{ required: true, message: '请选择班主任' }]}>
+          <Select showSearch optionFilterProp="label" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} />
+        </Form.Item> : <Form.Item name="homeroomUserIds" label="班主任" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一位班主任' }]}
+          extra="每位学习规划师分别创建一个同名班级，考期日期相同。">
+          <Select mode="multiple" showSearch optionFilterProp="label" placeholder="可选择多位班主任" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} />
+        </Form.Item>}
       </Form>
     </Modal>
     <DeliveryClassExamCalendar open={calendarOpen} initialDate={form.getFieldValue('startDate')?.format('YYYY-MM-DD')}

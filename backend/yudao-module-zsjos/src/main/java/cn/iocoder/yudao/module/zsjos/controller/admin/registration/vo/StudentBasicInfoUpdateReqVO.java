@@ -7,7 +7,8 @@ import lombok.Data;
 
 @Data
 public class StudentBasicInfoUpdateReqVO {
-    @NotBlank @Size(max = 100)
+    /** Ignored compatibility field: student names are read from orders. */
+    @Size(max = 100)
     private String name;
     @Size(max = 32)
     private String mobile;

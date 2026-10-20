@@ -95,6 +95,7 @@ export interface StudyPlanner {
 }
 
 export interface StudentService {
+  studentName?: string
   classId?: number
   className?: string
   ownerUserName?: string

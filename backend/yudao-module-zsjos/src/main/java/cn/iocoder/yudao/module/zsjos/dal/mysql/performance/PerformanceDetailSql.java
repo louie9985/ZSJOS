@@ -6,15 +6,19 @@ public final class PerformanceDetailSql {
     static String scoped(String fact) {
         String body = fact.replaceFirst("(?s)\\s*ORDER BY[^<]+</script>", "</script>")
                 .replace("<script>", "").replace("</script>", "");
+        // Missing domains predate the split. Preserve legacy sales visibility without assigning a historical domain.
+        String organizationEvidence = "(f.org_source='frozen'<if test=\"businessDomain == 'sales' and !unclassified\"> OR (f.business_domain IS NULL AND f.resolved_domain IS NULL)</if>)";
         return "SELECT f.* FROM (SELECT raw.*, CASE WHEN raw.business_domain IN ('sales','delivery') THEN raw.business_domain "
                 + "WHEN raw.business_domain IS NULL AND raw.org_source='frozen' THEN "
                 + "(SELECT org.business_domain FROM zsjos_performance_org org WHERE org.tenant_id=#{tenant} AND org.deleted=0 "
                 + "AND org.dept_id=raw.dept_id AND org.create_time &lt;= raw.occurred_at AND org.update_time &lt;= raw.occurred_at) "
                 + "ELSE NULL END resolved_domain FROM (" + body + ") raw) f WHERE "
-                + "<choose><when test=\"unclassified\">f.resolved_domain IS NULL</when><otherwise>f.resolved_domain=#{businessDomain}</otherwise></choose> AND <choose>"
+                + "<choose><when test=\"unclassified\">f.resolved_domain IS NULL</when>"
+                + "<when test=\"businessDomain == 'sales'\">(f.resolved_domain='sales' OR (f.business_domain IS NULL AND f.resolved_domain IS NULL))</when>"
+                + "<otherwise>f.resolved_domain=#{businessDomain}</otherwise></choose> AND <choose>"
                 + "<when test=\"allDepartments\"><choose><when test=\"missingDepartment\">1=1</when>"
-                + "<otherwise>f.org_source='frozen' AND f.dept_id IS NOT NULL</otherwise></choose></when>"
-                + "<when test=\"departments != null and !departments.isEmpty()\">f.org_source='frozen' AND f.dept_id IN "
+                + "<otherwise>" + organizationEvidence + " AND f.dept_id IS NOT NULL</otherwise></choose></when>"
+                + "<when test=\"departments != null and !departments.isEmpty()\">" + organizationEvidence + " AND f.dept_id IN "
                 + "<foreach collection=\"departments\" item=\"dept\" open=\"(\" separator=\",\" close=\")\">#{dept}</foreach></when>"
                 + "<otherwise>1=0</otherwise></choose>";
     }

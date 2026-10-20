@@ -27,15 +27,24 @@ class PerformanceEnabledContributionTest {
  @Mock PerformanceReportMapper reports;
  @Mock PerformanceDetailMapper detailQueries;
  PerformanceFact order(long user,String amount){var f=new PerformanceFact();f.setUserId(user);f.setUserName("销售"+user);f.setDeptId(10L);f.setAmount(new BigDecimal(amount));f.setOccurredAt(LocalDate.of(2026,1,2).atStartOfDay());return f;}
- @Test void historicalDisabledOrdersRemainInTotalsAndContributionRows(){
+ @Test void historicalDisabledOrdersRemainInTotalsButNotContributionRows(){
+  contribution(1,true);
+ }
+ @Test void deliveryPersonnelAreExcludedFromRowsWithoutRewritingHistoricalTotals(){
+  contribution(0,false);
+ }
+ @Test void unknownStatusIsExcludedFromContributionRows(){contribution(null,true);}
+ @Test void enabledSalesPersonnelReturnToContributionRows(){contribution(0,true);}
+ void contribution(Integer secondStatus,boolean salesDepartment){
+  boolean secondVisible=Integer.valueOf(0).equals(secondStatus)&&salesDepartment;
   TenantContextHolder.setTenantId(1L);
   try {
    var q=new Query();q.setScopeType("DEPT");q.setScopeId(10L);q.setStart(LocalDate.of(2026,1,2));q.setEnd(LocalDate.of(2026,1,3));q.setGrain("day");
    when(detailQueries.conversionOrders(any())).thenReturn(List.of(order(2,"100"),order(3,"300")));
    when(access.historicalScope(any())).thenReturn(new PerformanceAccess.HistoricalScope(true,false,Set.of()));
    var enabled=new AdminUserRespDTO();enabled.setId(2L);enabled.setStatus(0);enabled.setNickname("销售2");
-   var disabled=new AdminUserRespDTO();disabled.setId(3L);disabled.setStatus(1);disabled.setNickname("销售3");
-   when(access.users(Set.of(2L,3L))).thenReturn(List.of(enabled,disabled));
+   var second=new AdminUserRespDTO();second.setId(3L);second.setStatus(secondStatus);second.setDeptId(salesDepartment?10L:20L);second.setNickname("人员3");
+   when(access.presentationUsers(Set.of(2L,3L))).thenReturn(secondVisible?List.of(enabled,second):List.of(enabled));
    when(reports.amounts(any())).thenAnswer(call->{var request=call.getArgument(0,PerformanceReportQuery.class);var result=new ArrayList<PerformanceAggregate>();
     for(var w:request.getIntervals())switch(request.getGrouping()){
      case "total"->result.add(PerformanceReportTest.sum(w.key(),"total","400",2,"400",2));
@@ -46,11 +55,11 @@ class PerformanceEnabledContributionTest {
    var result=service.analysis(q);
    assertEquals(new BigDecimal("400"),result.averages().getFirst().amount());
    assertEquals(2,result.averages().getFirst().orders());
-   assertEquals(2,result.contributionMetrics().size());
+   assertEquals(secondVisible?2:1,result.contributionMetrics().size());
    assertEquals(2L,result.contributionMetrics().getFirst().userId());
    assertEquals(new BigDecimal("0.250000"),result.contributionMetrics().getFirst().share());
-   assertEquals(2,result.contributors().size());
-   assertEquals(new BigDecimal("0.750000"),result.contributors().getFirst().share());
+   assertEquals(secondVisible?2:1,result.contributors().size());
+   assertEquals(new BigDecimal(secondVisible?"0.750000":"0.250000"),result.contributors().getFirst().share());
   } finally {TenantContextHolder.clear();}
  }
 }

@@ -24,6 +24,7 @@ public interface DeliveryClassService {
                                                     String selectedSkuIdsJson);
     AdminUserRespDTO validateHomeroom(Long userId);
     Long create(DeliveryClassSaveReqVO req, Long userId);
+    List<Long> createBatch(DeliveryClassBatchCreateReqVO req, Long userId);
     void update(Long id, DeliveryClassSaveReqVO req, Long userId);
     void complete(Long id, Long userId);
     void directTransfer(Long relationId, DeliveryClassDirectTransferReqVO req, Long userId);
