@@ -118,7 +118,7 @@ public class StudentServiceReadService {
         add(clauses,params,"p.in_service_period","inServicePeriod",req.getInServicePeriod());
         if (req.getKeyword()!=null && !req.getKeyword().isBlank()) {
             params.put("keyword","%"+req.getKeyword().trim()+"%");
-            clauses.add("(ro.student_name LIKE #{query.parameters.keyword} OR p.mobile LIKE #{query.parameters.keyword} OR p.wechat_id LIKE #{query.parameters.keyword} OR p.person_no LIKE #{query.parameters.keyword} OR rl.lead_no LIKE #{query.parameters.keyword})");
+            clauses.add("(sr.student_name_snapshot LIKE #{query.parameters.keyword} OR p.mobile LIKE #{query.parameters.keyword} OR p.wechat_id LIKE #{query.parameters.keyword} OR p.person_no LIKE #{query.parameters.keyword} OR rl.lead_no LIKE #{query.parameters.keyword})");
         }
         params.put("sortField",req.getSortField()); params.put("sortOrder",req.getSortOrder());
         params.put("limit",req.getPageSize()); params.put("offset",(long)(req.getPageNo()-1)*req.getPageSize());

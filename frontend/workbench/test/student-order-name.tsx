@@ -10,10 +10,10 @@ const params = new URLSearchParams(location.search)
 localStorage.setItem('crm-theme', JSON.stringify({ inboxLayoutMode: params.get('layout') || 'inbox' }))
 const long = params.has('long')
 const rows: StudentServiceSubject[] = [1, 2].map(id => ({
-  personId: 7, personNo: 'XY-FIXTURE-7', name: id === 1 ? '首次订单姓名' : params.has('missing') ? undefined : '第二订单姓名', mobile: '13800000000',
+  personId: 7, personNo: 'XY-FIXTURE-7', name: id === 1 ? '首次订单姓名' : params.has('missing') ? undefined : '独立服务快照姓名', mobile: '13800000000',
   serviceRelationId: id,
   service: {
-    serviceRelationId: id, leadId: 99, studentName: id === 1 ? '首次订单姓名' : '第二订单姓名', courseName: `课程${id}${long ? '大健康轻创技能提升与职业发展'.repeat(3) : ''}`,
+    serviceRelationId: id, leadId: 99, studentName: id === 1 ? '首次订单姓名' : '独立服务快照姓名', courseName: `课程${id}${long ? '大健康轻创技能提升与职业发展'.repeat(3) : ''}`,
     className: `班级${id}${long ? '技能提升2026秋班（班主任：示例老师）'.repeat(3) : ''}`,
     status: 'active', acceptanceStatus: id === 1 ? 'pending' : 'accepted', owner: true, version: 0,
     ownerUserId: 20 + id, ownerUserName: `规划师${id}${long ? '服务负责人'.repeat(8) : ''}`,

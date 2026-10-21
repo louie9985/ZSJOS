@@ -22,7 +22,7 @@ class ContentReviewNotifyPublisherTest {
     @Mock ContentReviewRelationMapper relationMapper;
     @Mock BpmProcessTaskApi processTaskApi;
     @Mock NotifyBusinessEventApi notifyBusinessEventApi;
-    @BeforeEach void tenant(){TenantContextHolder.setTenantId(7L);}
+    @BeforeEach void tenant(){TenantContextHolder.setTenantId(1L);}
     @AfterEach void clear(){TenantContextHolder.clear();}
     ContentReviewBatchDO batch(){var b=new ContentReviewBatchDO();b.setId(1L);b.setBatchNo("CR-1");b.setOperatorUserId(2L);b.setProcessInstanceId("p");b.setStatus("FINAL_REVIEW");b.setContextSnapshotJson("{\"finalTaskKey\":\"customFinal\"}");return b;}
     @Test void finalNotificationUsesAllActualBpmAssigneesAndConfiguredTaskKey(){
@@ -31,10 +31,11 @@ class ContentReviewNotifyPublisherTest {
           new BpmPendingTaskRespDTO("a","customFinal",3L,LocalDateTime.now()),
           new BpmPendingTaskRespDTO("b","customFinal",4L,LocalDateTime.now()),
           new BpmPendingTaskRespDTO("c","other",5L,LocalDateTime.now())));
-        publisher.publishDirectorCompleted(1L,9L,LocalDateTime.now());
+        publisher.publishNodeResult(new ContentReviewNotifyPublisher.NodeResult(1L, 1L, "p", "director-task",
+                "DIRECTOR", true, 9L, "通过", LocalDateTime.now()));
         var captor=ArgumentCaptor.forClass(NotifyBusinessEvent.class);verify(notifyBusinessEventApi).publish(captor.capture());
         assertEquals(Set.of(3L,4L),captor.getValue().getPayload().get("finalReviewerUserIds"));
-        assertEquals(7L,captor.getValue().getTenantId());
+        assertEquals(1L,captor.getValue().getTenantId());
     }
     @Test void timeoutUsesRegisteredSceneRuleAndStableTaskIdentity(){
         var now=LocalDateTime.of(2026,9,20,12,0);
@@ -46,5 +47,38 @@ class ContentReviewNotifyPublisherTest {
         assertEquals("content-review-timeout:task:8",event.getSourceEventKey());
         assertEquals(25L,event.getPayload().get("pendingHours"));
         assertEquals(Set.of(NotifyRecipientDTO.admin(3L)),new ContentReviewNotifySceneProvider().resolveRecipients(event,Set.of("final_reviewer")));
+    }
+
+    @Test void allFourResultsPublishOneEventWithActualCountsAndRoundIdentity() {
+        for (int count : new int[]{1, 6, 20}) for (String stage : List.of("DIRECTOR", "FINAL")) {
+            for (boolean approved : new boolean[]{true, false}) {
+                reset(batchMapper, itemMapper, notifyBusinessEventApi);
+                var batch = batch(); batch.setDirectorUserId(2L); batch.setCreator("2");
+                when(batchMapper.selectById(1L)).thenReturn(batch);
+                var items = java.util.stream.IntStream.range(0, count).mapToObj(i ->
+                        new cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewBatchItemDO()
+                                .setDirectorDecision(!approved && i == 0 ? "RETURNED" : "APPROVED")
+                                .setFinalDecision(!approved && i == 0 ? "RETURNED" : "APPROVED")).toList();
+                when(itemMapper.selectByBatchId(1L)).thenReturn(items);
+                var result = new ContentReviewNotifyPublisher.NodeResult(1L, 1L, "p", "task-1", stage,
+                        approved, 9L, "意见", LocalDateTime.now());
+                publisher.publishNodeResult(result);
+                var captor = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+                verify(notifyBusinessEventApi).publish(captor.capture());
+                var event = captor.getValue();
+                assertEquals("zsjos.content_review." + (stage.equals("DIRECTOR") ? "director" : "final")
+                        + (approved ? "_completed" : "_rejected"), event.getSceneCode());
+                assertEquals(count, event.getPayload().get("itemCount"));
+                assertEquals(approved ? 0L : 1L, event.getPayload().get("returnedCount"));
+                assertEquals("content_review", event.getBizType());
+                assertEquals("/zsjos/material-library/content-review?batchId=1", event.getPayload().get("deepLink"));
+                assertEquals("content-review:1:p:task-1:result", event.getSourceEventKey());
+                assertEquals(Set.of(NotifyRecipientDTO.admin(2L)), new ContentReviewNotifySceneProvider()
+                        .resolveRecipients(event, Set.of("operator", "director", "submitter")));
+                publisher.publishNodeResult(result);
+                verify(notifyBusinessEventApi, times(2)).publish(captor.capture());
+                assertEquals(event.getSourceEventKey(), captor.getValue().getSourceEventKey());
+            }
+        }
     }
 }

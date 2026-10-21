@@ -5594,6 +5594,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `collaboration_group_id` bigint DEFAULT NULL COMMENT '编导运营协作组',
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '学生服务关系编号',
   `person_id` bigint NOT NULL COMMENT '被服务 Person 编号',
+  `student_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员服务姓名快照',
+  `student_name_source` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员姓名快照来源',
   `teaching_delivery` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否纳入教学交付',
   `order_id` bigint DEFAULT NULL COMMENT '来源有效订单编号',
   `order_item_id` bigint DEFAULT NULL COMMENT '来源订单项编号',

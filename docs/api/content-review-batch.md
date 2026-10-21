@@ -191,3 +191,46 @@ batch/history 与 batch/get 保持响应结构和 `zsjos:content-review:query` �
 新增 GET /zsjos/content-review/account-profile-preview，参数为 batchId 或 studentPersonId + accountIds（逗号分隔）。批次场景按服务端批次账号集合查询，要求 submit 对象权限及可编辑状态；所有账号同时核验租户、学员和当前运营归属。返回类型为 ContentReviewAccountProfileRespVO。工作台新建/编辑/修订表单展示只读当前预览，失败可重试，加载未完成不能通过表单校验。账号名称改在账号资料维护。正式提交再次读取，不信任预览结果。
 
 历史已提交轮次不变，无迁移、无历史补全。部署顺序为后端后前端，新增接口未部署时表单预览会报错而不是继续使用旧数据。
+
+## 内容审批节点结果通知（2026-10-21）
+
+内容审批结果按“本轮批次＋实际 BPM 节点任务＋接收人”发送，作品数量不增加结果通知数量。
+编导、终审逐条保存或修改结论仅保存意见，不发布 director_item_decision/final_item_decision；
+批次通过／退回同步到每条内容时只保留状态与审计记录，不再额外发布 media.content.approved/rejected。
+旧场景和既有规则保留以读取历史，不重写历史消息，不自动停用管理员规则。
+
+四个现有场景编码保持不变：director_completed、director_rejected、final_completed、final_rejected
+（完整前缀 zsjos.content_review.）。它们分别展示编导审核通过、编导审核未通过、终审通过、终审未通过。
+未通过数 returnedCount 只统计当前节点真实 RETURNED 作品；整批退回不伪造其他作品的逐条结论。
+新增模板变量 itemCount、returnedCount、reviewStage、nextStatus；既有 batchNo 等变量兼容。
+
+内容审批公共 BPM 校验登记节点结果，Spring BEFORE_COMMIT 事件在引擎流转后、事务提交前
+调用 System 公共通知 API 写入现有可靠 Outbox。专用接口与通用 BPM 接口共用此边界；
+素材收录、状态更新或 Outbox 写入失败均回滚本轮动作，不发送成功通知。
+sourceEventKey 为 content-review:<batchId>:<processInstanceId>:<taskId>:result。
+同一规则内多角色命中同一用户合并；同事件投递重试由 System 原有唯一约束去重。
+退回重提使用新轮次及新任务键，历史节点结果不补发。
+
+Workbench 消息维持 bizType=content_review、bizId=本轮批次 ID、actionType=business_detail，
+弹窗和消息列表进入 /zsjos/material-library/content-review?batchId=<id>，不固定域名。
+批次详情与列表独立加载，列表分页、筛选、空结果或失败均不替换消息目标；
+旧消息读取原轮次冻结详情，URL 支持连续切换、刷新和前进后退。
+明确区分无权限、记录不存在、登录失效及临时失败；临时失败保留目标页重试，
+不可访问的消息动作回退原消息详情。已读同步失败不阻止打开详情。
+Vue Admin 保留自身审批入口与消息详情回退，不引入 Workbench 路由。
+
+### 升级与验收
+
+V338__content_review_node_notifications.sql 按数字顺序在 V337 后执行，依赖两账本的 V269。
+仅升级八个可识别、展示字段仍与 V269 完全相同的默认模板（四场景×站内信／企微）；
+管理员改过标题、摘要、正文、变量、名称或发送者的模板保留，需按上述变量自行审阅调整。
+不更新通知规则、渠道开关、个人偏好、角色权限或历史消息；企微与站内信仍是独立渠道。
+模板数据与两账本在同一失败控制事务内，重复执行保留版本记录；不以已有版本标记跳过缺失更新。
+应用回滚不删除历史记录；模板回滚应使用升级前备份，不覆盖管理员后续修改。
+
+执行 python script/sql/mysql/tools/test_content_review_node_notifications.py 可在保留的受控 MySQL
+数据库验证首次／重复／失败回滚／部分恢复／自定义模板保留／中文 HEX，并只读审计本地租户 1。
+在本地开发数据库已确认授权范围后，可加 --apply-local：先保存八个目标模板的 UTF-8 JSON 备份，
+执行 V338 并重复验证，核对租户 1 通知规则与历史消息数量不变。该参数不支持远程／共享环境操作。
+目标环境上线前另行只读确认四场景各一条启用站内信规则；存在重复规则时列明具体 ID 和影响，
+另行审核配置变更，不自动删除或停用。代码、SQL 验证不代表目标环境部署或真实账号验收。

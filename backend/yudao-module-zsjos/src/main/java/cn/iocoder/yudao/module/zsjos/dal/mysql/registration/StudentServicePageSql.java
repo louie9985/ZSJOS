@@ -19,7 +19,7 @@ public final class StudentServicePageSql {
         var q = (AdvancedFilterQuery) args.get("query");
         String field = (String) q.getParameters().get("sortField");
         String expression = switch (field == null ? "" : field) {
-            case "name" -> "ro.student_name"; case "mobile" -> "p.mobile"; case "wechatId" -> "p.wechat_id";
+            case "name" -> "sr.student_name_snapshot"; case "mobile" -> "p.mobile"; case "wechatId" -> "p.wechat_id";
             case "leadNo" -> "rl.lead_no"; case "className" -> "dc.class_name";
             case "courses" -> "JSON_UNQUOTE(JSON_EXTRACT(IF(JSON_VALID(COALESCE(oi.product_snapshot,sr.service_snapshot)),COALESCE(oi.product_snapshot,sr.service_snapshot),'{}'),'$.name'))";
             case "serviceStatus" -> "sr.status"; case "orderNos" -> "ro.order_no";

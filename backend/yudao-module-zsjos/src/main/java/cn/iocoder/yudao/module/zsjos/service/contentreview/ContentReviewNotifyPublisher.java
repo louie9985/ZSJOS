@@ -1,23 +1,26 @@
 package cn.iocoder.yudao.module.zsjos.service.contentreview;
 
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskActionContext;
 import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
-import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendResult;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewBatchDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.contentreview.ContentReviewBatchItemDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.contentreview.ContentReviewBatchItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.contentreview.ContentReviewBatchMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.contentreview.ContentReviewRelationMapper;
 import jakarta.annotation.Resource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
 
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ContentReviewConstants.*;
 
@@ -30,7 +33,7 @@ public class ContentReviewNotifyPublisher {
     @Resource private ContentReviewBatchMapper batchMapper;
     @Resource private cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi processTaskApi;
     @Resource private ContentReviewBatchItemMapper itemMapper;
-    @Resource private ContentReviewRelationMapper relationMapper;
+    @Resource private ApplicationEventPublisher eventPublisher;
 
     public void publishBatchSubmitted(Long batchId, Long operatorUserId, LocalDateTime occurredAt) {
         ContentReviewBatchDO batch = batchMapper.selectById(batchId);
@@ -52,131 +55,51 @@ public class ContentReviewNotifyPublisher {
                 ));
     }
 
-    public void publishDirectorItemDecision(Long batchId, Long itemId, String decision, String comment,
-                                            Long reviewerUserId, LocalDateTime occurredAt) {
-        ContentReviewBatchDO batch = batchMapper.selectById(batchId);
-        ContentReviewBatchItemDO item = itemMapper.selectById(itemId);
-        if (batch == null || item == null) return;
+    public record NodeResult(Long tenantId, Long batchId, String processInstanceId, String taskId,
+                             String stage, boolean approved, Long reviewerUserId, String reason,
+                             LocalDateTime occurredAt) {}
 
-        Set<Long> operatorUserIds = resolveOperatorUserIds(batch);
-
-        publish("zsjos.content_review.director_item_decision", batchId,
-                "batch:" + batchId + ":item:" + itemId + ":director",
-                reviewerUserId, occurredAt,
-                Map.of(
-                        "batchNo", batch.getBatchNo(),
-                        "batchTitle", buildBatchTitle(batch),
-                        "itemTitle", "内容" + item.getSortNo(),
-                        "decision", decision,
-                        "comment", comment != null ? comment : "",
-                        "reviewerName", "编导",
-                        "operatorUserIds", operatorUserIds
-                ));
+    public void deferNodeResult(ContentReviewBatchDO batch, String stage,
+                                BpmTaskActionContext context) {
+        // The common BPM validator runs before engine completion. BEFORE_COMMIT observes the actual
+        // next assignees and shares the approval transaction, including material-collection rollback.
+        eventPublisher.publishEvent(new NodeResult(TenantContextHolder.getRequiredTenantId(), batch.getId(),
+                context.getProcessInstanceId(), context.getTaskId(), stage, "APPROVE".equals(context.getAction()),
+                context.getUserId(), context.getReason(), LocalDateTime.now()));
     }
 
-    public void publishDirectorCompleted(Long batchId, Long reviewerUserId, LocalDateTime occurredAt) {
-        ContentReviewBatchDO batch = batchMapper.selectById(batchId);
-        if (batch == null) return;
-
-        Set<Long> operatorUserIds = resolveOperatorUserIds(batch);
-        Set<Long> finalReviewerUserIds = resolveFinalReviewerUserIds(batch);
-
-        publish("zsjos.content_review.director_completed", batchId,
-                "batch:" + batchId + ":director_completed",
-                reviewerUserId, occurredAt,
-                Map.of(
-                        "batchNo", batch.getBatchNo(),
-                        "batchTitle", buildBatchTitle(batch),
-                        "itemCount", countItems(batchId),
-                        "reviewerName", "编导",
-                        "operatorUserIds", operatorUserIds,
-                        "finalReviewerUserIds", finalReviewerUserIds
-                ));
-    }
-
-    public void publishDirectorRejected(Long batchId, Long reviewerUserId, String reason, LocalDateTime occurredAt) {
-        ContentReviewBatchDO batch = batchMapper.selectById(batchId);
-        if (batch == null) return;
-
-        Set<Long> operatorUserIds = resolveOperatorUserIds(batch);
-
-        publish("zsjos.content_review.director_rejected", batchId,
-                "batch:" + batchId + ":director_rejected",
-                reviewerUserId, occurredAt,
-                Map.of(
-                        "batchNo", batch.getBatchNo(),
-                        "batchTitle", buildBatchTitle(batch),
-                        "reason", reason != null ? reason : "",
-                        "reviewerName", "编导",
-                        "operatorUserIds", operatorUserIds,
-                        "submitterUserId", batch.getCreator()
-                ));
-    }
-
-    public void publishFinalItemDecision(Long batchId, Long itemId, String decision, String comment,
-                                         Long reviewerUserId, LocalDateTime occurredAt) {
-        ContentReviewBatchDO batch = batchMapper.selectById(batchId);
-        ContentReviewBatchItemDO item = itemMapper.selectById(itemId);
-        if (batch == null || item == null) return;
-
-        Set<Long> operatorUserIds = resolveOperatorUserIds(batch);
-        Set<Long> directorUserIds = resolveDirectorUserIds(batch);
-
-        publish("zsjos.content_review.final_item_decision", batchId,
-                "batch:" + batchId + ":item:" + itemId + ":final",
-                reviewerUserId, occurredAt,
-                Map.of(
-                        "batchNo", batch.getBatchNo(),
-                        "batchTitle", buildBatchTitle(batch),
-                        "itemTitle", "内容" + item.getSortNo(),
-                        "decision", decision,
-                        "comment", comment != null ? comment : "",
-                        "reviewerName", "终审",
-                        "operatorUserIds", operatorUserIds,
-                        "directorUserIds", directorUserIds
-                ));
-    }
-
-    public void publishFinalCompleted(Long batchId, Long reviewerUserId, LocalDateTime occurredAt) {
-        ContentReviewBatchDO batch = batchMapper.selectById(batchId);
-        if (batch == null) return;
-
-        Set<Long> operatorUserIds = resolveOperatorUserIds(batch);
-        Set<Long> directorUserIds = resolveDirectorUserIds(batch);
-
-        publish("zsjos.content_review.final_completed", batchId,
-                "batch:" + batchId + ":final_completed",
-                reviewerUserId, occurredAt,
-                Map.of(
-                        "batchNo", batch.getBatchNo(),
-                        "batchTitle", buildBatchTitle(batch),
-                        "itemCount", countItems(batchId),
-                        "reviewerName", "终审",
-                        "operatorUserIds", operatorUserIds,
-                        "directorUserIds", directorUserIds,
-                        "submitterUserId", batch.getCreator()
-                ));
-    }
-
-    public void publishFinalRejected(Long batchId, Long reviewerUserId, String reason, LocalDateTime occurredAt) {
-        ContentReviewBatchDO batch = batchMapper.selectById(batchId);
-        if (batch == null) return;
-
-        Set<Long> operatorUserIds = resolveOperatorUserIds(batch);
-        Set<Long> directorUserIds = resolveDirectorUserIds(batch);
-
-        publish("zsjos.content_review.final_rejected", batchId,
-                "batch:" + batchId + ":final_rejected",
-                reviewerUserId, occurredAt,
-                Map.of(
-                        "batchNo", batch.getBatchNo(),
-                        "batchTitle", buildBatchTitle(batch),
-                        "reason", reason != null ? reason : "",
-                        "reviewerName", "终审",
-                        "operatorUserIds", operatorUserIds,
-                        "directorUserIds", directorUserIds,
-                        "submitterUserId", batch.getCreator()
-                ));
+    @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
+    public void publishNodeResult(NodeResult result) {
+        TenantUtils.execute(result.tenantId(), () -> {
+            ContentReviewBatchDO batch = batchMapper.selectById(result.batchId());
+            if (batch == null || !Objects.equals(batch.getProcessInstanceId(), result.processInstanceId())) {
+                throw new IllegalStateException("Content approval notification round changed");
+            }
+            List<ContentReviewBatchItemDO> items = itemMapper.selectByBatchId(batch.getId());
+            boolean director = STAGE_DIRECTOR.equals(result.stage());
+            long returnedCount = items.stream().filter(item -> DECISION_RETURNED.equals(
+                    director ? item.getDirectorDecision() : item.getFinalDecision())).count();
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("batchNo", batch.getBatchNo());
+            payload.put("batchTitle", buildBatchTitle(batch));
+            payload.put("itemCount", items.size());
+            payload.put("returnedCount", returnedCount);
+            payload.put("reviewerName", director ? "编导" : "终审");
+            payload.put("reviewStage", result.stage());
+            payload.put("decision", result.approved() ? DECISION_APPROVED : DECISION_RETURNED);
+            payload.put("nextStatus", result.approved() ? director ? "待终审" : "待发布" : "已退回修改");
+            payload.put("reason", result.reason() == null ? "" : result.reason());
+            payload.put("operatorUserIds", resolveOperatorUserIds(batch));
+            payload.put("directorUserIds", resolveDirectorUserIds(batch));
+            payload.put("submitterUserId", batch.getCreator());
+            if (director && result.approved()) payload.put("finalReviewerUserIds", resolveFinalReviewerUserIds(batch));
+            payload.put("deepLink", "/zsjos/material-library/content-review?batchId=" + batch.getId());
+            String scene = "zsjos.content_review." + (director ? "director" : "final")
+                    + (result.approved() ? "_completed" : "_rejected");
+            publish(scene, batch.getId(), "content-review:" + batch.getId() + ":"
+                    + result.processInstanceId() + ":" + result.taskId() + ":result",
+                    result.reviewerUserId(), result.occurredAt(), payload);
+        });
     }
 
     public void publishReviewTimeout(ContentReviewBatchDO batch,

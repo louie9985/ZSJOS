@@ -51,12 +51,34 @@ with sync_playwright() as p:
         expect(cards.get_by_text('Published account', exact=True)).to_be_visible()
         for tab in ['收藏', '我的素材', '全部']:
             page.get_by_role('tab', name=tab, exact=True).click()
-            expect(cards).to_have_count(1)
+            expect(cards).to_have_count(4 if tab == '我的素材' else 1)
             page.wait_for_timeout(200)
             request = json.loads(page.locator('html').get_attribute('data-request'))
             assert bool(request.get('mine')) == (tab == '我的素材'), request
             assert bool(request.get('favorite')) == (tab == '收藏'), request
             assert 'versionStatus' not in request
+            if tab == '我的素材':
+                assert page.locator('html').get_attribute('data-list-url') == '/zsjos/material/page'
+                expect(cards.get_by_text('Personal DRAFT', exact=True)).to_be_visible()
+                expect(cards.get_by_text('Personal IN_APPROVAL', exact=True)).to_be_visible()
+                expect(cards.get_by_text('审核人：Fixture reviewer', exact=True)).to_be_visible()
+                page.screenshot(path=str(artifact_dir / f'mine-statuses-{width}.png'))
+                cards.first.locator('.material-library-title').click()
+                expect(page.locator('.ant-drawer-body').get_by_text('Personal DRAFT', exact=True)).to_be_visible()
+                assert page.locator('html').get_attribute('data-detail-request') == '/zsjos/material/1'
+                page.keyboard.press('Escape')
+                page.get_by_role('combobox', name='审核状态').click()
+                page.locator('.ant-select-item-option').filter(has_text='待审核／审批中').click()
+                expect(cards).to_have_count(1)
+                cards.first.locator('.material-library-title').click()
+                expect(page.locator('.material-layout-summary')).to_contain_text('Fixture reviewer')
+                assert page.locator('html').get_attribute('data-detail-request') == '/zsjos/material/2'
+                page.locator('.material-layout-summary-actions button').click()
+                page.wait_for_function("document.documentElement.dataset.historyRequest === '/zsjos/material/2/version/list'")
+                page.keyboard.press('Escape')
+                page.keyboard.press('Escape')
+            else:
+                assert page.locator('html').get_attribute('data-list-url') == '/zsjos/material/browse/page'
         for name in ['创建爆款账号', '创建爆款内容', '继续编辑', '修改并重新送审', '撤回审批', '通过审批']:
             expect(page.get_by_role('button', name=name, exact=True)).to_have_count(0)
         expect(page.get_by_role('combobox', name='审核状态')).to_have_count(0)
@@ -93,4 +115,4 @@ with sync_playwright() as p:
         page.screenshot(path=str(artifact_dir / f'compact-grid-{width}.png'))
     assert not errors, errors
     browser.close()
-print('PASS effective-only browse UI, tabs, published detail/history, no management actions, denied/retry at 1440/390')
+print('PASS mine draft/review states, personal details/history/filter; all/favorite effective only; layout, denied/retry at 1440/390')

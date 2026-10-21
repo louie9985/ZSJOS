@@ -673,6 +673,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             ServiceRelationDO relation = new ServiceRelationDO();
             relation.setPersonId(order.getPersonId()); relation.setOrderId(order.getId()); relation.setOrderItemId(orderItem.getId());
             relation.setRegistrationCaseId(caseId); relation.setStatus("active");
+            relation.setStudentNameSnapshot(cn.hutool.core.util.StrUtil.trimToNull(order.getStudentName()));
+            relation.setStudentNameSource("order_creation");
             relation.setOwnerUserId(classMode ? assignment.ownerUserId() : plannerId);
             relation.setClassId(classMode ? assignment.deliveryClass().getId() : pendingClass.getId());
             relation.setAcceptanceStatus("pending"); relation.setServiceSnapshot(orderItem.getProductSnapshot());

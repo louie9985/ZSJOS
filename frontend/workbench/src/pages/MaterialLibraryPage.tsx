@@ -12,6 +12,7 @@ import {
   LikeFilled,
   LikeOutlined,
   LinkOutlined,
+  MoreOutlined,
   ReloadOutlined,
   SearchOutlined
 } from '@ant-design/icons'
@@ -22,6 +23,7 @@ import {
   Checkbox,
   Descriptions,
   Drawer,
+  Dropdown,
   Empty,
   Image,
   Input,
@@ -39,8 +41,9 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DateTimeText from '../components/DateTimeText'
-import { STORAGE_KEYS } from '../constants'
+import { DICT_TYPE, STORAGE_KEYS } from '../constants'
 import SafeRichText from '../components/SafeRichText'
+import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
 import ViralAccountMaterialForm from '../components/ViralAccountMaterialForm'
 import ViralContentMaterialForm from '../components/ViralContentMaterialForm'
 import { api, ApiError, type DictData } from '../services/api'
@@ -424,6 +427,10 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setSearchRevision(current => current + 1)
   }
   const [materialTypeId, setMaterialTypeId] = useState<number>()
+  const [accountType, setAccountType] = useState<string>()
+  const [profession, setProfession] = useState<string>()
+  const [accountStage, setAccountStage] = useState<string>()
+  const [versionStatus, setVersionStatus] = useState<MaterialVersion['status']>()
   const [types, setTypes] = useState<MaterialType[]>([])
   const [rows, setRows] = useState<Material[]>([])
   const [selectedId, setSelectedId] = useState<number>()
@@ -465,7 +472,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   }, [])
 
   const loadDictionaries = useCallback(async () => {
-    const dictTypes = ['zsjos_account_platform', 'zsjos_viral_content_type', 'zsjos_persona_type', 'zsjos_material_profession', 'zsjos_media_account_stage', 'zsjos_media_account_primary_problem']
+    const dictTypes = ['zsjos_account_platform', 'zsjos_viral_content_type', DICT_TYPE.PERSONA_TYPE, DICT_TYPE.MATERIAL_PROFESSION, DICT_TYPE.MEDIA_ACCOUNT_STAGE, DICT_TYPE.MEDIA_ACCOUNT_PRIMARY_PROBLEM]
     setDictLoading(true)
     setDictError('')
     const results = await Promise.allSettled(dictTypes.map(dictType => api.dictDataByType(dictType)))
@@ -493,7 +500,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setDetailLoading(true)
     setDetailError('')
     try {
-      const result = await materialApi.browse(id)
+      const result = await (view === 'mine' ? materialApi.get(id) : materialApi.browse(id))
       if (requestId === detailRequestRef.current) setSelected(result)
     } catch (cause) {
       if (requestId !== detailRequestRef.current) return
@@ -502,7 +509,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     } finally {
       if (requestId === detailRequestRef.current) setDetailLoading(false)
     }
-  }, [])
+  }, [view])
 
   useEffect(() => {
     const materialId = Number(searchParams.get('materialId'))
@@ -514,14 +521,18 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setLoading(true)
     setError('')
     try {
-      const result = await materialApi.browsePage({
+      const result = await (view === 'mine' ? materialApi.page : materialApi.browsePage)({
         pageNo: targetPage,
         pageSize: PAGE_SIZE,
         keyword: keyword || undefined,
         materialTypeId,
+        accountType,
+        profession,
+        accountStage,
         favorite: view === 'favorite' || undefined,
         mine: view === 'mine' || undefined,
-        sortBy: view === 'all' || view === 'mine' ? 'createTime' : undefined
+        sortBy: view === 'all' || view === 'mine' ? 'createTime' : undefined,
+        versionStatus: view === 'mine' ? versionStatus : undefined
       })
       if (requestId !== listRequestRef.current) return
       setRows(targetPage === 1 ? result.list : current => [...current, ...result.list.filter(item => !current.some(existing => existing.id === item.id))])
@@ -537,7 +548,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     } finally {
       if (requestId === listRequestRef.current) setLoading(false)
     }
-  }, [keyword, loadDetail, materialTypeId, view, searchRevision])
+  }, [keyword, loadDetail, materialTypeId, accountType, profession, accountStage, view, versionStatus, searchRevision])
 
   useEffect(() => { setRows([]); setHasMore(false); void load(1) }, [load])
   useEffect(() => {
@@ -578,7 +589,7 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     setVersions([])
     setVersionsLoading(true)
     setVersionsError('')
-    try { setVersions(await materialApi.browseVersions(selected.id)) }
+    try { setVersions(await (view === 'mine' ? materialApi.versions(selected.id) : materialApi.browseVersions(selected.id))) }
     catch (cause) { setVersionsError(errorText(cause)) }
     finally { setVersionsLoading(false) }
   }
@@ -599,24 +610,47 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   return <section className={`workspace-page material-library-page material-library-${layoutMode}${view === 'mine' ? ' material-library-mine' : ''}`}>
     <header className="material-library-filter-shell">
       <div className="material-library-toolbar">
-        <Tabs className="material-library-view-tabs" activeKey={view} onChange={key => setView(key as ViewKey)} items={[
+        <Tabs className="material-library-view-tabs" activeKey={view} onChange={key => {
+          detailRequestRef.current += 1
+          setSelected(undefined); setSelectedId(undefined); setFormOpen(false)
+          setVersionsOpen(false); setVersions([])
+          setView(key as ViewKey)
+        }} items={[
           { key: 'all', label: '全部' },
           { key: 'favorite', label: '收藏' },
           { key: 'mine', label: '我的素材' }
         ]} />
         <Input.Search className="material-library-search" allowClear value={keywordInput} onChange={event => setKeywordInput(event.target.value)}
-          onSearch={searchMaterials} placeholder="搜索素材编号、标题、摘要或可检索字段" aria-label="搜索素材" />
+          onSearch={searchMaterials} placeholder="搜索素材" aria-label="搜索素材" title="搜索素材编号、标题、摘要或可检索字段" />
+        {[
+          { label: '适配账号类型', dictType: DICT_TYPE.PERSONA_TYPE, value: accountType, onChange: setAccountType },
+          { label: '适配业务定位', dictType: DICT_TYPE.MATERIAL_PROFESSION, value: profession, onChange: setProfession },
+          { label: '适配账号期段', dictType: DICT_TYPE.MEDIA_ACCOUNT_STAGE, value: accountStage, onChange: setAccountStage }
+        ].map(filter => <Select key={filter.dictType} className="material-library-adaptation-select" aria-label={filter.label}
+          allowClear showSearch={{ optionFilterProp: 'label' }} placeholder={filter.label} value={filter.value} onChange={filter.onChange}
+          loading={dictLoading} disabled={dictLoading || !dicts[filter.dictType]}
+          options={dicts[filter.dictType] || []} classNames={{ popup: { root: 'material-library-filter-options' } }}
+          labelRender={({ label }) => <span className="material-library-filter-label">{label}</span>} />)}
         <Select className="material-library-select" allowClear placeholder="素材类型" value={materialTypeId} onChange={setMaterialTypeId}
           loading={metadataLoading} disabled={metadataLoading || Boolean(metadataError)}
           options={types.map(type => ({ value: type.id, label: type.name }))} />
-        <Tooltip title="刷新"><Button aria-label="刷新素材" className="material-library-refresh" icon={<ReloadOutlined />} onClick={() => void load(1, selectedId)} /></Tooltip>
         <Segmented<LayoutMode> className="material-library-layout-switch" aria-label="素材布局" value={layoutMode} onChange={changeLayout}
           options={[
             { value: 'large', label: <span title="大图布局" aria-label="大图布局"><AppstoreOutlined /><span className="material-layout-label">大图</span></span> },
             { value: 'compact', label: <span title="紧凑布局" aria-label="紧凑布局"><BarsOutlined /><span className="material-layout-label">紧凑</span></span> }
           ]} />
+        <Dropdown trigger={['click']} menu={{ items: [
+          { key: 'clear', label: '清空适配筛选', disabled: !accountType && !profession && !accountStage,
+            onClick: () => { setAccountType(undefined); setProfession(undefined); setAccountStage(undefined) } },
+          { key: 'refresh', label: '刷新素材', icon: <ReloadOutlined />, onClick: () => void load(1, selectedId) }
+        ] }}><Button aria-label="更多素材操作" className="material-library-actions" icon={<MoreOutlined />} /></Dropdown>
       </div>
     </header>
+    {view === 'mine' && <div className="material-mine-filters">
+      <Select aria-label="审核状态" allowClear placeholder="全部审核状态" value={versionStatus} onChange={setVersionStatus}
+        options={(['DRAFT', 'IN_APPROVAL', 'EFFECTIVE', 'REJECTED'] as const).map(value => ({ value, label: statusLabel[value] }))} />
+      <Typography.Text type="secondary">按当前修订版本筛选；新版本审核期间，旧生效版本仍可浏览。</Typography.Text>
+    </div>}
     {metadataError && <Alert type="error" showIcon message={`素材类型加载失败：${metadataError}`}
       action={<Button size="small" onClick={() => void loadMetadata()}>重试</Button>} />}
     {dictError && <Alert type="error" showIcon message={dictError}
@@ -637,6 +671,9 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
                   </span>
                 <span>{item.materialTypeName} · {item.materialNo}</span>
                 {view === 'mine' ? <>
+                  <span>审核人：{item.currentVersion?.status === 'IN_APPROVAL' ? item.currentVersion.pendingApproverNames?.join('、') || '等待流程分配' : '—'}</span>
+                  {item.currentVersion?.submittedAt && <span>最近提交：<DateTimeText value={item.currentVersion.submittedAt} /></span>}
+                  {item.currentVersion?.rejectionReason && <span>驳回原因：{item.currentVersion.rejectionReason}</span>}
                   {item.currentVersion?.effectiveAt && <span>生效时间：<DateTimeText value={item.currentVersion.effectiveAt} /></span>}
                 </> : <span><LikeOutlined /> {item.likeCount}　<LinkOutlined /> {item.referenceCount}</span>}
                 <MaterialSearchContent material={item} keyword={keyword} onSearch={searchMaterials}
@@ -668,11 +705,18 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
         : <>
       {selected && <div className="material-layout-summary">
         <div className="material-layout-summary-info"><Tag>{statusLabel[currentVersion?.status || selected.status]}</Tag><span>负责人：{selected.ownerName || '未记录'}</span><span>当前版本：V{currentVersion?.versionNo || '-'}</span>
+          {view === 'mine' && currentVersion?.status === 'IN_APPROVAL' && <span>审核人：{currentVersion.pendingApproverNames?.join('、') || '等待流程分配'}</span>}
+          {view === 'mine' && currentVersion?.rejectionReason && <span>驳回原因：{currentVersion.rejectionReason}</span>}
+          {view === 'mine' && selected.currentEffectiveVersionId && selected.currentDraftVersionId && <span>旧生效版本继续可用</span>}
         </div>
         <div className="material-layout-summary-actions">
           <Button icon={<HistoryOutlined />} onClick={() => void openVersions()}>版本记录</Button>
         </div>
       </div>}
+      {view === 'mine' && currentVersion?.status === 'IN_APPROVAL' && currentVersion.processInstanceId
+        && hasPermission(permissions, 'bpm:process-instance:query') && <BpmProcessPanel
+          compact decisionOnly allowDecision={false} canUpdate={false} users={[]}
+          processInstanceId={currentVersion.processInstanceId} />}
       {displayedTypeCode === 'viral_content'
         ? viralContentType && <ViralContentMaterialForm key={selected?.id} mode="view" type={viralContentType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />

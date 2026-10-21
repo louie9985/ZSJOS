@@ -74,9 +74,11 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                     + "AND f.user_id={0} AND f.active=b'1' AND f.tenant_id=zsjos_material.tenant_id "
                     + "AND f.deleted=b'0')", userId);
         }
-        appendDimension(query, "account_type", req.getAccountType(), req.getRecommendation());
-        appendDimension(query, "profession", req.getProfession(), req.getRecommendation());
-        appendDimension(query, "account_stage", req.getAccountStage(), req.getRecommendation());
+        // Personal browsing displays the current revision; public browsing and recommendations use the publication.
+        boolean currentRevision = !browse && Boolean.TRUE.equals(req.getMine()) && !Boolean.TRUE.equals(req.getRecommendation());
+        appendDimension(query, "account_type", req.getAccountType(), req.getRecommendation(), currentRevision);
+        appendDimension(query, "profession", req.getProfession(), req.getRecommendation(), currentRevision);
+        appendDimension(query, "account_stage", req.getAccountStage(), req.getRecommendation(), currentRevision);
         if(req.getPlatform()!=null && !req.getPlatform().isBlank()) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_material_version pv WHERE pv.id=zsjos_material.current_effective_version_id "
                     + "AND pv.tenant_id=zsjos_material.tenant_id AND pv.deleted=b'0' "
@@ -201,17 +203,20 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
     }
 
     private static void appendDimension(LambdaQueryWrapperX<MaterialDO> query, String key, String value,
-                                        Boolean recommendation) {
+                                        Boolean recommendation, boolean currentRevision) {
         if (!Boolean.TRUE.equals(recommendation) && (value == null || value.isBlank())) {
             return;
         }
+        String versionId = currentRevision
+                ? "COALESCE(zsjos_material.current_draft_version_id,zsjos_material.current_effective_version_id)"
+                : "zsjos_material.current_effective_version_id";
         if (value == null || value.isBlank()) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_material_dimension d WHERE "
-                    + "d.material_version_id=zsjos_material.current_effective_version_id "
+                    + "d.material_version_id=" + versionId + " AND d.tenant_id=zsjos_material.tenant_id "
                     + "AND d.dimension_key={0} AND d.unlimited=b'1' AND d.deleted=b'0')", key);
         } else {
             query.apply("EXISTS (SELECT 1 FROM zsjos_material_dimension d WHERE "
-                    + "d.material_version_id=zsjos_material.current_effective_version_id "
+                    + "d.material_version_id=" + versionId + " AND d.tenant_id=zsjos_material.tenant_id "
                     + "AND d.dimension_key={0} AND (d.dimension_value={1} OR d.unlimited=b'1') AND d.deleted=b'0')", key, value);
         }
     }

@@ -67,7 +67,7 @@ class DeliveryClassServiceImplTest {
         assertEquals(0L, service.getMyPage(9L, request).getTotal());
     }
 
-    @Test void classStudentNameComesFromCurrentOrder() {
+    @Test void classStudentNameSurvivesOrderUnlink() {
         var personMapper = mock(cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper.class);
         var orderMapper = mock(cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper.class);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "personMapper", personMapper);
@@ -75,13 +75,13 @@ class DeliveryClassServiceImplTest {
         var person = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO(); person.setName("主档姓名");
         var order = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO(); order.setStudentName("订单姓名");
         var relation = new ServiceRelationDO(); relation.setId(1L); relation.setPersonId(2L); relation.setOrderId(3L);
-        when(personMapper.selectById(2L)).thenReturn(person); when(orderMapper.selectById(3L)).thenReturn(order);
+        when(personMapper.selectById(2L)).thenReturn(person); relation.setStudentNameSnapshot("订单姓名");
         cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassStudentRespVO row =
                 org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "student", relation);
         assertEquals("订单姓名", row.getStudentName());
         relation.setOrderId(null);
         row = org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "student", relation);
-        org.junit.jupiter.api.Assertions.assertNull(row.getStudentName());
+        assertEquals("订单姓名", row.getStudentName());
     }
 
     @BeforeEach

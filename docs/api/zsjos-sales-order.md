@@ -191,6 +191,8 @@ Vue Admin 的 `ExternalRepurchaseDialog.vue` 直接调用外部复购订单接�
 
 提交和补正的 `giftItems` 仍为编码数组，例如 `["gift-code"]`。省略、`null`、`[]` 均表示无礼品；清空选择显式发送 `[]`。JSON 字符串不能替代数组，类型或格式错误返回参数错误，不回显原始请求值。
 
+Workbench 共用订单录入表单（首购、复购和补正）选择礼品后，“礼品邮寄地址”显示必填星号；空地址或纯空白地址在字段处提示“选择礼品后请填写邮寄地址”。清空全部礼品后取消必填，既有提交校验及服务端地址校验保持生效。
+
 订单列表、详情新增 `giftItemCodes: string[]`、`giftItemSnapshots: {code,name?,path?,snapshotAt?}[]` 和 `giftItemsInvalid: boolean`；原 `giftItems` 字符串兼容保留。礼品采购响应保留 `giftItemsJson` 并新增 `giftItemSnapshots`、`giftItemsInvalid`。损坏历史返回无效标志，编码/快照不可作为可提交的空选择；Workbench 和 Admin 均阻止补正并提示核对，Admin 礼品采购展示“历史礼品信息无法读取”。
 
 统一读取对象数组 JSON 与旧版“JSON 快照字符串数组”；新写入为对象数组 JSON，数据库列不变。历史缺失名称、路径、时间不从当前目录补造，显示名称未记录。Workbench 以编码回填、快照展示，并核对两者一致；旧服务响应可从兼容字段提取编码。Admin 礼品采购使用相同历史语义，不展示原始 JSON。

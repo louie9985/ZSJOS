@@ -1,0 +1,26 @@
+# Workstream local-material-adaptation-filters-20261021
+
+- Environment: local; ZSJOS_AGENT_ENV unset, /etc/zsjos/agent-environment absent.
+- Owner: Codex /root; branch: main; worktree: D:/ZSJ-OS; base: b1ecfffc9f2e19fa4d58d455cb4e4c3e7c033f11.
+- Goal: implement confirmed single-row material browse toolbar with shortened search and three dictionary-backed adaptation filters; show complete field and selection labels; personal filtering follows the displayed revision.
+- Non-goals: database/schema/data/role changes, new dependencies, service operations, branch/worktree operations, commits or publishing.
+- Ownership: this record; frontend/workbench/src/pages/MaterialLibraryPage.tsx; frontend/workbench/src/styles/pages/material-library.css; frontend/workbench/test/material-browse-search.tsx; new frontend/workbench/test/material-adaptation-filters-browser.py; backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/material/MaterialMapper.java; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/material/MaterialPersonalFilterTest.java; docs/api/material-library.md. Isolated verification artifacts under frontend/workbench/tmp/material-adaptation-filters/.
+- Existing changes: preserve the delivered 2026-10-21 personal-view restoration in page, fixture and API docs; its handoff explicitly releases ownership. Other concurrent student work remains untouched. No write to shared handoff/main.md.
+- Dependencies: existing System dictionary API, material dimension/version storage and browse/personal endpoints; tenant 1. Admin consumer retains existing optional API contract; inspect and verify unchanged no-filter behavior.
+- Verification: focused mapper and browse tests; frontend typecheck and material tests; isolated bundled real-browser fixture at desktop/mobile widths, full-label geometry, filter combination/reset/tab/pagination, errors and retry. No shared dev service. Target branch/integration order: None.
+
+## Delivery
+
+- Implemented the confirmed desktop single-row toolbar: shortened search, three searchable/clearable dictionary selects, existing material type and layout toggle, and a more-actions menu for adaptation reset/refresh. Field names have fixed minimum space; long dictionary selections and dropdown options wrap in full. Narrow desktop containers scroll locally rather than compressing labels; mobile controls wrap without page overflow.
+- Requests carry accountType/profession/accountStage through filter changes, tab switches and pagination. Dictionary failures remain disabled with retry. Personal filtering uses the current revision, falling back to the effective version; public browse/recommendation still use effective versions. Existing tenant/deletion/ownership/favorite boundaries remain; dimension subqueries now explicitly correlate tenant IDs.
+- Preserved the already-delivered personal-view changes and unrelated concurrent work. Updated API documentation. Admin inspection: MaterialPageParams and material/index.vue do not pass adaptation filters; focused backend tests cover the unchanged absent-filter contract for both normal and personal management queries.
+- Verification: Workbench typecheck passed; 26 focused Vitest tests passed; isolated javac compilation and JUnit execution passed 15 tests across MaterialPersonalFilterTest, MaterialBrowseVisibilityTest, MaterialUploadSortTest. A pre-existing concurrent Maven process was detected, so verification copied compiled dependencies into this task's own output directory and compiled the changed mapper/current tests there, without modifying shared Maven outputs.
+- Chrome synthetic-transport checks passed at 1440/1280/1024/390/320: single-row desktop geometry, complete placeholders and long selections, combined filters, retained tab state, empty/reset, pagination and dictionary retry. Existing 1440/390 browse regression passed personal statuses/detail/history, published-only all/favorite, layout persistence and denied/retry. Screenshots and isolated verification outputs: frontend/workbench/tmp/material-adaptation-filters/. Scoped diff and UTF-8 checks passed.
+- Limits: no live-account/API/database acceptance, full server build, deployment or restart. No SQL, grants, dependencies, commits or publishing. Both frontend and backend must be deployed for complete personal-revision behavior. Ownership released.
+
+## Follow-up registration: fill toolbar width
+
+- Same environment, owner, branch and worktree. User correction: search must grow into all remaining toolbar space instead of stopping at 200px.
+- Reacquired ownership only of this record, material-library.css, directly affected API documentation and isolated verification artifacts. Verification: real-browser toolbar right-edge/search-width measurements at desktop widths, mobile/full-label checks and scoped diff review; no business logic change.
+
+- Delivered: removed the search max-width cap; flex growth fills remaining space while fixed filter widths remain intact. Chrome measured search widths of 225/385/865px at 1280/1440/1920, each with zero unused space after the last toolbar control; 390px mobile layout remains within viewport. Screenshot visually inspected at 1440. Updated API layout description; no additional runtime tests/build required for this one-property layout correction. Ownership released.

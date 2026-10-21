@@ -29,13 +29,13 @@ class StudentServiceReadServiceTest {
     @Mock StudentServiceSummaryReader summaryReader;
     @BeforeEach void before(){TenantContextHolder.setTenantId(1L);}
     @AfterEach void after(){TenantContextHolder.clear();}
-    @Test void nameKeywordAndSortUseCurrentOrder() {
+    @Test void nameKeywordAndSortUseServiceSnapshot() {
         var req = new StudentServicePageReqVO(); req.setKeyword("订单姓名"); req.setSortField("name"); req.setSortOrder("ascend");
         var q = service.query(7L, req);
-        assertTrue(q.getWhereSql().contains("ro.student_name LIKE"));
+        assertTrue(q.getWhereSql().contains("sr.student_name_snapshot LIKE"));
         assertFalse(q.getWhereSql().contains("p.name LIKE"));
         assertEquals("%订单姓名%", q.getParameters().get("keyword"));
-        assertTrue(StudentServicePageSql.page(Map.of("query", q)).contains("ORDER BY ro.student_name ASC"));
+        assertTrue(StudentServicePageSql.page(Map.of("query", q)).contains("ORDER BY sr.student_name_snapshot ASC"));
     }
     @Test void twoCoursesOfSamePersonRemainTwoRowsAndDatabaseTotal(){
         var a=new ServiceRelationDO();a.setId(11L);a.setPersonId(9L);

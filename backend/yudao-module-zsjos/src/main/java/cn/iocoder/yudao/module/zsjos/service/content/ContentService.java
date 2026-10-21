@@ -164,7 +164,9 @@ public class ContentService {
                 || mapper.applyBatchReview(content.getId(), expectedVersion, approved) != 1) {
             throw exception(CONTENT_VERSION_CONFLICT);
         }
-        publishTransitionEvents(content, CONTENT_ACCEPTANCE, target, reason, reviewerUserId, expectedVersion);
+        // Batch approvals notify once per node; retain the per-content audit transition only.
+        workflowEventService.transition(BIZ_TYPE_CONTENT, content.getId(), reviewerUserId,
+                CONTENT_ACCEPTANCE, target, reason, "content:" + content.getId() + ":" + expectedVersion + ":" + target);
     }
 
     public void registerPublished(ContentDO content, Integer expectedVersion, String url,

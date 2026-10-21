@@ -307,6 +307,35 @@ describe('notify message business actions', () => {
     await executeNotifyMessageAction(message({ bizType: 'content_review', bizId: 41 }), { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() })
     expect(navigate).toHaveBeenCalledWith('/zsjos/material-library/content-review?batchId=41')
   })
+  it.each([403, 1900020030, 404, 1900020021])('distinguishes inaccessible content approval %s', async code => {
+    vi.spyOn(contentReviewApi, 'get').mockRejectedValue(new ApiError(code, 'server reason'))
+    const navigate = vi.fn(), warn = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'content_review', bizId: 41 }), { navigate, warn, refreshUnreadCount: vi.fn() })
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining([403, 1900020030].includes(code) ? '无权查看' : '不存在或已失效'))
+    expect(navigate).toHaveBeenCalledWith(expect.stringContaining('messageId=11'))
+  })
+  it('ignores a slower earlier message target after a newer click', async () => {
+    let finish: (value: Awaited<ReturnType<typeof contentReviewApi.get>>) => void = () => {}
+    vi.spyOn(contentReviewApi, 'get')
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+      .mockResolvedValueOnce({ id: 42 } as never)
+    const navigate = vi.fn(), deps = { navigate, warn: vi.fn(), refreshUnreadCount: vi.fn() }
+    const earlier = executeNotifyMessageAction(message({ bizType: 'content_review', bizId: 41 }), deps)
+    await vi.waitFor(() => expect(contentReviewApi.get).toHaveBeenCalledWith(41))
+    await executeNotifyMessageAction(message({ bizType: 'content_review', bizId: 42 }), deps)
+    finish({ id: 41 } as never)
+    await earlier
+    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(navigate).toHaveBeenCalledWith('/zsjos/material-library/content-review?batchId=42')
+  })
+  it('keeps the exact batch retryable on temporary failure even when read-status synchronization fails', async () => {
+    vi.spyOn(api, 'markNotifyMessagesRead').mockRejectedValue(new Error('read sync failed'))
+    vi.spyOn(contentReviewApi, 'get').mockRejectedValue(new ApiError(503, 'unavailable'))
+    const navigate = vi.fn(), warn = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'content_review', bizId: 41, readStatus: false }), { navigate, warn, refreshUnreadCount: vi.fn() })
+    expect(warn).toHaveBeenCalledWith('消息已打开，但已读状态同步失败')
+    expect(navigate).toHaveBeenCalledWith('/zsjos/material-library/content-review?batchId=41')
+  })
   it.each(['media_account_diagnosis', 'student_delivery_stage'])('resolves %s through authorized server target', async bizType => {
     vi.spyOn(api.mediaStudents, 'target').mockResolvedValue({ personId: 29, targetTab: 'accounts', recordId: 7 })
     const navigate = vi.fn()

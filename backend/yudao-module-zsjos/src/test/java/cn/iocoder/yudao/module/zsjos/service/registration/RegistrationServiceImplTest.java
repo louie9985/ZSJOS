@@ -363,6 +363,7 @@ class RegistrationServiceImplTest {
     void completeCreatesEveryServiceAndPublishesOneStudentNotification() {
         RegistrationCaseDO registrationCase = editableCase();
         SalesOrderDO order = new SalesOrderDO();
+        order.setStudentName(" 创建时学员姓名 ");
         order.setId(10L); order.setStatus(STATUS_EFFECTIVE); order.setPersonId(501L);
         RegistrationCaseChecklistItemDO item = new RegistrationCaseChecklistItemDO();
         item.setId(101L); item.setItemType("checkbox"); item.setChecked(true);
@@ -396,7 +397,12 @@ class RegistrationServiceImplTest {
             cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
         }
 
-        verify(serviceRelationMapper, times(2)).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO.class));
+        ArgumentCaptor<ServiceRelationDO> captured = ArgumentCaptor.forClass(ServiceRelationDO.class);
+        verify(serviceRelationMapper, times(2)).insert(captured.capture());
+        captured.getAllValues().forEach(relation -> {
+            assertEquals("创建时学员姓名", relation.getStudentNameSnapshot());
+            assertEquals("order_creation", relation.getStudentNameSource());
+        });
         verify(registrationNotifyPublisher, times(2)).publishPlannerAssigned(registrationCase, order, null, 30L, 501L, null);
     }
 

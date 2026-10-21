@@ -1,5 +1,25 @@
 # 内容审核通知模板配置
 
+## 当前节点结果模板（2026-10-21）
+
+以下表格是现行配置，后文保留作历史设计参考。默认模板升级来源为 V338__content_review_node_notifications.sql，System 占位符使用双大括号。
+
+| 场景后缀（前缀 zsjos.content_review.） | 标题 | 摘要 |
+| --- | --- | --- |
+| director_completed | 内容审批 · 编导审核通过 | 批次 {{batchNo}}，共 {{itemCount}} 条作品，编导已全部通过，待终审。 |
+| director_rejected | 内容审批 · 编导审核未通过 | 批次 {{batchNo}}，共 {{itemCount}} 条作品，其中 {{returnedCount}} 条未通过，已退回修改。 |
+| final_completed | 内容审批 · 终审通过 | 批次 {{batchNo}}，共 {{itemCount}} 条作品，已全部通过，待发布。 |
+| final_rejected | 内容审批 · 终审未通过 | 批次 {{batchNo}}，共 {{itemCount}} 条作品，其中 {{returnedCount}} 条未通过，已退回修改。 |
+
+正文在摘要后追加“请打开本轮内容审核查看逐条结论及意见。”；模板变量声明为 batchNo、itemCount、returnedCount。
+事件还提供 batchTitle、reviewStage（DIRECTOR/FINAL）、decision（APPROVED/RETURNED）、nextStatus、reason、reviewerName 和 deepLink。
+未通过数只统计当前节点真实 RETURNED 结论；接收人沿用服务端规则，同规则内多角色命中同一用户合并。
+消息使用 bizType=content_review、bizId=本轮批次 ID，工作台打开 `/zsjos/material-library/content-review?batchId=…`。
+提交待办与超时提醒保留；逐条场景保留供历史读取，新审批不再发布。批次同步不再发逐条内容验收消息。
+V338 仅升级未修改的 V269 默认模板（包括对应 _WECOM 模板），不覆盖管理员自定义模板，不修改规则和历史消息。
+
+## 历史设计示例
+
 本文件定义内容审核业务的通知场景和模板，供系统通知服务使用。
 
 ## 场景列表

@@ -630,7 +630,7 @@ public class StudentContactServiceImpl implements StudentContactService {
             context.put("registrationCaseId", relation.getRegistrationCaseId());
             context.put("orderNo", order == null ? "" : order.getOrderNo());
             context.put("leadNo", lead == null || lead.getLeadNo() == null ? "" : lead.getLeadNo());
-            context.put("studentName", order == null || order.getStudentName() == null ? "" : order.getStudentName());
+            context.put("studentName", relation.getStudentNameSnapshot() == null ? "" : relation.getStudentNameSnapshot());
             context.put("contentDirectorUserId", request.getUserId());
             studentContactNotifyPublisher.publish(
                     cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.NOTIFY_SCENE_DIRECTOR_ASSIGNED,
@@ -1313,10 +1313,9 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         collaborationNotify.send(MEDIA_STUDENT_COLLABORATOR_CHANGED, "student_service", selected.getId(), "", userId,
                 "operator-handover:" + selected.getPersonId() + ":" + request.getIdempotencyKey(), previousOperators, Map.of());
-        SalesOrderDO order = selected.getOrderId() == null ? null : orderMapper.selectById(selected.getOrderId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("operatorUserId", request.getUserId());
-        context.put("studentName", order == null || order.getStudentName() == null ? "" : order.getStudentName());
+        context.put("studentName", selected.getStudentNameSnapshot() == null ? "" : selected.getStudentNameSnapshot());
         studentContactNotifyPublisher.publish(NOTIFY_OPERATOR_ASSIGNED, selected.getId(),
                 "student-operator-assigned:" + selected.getPersonId() + ":" + request.getIdempotencyKey(),
                 null, LocalDateTime.now(), context);

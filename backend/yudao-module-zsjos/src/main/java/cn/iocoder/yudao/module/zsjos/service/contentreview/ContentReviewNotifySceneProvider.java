@@ -30,10 +30,10 @@ public class ContentReviewNotifySceneProvider implements NotifySceneProvider {
                 scene("zsjos.content_review.batch_submitted", "内容批次已提交", ROLE_DIRECTOR),
                 scene("zsjos.content_review.director_item_decision", "编导已审核内容", ROLE_OPERATOR),
                 scene("zsjos.content_review.director_completed", "编导审核通过", ROLE_OPERATOR, ROLE_FINAL_REVIEWER),
-                scene("zsjos.content_review.director_rejected", "编导审核驳回", ROLE_OPERATOR, ROLE_SUBMITTER),
+                scene("zsjos.content_review.director_rejected", "编导审核未通过", ROLE_OPERATOR, ROLE_SUBMITTER),
                 scene("zsjos.content_review.final_item_decision", "终审已审核内容", ROLE_OPERATOR, ROLE_DIRECTOR),
                 scene("zsjos.content_review.final_completed", "终审通过", ROLE_OPERATOR, ROLE_DIRECTOR, ROLE_SUBMITTER),
-                scene("zsjos.content_review.final_rejected", "终审驳回", ROLE_OPERATOR, ROLE_DIRECTOR, ROLE_SUBMITTER),
+                scene("zsjos.content_review.final_rejected", "终审未通过", ROLE_OPERATOR, ROLE_DIRECTOR, ROLE_SUBMITTER),
                 scene("zsjos.content_review.review_timeout_reminder", "审核超时提醒", ROLE_DIRECTOR, ROLE_FINAL_REVIEWER)
         );
     }
@@ -78,6 +78,9 @@ public class ContentReviewNotifySceneProvider implements NotifySceneProvider {
                         variable("batchTitle", "批次标题"),
                         variable("itemTitle", "内容标题"),
                         variable("itemCount", "内容数量"),
+                        variable("returnedCount", "未通过作品数量"),
+                        variable("reviewStage", "审核节点"),
+                        variable("nextStatus", "后续状态"),
                         variable("decision", "审核结论"),
                         variable("comment", "审核意见"),
                         variable("reason", "驳回原因"),

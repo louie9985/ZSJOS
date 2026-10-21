@@ -1,7 +1,16 @@
 import dayjs from 'dayjs'
 import type { FormInstance } from 'antd'
-import { ApiError } from './api'
+import { ApiError, AuthenticationError } from './api'
 import { contentReviewApi, type ContentReviewBatch, type ContentReviewSelection } from './materialApi'
+
+export function contentReviewDetailError(error: unknown): string {
+  if (error instanceof AuthenticationError) return '登录状态已失效，请重新登录后打开该审批批次'
+  if (error instanceof ApiError) {
+    if ([403, 1900020030, 1900003013].includes(error.code)) return '当前账号无权查看该审批批次'
+    if ([404, 1900020021].includes(error.code)) return '关联审批批次不存在或已失效'
+  }
+  return '审批批次加载失败，请稍后重试'
+}
 
 export function httpsLinkError(value: unknown): string | undefined {
   if (value == null || String(value).trim() === '') return

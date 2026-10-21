@@ -281,6 +281,52 @@ class ContentReviewBatchServiceTest {
     }
 
     @Test
+    void savingEachItemKeepsDecisionsWithoutPublishingNotifications() {
+        for (boolean director : new boolean[]{true, false}) {
+            org.mockito.Mockito.reset(batchMapper, itemMapper, processTaskApi, notifyPublisher);
+            var batch = reviewBatch(director ? BATCH_DIRECTOR_REVIEW : BATCH_FINAL_REVIEW,
+                    director ? STAGE_DIRECTOR : STAGE_FINAL);
+            when(batchMapper.selectByIdForUpdate(50L, TENANT_ID)).thenReturn(batch);
+            when(processTaskApi.getTodoTask(OPERATOR_ID, "task-1")).thenReturn(new BpmTaskRespDTO()
+                    .setProcessInstanceId("process-1").setBusinessKey(batch.getBusinessKey())
+                    .setProcessDefinitionKey("content-review").setTaskDefinitionKey(director ? "director" : "final"));
+            var item = reviewItem(1L, DECISION_APPROVED, null, false);
+            when(itemMapper.selectByIdForUpdate(1L, TENANT_ID)).thenReturn(item);
+            var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewDecisionReqVO();
+            request.setDecision(DECISION_APPROVED); request.setExpectedVersion(0); request.setTaskId("task-1");
+            if (director) {
+                when(itemMapper.updateDirectorDecision(eq(1L), eq(50L), eq(0), eq(DECISION_APPROVED),
+                        eq(null), eq(OPERATOR_ID), any())).thenReturn(1);
+                service.saveDirectorDecision(50L, 1L, request, OPERATOR_ID);
+            } else {
+                when(itemMapper.updateFinalDecision(eq(1L), eq(50L), eq(0), eq(DECISION_APPROVED),
+                        eq(null), eq(false), eq(null), eq(OPERATOR_ID), any())).thenReturn(1);
+                service.saveFinalDecision(50L, 1L, request, OPERATOR_ID);
+            }
+            verifyNoInteractions(notifyPublisher);
+        }
+    }
+
+    @Test
+    void commonBpmValidationRegistersExactlyOneNodeResultForEveryOutcome() {
+        for (String stage : List.of(STAGE_DIRECTOR, STAGE_FINAL)) for (boolean approved : new boolean[]{true, false}) {
+            org.mockito.Mockito.reset(batchMapper, itemMapper, notifyPublisher);
+            boolean director = STAGE_DIRECTOR.equals(stage);
+            ContentReviewBatchDO batch = reviewBatch(director ? BATCH_DIRECTOR_REVIEW : BATCH_FINAL_REVIEW, stage);
+            mockLockedBatch(batch);
+            when(itemMapper.selectByBatchId(batch.getId())).thenReturn(List.of(
+                    reviewItem(1L, !director || approved ? DECISION_APPROVED : DECISION_RETURNED,
+                            approved ? DECISION_APPROVED : DECISION_RETURNED, false)));
+            if (director && approved) when(batchMapper.markDirectorCompleted(eq(batch), any())).thenReturn(1);
+            var context = taskContext(director ? "director" : "final", OPERATOR_ID);
+            context.setAction(approved ? ACTION_APPROVE : "REJECT");
+            service.validateTaskAction(context);
+            verify(notifyPublisher).deferNodeResult(batch, stage, context);
+            org.mockito.Mockito.verifyNoMoreInteractions(notifyPublisher);
+        }
+    }
+
+    @Test
     void directorCompletionRejectsMissingItemDecision() {
         ContentReviewBatchDO batch = reviewBatch(BATCH_DIRECTOR_REVIEW, STAGE_DIRECTOR);
         mockLockedBatch(batch);
@@ -294,6 +340,7 @@ class ContentReviewBatchServiceTest {
         assertEquals("第 2 件作品：请先保存本条编导审核结论", failure.getMessage());
 
         verify(batchMapper, never()).markDirectorCompleted(any(), any());
+        verifyNoInteractions(notifyPublisher);
     }
 
     /**

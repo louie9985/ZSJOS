@@ -20,6 +20,9 @@ public class ServiceRelationDO extends TenantBaseDO {
     /** Explicit collaboration-group boundary; legacy rows are backfilled by V218. */
     private Long collaborationGroupId;
     private Long personId;
+    /** Captured when the service is created; never resolved from mutable identity/order data on reads. */
+    private String studentNameSnapshot;
+    private String studentNameSource;
     /** Media relationships may exist without participating in teaching delivery. */
     private Boolean teachingDelivery;
     /** Historical enrollment can own a service without a sale; never create a placeholder order. */

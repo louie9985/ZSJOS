@@ -95,6 +95,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const transactionLocked = orderId ? revisionOrder?.transactionLocked !== false : Boolean(purchaseIntent?.paymentLocked)
 
   const items = Form.useWatch('items', form) || []
+  const giftItems = Form.useWatch('giftItems', form)
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
   const paymentLinkActionLabel = getPaymentLinkActionLabel(collectionMode, orderId, purchaseIntent)
@@ -368,7 +369,15 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           </Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">礼品</Divider>
-        <Row gutter={16}><Col xs={24} md={12}><Form.Item name="giftItems" label="礼品"><TreeSelect treeData={giftNodes} treeCheckable showCheckedStrategy={TreeSelect.SHOW_CHILD} multiple allowClear placeholder="请选择礼品" style={{ width: '100%' }} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col><Col xs={24} md={12}><Form.Item name="giftShippingAddress" label="礼品邮寄地址"><Input.TextArea rows={3} maxLength={1000} showCount placeholder="选择礼品后必填"/></Form.Item></Col></Row>
+        <Row gutter={16}>
+          <Col xs={24} md={12}><Form.Item name="giftItems" label="礼品"><TreeSelect treeData={giftNodes} treeCheckable showCheckedStrategy={TreeSelect.SHOW_CHILD} multiple allowClear placeholder="请选择礼品" style={{ width: '100%' }} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="giftShippingAddress" label="礼品邮寄地址" dependencies={['giftItems']}
+              rules={[{ required: Boolean(giftItems?.length), whitespace: Boolean(giftItems?.length), message: '选择礼品后请填写邮寄地址' }]}>
+              <Input.TextArea rows={3} maxLength={1000} showCount placeholder="选择礼品后必填"/>
+            </Form.Item>
+          </Col>
+        </Row>
         <Space wrap>{!orderId && <Button icon={<SaveOutlined/>} loading={draftSaving} onClick={() => void saveDraft(false)}>保存草稿</Button>}
           {paymentLinkActionLabel && <Button type="primary" icon={<LinkOutlined/>} loading={draftSaving} onClick={() => void saveDraft(true)}>{paymentLinkActionLabel}</Button>}
           <IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」审批` : `提交「${lead.submittedName}」的成交订单审批`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>

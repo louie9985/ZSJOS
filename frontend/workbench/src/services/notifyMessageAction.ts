@@ -1,6 +1,7 @@
 import { hrmEmployeeNotificationTarget } from './hrmNotification'
 import { POINTS_ROUTE, pointsApi } from './pointsRedemptionApi'
 import { contentReviewApi } from './materialApi'
+import { contentReviewDetailError } from './contentReviewErrors'
 import { workOrderApi } from './workOrderApi'
 import type { NavigateFunction } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
@@ -21,6 +22,7 @@ export type NotifyMessageActionDeps = {
 export type NotifyActionErrorKind = 'authentication' | 'forbidden' | 'missing' | 'temporary'
 
 const isPositiveId = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0
+let latestActionRequest = 0
 
 export const isNotifyLeadActionCandidate = (detail: NotifyMessage) =>
   detail.actionType === 'business_detail'
@@ -161,6 +163,7 @@ export async function resolveNotifyLeadAction(
 }
 
 export async function executeNotifyMessageAction(detail: NotifyMessage, deps: NotifyMessageActionDeps) {
+  const actionRequest = ++latestActionRequest
   await syncReadStatusBestEffort(detail, deps)
   if (detail.actionType === 'none') return
   if (detail.actionType !== 'business_detail') {
@@ -277,7 +280,10 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
   if (isPositiveId(detail.bizId) && ['content_review', 'work-order', 'work_task', 'work_plan'].includes(detail.bizType || '')) {
     try {
       if (detail.bizType === 'content_review') {
+        if (actionRequest !== latestActionRequest) return
         await contentReviewApi.get(detail.bizId)
+        // A slower earlier click must not replace a newer message's target.
+        if (actionRequest !== latestActionRequest) return
         deps.navigate(`${APP_ROUTES.CONTENT_REVIEW}?batchId=${detail.bizId}`)
       } else if (detail.bizType === 'work-order') {
         await workOrderApi.detail(detail.bizId)
@@ -289,9 +295,21 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
         await api.workPlan(detail.bizId)
         deps.navigate(`${APP_ROUTES.WORK_PLANS}?planId=${detail.bizId}`)
       }
-    } catch {
-      deps.warn('关联业务不可访问或暂时加载失败，已打开消息详情')
-      deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+    } catch (error) {
+      if (detail.bizType === 'content_review') {
+        if (actionRequest !== latestActionRequest) return
+        const reason = contentReviewDetailError(error)
+        if (reason === '审批批次加载失败，请稍后重试') {
+          // Keep the exact target available with the page's retry action on transient failure.
+          deps.navigate(`${APP_ROUTES.CONTENT_REVIEW}?batchId=${detail.bizId}`)
+        } else {
+          deps.warn(`${reason}，已打开消息详情`)
+          deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+        }
+      } else {
+        deps.warn('关联业务不可访问或暂时加载失败，已打开消息详情')
+        deps.navigate(`${APP_ROUTES.ALL_MESSAGES}?messageId=${detail.id}`)
+      }
     }
     return
   }

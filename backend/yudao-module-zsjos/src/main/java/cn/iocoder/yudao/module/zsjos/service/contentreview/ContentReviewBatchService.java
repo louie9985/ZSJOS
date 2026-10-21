@@ -683,9 +683,6 @@ public class ContentReviewBatchService {
             throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
         }
 
-        // 发送编导逐条决策通知
-        notifyPublisher.publishDirectorItemDecision(batchId, itemId, decision,
-                trimToNull(request.getComment()), userId, now);
     }
 
     @ZsjosPermission(bizType = "content-review-batch", bizId = "#batchId", action = "final-review")
@@ -709,9 +706,6 @@ public class ContentReviewBatchService {
             throw exception(CONTENT_REVIEW_VERSION_CONFLICT);
         }
 
-        // 发送终审逐条决策通知
-        notifyPublisher.publishFinalItemDecision(batchId, itemId, decision,
-                trimToNull(request.getComment()), userId, now);
     }
 
     @ZsjosPermission(bizType = "content-review-batch", bizId = "#batchId", action = "director-review")
@@ -735,14 +729,10 @@ public class ContentReviewBatchService {
             // 有退回内容，直接驳回整个批次，不进入终审
             processTaskApi.rejectTask(userId, new BpmTaskDecisionReqDTO()
                     .setTaskId(request.getTaskId()).setReason(request.getReason()));
-            // 发送编导驳回通知
-            notifyPublisher.publishDirectorRejected(batchId, userId, request.getReason(), LocalDateTime.now());
         } else {
             // 全部通过，进入终审环节
             processTaskApi.approveTask(userId, new BpmTaskDecisionReqDTO()
                     .setTaskId(request.getTaskId()).setReason(request.getReason()));
-            // 发送编导审核通过通知
-            notifyPublisher.publishDirectorCompleted(batchId, userId, LocalDateTime.now());
         }
     }
 
@@ -762,19 +752,14 @@ public class ContentReviewBatchService {
         boolean hasReturned = hasReturnedItem(items);
         requireBatchDecision(request.getDecision(), hasReturned);
 
-        LocalDateTime now = LocalDateTime.now();
         if (hasReturned) {
             // 有退回内容，驳回批次
             processTaskApi.rejectTask(userId, new BpmTaskDecisionReqDTO()
                     .setTaskId(request.getTaskId()).setReason(request.getReason()));
-            // 发送终审驳回通知
-            notifyPublisher.publishFinalRejected(batchId, userId, request.getReason(), now);
         } else {
             // 全部通过
             processTaskApi.approveTask(userId, new BpmTaskDecisionReqDTO()
                     .setTaskId(request.getTaskId()).setReason(request.getReason()));
-            // 发送终审通过通知
-            notifyPublisher.publishFinalCompleted(batchId, userId, now);
         }
     }
 
@@ -819,6 +804,7 @@ public class ContentReviewBatchService {
             } else {
                 throw exception(CONTENT_TASK_CHANGED);
             }
+            notifyPublisher.deferNodeResult(batch, STAGE_DIRECTOR, context);
             return;
         }
         if (BATCH_FINAL_REVIEW.equals(batch.getStatus()) && STAGE_FINAL.equals(batch.getCurrentStage())
@@ -833,6 +819,7 @@ public class ContentReviewBatchService {
             if (!returned) for (ContentReviewBatchItemDO item : items) {
                 if (Boolean.TRUE.equals(item.getCollectMaterial())) readPreparedCollection(batch, item);
             }
+            notifyPublisher.deferNodeResult(batch, STAGE_FINAL, context);
             return;
         }
         throw exception(CONTENT_TASK_CHANGED);

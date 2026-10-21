@@ -1,4 +1,4 @@
-import { locateContentError, contentSaveError, contentResultUncertain, type ContentSavePhase } from '../services/contentReviewErrors'
+import { locateContentError, contentSaveError, contentResultUncertain, contentReviewDetailError, type ContentSavePhase } from '../services/contentReviewErrors'
 import { useContentReviewSubmit } from '../components/ContentReviewReviewerSelect'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
 import ContentReviewWorkDetail from '../components/ContentReviewWorkDetail'
@@ -41,7 +41,7 @@ import {
   Typography
 } from 'antd'
 import dayjs from 'dayjs'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DateTimeText from '../components/DateTimeText'
 import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
@@ -335,22 +335,37 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   }, [])
 
   const location = useLocation()
-  const linkedBatchId = Number(new URLSearchParams(location.search).get('batchId')) || undefined
+  const navigate = useNavigate()
+  const linkedBatchValue = new URLSearchParams(location.search).get('batchId')
+  const linkedBatchNumber = Number(linkedBatchValue)
+  const linkedBatchId = linkedBatchValue !== null && Number.isSafeInteger(linkedBatchNumber) && linkedBatchNumber > 0
+    ? linkedBatchNumber : undefined
+  const invalidBatchLink = linkedBatchValue !== null && linkedBatchId === undefined
   const loadDetail = useCallback(async (id: number, historyOrigin?: number) => {
     setHistoryOriginId(historyOrigin)
     const run = ++detailRun.current
     selectedIdRef.current = id
     setSelectedId(id)
+    setSelected(undefined)
+    setDirtyItems({})
     setDetailLoading(true)
     setDetailError('')
     try { const result = await contentReviewApi.get(id); if (run === detailRun.current) { setSelected(result); detailPane.current?.scrollTo(0, 0) } }
-    catch (cause) { if (run === detailRun.current) { setSelected(undefined); setDetailError(errorText(cause)) } }
+    catch (cause) { if (run === detailRun.current) { setSelected(undefined); setDetailError(contentReviewDetailError(cause)) } }
     finally { if (run === detailRun.current) setDetailLoading(false) }
   }, [])
 
   const load = useCallback(async (targetPage = 1, preferredId?: number) => {
     const run = ++listRun.current
     detailRun.current++
+    const targetId = preferredId ?? linkedBatchId
+    // A notification target is independent from list filters, pagination and list availability.
+    const detailRequest = targetId ? loadDetail(targetId) : undefined
+    if (linkedBatchId || invalidBatchLink) setMobileDetail(true)
+    if (invalidBatchLink && !preferredId) {
+      setSelected(undefined); setSelectedId(undefined); selectedIdRef.current = undefined
+      setDetailLoading(false); setDetailError('内容审批链接无效，请从消息中心重新打开')
+    }
     setLoading(true)
     setError('')
     try {
@@ -361,15 +376,20 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
       setRows(result.list)
       setTotal(result.total)
       setPage(targetPage)
-      const nextId = preferredId ?? linkedBatchId ?? result.list[0]?.id
-      if (nextId) await loadDetail(nextId)
-      else { setSelectedId(undefined); selectedIdRef.current = undefined; setSelected(undefined); setDetailLoading(false) }
+      if (!targetId && !invalidBatchLink) {
+        const nextId = result.list[0]?.id
+        if (nextId) await loadDetail(nextId)
+        else { setSelectedId(undefined); selectedIdRef.current = undefined; setSelected(undefined); setDetailLoading(false); setDetailError('') }
+      }
     } catch (cause) {
       if (run !== listRun.current) return
-      setRows([]); setSelected(undefined); setSelectedId(undefined); setError(errorText(cause))
-      setDetailLoading(false)
+      setRows([]); setTotal(0); setError(errorText(cause))
+      if (!targetId && !invalidBatchLink) {
+        setSelected(undefined); setSelectedId(undefined); setDetailLoading(false)
+      }
     } finally { if (run === listRun.current) setLoading(false) }
-  }, [keyword, loadDetail, mine, category, filters, linkedBatchId])
+    await detailRequest
+  }, [keyword, loadDetail, mine, category, filters, linkedBatchId, invalidBatchLink])
 
   useEffect(() => { void load(1) }, [load])
   useEffect(() => {
@@ -552,7 +572,10 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
           keyword={keyword} category={category} filters={filters} mine={mine} canSeeAll={canSeeAll} statusText={statusText}
           onSearch={value => confirmChange(() => setKeyword(value))} onFilters={value => confirmChange(() => setFilters(value))}
           onMine={value => confirmChange(() => setMine(value))} onReset={() => confirmChange(() => { setKeyword(''); setFilters({}); setMine(false) })}
-          onRetry={() => void load(page)} onSelect={id => { if (id === selectedId) { setMobileDetail(true); return }; confirmChange(() => { setMobileDetail(true); void loadDetail(id) }) }} />
+          onRetry={() => void load(page)} onSelect={id => { if (id === selectedId) { setMobileDetail(true); return }; confirmChange(() => {
+            const params = new URLSearchParams(location.search); params.set('batchId', String(id))
+            setMobileDetail(true); navigate({ pathname: APP_ROUTES.CONTENT_REVIEW, search: params.toString() })
+          }) }} />
         {total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={total}
           onChange={value => confirmChange(() => void load(value))} />}
       </aside>

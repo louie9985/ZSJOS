@@ -36,6 +36,21 @@ class ContentServiceTest {
     @Mock private MediaWorkflowEventService workflowEventService;
 
     @Test
+    void batchReviewKeepsAuditWithoutPerContentResultMessages() {
+        for (boolean approved : new boolean[]{true, false}) {
+            ContentDO content = new ContentDO().setId(2L).setContentNo("CT-2")
+                    .setStatus(CONTENT_ACCEPTANCE).setVersion(3);
+            when(mapper.applyBatchReview(2L, 3, approved)).thenReturn(1);
+            service.applyBatchReview(content, 3, approved, "审核意见", 9L);
+            String target = approved ? CONTENT_READY_TO_PUBLISH : CONTENT_REJECTED;
+            verify(workflowEventService).transition(BIZ_TYPE_CONTENT, 2L, 9L,
+                    CONTENT_ACCEPTANCE, target, "审核意见", "content:2:3:" + target);
+        }
+        verify(workflowEventService, never()).notify(anyString(), anyString(), anyLong(), any(), any(), anyString(), any());
+        verifyNoInteractions(accountMapper, collaborationNotify);
+    }
+
+    @Test
     void legacyAcceptanceActionsAreDisabled() {
         assertServiceCode(CONTENT_REVIEW_LEGACY_ENTRY_DISABLED,
                 () -> service.approveAcceptance(2L, 3));

@@ -331,11 +331,15 @@ public class MyStudentServiceImpl implements MyStudentService {
         LeadDO relatedLead = relatedLeadId == null ? null : leadMapper.selectById(relatedLeadId);
         result.setLeadId(ownedLeadId);
         result.setLeadNo(relatedLead == null ? null : relatedLead.getLeadNo());
-        // Only authorized service orders participate; a missing first-order name is not replaced by a later one.
+        // Keep the established first visible order selection; independent services use stable creation order.
         SalesOrderDO firstOrder = orders.values().stream()
                 .min(Comparator.comparing(SalesOrderDO::getCreateTime, Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(SalesOrderDO::getId)).orElse(null);
-        result.setName(firstOrder == null ? null : StrUtil.trimToNull(firstOrder.getStudentName()));
+        ServiceRelationDO namedRelation = relations.stream()
+                .filter(r -> firstOrder == null || Objects.equals(r.getOrderId(), firstOrder.getId()))
+                .min(Comparator.comparing(ServiceRelationDO::getCreateTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(ServiceRelationDO::getId)).orElse(null);
+        result.setName(namedRelation == null ? null : StrUtil.trimToNull(namedRelation.getStudentNameSnapshot()));
         result.setMobile(person.getMobile()); result.setWechatId(person.getWechatId());
         result.setActivatedAt(relations.stream().map(ServiceRelationDO::getActivatedAt).filter(Objects::nonNull)
                 .max(Comparator.naturalOrder()).orElse(null));
@@ -347,7 +351,7 @@ public class MyStudentServiceImpl implements MyStudentService {
             row.setLeadId(serviceLead == null ? null : serviceLead.getId());
             row.setLeadNo(serviceLead == null ? null : serviceLead.getLeadNo());
             row.setOrderNo(order == null ? null : order.getOrderNo());
-            row.setStudentName(order == null ? null : StrUtil.trimToNull(order.getStudentName()));
+            row.setStudentName(StrUtil.trimToNull(relation.getStudentNameSnapshot()));
             row.setOrderStatus(order == null ? null : order.getStatus());
             row.setOrderStatusLabel(order == null || order.getStatus() == null ? null : switch (order.getStatus()) {
                 case "pending_approval" -> "待财务审核";

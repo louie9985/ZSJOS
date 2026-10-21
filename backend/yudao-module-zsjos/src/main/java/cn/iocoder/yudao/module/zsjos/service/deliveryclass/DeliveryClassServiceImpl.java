@@ -370,8 +370,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         DeliveryClassStudentRespVO row = new DeliveryClassStudentRespVO();
         row.setServiceRelationId(relation.getId()); row.setPersonId(relation.getPersonId());
         if (person != null) row.setPersonNo(person.getPersonNo());
-        var order = relation.getOrderId() == null ? null : orderMapper.selectById(relation.getOrderId());
-        row.setStudentName(order == null ? null : cn.hutool.core.util.StrUtil.trimToNull(order.getStudentName()));
+        row.setStudentName(cn.hutool.core.util.StrUtil.trimToNull(relation.getStudentNameSnapshot()));
         SalesOrderItemDO orderItem = relation.getOrderItemId() == null ? null
                 : orderItemMapper.selectById(relation.getOrderItemId());
         ZsjosProductDO product = orderItem == null || orderItem.getProductId() == null ? null

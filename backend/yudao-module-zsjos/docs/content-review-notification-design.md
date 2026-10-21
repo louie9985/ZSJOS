@@ -1,5 +1,7 @@
 # 内容审核通知系统设计文档
 
+> 2026-10-21 当前契约：每位接收人每个审批节点一条通过／未通过结果；逐条保存和批次同步不发逐条消息。公共 BPM 校验通过 BEFORE_COMMIT 事件写入原有 Outbox，失败随审批回滚。事件键包含批次、流程实例及任务 ID。以下逐条通知示例为历史设计，以 [内容审核接口](../../../docs/api/content-review-batch.md) 为准。
+
 > 2026-09-20 实现校正：当前受支持契约见 [编导与运营通知](../../../docs/api/director-operator-notifications.md)。以下示例保留作历史设计参考；超时场景为 `zsjos.content_review.review_timeout_reminder`，由 `MediaNotificationReminderScheduler` 按 System 规则扫描真实 BPM 待办，不使用本文旧 Quartz Job。Workbench 统一入口为 `/zsjos/material-library/content-review?batchId=…`，Vue Admin 未支持的员工业务动作回退消息详情。
 
 

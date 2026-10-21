@@ -187,13 +187,13 @@ def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_
     order_id = item_id = case_id = None
 
     cur.execute(
-        "INSERT INTO zsjos_service_relation (person_id,order_id,order_item_id,registration_case_id,"
+        "INSERT INTO zsjos_service_relation (student_name_snapshot,student_name_source,person_id,order_id,order_item_id,registration_case_id,"
         "teaching_delivery,class_id,status,owner_user_id,acceptance_status,accepted_by_user_id,accepted_at,"
         "content_director_user_id,operator_user_id,director_stage,service_snapshot,activated_at,"
         "version,creator,create_time,updater,update_time,deleted,tenant_id) "
-        "VALUES (%s,%s,%s,%s,%s,%s,'active',NULL,'accepted',%s,%s,%s,%s,%s,CAST(%s AS JSON),%s,"
+        "VALUES (%s,'independent_entry',%s,%s,%s,%s,%s,%s,'active',NULL,'accepted',%s,%s,%s,%s,%s,CAST(%s AS JSON),%s,"
         "0,'seed-student',%s,'seed-student',%s,b'0',%s)",
-        (person_id, order_id, item_id, case_id, teaching_delivery, class_id, operator_id, now,
+        (name.strip() or None, person_id, order_id, item_id, case_id, teaching_delivery, class_id, operator_id, now,
          director_id, operator_id, DIRECTOR_STAGE, UNKNOWN_COURSE_SNAPSHOT, now, now, now, tenant_id),
     )
     rel_id = cur.lastrowid

@@ -170,7 +170,7 @@ class MyStudentServiceImplTest {
         relation.setRegistrationCaseId(15L); relation.setStatus("active"); relation.setActivatedAt(LocalDateTime.now());
         relation.setContentDirectorUserId(18L); relation.setAcceptanceStatus("accepted"); relation.setVersion(3);
         PersonDO person = new PersonDO(); person.setId(12L); person.setName("编导学员");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(13L); order.setOrderNo("OD202608180001"); order.setStudentName("订单编导学员");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(13L); order.setOrderNo("OD202608180001"); order.setStudentName("已变更订单名"); relation.setStudentNameSnapshot("订单编导学员");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(14L); item.setOrderId(13L);
 
         when(relationMapper.selectByOwnerAndPersonIncludingHistory(18L, 12L)).thenReturn(List.of());
@@ -195,7 +195,7 @@ class MyStudentServiceImplTest {
         relation.setStatus("active"); relation.setAcceptanceStatus("accepted");
         relation.setActivatedAt(LocalDateTime.now()); relation.setContentDirectorUserId(28L);
         PersonDO person = new PersonDO(); person.setId(22L); person.setName("编导负责学员");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(23L); order.setOrderNo("OD202608200001"); order.setStudentName("订单编导负责学员");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(23L); order.setOrderNo("OD202608200001"); order.setStudentName("已变更订单名"); relation.setStudentNameSnapshot("订单编导负责学员");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(24L); item.setOrderId(23L);
 
         when(relationMapper.selectActiveByContentDirectorAndPerson(28L, 22L)).thenReturn(List.of(relation));
@@ -412,8 +412,8 @@ class MyStudentServiceImplTest {
 
     @Test
     void aggregateUsesFirstOrderButServiceDetailUsesSelectedOrderWithoutChangingVisibleCourses() {
-        var first = detailRelation(71L, 28L); first.setOrderId(81L);
-        var second = detailRelation(72L, 28L); second.setOrderId(82L);
+        var first = detailRelation(71L, 28L); first.setOrderId(81L); first.setStudentNameSnapshot("首次订单姓名");
+        var second = detailRelation(72L, 28L); second.setOrderId(82L); second.setStudentNameSnapshot("第二订单姓名");
         var person = new PersonDO(); person.setId(70L); person.setName("客资主档姓名");
         var oldOrder = new SalesOrderDO(); oldOrder.setId(81L); oldOrder.setStudentName("首次订单姓名");
         oldOrder.setCreateTime(LocalDateTime.of(2026, 8, 1, 0, 0));
@@ -426,14 +426,33 @@ class MyStudentServiceImplTest {
         assertEquals("首次订单姓名", service.getMyStudent(28L, 70L).getName());
         assertEquals("第二订单姓名", service.getMyStudentByService(28L, 72L).getName());
         assertEquals(2, service.getMyStudentByService(28L, 72L).getServices().size());
-        // Blank first names stay missing, even though the later order and Person both have names.
+        // Order edits cannot overwrite captured service names; empty snapshots do not fall back.
         oldOrder.setStudentName("  ");
+        assertEquals("首次订单姓名", service.getMyStudent(28L, 70L).getName());
+        first.setStudentNameSnapshot(null);
         org.junit.jupiter.api.Assertions.assertNull(service.getMyStudent(28L, 70L).getName());
         assertEquals("第二订单姓名", service.getMyStudentByService(28L, 72L).getName());
         newOrder.setCreateTime(oldOrder.getCreateTime());
-        oldOrder.setStudentName("同时间按订单编号排序");
+        first.setStudentNameSnapshot("同时间按订单编号排序");
         assertEquals("同时间按订单编号排序", service.getMyStudent(28L, 70L).getName());
         verify(orderMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void independentServiceUsesRepairedSnapshotWithoutOrderOrPersonFallback() {
+        var first = detailRelation(71L, 28L);
+        var second = detailRelation(72L, 28L);
+        first.setOrderId(null); second.setOrderId(null);
+        first.setStudentNameSnapshot("独立服务快照"); second.setStudentNameSnapshot("另一服务姓名");
+        var person = new PersonDO(); person.setId(70L); person.setName("主档新姓名");
+        when(personMapper.selectById(70L)).thenReturn(person);
+        when(relationMapper.selectByOwnerAndPersonIncludingHistory(28L, 70L)).thenReturn(List.of(second, first));
+        assertEquals("独立服务快照", service.getMyStudent(28L, 70L).getName());
+        first.setStudentNameSnapshot(null);
+        org.junit.jupiter.api.Assertions.assertNull(service.getMyStudent(28L, 70L).getName());
+        first.setStudentNameSnapshot("后续核实回填");
+        assertEquals("后续核实回填", service.getMyStudent(28L, 70L).getName());
+        verify(orderMapper, never()).selectBatchIds(org.mockito.ArgumentMatchers.anyCollection());
     }
 
     @Test
