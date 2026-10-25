@@ -1,0 +1,15 @@
+# Registration — test-media-teaching-exit-batch2-20261022
+
+- Owner Codex /root; environment test from /etc/zsjos/agent-environment; branch main; worktree /opt/zsjos; base 404387de566fcb9abf4b264f0e005bf0566ea209; integration None.
+- User authorizes the same teaching-only exit for the supplied 13 lines / 12 unique student numbers. Resolved exact tenant-1 service IDs 898–909 / Person IDs 7984–7995. All active/accepted, teaching=true, no teaching owner/contact/task/transfer. Unlike prior batch, existing effective orders and completed registrations are preserved.
+- Goal: only teaching_delivery true -> false; keep all other service fields, media responsibility and linked business rows. No deletions, order/registration cleanup, lifecycle transitions, grants, deployment, restart or Git operations.
+- Ownership: this record; script/sql/mysql/repairs/exit_teaching_delivery_batch2_20261022.py; docs/operations/media-teaching-exit-batch2-20261022.md; private /opt/zsjos-runtime/backups/media-teaching-exit-batch2-20261022-test. Preserve all earlier dirty/untracked files and use unique handoff.
+- Dependencies: V336 and existing backend participation boundary, existing pymysql connector. Verification: scoped identity/read-only preflight; MySQL session temporary initial/replay/failure rollback/recovery; private exact plan; locked revalidation and whole-row/linked-record comparison; independent committed readback, teaching exclusion, original director/operator predicates, UTF-8 name HEX, zero-write replay. Authenticated UI/API acceptance separately reported.
+
+## Delivery
+
+- Exact 12 service rows 898–909 updated teaching_delivery true -> false in test tenant1. Every other service field preserved; no order/registration unlink or media transition. User's duplicated input processed once.
+- Actual MySQL temporary-table initial application, injected failure rollback, recovery, whole-row preservation and replay passed. Private snapshot serializes Decimal amounts without precision loss. Locked full before-image revalidation passed; committed independent readback passed; exact replay updated0.
+- Teaching predicate finds0 target services; original director/operator responsibility predicate retains12. Captured full linked records unchanged, including12 accounts/groups/plans/stages/cards/interviews,81 associated business tasks,56 content records,1 production ticket,12 orders/items/registration cases, and captured revisions/submissions/links/details. Name HEX unchanged.
+- Private evidence /opt/zsjos-runtime/backups/media-teaching-exit-batch2-20261022-test/{plan.json,verification.json}; permissions0700/0600; plan SHA256 4e50ced3303fa44577bd1ca0111d2bb0dbbf6865a8f8e9500cf67d1bd01efc6a. No sensitive payloads published.
+- Changed only this registration, dedicated batch executor and operation document. Earlier dirty/untracked files preserved. No dependencies, schema/ledgers, permissions, messages, restart/deployment or Git mutations. Authenticated API/browser checks not performed; database and query verification complete. Ownership released.

@@ -1,0 +1,14 @@
+# Registration — test-student-name-backfill-20261021
+
+- Environment test from /etc/zsjos/agent-environment; owner Codex /root; branch main; worktree /opt/zsjos; base 404387de566fcb9abf4b264f0e005bf0566ea209; integration None.
+- User authorizes direct snapshot backfill in the existing test database without backend restart. Scope: tenant 1, nondeleted independent services with both name/source NULL, copying trimmed same-tenant nondeleted Person.name as person_current_repair. Preflight: 233 live services, 57 independent missing snapshots, no order-linked missing names; V337 columns and ledger now present after separately running deployment migration.
+- Ownership: this unique handoff, script/sql/mysql/repairs/backfill_student_names_20261021.py, docs/operations/student-name-backfill-20261021.md; private backup directory outside repository. Existing student_name_backfill.py is reused unchanged. Separate deployment work owns runtime/migrations; no conflicting writes.
+- Non-goals: schema/migration/ledger changes, Person/order/permissions, restart/deployment, commits/push, frontend changes.
+- Dependencies: completed V337 in both ledgers and UTF-8 columns. Verification: session temporary MySQL fixtures using existing repair function for rollback/replay/exclusions/HEX/audit preservation, private exact plan, locked source/target revalidation and complete service-row comparison, committed readback and zero-write replay. Existing repair briefly locks service rows to prove unrelated fields/rows unchanged; bounded lock timeout. Authenticated browser acceptance is separate from database verification.
+
+## Delivery
+
+- Executed authorized test tenant-1 repair: 57 independent service snapshots copied from current same-tenant Person.name; source person_current_repair. All 233 nondeleted services now named, independent missing count zero. No historical creation-name inference.
+- MySQL temporary fixtures passed rollback after an earlier successful row, recovery, initial/replay, tenant/order/existing-name exclusions, HEX and fixed audit/version checks. Real repair committed 57 updates; all service columns/rows compared inside transaction and only planned name/source values changed. Replay changed zero rows. Independent UTF-8 connection verified all 57 exact plan values via HEX and unchanged null order references.
+- Private plan /opt/zsjos-runtime/backups/student-name-snapshot-20261021-test/plan.json; SHA256 dca5373349c338337769e3da33045533acb41b6f52520d0872b6c3b400347e2a. Sanitized committed verification.json in same private directory. Source adapter and operational document reproduce the procedure; no changes to existing migration or local repair tool.
+- No backend restart/deployment, schema/ledger write, permissions, Person/order changes or Git operations. Concurrent externally initiated migration finished before repair. Authenticated live API/browser display remains unverified; database repair complete. Ownership released.

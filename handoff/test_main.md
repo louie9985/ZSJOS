@@ -2517,3 +2517,39 @@
 - Verification correction: imported assignEmptyHandler has added userIds:null; initial strict comparison stopped before publish. Confirmed serialization-only difference, reused imported model and deployed once successfully.
 - Limits: whole manifest has unrelated existing sales-order legacy BPMN checksum mismatch; preserved and reported. Actual business submit/approval and browser flows not executed. No auth/tenant/API contract changes; deployment available to both consumers through existing backend.
 - Remaining: user can refresh and retry normal class-transfer entry; supervisor eligibility and business validations still apply. Deployment delivered; ownership released.
+
+
+## Registration — test-db-backup-20261021 — 2026-10-21T07:53:20.581509+00:00
+- Owner: Codex /root; environment: test from /etc/zsjos/agent-environment; branch: main; worktree: /opt/zsjos; base: 404387de566fcb9abf4b264f0e005bf0566ea209; target branch / integration order: None.
+- Goal: user-requested full logical backup of configured zsjos database to /opt/zsjos/backup/.
+- Ownership: backup/ new private archive, checksum, verification metadata and local ignore file; this handoff. Preserve existing unrelated changes and backups.
+- Non-goals: database writes/restoration, service lifecycle, application or migration changes, Git commit/push.
+- Dependencies: running zsjos-mysql-1, MySQL 8.4.11, existing secret mount. Preflight: 563 InnoDB tables; no views/routines/triggers/events; 2.7 GiB available, so stream directly to gzip.
+- Verification: mysqldump success, full gzip/UTF-8 read, completion marker, exact table inventory comparison, SHA-256 and restricted permissions. Restore rehearsal outside scope; backup does not include external uploaded objects or MySQL system accounts.
+
+
+## Delivery — test-db-backup-20261021 — 2026-10-21T07:55:26.894527+00:00
+- Result: full schema/data backup to /opt/zsjos/backup/zsjos-test-20261021T075320Z.sql.gz, 224,797,575 compressed bytes / 3,343,192,617 uncompressed bytes; 563 tables.
+- Evidence PASS: mysqldump exit 0 and empty stderr; single-transaction/quick utf8mb4 export with hex blobs and routines/events/triggers; full gzip CRC and UTF-8 read, exact preflight table inventory, database scope, data statements and completion trailer. SHA-256 397a1d31f188aa3b880d26525ec9cab9e253a59440f7e8df2bc91ffeff8f14ef; independent sha256sum -c PASS. Sidecar checksum, inventory and verification JSON retained beside archive.
+- Backup directory 0700, private files 0600; backup/.gitignore excludes artifacts. No source database write, service change or Git commit/push. Existing backups and unrelated changes preserved.
+- Limit: restore rehearsal not performed; external uploaded files and MySQL system accounts are outside this database backup. About 2.5 GiB disk remains.
+- Authorized backup complete; ownership released.
+
+
+## Registration — test-student-lead-backfill-20261023
+- Owner /root; environment test from /etc/zsjos/agent-environment; branch main; worktree /opt/zsjos; base 404387de566fcb9abf4b264f0e005bf0566ea209; target branch/integration None.
+- Goal: user explicitly authorized one education-self-sourced Lead for the existing student, using corrected contact confirmed against the existing Person and failed API log 4195687; original submitter remains owner. Preserve Person, contact claims, existing orders and service relations.
+- Ownership: script/sql/mysql/repairs/backfill_student_lead_20261023.py; docs/operations/student-lead-backfill-20261023.md; this handoff; private evidence under /opt/zsjos-runtime/backups/student-lead-20261023-*.
+- Scope: tenant 1, existing internal Person key 6028, submitting user key 400. One new Lead and intended product, assignment, automatic first follow-up/qualification, open opportunity, tasks, performance snapshots and business audit events; transactional daily Lead counter. Repair actor 0 with explicit provenance; no impersonated API call or notification dispatch.
+- Non-goals: generic duplicate-check fix, identity/contact changes, historical order/service re-linking, permissions, schema/migration/ledger changes, application restart/deployment, commits/push, other records.
+- Dependencies: MySQL 8.4.11; enabled current dictionary/product/rule/account and permission configuration; no existing Lead or open opportunity for target. Final request next-follow-up remains future.
+- Verification: guarded preflight and private preimages; same-engine session-temporary tables for initial/repeat/failure rollback/partial refusal/recovery; one atomic live transaction; committed readback, zero-write repeat, UTF-8 HEX, unchanged protected rows and service process. API/browser read verification if existing facilities allow without permission changes.
+
+
+## Delivery — test-student-lead-backfill-20261023
+- Context: registration above; /root; test/main /opt/zsjos; base unchanged; integration None. User explicitly authorized corrected-contact single-student backfill.
+- Committed at 2026-10-23 18:34:19 Beijing: Lead KZ202610231834190049, valid/owned, education identity, original submitting owner, existing Person reused. One automatic first follow-up, open initial_conversion opportunity, two completed lifecycle tasks and pending follow-up reminder for 2026-11-20 00:00:00; 18 new business rows plus atomic daily counter. System repair actor/provenance retained.
+- PASS: MySQL 8.4.11 temporary-table first/repeat/four injected rollback/counter rollback/partial refusal/recovery; real-target rolled-back preview; guarded atomic commit; committed readback and zero-write repeat; independent relationship/state query; UTF-8 HEX; protected Person/contact claims/old order/service relation full-field equality. Python syntax and diff checks passed. Backend PID/start timestamp unchanged.
+- Source: script/sql/mysql/repairs/backfill_student_lead_20261023.py; docs/operations/student-lead-backfill-20261023.md; this record. Existing unrelated edits preserved. No permissions/schema/migrations/ledger/code deployment/restart/commit/push changes.
+- Private evidence: /opt/zsjos-runtime/backups/student-lead-20261023-preview-v2 and student-lead-20261023-applied. Initial backup serialization rejected Decimal before mutations; local serializer corrected and all checks rerun.
+- Limits: authenticated API/browser and subsequent order/BPM execution not exercised; no active notification dispatch. Existing duplicate-check defect remains outside this single-record exception. UI verification remains with normal authorized account. No further data changes needed for the authorized backfill. Ownership released.
