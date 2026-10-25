@@ -48,12 +48,17 @@ public interface BpmTaskConvert {
                                                         Map<String, ProcessInstance> processInstanceMap,
                                                         Map<Long, AdminUserRespDTO> userMap,
                                                         Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap) {
-        return BeanUtils.toBean(pageResult, BpmTaskRespVO.class, taskVO -> {
+        List<BpmTaskRespVO> taskVOList = convertList(pageResult.getList(), task -> {
+            BpmTaskRespVO taskVO = BeanUtils.toBean(task, BpmTaskRespVO.class);
+            // Flowable stores task status in local variables, outside ordinary bean properties.
+            taskVO.setStatus(FlowableUtils.getTaskStatus(task));
             ProcessInstance processInstance = processInstanceMap.get(taskVO.getProcessInstanceId());
             if (processInstance == null) {
-                return;
+                return taskVO;
             }
+            taskVO.setProcessDefinitionKey(processInstance.getProcessDefinitionKey());
             taskVO.setProcessInstance(BeanUtils.toBean(processInstance, BpmTaskRespVO.ProcessInstance.class));
+            taskVO.getProcessInstance().setProcessDefinitionKey(processInstance.getProcessDefinitionKey());
             Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId());
             AdminUserRespDTO startUser = startAdminUserId == null ? null : userMap.get(startAdminUserId);
             taskVO.getProcessInstance().setStartUser(buildStartUser(processInstance.getStartUserId(),
@@ -62,7 +67,9 @@ public interface BpmTaskConvert {
             // 摘要
             taskVO.getProcessInstance().setSummary(FlowableUtils.getSummary(processDefinitionInfoMap.get(processInstance.getProcessDefinitionId()),
                     processInstance.getProcessVariables()));
+            return taskVO;
         });
+        return new PageResult<>(taskVOList, pageResult.getTotal());
     }
 
     default PageResult<BpmTaskRespVO> buildTaskPage(PageResult<HistoricTaskInstance> pageResult,
@@ -86,7 +93,9 @@ public interface BpmTaskConvert {
             if (processInstance != null) {
                 Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId());
                 AdminUserRespDTO startUser = startAdminUserId == null ? null : userMap.get(startAdminUserId);
+                taskVO.setProcessDefinitionKey(processInstance.getProcessDefinitionKey());
                 taskVO.setProcessInstance(BeanUtils.toBean(processInstance, BpmTaskRespVO.ProcessInstance.class));
+                taskVO.getProcessInstance().setProcessDefinitionKey(processInstance.getProcessDefinitionKey());
                 taskVO.getProcessInstance().setStartUser(buildStartUser(processInstance.getStartUserId(),
                         processInstance.getProcessVariables(), startUser));
                 // 摘要

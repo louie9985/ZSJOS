@@ -1,0 +1,66 @@
+{
+  "default": {
+    "afternoon": {
+      "end": "18:00",
+      "start": "13:30"
+    },
+    "morning": {
+      "end": "12:00",
+      "start": "08:30"
+    }
+  },
+  "departments": {
+    "AI应用部": {
+      "afternoon": {
+        "end": "18:00",
+        "start": "13:00"
+      },
+      "mode": "custom",
+      "morning": {
+        "end": "12:00",
+        "start": "09:00"
+      }
+    },
+    "客资部": {
+      "mode": "default"
+    },
+    "市场部": {
+      "mode": "default"
+    },
+    "教务部": {
+      "mode": "default"
+    },
+    "教研部": {
+      "mode": "default"
+    },
+    "综合教研部": {
+      "mode": "default"
+    },
+    "综合管理层队伍": {
+      "mode": "default"
+    },
+    "综合行政中心": {
+      "mode": "default"
+    },
+    "考务部": {
+      "mode": "default"
+    },
+    "财务部": {
+      "mode": "default"
+    },
+    "运营部": {
+      "mode": "default"
+    },
+    "销售部": {
+      "afternoon": {
+        "end": "21:30",
+        "start": "13:30"
+      },
+      "mode": "custom",
+      "morning": {
+        "end": "12:00",
+        "start": "11:00"
+      }
+    }
+  }
+}

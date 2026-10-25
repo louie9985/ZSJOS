@@ -36,6 +36,14 @@ public class LocalFileClient extends AbstractFileClient<LocalFileClientConfig> {
     }
 
     @Override
+    public String uploadFile(java.nio.file.Path source, String path, String type) throws java.io.IOException {
+        Path target = Paths.get(getFilePath(path));
+        java.nio.file.Files.createDirectories(target.getParent());
+        java.nio.file.Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        return super.formatFileUrl(config.getDomain(), path);
+    }
+
+    @Override
     public void delete(String path) {
         String filePath = getFilePath(path);
         FileUtil.del(filePath);

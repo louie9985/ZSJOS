@@ -23,8 +23,28 @@ public interface ContentReviewBatchMapper extends BaseMapperX<ContentReviewBatch
             + "THEN JSON_EXTRACT(context_snapshot_json, '$.accountSnapshots') ELSE JSON_ARRAY(JSON_MERGE_PATCH("
             + "COALESCE(JSON_EXTRACT(context_snapshot_json, '$.account'), JSON_OBJECT()), "
             + "JSON_OBJECT('ownerOperatorUserId', operator_user_id, 'directorUserId', director_user_id))) END)";
-    @org.apache.ibatis.annotations.Update("UPDATE zsjos_content_review_batch SET account_ids_json=JSON_REMOVE(account_ids_json, JSON_UNQUOTE(JSON_SEARCH(account_ids_json,'one',CAST(#{accountId} AS CHAR)))), version=version+1 WHERE tenant_id=(SELECT tenant_id FROM zsjos_media_account WHERE id=#{accountId}) AND deleted=b'0' AND JSON_CONTAINS(account_ids_json,JSON_ARRAY(#{accountId})) AND status IN ('DRAFT','DIRECTOR_REVIEW','FINAL_REVIEW')")
-    int excludeDeletedAccount(@org.apache.ibatis.annotations.Param("accountId") Long accountId);
+    // JSON_TABLE subqueries in UPDATE functions are not supported by the tenant SQL parser.
+    // Lock only affected active rows, then retain tenant and version checks on ordinary updates.
+    default int excludeDeletedAccount(Long accountId) {
+        var rows = selectList(new LambdaQueryWrapperX<ContentReviewBatchDO>()
+                .select(ContentReviewBatchDO::getId, ContentReviewBatchDO::getAccountIdsJson, ContentReviewBatchDO::getVersion)
+                .in(ContentReviewBatchDO::getStatus, "DRAFT", "DIRECTOR_REVIEW", "FINAL_REVIEW")
+                .apply("JSON_CONTAINS(account_ids_json, JSON_ARRAY({0}))", accountId).last("FOR UPDATE"));
+        int changed = 0;
+        for (var row : rows) {
+            var values = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseArray(row.getAccountIdsJson(), Object.class);
+            var remaining = values.stream().filter(value -> !(value instanceof Number
+                    && value.toString().equals(accountId.toString()))).toList();
+            var update = new LambdaUpdateWrapper<ContentReviewBatchDO>().eq(ContentReviewBatchDO::getId, row.getId())
+                    .eq(ContentReviewBatchDO::getVersion, row.getVersion())
+                    .set(ContentReviewBatchDO::getAccountIdsJson, cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(remaining))
+                    .set(ContentReviewBatchDO::getVersion, row.getVersion() + 1);
+            if (update(null, update) != 1) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_REVIEW_VERSION_CONFLICT);
+            changed++;
+        }
+        return changed;
+    }
 
     default PageResult<ContentReviewBatchDO> selectPage(ContentReviewBatchPageReqVO request,
                                                          Long userId, boolean seeAll,

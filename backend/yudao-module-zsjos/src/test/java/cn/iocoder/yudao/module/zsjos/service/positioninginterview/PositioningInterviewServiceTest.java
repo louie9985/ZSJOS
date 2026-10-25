@@ -34,6 +34,32 @@ class PositioningInterviewServiceTest {
   assertEquals(List.of("VIEW_POSITIONING_INTERVIEW"),result.getAvailableActions());
   verify(mapper,never()).insert(any(PositioningInterviewDO.class));
  }
+ @Test void authorizedUploaderCanRecoverUnboundUploadsWithoutExposingSiblingDirectory(){
+  when(permissionApi.hasAnyPermissions(7L,PositioningInterviewService.QUERY)).thenReturn(true);
+  when(relationMapper.selectById(9L)).thenReturn(relation);
+  when(mapper.selectOne(any())).thenReturn(row);
+  var pending=new PositioningInterviewAttachmentDO();pending.setFileId(99L);pending.setFileSize(42L);
+  when(attachmentMapper.selectList(any())).thenAnswer(c->{
+   com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PositioningInterviewAttachmentDO> q=c.getArgument(0);
+   if(q.getSqlSegment().contains("IS NULL")) {
+    assertTrue(q.getParamNameValuePairs().containsValue("zsjos/positioning-interview/1/relations/9/2/7"));
+    return List.of(pending);
+   }
+   return List.of();
+  });
+  assertEquals(List.of(99L),service.context(9L,7L).getAttachments().stream().map(Attachment::getFileId).toList());
+ }
+ @Test void completedSnapshotNeverIncludesUnboundFilesFromAnotherTab(){
+  when(permissionApi.hasAnyPermissions(7L,PositioningInterviewService.QUERY)).thenReturn(true);
+  when(relationMapper.selectById(9L)).thenReturn(relation);row.setStatus("completed");
+  when(mapper.selectOne(any())).thenReturn(row);
+  var bound=attachment();bound.setInterviewId(row.getId());
+  when(attachmentMapper.selectList(any())).thenAnswer(call->{
+   com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PositioningInterviewAttachmentDO> q=call.getArgument(0);
+   assertFalse(q.getSqlSegment().contains("IS NULL"),"completed records must not query unbound uploads");return List.of(bound);
+  });
+  assertEquals(List.of(bound.getFileId()),service.context(9L,7L).getAttachments().stream().map(Attachment::getFileId).toList());
+ }
  @Test void administratorReadDoesNotAuthorizeDraftWrite(){
   when(permissionApi.hasAnyPermissions(30L,PositioningInterviewService.EDIT)).thenReturn(true);
   when(relationMapper.selectById(9L)).thenReturn(relation);
@@ -102,7 +128,7 @@ class PositioningInterviewServiceTest {
  @Test void foreignAttachmentRejected(){writable();var r=request("NOT_COMMUNICATED");r.setAttachmentIds(List.of(55L));when(attachmentMapper.selectOne(any())).thenReturn(null);assertThrows(ServiceException.class,()->service.save(9L,r,7L,true));verify(mapper,never()).update(any(),any());}
  @Test void completionPersistsIndependentSnapshotAndStops(){
   writable();var r=request("CLIENT_REFUSED");r.setAttachmentIds(List.of(55L));
-  var a=new PositioningInterviewAttachmentDO();a.setId(6L);a.setFileId(55L);a.setStudentPersonId(2L);a.setUploadedBy(7L);a.setDirectory("zsjos/positioning-interview/1/relations/9/2/7");
+  var a=new PositioningInterviewAttachmentDO();a.setId(6L);a.setFileId(55L);a.setFileSize(100L);a.setStudentPersonId(2L);a.setUploadedBy(7L);a.setDirectory("zsjos/positioning-interview/1/relations/9/2/7");
   when(attachmentMapper.selectOne(any())).thenReturn(a);
   var info=new FileInfoRespDTO();info.setId(55L);info.setCreator("7");info.setPath(a.getDirectory()+"/test.pdf");when(fileApi.getFileInfo(55L)).thenReturn(info);
   when(mapper.update(any(),any())).thenReturn(1);
@@ -155,8 +181,35 @@ class PositioningInterviewServiceTest {
   verifyNoInteractions(fileApi);verify(attachmentMapper,never()).deleteById(any());
  }
  private PositioningInterviewAttachmentDO attachment(){
-  var a=new PositioningInterviewAttachmentDO();a.setId(6L);a.setFileId(55L);a.setStudentPersonId(2L);a.setUploadedBy(7L);a.setDirectory("zsjos/positioning-interview/1/2/7");return a;
+  var a=new PositioningInterviewAttachmentDO();a.setId(6L);a.setFileId(55L);a.setFileSize(100L);a.setStudentPersonId(2L);a.setUploadedBy(7L);a.setDirectory("zsjos/positioning-interview/1/2/7");return a;
  }
  @Test void completedFileRemovalRejected(){access(PositioningInterviewService.EDIT);when(mapper.lockStudent(2L,1L)).thenReturn(2L);row.setStatus("completed");when(mapper.selectOne(any())).thenReturn(row);assertThrows(ServiceException.class,()->service.remove(9L,7L,50L,0,"remove-key"));verifyNoInteractions(attachmentMapper);}
- @Test void oversizedTranscriptRejected(){access(PositioningInterviewService.EDIT);when(mapper.lockStudent(2L,1L)).thenReturn(2L);when(mapper.selectOne(any())).thenReturn(row);var file=mock(org.springframework.web.multipart.MultipartFile.class);when(file.getOriginalFilename()).thenReturn("transcript.pdf");when(file.getSize()).thenReturn(21L*1024*1024);assertThrows(ServiceException.class,()->service.upload(9L,7L,file));verifyNoInteractions(fileApi);}
+ @Test void oversizedTranscriptRejectedBeforeReadingBytes() throws Exception {
+  uploadAccess(); var file=mock(org.springframework.web.multipart.MultipartFile.class);
+  when(file.getSize()).thenReturn(1024L*1024*1024+1);
+  var error=assertThrows(ServiceException.class,()->service.upload(9L,7L,file));
+  assertEquals(1900158000,error.getCode());verify(file,never()).getBytes();verifyNoInteractions(fileApi);
+ }
+ @Test void retainedAndNewTranscriptsCannotExceedBudget() throws Exception {
+  uploadAccess(); var retained=attachment();retained.setFileSize(700L*1024*1024);
+  when(attachmentMapper.selectList(any())).thenReturn(List.of(retained));
+  var file=mock(org.springframework.web.multipart.MultipartFile.class);when(file.getSize()).thenReturn(324L*1024*1024+1);
+  assertEquals(1900158000,assertThrows(ServiceException.class,()->service.upload(9L,7L,file)).getCode());
+  verify(file,never()).getBytes();verifyNoInteractions(fileApi);
+ }
+ @Test void transcriptGroupAtExactlyOneGiBAccepted() throws Exception {
+  uploadAccess();byte[] content="transcript content".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+  var retained=attachment();retained.setFileSize(1024L*1024*1024-content.length);
+  when(attachmentMapper.selectList(any())).thenReturn(List.of(retained));
+  var file=mock(org.springframework.web.multipart.MultipartFile.class);
+  when(file.getSize()).thenReturn((long)content.length);when(file.getOriginalFilename()).thenReturn("transcript.txt");
+  when(file.getInputStream()).thenReturn(new java.io.ByteArrayInputStream(content));
+  var info=new FileInfoRespDTO();info.setId(77L);var staged=new java.util.concurrent.atomic.AtomicReference<java.nio.file.Path>();
+  when(fileApi.createFileInfoFromPath(any(),any(),any(),any())).thenAnswer(call->{
+   java.nio.file.Path path=call.getArgument(0);staged.set(path);assertEquals(content.length,java.nio.file.Files.size(path));return info;
+  });
+  assertEquals(77L,service.upload(9L,7L,file).getFileId());verify(attachmentMapper).insert(any(PositioningInterviewAttachmentDO.class));
+  verify(file,never()).getBytes();assertFalse(java.nio.file.Files.exists(staged.get()));
+ }
+ private void uploadAccess(){access(PositioningInterviewService.EDIT);when(mapper.selectOne(any())).thenReturn(row);}
 }

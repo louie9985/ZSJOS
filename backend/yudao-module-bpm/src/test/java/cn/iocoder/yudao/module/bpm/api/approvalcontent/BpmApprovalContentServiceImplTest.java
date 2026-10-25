@@ -75,6 +75,19 @@ class BpmApprovalContentServiceImplTest {
         assertEquals("WD2", result.get("t2").getTitle());
     }
 
+    @Test
+    void forwardsAuthorizedProcessInstanceToRoundSpecificProviders() {
+        var task = new BpmTaskRespDTO(); task.setBusinessKey("media-account-delete:210:round"); task.setProcessInstanceId("exact-round");
+        when(processTaskApi.getTodoTask(9L, "t1")).thenReturn(task);
+        var provider = org.mockito.Mockito.mock(BpmApprovalContentProvider.class);
+        when(registry.resolve(task.getBusinessKey())).thenReturn(java.util.Optional.of(provider));
+        when(provider.parseBusinessId(task.getBusinessKey())).thenReturn("210");
+        var detail = new BpmApprovalDetailVO(); detail.setTitle("本轮删除申请");
+        when(provider.detail("210", 9L, "exact-round")).thenReturn(detail);
+        assertEquals(detail, service.getDetail("t1", "todo", 9L));
+        org.mockito.Mockito.verify(provider, org.mockito.Mockito.never()).detail("210", 9L);
+    }
+
     private static final class ThrowingProvider implements BpmApprovalContentProvider {
         @Override
         public String bizType() {

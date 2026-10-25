@@ -38,6 +38,8 @@ public interface FileService {
     String createFile(@NotEmpty(message = "文件内容不能为空") byte[] content,
                       String name, String directory, String type);
 
+    FileDO createFileInfoFromPath(java.nio.file.Path source, String name, String directory, String type);
+
     FileDO createFileInfo(@NotEmpty(message = "文件内容不能为空") byte[] content,
                           String name, String directory, String type);
 

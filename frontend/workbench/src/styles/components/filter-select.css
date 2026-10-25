@@ -1,0 +1,22 @@
+/* Filter popups are portals, so scope the rule to their explicit opt-in class. */
+.workbench-filter-select,
+.ant-space:has(> .ant-space-item > .workbench-filter-select),
+.ant-space-item:has(> .workbench-filter-select) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.workbench-filter-popup .ant-select-item-option-content,
+.workbench-filter-popup .ant-select-item-group {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.workbench-filter-label {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

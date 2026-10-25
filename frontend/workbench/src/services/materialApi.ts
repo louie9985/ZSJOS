@@ -267,6 +267,7 @@ export type ContentReviewBatch = {
   relationSnapshot: Record<string, unknown>
   canReadStudentForReview?: boolean
   contextSnapshot: Record<string, unknown>
+  draftReviewerSelection?: ContentReviewSelection | null
   status: string
   currentStage: string
   processInstanceId?: string
@@ -367,6 +368,8 @@ export type ContentReviewSelection = { directorUserId: number; processDefinition
 export type ContentReviewAccountProfile = {
   id: number; accountNo?: string; nickname?: string; platformAccountId?: string
   platformValue?: string; platformLabel?: string; sStage?: string; sStageLabel?: string
+  sStageEnteredAt?: number; sStageDurationAsOf?: number; sStageDurationDays?: number
+  sStageTimingSource?: 'RECORDED' | 'HISTORY_RECONSTRUCTED'
   currentStatusValue?: string; currentStatusLabel?: string; ownerOperatorUserId?: number; directorUserId?: number
   operatorName?: string; directorName?: string; productGoal?: string; productFormLabel?: string
   publishFrequency?: string; bottleneckLabel?: string
@@ -382,6 +385,8 @@ export const contentReviewApi = {
     })),
   submitContext: async (id: number) => unwrap<ContentReviewSubmitContext>(
     await http.get(`/zsjos/content-review/batch/${id}/submit-context`)),
+  formSubmitContext: async (params: { studentPersonId?: number; batchId?: number }) =>
+    unwrap<ContentReviewSubmitContext>(await http.get('/zsjos/content-review/submit-context', { params })),
   candidates: async (params: { pageNo: number; pageSize: number; keyword?: string }) =>
     unwrap<PageResult<ContentReviewCandidate>>(await http.get('/zsjos/content-review/candidate/page', { params })),
   page: async (params: ContentReviewPageParams) =>
@@ -395,6 +400,7 @@ export const contentReviewApi = {
     await http.get('/zsjos/content-review/batch/history', { params: { id } })
   ),
   createFromStudent: async (data: {
+    draftReviewerSelection?: ContentReviewSelection | null
     contentVersionIds?: number[]
     studentPersonId: number
     accountIds: number[]
@@ -426,12 +432,14 @@ export const contentReviewApi = {
   }) =>
     unwrap<number>(await http.post('/zsjos/content-review/batch/create-from-student', data)),
   resubmitFromStudent: async (batchId: number, data: {
+    draftReviewerSelection?: ContentReviewSelection | null
     studentPersonId: number
     accountIds: number[]
     accountSnapshots?: Record<string, Record<string, unknown>>
     works: Array<Record<string, unknown>>
   }) => unwrap<number>(await http.post(`/zsjos/content-review/batch/${batchId}/resubmit-from-student`, data)),
   saveStudentDraft: async (batchId: number, data: {
+    draftReviewerSelection?: ContentReviewSelection | null
     expectedVersion?: number
     studentPersonId: number
     accountIds: number[]

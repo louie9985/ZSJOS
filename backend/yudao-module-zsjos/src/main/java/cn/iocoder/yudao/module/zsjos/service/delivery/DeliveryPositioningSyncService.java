@@ -33,6 +33,21 @@ public class DeliveryPositioningSyncService {
     public void syncAccount(Long accountId) {
         var account = accounts.selectByIdForUpdate(accountId, TenantContextHolder.getRequiredTenantId());
         if (account == null) return;
+        var round = sources.diagnosisRound(account);
+        if (round != null) {
+            var values = DeliveryPositioningSource.parse(account.getDetailValuesJson());
+            var context = DeliveryPositioningSource.parse(values.get("_diagnosisContext") instanceof String json ? json : null);
+            String anchor = DeliveryPositioningSource.effectiveAt(round).toString();
+            // Reconcile even previously synchronized sources; account creation must never split a service clock.
+            if (!Objects.equals(anchor, context.get("anchorAt"))
+                    || !Objects.equals(String.valueOf(round.getId()), String.valueOf(context.get("roundKey")))) {
+                context.put("anchorAt", anchor);
+                context.put("roundKey", round.getId());
+                values.put("_diagnosisContext", JsonUtils.toJsonString(context));
+                account.setDetailValuesJson(JsonUtils.toJsonString(values)).setVersion(account.getVersion() + 1);
+                accounts.updateById(account);
+            }
+        }
         var source = sources.latest(account);
         if (source == null) return;
         var latest = plans.selectOne(new LambdaQueryWrapper<StudentDeliveryPlanDO>().eq(StudentDeliveryPlanDO::getAccountId, accountId).orderByDesc(StudentDeliveryPlanDO::getId).last("LIMIT 1"));
@@ -40,17 +55,6 @@ public class DeliveryPositioningSyncService {
         if (DeliveryPositioningSource.effectiveAt(source) != null && entries.replay(accountId, 0L, key) == null) {
             var values = DeliveryPositioningSource.parse(account.getDetailValuesJson());
             var context = DeliveryPositioningSource.parse(values.get("_diagnosisContext") instanceof String json ? json : null);
-            boolean restart = latest != null && "REPOSITIONING".equals(latest.getStatus())
-                    && !Objects.equals(latest.getSourceSubmissionId(), source.getId()) && latest.getRestartRequestedAt() != null
-                    && source.getSubmittedAt() != null && !source.getSubmittedAt().isBefore(latest.getRestartRequestedAt());
-            if (context.get("anchorAt") == null || restart) {
-                var first = restart ? source : sources.firstProven(account);
-                var anchor = DeliveryPositioningSource.effectiveAt(first);
-                if (anchor != null) {
-                    if (account.getCreateTime() != null && anchor.isBefore(account.getCreateTime())) anchor = account.getCreateTime();
-                    context.put("anchorAt", anchor.toString()); context.put("roundKey", first.getId());
-                }
-            }
             context.put("submissionId", source.getId()); context.put("submissionNo", source.getSubmissionNo());
             context.put("syncedAt", LocalDateTime.now(ZoneId.of("Asia/Shanghai")).toString());
             context.put("effectiveAt", DeliveryPositioningSource.effectiveAt(source).toString());

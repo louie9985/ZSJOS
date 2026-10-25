@@ -1,3 +1,6 @@
+import { invalidateMenuTasks } from '../services/menuTaskRefresh'
+import { BUSINESS_APPROVAL_PROCESS_KEYS } from '../services/approvalNavigation'
+import BusinessTaskApproval, { hasBusinessApproval } from '../components/bpm/BusinessTaskApproval'
 import BusinessTable from '../components/BusinessTable'
 import { MATERIAL_APPROVAL_INVALID_TASK } from '../services/materialApprovalApi'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -54,6 +57,7 @@ const LEAD_APPEAL_PERMISSION_DENIED = 1_900_003_041
 const taskStatusLabel = (status?: number) => approvalStatus(status, bpmStatusLabel)
 const taskStatusColor = bpmStatusColor
 
+/** 主标题使用审批名称；业务摘要的 title 可能只是单号，保留在摘要中展示。 */
 function taskSubject(task: BpmTask) {
   return task.processInstance?.name?.trim() || task.name?.trim() || '审批任务'
 }
@@ -77,10 +81,6 @@ function taskSummary(task?: BpmTask) {
 }
 
 /** 业务摘要优先展示业务单据标题与字段；未接入业务域的流程退回流程摘要。 */
-function briefTitle(task: BpmTask, briefs: Record<string, BpmApprovalBrief>) {
-  return briefs[task.id]?.title
-}
-
 function briefSummary(task: BpmTask, briefs: Record<string, BpmApprovalBrief>) {
   const brief = briefs[task.id]
   if (!brief) return []
@@ -100,17 +100,6 @@ function formatDuration(duration?: number) {
   return [days ? `${days} 天` : '', hours ? `${hours} 小时` : '', `${remainder} 分钟`].filter(Boolean).join(' ')
 }
 
-/**
- * 已接入专属业务审批页的流程：这些流程的待办/已办统一在各自业务页处理，
- * 不再出现在通用审批中心，避免同一笔业务在两个入口重复展示、重复处理。
- * 与后端 ZsjosBpmBusinessTaskTargetServiceImpl 支持的业务入口保持一致。
- */
-const BUSINESS_APPROVAL_PROCESS_KEYS = [
-  'zsjos_sales_order_dual_approval',
-  'zsjos_lead_appeal_review',
-  'zsjos_viral_account_review',
-  'zsjos_viral_content_review'
-].join(',')
 
 /**
  * 已接入员工端业务页的流程，额外提供业务详情入口；
@@ -314,7 +303,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [canQuery, keyword, permissions, tablePage, tablePageSize, useTableLayout, view, linkedTaskId, message])
+  }, [canQuery, keyword, permissions, tablePage, tablePageSize, useTableLayout, view, linkedTaskId, message, location.pathname])
 
   const loadMore = useCallback(async () => {
     if (!canQuery || loading || loadingMoreRef.current || tasks.length >= total) return
@@ -386,8 +375,9 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     navigate(nextView === 'done' ? APP_ROUTES.BPM_DONE : APP_ROUTES.BPM_TODO)
   }
 
-  const reload = () => {
+  const reload = async () => {
     if (draft.current.busy) return
+    if (hasBusinessApproval(selectedTask) && !await confirmLeave()) return
     if (selectedTask) { heldRef.current = selectedTask; setHeldTask(selectedTask) }
     setRefreshVersion(value => value + 1)
     void loadCounts()
@@ -418,7 +408,15 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   }
 
   const nextTask = tasks.find(item => item.id !== selectedTask?.id)
-  const detail = <><>{completed && <Alert type="success" message="本次操作已完成" action={nextTask ? <Button onClick={() => void selectTask(nextTask)}>下一条待办</Button> : <span>暂无下一条待办</span>}/>}</><BpmApprovalDetail key={(selectedTask?.id ?? "") + view}
+  const detail = <><>{completed && <Alert type="success" message="本次操作已完成" action={nextTask ? <Button onClick={() => void selectTask(nextTask)}>下一条待办</Button> : <span>暂无下一条待办</span>}/>}</>{selectedTask && hasBusinessApproval(selectedTask) ? <BusinessTaskApproval
+    key={selectedTask.id + view + refreshVersion} task={selectedTask} permissions={permissions}
+    done={view === 'done' || completed} onState={setDraftState}
+    onComplete={() => {
+      invalidateMenuTasks(true)
+      heldRef.current = selectedTask; setHeldTask(selectedTask); setCompleted(true)
+      void loadCounts(); void loadFirstPage(true)
+    }}
+  /> : <BpmApprovalDetail key={(selectedTask?.id ?? "") + view}
     task={selectedTask}
     onState={setDraftState} refreshVersion={refreshVersion} completed={completed}
     initialDraft={draftValues.current} onDraft={saveDraft}
@@ -434,12 +432,13 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
       ? { loading: businessEntry.loading, onOpen: () => void businessEntry.open() }
       : undefined}
     onActionSuccess={taskCompleted => {
+      invalidateMenuTasks(true)
       if (selectedTask) { heldRef.current = selectedTask; setHeldTask(selectedTask) }
       setCompleted(!!taskCompleted)
       void loadCounts()
       void loadFirstPage(true)
     }}
-  /></>
+  />}</>
 
   return <section className={`workspace-page business-inbox-page bpm-approval-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar bpm-approval-header">
@@ -541,7 +540,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
                       <Avatar icon={<FileSearchOutlined/>}/>
                       <div className="business-inbox-item-copy">
                         <div className="business-inbox-item-title">
-                          <strong>{briefTitle(task, briefs) || taskSubject(task)}</strong>
+                          <strong>{taskSubject(task)}</strong>
                           <Tag color={taskStatusColor(task.status)}>{taskStatusLabel(task.status)}</Tag>
                         </div>
                         <span>{task.name || '流程节点'} · 发起人：{task.processInstance?.startUser?.nickname || '-'}</span>

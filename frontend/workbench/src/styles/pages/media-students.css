@@ -600,6 +600,9 @@
 .account-profile-sections .account-positioning-summary-row .ant-tag { font-size: var(--crm-font-sm); }
 .account-profile-sections .ant-btn, .account-history-full .ant-btn { border-radius: var(--crm-radius-md); min-height: 30px; font-size: var(--crm-font-base); padding-inline: var(--crm-sp-3); white-space: normal; height: auto; }
 .account-review-record-actions { display: flex; align-items: center; flex-wrap: nowrap; width: 100%; min-width: 0; max-width: 100%; overflow: hidden; }
+/* Diagnosis requirements vary in length; use the shared grid row height to align history actions. */
+.account-profile-sections > [data-profile-section="REVIEW"] .account-profile-row:is([data-profile-key="diagnosis_7d"], [data-profile-key="diagnosis_14d"], [data-profile-key="diagnosis_28d"], [data-profile-key="adjustment_28d"]) > div:nth-child(2) { flex: 1; flex-direction: column; align-items: stretch; }
+.account-profile-sections > [data-profile-section="REVIEW"] .account-profile-row > div:nth-child(2) > .account-review-record { width: 100%; margin-block-start: auto; }
 .account-review-record-actions .ant-btn { flex: 1 1 0; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-inline: var(--crm-sp-2); font-size: var(--crm-font-sm); }
 .account-review-record-actions .account-review-record-primary { display: flex; flex: 1 1 0; min-width: 0; }
 .account-review-record-actions .account-review-record-primary .ant-btn { width: 100%; }
@@ -862,6 +865,17 @@
 .account-diagnosis-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 var(--crm-sp-6); }
 .account-diagnosis-basics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .account-diagnosis-grid .ant-input-number { width: 100%; }
+.account-diagnosis-accounts { margin: 0 0 var(--crm-sp-6); min-width: 0; }
+.account-diagnosis-accounts-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--crm-sp-3); margin-bottom: var(--crm-sp-4); }
+.account-diagnosis-accounts-heading .ant-typography { margin: 0; }
+.account-diagnosis-accounts .business-table .ant-form-item { margin-bottom: 0; }
+.account-diagnosis-accounts .ant-select, .account-diagnosis-accounts .ant-input-number { width: 100%; }
+.account-diagnosis-add-account.ant-btn { margin-top: var(--crm-sp-4); min-height: 48px; color: var(--crm-color-primary); }
+.account-diagnosis-account-picker { width: min(360px, calc(100vw - 64px)); }
+.account-diagnosis-candidates { width: 100%; }
+.account-diagnosis-candidates .ant-btn { height: auto; min-height: 48px; white-space: normal; justify-content: space-between; gap: var(--crm-sp-4); text-align: left; }
+.account-diagnosis-candidates .ant-btn > span { overflow-wrap: anywhere; }
+.account-diagnosis-mobile-row { padding: var(--crm-sp-4) 0; border-bottom: 1px solid var(--crm-border); }
 @media (max-width: 768px) {
   .account-diagnosis-grid { grid-template-columns: minmax(0, 1fr); }
 }

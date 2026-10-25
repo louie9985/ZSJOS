@@ -32,9 +32,9 @@ export function WorkbenchPageNavigation({ canOpen, canRetain, children }: { canO
 }
 
 export function useWorkbenchPageNavigation() { return useContext(Context) }
-export function useWorkbenchPageGuard(path: string, guard: Guard) {
+export function useWorkbenchPageGuard(path: string, guard: Guard, enabled = true) {
   const navigation = useContext(Context)
   const latest = useRef(guard)
   latest.current = guard
-  useEffect(() => navigation?.register(path, destination => latest.current(destination)), [navigation?.register, path])
+  useEffect(() => enabled ? navigation?.register(path, destination => latest.current(destination)) : undefined, [navigation?.register, path, enabled])
 }

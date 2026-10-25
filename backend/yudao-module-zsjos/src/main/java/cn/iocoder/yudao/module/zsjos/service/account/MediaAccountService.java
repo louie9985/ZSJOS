@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.account;
 
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaServiceReadiness;
+
 import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
 
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountSaveReqVO;
@@ -137,7 +139,7 @@ public class MediaAccountService {
 
     private void validateCreateRelation(ServiceRelationDO relation, MediaAccountSaveReqVO req, Long userId) {
         if (relation == null || !Objects.equals(relation.getPersonId(), req.getStudentPersonId())
-                || !"active".equals(relation.getStatus()) || !"accepted".equals(relation.getAcceptanceStatus())
+                || !"active".equals(relation.getStatus()) || !MediaServiceReadiness.ready(relation)
                 || relation.getContentDirectorUserId() == null
                 || !(Objects.equals(relation.getContentDirectorUserId(), userId)
                      || Objects.equals(relation.getOperatorUserId(), userId))
@@ -366,13 +368,18 @@ public class MediaAccountService {
     public void handleRebindProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
         MediaAccountDO account = mapper.selectByRebindProcessInstanceId(processInstanceId);
-        if (account == null || !"pending".equals(account.getRebindStatus())) return;
+        if (account == null) return;
+        account = mapper.selectByIdForUpdate(account.getId(), cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        if (account == null || !"pending".equals(account.getRebindStatus())
+                || !Objects.equals(processInstanceId, account.getRebindProcessInstanceId())) return;
         boolean approved = BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus);
         boolean rejected = BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus);
         if (!approved && !rejected) return;
         String targetStatus = approved ? "approved" : "rejected";
         Long targetStudentId = approved ? account.getRebindTargetStudentPersonId() : null;
         if (approved && targetStudentId == null) throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
+        if (approved && ("deleted".equals(account.getRunStatus()) || "delete_pending".equals(account.getRunStatus())))
+            throw exception(MEDIA_ACCOUNT_STATE_INVALID);
 
         LocalDateTime now = LocalDateTime.now();
         if (approved) {
@@ -465,8 +472,14 @@ public class MediaAccountService {
             actions.add(account.getStudentPersonId() == null ? ACTION_BIND_STUDENT : ACTION_UNBIND_STUDENT);
         }
         if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:edit")) actions.add(ACTION_EDIT_ACCOUNT);
-        if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:delete") && objectPermissionProvider.hasPermission(account.getId(), "delete", userId)
-                && !"pending".equals(account.getDeleteStatus()) && !"deleted".equals(account.getRunStatus())) actions.add("REQUEST_DELETE_ACCOUNT");
+        if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:delete")
+                && !"pending".equals(account.getDeleteStatus()) && !"deleted".equals(account.getRunStatus())) {
+            if (objectPermissionProvider.hasPermission(account.getId(), "delete-direct", userId)) {
+                actions.add("DELETE_ACCOUNT_DIRECTLY");
+            } else if (objectPermissionProvider.hasPermission(account.getId(), "delete-request", userId)) {
+                actions.add("REQUEST_DELETE_ACCOUNT");
+            }
+        }
         if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:rescue")) actions.add(ACTION_RESCUE_ACCOUNT);
         if (account.getStudentPersonId() != null && !"pending".equals(account.getRebindStatus())
                 && objectPermissionProvider.hasPermission(account.getId(), "rebind", userId)

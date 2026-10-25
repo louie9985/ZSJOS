@@ -817,9 +817,7 @@ public class MaterialService {
         }
         MaterialVersionDO draft = material.getCurrentDraftVersionId() == null ? null
                 : versionMapper.selectByIdForUpdate(material.getCurrentDraftVersionId(), tenantId());
-        if (!MATERIAL_DRAFT.equals(material.getStatus()) || material.getCurrentEffectiveVersionId() != null
-                || draft == null || !Objects.equals(draft.getMaterialId(), materialId)
-                || !VERSION_DRAFT.equals(draft.getStatus()) || draft.getProcessInstanceId() != null) {
+        if (!isDeletableDraft(material, draft)) {
             throw exception(MATERIAL_STATE_INVALID);
         }
         // Retain immutable versions and uploaded files for audit; all reads require a live material.
@@ -834,8 +832,7 @@ public class MaterialService {
         boolean owner = Objects.equals(material.getOwnerUserId(), userId);
         MaterialVersionDO draft = material.getCurrentDraftVersionId() == null ? null
                 : versionMapper.selectById(material.getCurrentDraftVersionId());
-        if (owner && MATERIAL_DRAFT.equals(material.getStatus()) && material.getCurrentEffectiveVersionId() == null
-                && draft != null && VERSION_DRAFT.equals(draft.getStatus()) && draft.getProcessInstanceId() == null
+        if (owner && isDeletableDraft(material, draft)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:material:delete-draft")) {
             actions.add("DELETE_DRAFT");
         }
@@ -864,6 +861,17 @@ public class MaterialService {
             actions.add("RESTORE");
         }
         return new ArrayList<>(actions);
+    }
+
+    private boolean isDeletableDraft(MaterialDO material, MaterialVersionDO draft) {
+        if (!MATERIAL_DRAFT.equals(material.getStatus()) || material.getCurrentEffectiveVersionId() != null
+                || draft == null || !Objects.equals(draft.getMaterialId(), material.getId())
+                || !VERSION_DRAFT.equals(draft.getStatus())) return false;
+        if (draft.getProcessInstanceId() == null) return true;
+        // Withdrawal retains the process reference for audit; only its concluded cancellation permits deletion.
+        MaterialApprovalRoundDO round = approvalRoundMapper.selectByProcessInstanceId(draft.getProcessInstanceId());
+        return round != null && Objects.equals(round.getMaterialVersionId(), draft.getId())
+                && "CANCELLED".equals(round.getStatus());
     }
 
     private MaterialTypeDO requireCreatableType(Long typeId) {

@@ -5,6 +5,27 @@ import java.io.*;
 import java.util.zip.*;
 import static org.junit.jupiter.api.Assertions.*;
 class StudentInfoAttachmentValidatorTest {
+    @Test void acceptsStoredDocxEntriesWithDataDescriptors() throws Exception {
+        // Streaming ZIP writer: STORED entries, bit 3 set, sizes/CRC in data descriptors.
+        byte[] docx = Base64.getDecoder().decode("UEsDBBQACAAAANWCVV0AAAAAAAAAAAAAAAATAAAAW0NvbnRlbnRfVHlwZXNdLnhtbDxUeXBlcy8+UEsHCMccFzwIAAAACAAAAFBLAwQUAAgAAADVglVdAAAAAAAAAAAAAAAAEQAAAHdvcmQvZG9jdW1lbnQueG1sPGRvY3VtZW50Lz5QSwcIX1vRTAsAAAALAAAAUEsBAhQAFAAIAAAA1YJVXcccFzwIAAAACAAAABMAAAAAAAAAAAAAAIABAAAAAFtDb250ZW50X1R5cGVzXS54bWxQSwECFAAUAAgAAADVglVdX1vRTAsAAAALAAAAEQAAAAAAAAAAAAAAgAFJAAAAd29yZC9kb2N1bWVudC54bWxQSwUGAAAAAAIAAgCAAAAAkwAAAAAA");
+        try (var stream = new ZipInputStream(new ByteArrayInputStream(docx))) {
+            assertThrows(ZipException.class, stream::getNextEntry);
+        }
+        assertEquals("application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                StudentInfoAttachmentValidator.validate(docx, "报名申请表.docx", StudentInfoFields.extensions("application_images")));
+        assertThrows(Exception.class, () -> StudentInfoAttachmentValidator.validate(docx, "test.docx", StudentInfoFields.extensions("work_proof")));
+    }
+    @Test void rejectsTruncatedAndNonWordZipsWithActionableErrors() throws Exception {
+        var broken = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> StudentInfoAttachmentValidator.validate(new byte[]{80, 75, 3, 4}, "test.docx", List.of("docx")));
+        assertTrue(broken.getMessage().contains("DOCX"));
+        var buffer = new ByteArrayOutputStream();
+        try (var zip = new ZipOutputStream(buffer)) {
+            zip.putNextEntry(new ZipEntry("unrelated.txt")); zip.write("text".getBytes()); zip.closeEntry();
+        }
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> StudentInfoAttachmentValidator.validate(buffer.toByteArray(), "test.docx", List.of("docx")));
+    }
     @Test void fieldSpecificFormatsRejectDisguisedAndUnsupportedFiles() throws Exception {
         byte[] pdf="%PDF-1.7\nsynthetic\n%%EOF".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
         assertEquals("application/pdf",StudentInfoAttachmentValidator.validate(pdf,"test.pdf",StudentInfoFields.extensions("education_report")));

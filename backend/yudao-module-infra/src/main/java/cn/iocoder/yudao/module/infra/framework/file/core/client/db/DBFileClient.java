@@ -37,6 +37,27 @@ public class DBFileClient extends AbstractFileClient<DBFileClientConfig> {
     }
 
     @Override
+    public String uploadFile(java.nio.file.Path source, String path, String type) throws Exception {
+        var dataSource = SpringUtil.getBean(javax.sql.DataSource.class);
+        var connection = org.springframework.jdbc.datasource.DataSourceUtils.getConnection(dataSource);
+        String sql = "INSERT INTO infra_file_content(config_id,path,content,creator,updater) VALUES(?,?,?,?,?)";
+        try {
+            // MySQL client-side prepared statements buffer the whole binary packet. Use its server-side stream.
+            try (var statement = connection.isWrapperFor(com.mysql.cj.jdbc.JdbcConnection.class)
+                    ? connection.unwrap(com.mysql.cj.jdbc.JdbcConnection.class).serverPrepareStatement(sql)
+                    : connection.prepareStatement(sql);
+                 var input = java.nio.file.Files.newInputStream(source)) {
+                String actor = java.util.Objects.toString(cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId(), "");
+                statement.setLong(1, getId()); statement.setString(2, path);
+                statement.setBinaryStream(3, input, java.nio.file.Files.size(source));
+                statement.setString(4, actor); statement.setString(5, actor);
+                statement.executeUpdate();
+            }
+        } finally { org.springframework.jdbc.datasource.DataSourceUtils.releaseConnection(connection, dataSource); }
+        return super.formatFileUrl(config.getDomain(), path);
+    }
+
+    @Override
     public void delete(String path) {
         fileContentMapper.deleteByConfigIdAndPath(getId(), path);
     }

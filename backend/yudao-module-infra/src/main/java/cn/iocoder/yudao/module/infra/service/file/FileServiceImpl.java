@@ -124,6 +124,40 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    @SneakyThrows
+    public FileDO createFileInfoFromPath(java.nio.file.Path source, String name, String directory, String type) {
+        long size = java.nio.file.Files.size(source);
+        Assert.isTrue(size > 0, "文件内容不能为空");
+        name = FilePathUtils.validateFileName(name);
+        if (StrUtil.isEmpty(type)) {
+            try (var input = java.nio.file.Files.newInputStream(source)) {
+                type = new org.apache.tika.Tika().detect(input, name);
+            }
+        }
+        if (StrUtil.isEmpty(name)) {
+            try (var input = java.nio.file.Files.newInputStream(source)) { name = DigestUtil.sha256Hex(input); }
+        }
+        if (StrUtil.isEmpty(FileUtil.extName(name))) {
+            String extension = FileTypeUtils.getExtension(type);
+            if (StrUtil.isNotEmpty(extension)) name += extension;
+        }
+        String path = generateUploadPath(name, directory);
+        FileClient client = fileConfigService.getMasterFileClient();
+        Assert.notNull(client, "客户端(master) 不能为空");
+        try {
+            String url = client.uploadFile(source, path, type);
+            FileDO file = new FileDO().setConfigId(client.getId()).setName(name).setPath(path)
+                    .setUrl(url).setType(type).setSize(size);
+            fileMapper.insert(file);
+            return file;
+        } catch (Exception failure) {
+            // A provider can fail after writing part/all of this new object, including while signing its URL.
+            try { client.delete(path); } catch (Exception cleanup) { failure.addSuppressed(cleanup); }
+            throw failure;
+        }
+    }
+
+    @Override
     public FileDO createAvatarFile(byte[] content, String directory) {
         if (!AVATAR_DIRECTORIES.contains(directory)) {
             throw exception(FILE_AVATAR_DIRECTORY_INVALID);

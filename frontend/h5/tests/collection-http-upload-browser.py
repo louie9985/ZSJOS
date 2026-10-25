@@ -3,9 +3,14 @@
 
 Build to frontend/h5/tmp/collection-http-upload/dist, then run this script.
 Use --dev to read assets from the existing Vite server on port 10086 instead.
+Use --current-build to read the normal frontend/h5/dist production bundle.
+Set COLLECTION_UPLOAD_TEST_OUT to isolate the bundle and browser output directory.
 Business APIs are always intercepted; no business data is used or modified.
 """
 import json
+import os
+import io
+import zipfile
 import struct
 import sys
 import zlib
@@ -16,8 +21,8 @@ from pathlib import Path
 from playwright.sync_api import expect, sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / "tmp" / "collection-http-upload"
-DIST = OUT / "dist"
+OUT = Path(os.environ.get("COLLECTION_UPLOAD_TEST_OUT", ROOT / "tmp" / "collection-http-upload"))
+DIST = ROOT / "dist" if "--current-build" in sys.argv else OUT / "dist"
 # A visible non-square fixture catches a collapsed or stretched preview that a 1px image misses.
 def png_chunk(kind, data):
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
@@ -30,29 +35,37 @@ PNG = (b"\x89PNG\r\n\x1a\n"
        + png_chunk(b"IEND", b""))
 DEV = "--dev" in sys.argv
 PDF = b"%PDF-1.7\nsynthetic fixture\n%%EOF"
+docx_buffer = io.BytesIO()
+with zipfile.ZipFile(docx_buffer, 'w') as archive:
+    archive.writestr('[Content_Types].xml', '<Types/>')
+    archive.writestr('word/document.xml', '<document/>')
+DOCX = docx_buffer.getvalue()
 FIELDS = [
     dict(key="name", label="姓名", type="text", group="basic", required=True, enabled=True),
     dict(key="portrait", label="证件照片", type="images", group="materials",
-         required=False, enabled=True, maxImages=9, maxSizeMb=1, allowedExtensions=["png"]),
+         required=False, enabled=True, maxImages=9, maxSizeMb=100, allowedExtensions=["png"]),
     dict(key="education_report", label="学历认证报备", type="images", group="materials",
-         required=False, enabled=True, maxImages=9, maxSizeMb=1, allowedExtensions=["pdf"]),
+         required=False, enabled=True, maxImages=9, maxSizeMb=100, allowedExtensions=["pdf"]),
+    dict(key="application_images", label="报名申请表", type="images", group="materials",
+         required=False, enabled=True, maxImages=9, maxSizeMb=100, allowedExtensions=["pdf", "docx"]),
 ]
 
 
 def scenario(browser, origin, width, no_crypto=False):
+    pdf_content = PDF + b'\n' + b'x' * (11 * 1024 * 1024) if width == 1440 else PDF
     context = browser.new_context(viewport={"width": width, "height": 1000},
                                   accept_downloads=True, has_touch=True)
     if no_crypto:
         context.add_init_script("Object.defineProperty(globalThis,'crypto',{value:undefined})")
     page = context.new_page()
-    errors, uploads, submitted, held = [], [], [], []
+    errors, uploads, submitted, held, upload_requests = [], [], [], [], []
     state = {"images": [], "contents": {}, "fail": False, "hold": True, "next_id": 100}
     page.on("pageerror", lambda error: errors.append(str(error)))
 
-    def reply(route, data, code=0):
+    def reply(route, data, code=0, message=None):
         route.fulfill(content_type="application/json; charset=utf-8",
                       body=json.dumps({"code": code, "data": data,
-                                       "msg": "合成上传失败，请重试" if code else ""}))
+                                       "msg": message or ("合成上传失败，请重试" if code else "")}))
 
     def request(route):
         req = route.request
@@ -63,10 +76,14 @@ def scenario(browser, origin, width, no_crypto=False):
             if path.endswith("/detail"):
                 return reply(route, dict(status="SUBMITTED" if submitted else "DRAFT",
                     tenantId=1, fields=FIELDS, options={}, images=state["images"]))
+            if path.endswith('/draft'):
+                draft=req.post_data_json
+                return reply(route,dict(revision=draft['revision']+1,values=draft['values'],savedAt='2026-10-21 16:00:00'))
             if path.endswith("/images"):
+                upload_requests.append(req.method)
                 if state["fail"]:
                     state["fail"] = False
-                    return reply(route, None, 500)
+                    return reply(route, None, state.pop("failure_code", 500), state.pop("failure_message", None))
                 message = BytesParser(policy=policy.default).parsebytes(
                     ("Content-Type: " + req.headers["content-type"] + "\r\n\r\n").encode()
                     + req.post_data_buffer)
@@ -76,10 +93,10 @@ def scenario(browser, origin, width, no_crypto=False):
                 side = parts["side"].get_content().strip()
                 file = parts["file"]
                 content = file.get_payload(decode=True)
-                assert side == "" and field in ["portrait", "education_report"]
-                assert content == (PNG if field == "portrait" else PDF)
+                assert side == "" and field in ["portrait", "education_report", "application_images"]
+                assert content == {"portrait": PNG, "education_report": pdf_content, "application_images": DOCX}[field]
                 image = dict(id=state["next_id"], fieldKey=field, side=side,
-                             contentType="image/png" if field == "portrait" else "application/pdf",
+                             contentType={"portrait": "image/png", "education_report": "application/pdf", "application_images": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}[field],
                              name=file.get_filename(), size=len(content))
                 state["next_id"] += 1
                 state["images"].append(image)
@@ -125,12 +142,26 @@ def scenario(browser, origin, width, no_crypto=False):
         assert page.evaluate("typeof crypto.randomUUID") == "undefined"
         assert page.evaluate("typeof crypto.getRandomValues") == "function"
     page.locator("#name").fill("合成测试")
-    page.locator("[data-group=materials] summary").click()
+    if not page.locator('[data-group=materials]').evaluate('(node) => node.open'):
+        page.locator("[data-group=materials] summary").click()
     submit = page.get_by_role("button", name="提交信息", exact=True)
 
     def upload(label, name, content, mime):
         page.get_by_label(label + "添加附件", exact=True).set_input_files(
             {"name": name, "buffer": content, "mimeType": mime})
+
+    for label, name, mime in [
+        ("报名申请表", "empty.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        ("报名申请表", "empty.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        ("学历认证报备", "empty.pdf", "application/pdf"),
+        ("证件照片", "empty.png", "image/png"),
+    ]:
+        upload(label, name, b"", mime)
+        expect(page.locator(".van-toast")).to_have_text("文件为空，请保存有效内容后重新上传")
+        expect(page.locator(".collection-images__pending")).to_have_count(0)
+        expect(submit).to_be_enabled()
+        assert not upload_requests
+    page.screenshot(path=str(OUT / f"empty-file-{width}-{'https' if origin.startswith('https:') else 'http'}.png"))
 
     upload("证件照片", "portrait.png", PNG, "image/png")
     expect(page.locator(".collection-images__pending")).to_be_visible()
@@ -183,13 +214,39 @@ def scenario(browser, origin, width, no_crypto=False):
     page.locator(".van-image-preview__swipe-item").tap(position={"x": 10, "y": 10})
     expect(page.locator(".van-image-preview")).to_be_hidden()
 
-    upload("学历认证报备", "report.pdf", PDF, "application/pdf")
+    pdf_name = 'education_report-123456789-学历认证报备.pdf'
+    upload("学历认证报备", pdf_name, pdf_content, "application/pdf")
     document = page.get_by_role("button", name="预览学历认证报备", exact=True)
-    expect(document).to_contain_text("report.pdf")
+    expect(document).to_contain_text(pdf_name)
+    expect(document).to_have_attribute('title', pdf_name)
+    expect(document.locator('.collection-images__file-name')).to_have_css('font-size', '12px')
+    expect(document.locator('.collection-images__file-name')).to_have_css('-webkit-line-clamp', '2')
+    expect(document.locator('svg')).to_contain_text('PDF')
+    assert document.bounding_box()['width'] == 96
+    icon_box = document.locator('svg').bounding_box()
+    name_box = document.locator('.collection-images__file-name').bounding_box()
+    assert name_box['y'] >= icon_box['y'] + icon_box['height'], (icon_box, name_box)
     with page.expect_download() as event:
         document.click()
-    assert event.value.suggested_filename == "report.pdf"
-    assert Path(event.value.path()).read_bytes() == PDF
+    assert event.value.suggested_filename == pdf_name
+    assert Path(event.value.path()).read_bytes() == pdf_content
+    state['fail'] = True
+    state['failure_code'] = 1900090013
+    state['failure_message'] = '单个附件不能超过 100MB'
+    docx_name = '报名申请表-中文名称与英文-application-long-name.docx'
+    upload('报名申请表', docx_name, DOCX, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+    expect(page.get_by_role('button', name='重试', exact=True)).to_be_visible()
+    expect(page.locator('.collection-images__pending')).to_contain_text('单个附件不能超过 100MB')
+    expect(submit).to_be_disabled()
+    page.get_by_role('button', name='重试', exact=True).click()
+    word = page.get_by_role('button', name='预览报名申请表', exact=True)
+    expect(word.locator('svg')).to_contain_text('W')
+    expect(word).to_have_attribute('title', docx_name)
+    with page.expect_download() as event:
+        word.click()
+    assert event.value.suggested_filename == docx_name
+    assert Path(event.value.path()).read_bytes() == DOCX
+    page.screenshot(path=str(OUT / f'{prefix}-documents-{width}.png'), full_page=True)
     page.get_by_role("button", name="删除学历认证报备添加附件", exact=True).click()
     expect(document).to_have_count(0)
 
@@ -204,11 +261,17 @@ def scenario(browser, origin, width, no_crypto=False):
     expect(preview.locator("img")).to_have_count(2)
 
     count = len(uploads)
+    request_count = len(upload_requests)
     upload("证件照片", "wrong.pdf", PDF, "application/pdf")
     expect(page.locator(".van-toast")).to_contain_text("附件格式不符合此字段要求")
-    upload("证件照片", "large.png", b"x" * (1024 * 1024 + 1), "image/png")
-    expect(page.locator(".van-toast")).to_contain_text("单个不能超过")
+    page.get_by_label('证件照片添加附件', exact=True).evaluate("""input => {
+        const transfer = new DataTransfer();
+        transfer.items.add(new File([new ArrayBuffer(100 * 1024 * 1024 + 1)], 'large.png', {type:'image/png'}));
+        input.files=transfer.files; input.dispatchEvent(new Event('change',{bubbles:true}));
+    }""")
+    expect(page.locator(".van-toast")).to_contain_text("单个附件不能超过 100MB")
     assert len(uploads) == count
+    assert len(upload_requests) == request_count
     assert not page.evaluate("document.documentElement.scrollWidth > innerWidth")
     label = ("https" if origin.startswith("https:") else "http") + ("-no-crypto" if no_crypto else "")
     page.screenshot(path=str(OUT / f"{prefix}-{width}.png"), full_page=True)
@@ -216,11 +279,12 @@ def scenario(browser, origin, width, no_crypto=False):
     page.get_by_role("button", name="确认", exact=True).click()
     expect(page.locator(".van-empty")).to_contain_text("信息已提交")
     assert len(submitted) == 1
-    assert submitted[0]["values"]["portrait"] == [image["id"] for image in state["images"]]
+    assert submitted[0]["values"]["portrait"] == [image["id"] for image in state["images"] if image['fieldKey'] == 'portrait']
     assert submitted[0]["values"]["education_report"] == []
+    assert submitted[0]['values']['application_images'] == [image['id'] for image in state['images'] if image['fieldKey'] == 'application_images']
     assert not errors, errors
     context.close()
-    print(f"PASS {label} {width}px: upload/progress/image/PDF/retry/delete/validation/submission")
+    print(f"PASS {label} {width}px: upload/progress/image/PDF/DOCX/filename/download/retry/delete/validation/submission")
 
 
 if __name__ == "__main__":

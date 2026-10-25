@@ -41,6 +41,27 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PositioningCardServiceTest {
     @org.mockito.Mock private cn.iocoder.yudao.module.zsjos.service.media.MediaCollaborationNotifyPublisher collaborationNotify;
+    @Test void multipartAttachmentStreamsWithoutCallingGetBytes() throws Exception {
+        var card=editableDraft(1).setFieldsSnapshotJson("[{\"key\":\"files\",\"type\":\"attachment\",\"enabled\":true}]");
+        when(mapper.selectById(1L)).thenReturn(card);
+        byte[] content="synthetic content".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        var upload=new org.springframework.mock.web.MockMultipartFile("file","note.txt","text/plain",content) {
+            @Override public byte[] getBytes() { throw new AssertionError("HTTP uploads must not read the full file into heap"); }
+        };
+        var stored=new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO();
+        stored.setId(77L);stored.setName("note.txt");stored.setType("text/plain");stored.setSize((long)content.length);
+        var staged=new java.util.concurrent.atomic.AtomicReference<java.nio.file.Path>();
+        when(positioningFileApi.createFileInfoFromPath(any(),eq("note.txt"),any(),eq("text/plain"))).thenAnswer(call->{
+            java.nio.file.Path path=call.getArgument(0);staged.set(path);
+            assertEquals("synthetic content",java.nio.file.Files.readString(path));return stored;
+        });
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try { assertEquals(77L,service.uploadAttachmentFile(1L,"files",upload,99L).id()); }
+        finally { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
+        assertFalse(java.nio.file.Files.exists(staged.get()));
+        verify(positioningFileApi,never()).createFileInfo(any(),any(),any(),any());
+    }
+
     @Test void attachmentWrongDirectorReportsPermissionInsteadOfVersionConflict() {
         when(mapper.selectById(1L)).thenReturn(editableDraft(2));
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
@@ -100,7 +121,29 @@ class PositioningCardServiceTest {
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerStudentLinkMapper partnerStudentLinkMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper partnerAccountMapper;
     @Mock private MediaWorkflowEventService workflowEventService;
+    @Mock private cn.iocoder.yudao.module.infra.api.file.FileApi positioningFileApi;
     @InjectMocks private PositioningCardService service;
+    @Test void draftAttachmentGroupCannotExceedOneGiB() {
+        var existing = editableDraft(2);
+        when(mapper.selectById(1L)).thenReturn(existing);
+        when(directorFormTemplateService.requirePublished(eq(DirectorFormTemplateService.SCENE_POSITIONING), any()))
+                .thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.director.DirectorFormTemplateVersionDO().setId(42L));
+        var snapshot = positioningSnapshot(java.util.Map.of("files", java.util.List.of(51L, 52L)));
+        var field = new DirectorFormTemplateVO.Field();field.setKey("files");field.setType("attachment");
+        snapshot.setFields(java.util.List.of(field));snapshot.setDictSnapshots(new java.util.HashMap<>());
+        when(directorFormTemplateService.validateAndSnapshotVersion(eq(DirectorFormTemplateService.SCENE_POSITIONING), eq(42L), any(), eq(false), any())).thenReturn(snapshot);
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        var first=new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO();first.setId(51L);first.setSize(700L*1024*1024);first.setPath("zsjos/positioning-card/1/1/files/a.txt");
+        var second=new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO();second.setId(52L);second.setSize(324L*1024*1024+1);second.setPath("zsjos/positioning-card/1/1/files/b.txt");
+        when(positioningFileApi.getFileInfo(51L)).thenReturn(first);when(positioningFileApi.getFileInfo(52L)).thenReturn(second);
+        var req = new PositioningCardSaveReqVO();req.setAccountId(10L);req.setVersion(2);req.setValues(snapshot.getValues());
+        assertEquals(1900158000,assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,()->service.updateDraft(1L,req,99L)).getCode());
+        verify(mapper,never()).updateDraftSnapshot(any(),any(),any());
+        second.setSize(324L*1024*1024);
+        when(mapper.updateDraftSnapshot(any(),eq(2),eq(MediaWorkflowConstants.POSITIONING_CO_CREATING))).thenReturn(1);
+        org.junit.jupiter.api.Assertions.assertDoesNotThrow(()->service.updateDraft(1L,req,99L));
+    }
+
     @org.junit.jupiter.api.AfterEach void clearTenant(){cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();}
     private MediaAccountDO scopedAccount(Long id){var a=new MediaAccountDO().setId(id).setStudentPersonId(20L).setCreateServiceRelationId(30L).setDirectorUserId(99L);a.setTenantId(1L);return a;}
 

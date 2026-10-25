@@ -1,12 +1,79 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.giftpurchase;
-import cn.iocoder.yudao.framework.common.pojo.*; import cn.iocoder.yudao.module.zsjos.controller.admin.giftpurchase.vo.*; import cn.iocoder.yudao.module.zsjos.dal.dataobject.giftpurchase.GiftPurchaseDO; import cn.iocoder.yudao.module.zsjos.dal.mysql.giftpurchase.GiftPurchaseMapper; import cn.iocoder.yudao.framework.common.util.object.BeanUtils; import io.swagger.v3.oas.annotations.tags.Tag; import jakarta.annotation.Resource; import org.springframework.security.access.prepost.PreAuthorize; import org.springframework.web.bind.annotation.*; import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
-@Tag(name="管理后台-礼品采购") @RestController @RequestMapping("/zsjos/gift-purchase") public class GiftPurchaseController { @Resource private GiftPurchaseMapper mapper; @GetMapping("/get") @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:detail')") public CommonResult<GiftPurchaseRespVO> get(@RequestParam Long id){ return success(project(mapper.selectById(id))); } @GetMapping("/page") @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:query')") public CommonResult<PageResult<GiftPurchaseRespVO>> page(GiftPurchasePageReqVO req){ var p=mapper.selectPage(new com.baomidou.mybatisplus.extension.plugins.pagination.Page<GiftPurchaseDO>(req.getPageNo(),req.getPageSize()), com.baomidou.mybatisplus.core.toolkit.Wrappers.lambdaQuery(GiftPurchaseDO.class).like(req.getStudentName()!=null,GiftPurchaseDO::getStudentName,req.getStudentName()).like(req.getOrderNo()!=null,GiftPurchaseDO::getOrderNo,req.getOrderNo()).like(req.getGiftKeyword()!=null,GiftPurchaseDO::getGiftItemsJson,req.getGiftKeyword()).orderByDesc(GiftPurchaseDO::getGeneratedAt)); return success(new PageResult<>(p.getRecords().stream().map(this::project).toList(),p.getTotal())); } private GiftPurchaseRespVO project(GiftPurchaseDO row) {
-    if (row == null) return null;
-    GiftPurchaseRespVO result = BeanUtils.toBean(row, GiftPurchaseRespVO.class);
-    try { result.setGiftItemSnapshots(cn.iocoder.yudao.module.zsjos.service.order.SalesOrderGiftSnapshot.read(row.getGiftItemsJson())); }
-    catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) { result.setGiftItemsInvalid(true); }
-    return result;
-} }
 
+import cn.iocoder.yudao.framework.common.pojo.*;
+import cn.iocoder.yudao.module.zsjos.controller.admin.giftpurchase.vo.*;
+import cn.iocoder.yudao.module.zsjos.service.giftpurchase.GiftPurchaseService;
+import cn.iocoder.yudao.module.zsjos.service.gift.GiftConfigService;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+import java.util.List;
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
+@Tag(name = "管理后台-礼品采购")
+@RestController
+@RequestMapping("/zsjos/gift-purchase")
+@Validated
+public class GiftPurchaseController {
+    @Resource private GiftPurchaseService service;
+    @Resource private GiftConfigService giftConfigService;
 
+    @GetMapping("/page")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:query')")
+    public CommonResult<PageResult<GiftPurchaseRespVO>> page(@Valid GiftPurchasePageReqVO req) {
+        return success(service.page(req));
+    }
+
+    @GetMapping("/get")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:gift-purchase:detail','zsjos:gift-purchase:update')")
+    public CommonResult<GiftPurchaseRespVO> get(@RequestParam Long id) { return success(service.get(id)); }
+
+    @GetMapping("/operations")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:detail')")
+    public CommonResult<List<GiftPurchaseOperationRespVO>> operations(@RequestParam Long id) {
+        return success(service.operations(id));
+    }
+
+    public record GiftOption(Long id, Long parentId, String name, String code, Integer status) {}
+
+    @GetMapping("/gift-options")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:gift-purchase:create','zsjos:gift-purchase:update')")
+    public CommonResult<List<GiftOption>> giftOptions() {
+        return success(giftConfigService.listFlat(null).stream().map(g -> new GiftOption(
+                g.getId(), g.getParentId(), g.getName(), g.getCode(), g.getStatus())).toList());
+    }
+
+    @PostMapping("/create")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:create')")
+    public CommonResult<Long> create(@Valid @RequestBody GiftPurchaseSaveReqVO req) {
+        return success(service.create(req));
+    }
+
+    @PutMapping("/update")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:update')")
+    public CommonResult<Boolean> update(@Valid @RequestBody GiftPurchaseSaveReqVO req) {
+        if (req.getId() == null) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                cn.iocoder.yudao.module.zsjos.enums.GiftPurchaseErrorCodes.NOT_FOUND);
+        service.update(req); return success(true);
+    }
+
+    @PutMapping("/purchase")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:update')")
+    public CommonResult<Boolean> purchase(@RequestParam @NotNull Long id) {
+        service.setPurchased(id, true); return success(true);
+    }
+
+    @PutMapping("/unpurchase")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:update')")
+    public CommonResult<Boolean> unpurchase(@RequestParam @NotNull Long id) {
+        service.setPurchased(id, false); return success(true);
+    }
+
+    @DeleteMapping("/delete")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:delete')")
+    public CommonResult<Boolean> delete(@RequestParam Long id) { service.delete(id); return success(true); }
+}

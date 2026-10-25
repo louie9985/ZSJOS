@@ -22,10 +22,14 @@ public class DeliveryClassObjectPermissionProvider implements ZsjosObjectPermiss
 
     @Override
     public boolean hasPermission(Long id, String action, Long userId) {
-        DeliveryClassDO row = mapper.selectById(id);
+        return hasPermission(mapper.selectById(id), action, userId);
+    }
+
+    boolean hasPermission(DeliveryClassDO row, String action, Long userId) {
         if (row == null) return false;
         if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
-        if ("read".equals(action) && Boolean.TRUE.equals(row.getSystemClass())) {
+        if ("read".equals(action) && permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_ALL)) return true;
+        if ("read".equals(action) && DeliveryClassKind.pending(row)) {
             return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED);
         }
         if ("read".equals(action)) {
@@ -37,6 +41,11 @@ public class DeliveryClassObjectPermissionProvider implements ZsjosObjectPermiss
         }
         return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED)
                 && scopeService.contains(userId, row.getDeptId());
+    }
+
+    DeliveryClassScopeService.Scope commandScope(Long userId, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO user) {
+        return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED)
+                ? scopeService.resolve(userId, user) : new DeliveryClassScopeService.Scope(false, java.util.Set.of());
     }
 
     @Override public void check(Long id, String action, Long userId) {

@@ -22,7 +22,7 @@ public final class StudentServicePageSql {
             case "name" -> "sr.student_name_snapshot"; case "mobile" -> "p.mobile"; case "wechatId" -> "p.wechat_id";
             case "leadNo" -> "rl.lead_no"; case "className" -> "dc.class_name";
             case "courses" -> "JSON_UNQUOTE(JSON_EXTRACT(IF(JSON_VALID(COALESCE(oi.product_snapshot,sr.service_snapshot)),COALESCE(oi.product_snapshot,sr.service_snapshot),'{}'),'$.name'))";
-            case "serviceStatus" -> "sr.status"; case "orderNos" -> "ro.order_no";
+            case "serviceStatus" -> cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.STATUS_SQL; case "orderNos" -> "ro.order_no";
             case "activatedAt" -> "sr.activated_at";
             case "personNo" -> "p.person_no";
             case "acceptedAt" -> "sr.accepted_at";
@@ -36,6 +36,10 @@ public final class StudentServicePageSql {
         };
         String direction = "ascend".equals(q.getParameters().get("sortOrder")) ? " ASC" : " DESC";
         boolean nullsLast = java.util.Set.of("acceptedAt", "examDate", "latestContactAt", "taskDueAt", "pausedAt", "completedAt", "terminatedAt").contains(field == null ? "" : field);
-        return "SELECT sr.*" + FROM + " ORDER BY " + (nullsLast ? "(" + expression + " IS NULL) ASC," : "") + expression + direction + ",sr.id DESC LIMIT #{query.parameters.limit} OFFSET #{query.parameters.offset}";
+        int priorityCount = q.getParameters().get("priorityRelationCount") instanceof Integer count ? count : 0;
+        String priority = priorityCount == 0 ? "" : "CASE WHEN sr.id IN (" + java.util.stream.IntStream.range(0, priorityCount)
+                .mapToObj(i -> "#{query.parameters.priorityRelation" + i + "}").collect(java.util.stream.Collectors.joining(","))
+                + ") THEN 0 ELSE 1 END ASC,";
+        return "SELECT sr.*" + FROM + " ORDER BY " + priority + (nullsLast ? "(" + expression + " IS NULL) ASC," : "") + expression + direction + ",sr.id DESC LIMIT #{query.parameters.limit} OFFSET #{query.parameters.offset}";
     }
 }

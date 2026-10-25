@@ -67,8 +67,28 @@
 }
 
 .delivery-class-card-head .ant-typography {
+  flex: 1;
   min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.delivery-class-card-head {
+  align-items: flex-start;
+}
+
+.delivery-class-card-head > .ant-tag,
+.delivery-class-card-head > span:not(.ant-typography) {
+  flex-shrink: 0;
+}
+
+.delivery-class-card-homeroom,
+.delivery-class-card-foot {
+  overflow-wrap: anywhere;
+}
+
+.delivery-class-card-foot {
+  flex-wrap: wrap;
 }
 
 .delivery-class-card-meta {
@@ -110,6 +130,45 @@
   padding: var(--crm-sp-3);
   color: var(--crm-text-secondary);
   text-align: center;
+}
+
+.delivery-group-block { min-width: 0; }
+.delivery-group-block-expanded { grid-column: 1 / -1; }
+.delivery-group-card { cursor: pointer; border-radius: var(--crm-radius-md); }
+.delivery-group-card .ant-card-body { display: flex; flex-direction: column; gap: var(--crm-sp-4); padding: var(--crm-card-pad); }
+.delivery-group-children { padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-top: 0; border-radius: 0 0 var(--crm-radius-md) var(--crm-radius-md); }
+.delivery-group-more { padding-top: var(--crm-sp-4); }
+.delivery-group-row > td { background: var(--crm-bg-layout); font-weight: 500; }
+.delivery-group-child-name { margin-inline-start: var(--crm-sp-6); }
+.delivery-group-confirm-list { max-height: 40vh; overflow: auto; overflow-wrap: anywhere; }
+.delivery-group-block .ant-typography { overflow-wrap: anywhere; }
+
+.delivery-class-system {
+  align-self: start;
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--crm-color-primary) 35%, var(--crm-border));
+  background: color-mix(in srgb, var(--crm-bg-container) 94%, var(--crm-color-primary) 6%);
+}
+
+.delivery-class-system .ant-card-body {
+  min-height: 0;
+  gap: var(--crm-sp-3);
+}
+
+.delivery-class-system-row > td {
+  background: color-mix(in srgb, var(--crm-bg-container) 94%, var(--crm-color-primary) 6%);
+}
+
+.delivery-class-name,
+.delivery-group-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.delivery-group-name {
+  height: auto;
+  max-width: 100%;
+  text-align: start;
 }
 
 @media (max-width: 768px) {

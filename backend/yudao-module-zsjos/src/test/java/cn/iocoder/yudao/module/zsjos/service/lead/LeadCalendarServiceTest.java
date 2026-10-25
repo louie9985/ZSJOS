@@ -39,6 +39,18 @@ class LeadCalendarServiceTest {
         var row = new LeadCalendarMapper.DueLead(); row.setId(id); row.setCategory(category); row.setDeadline(start.atTime(hour, 0)); return row;
     }
     void rows(LeadCalendarMapper.DueLead... rows) { when(mapper.selectDueLeads(91L, 7L, start.atStartOfDay(), start.plusDays(1).atStartOfDay())).thenReturn(List.of(rows)); }
+    @Test void defaultSubmissionSortIgnoresDeadlinesAndKeepsMissingDatesLast() {
+        var old = row(1, 11, "S"); old.setSubmittedAt(start.atTime(8, 0));
+        var newer = row(2, 12, "A"); newer.setSubmittedAt(start.atTime(9, 0));
+        var tie = row(3, 7, "S"); tie.setSubmittedAt(newer.getSubmittedAt());
+        var missing = row(4, 6, "S");
+        var q = query(); assertEquals("submittedAt", q.getSort()); assertEquals("desc", q.getDirection());
+        var values = new ArrayList<>(List.of(old, missing, newer, tie));
+        values.sort(LeadCalendarService.comparator(q.getSort(), q.getDirection(), Map.of()));
+        assertEquals(List.of(3L, 2L, 1L, 4L), values.stream().map(LeadCalendarMapper.DueLead::getId).toList());
+        values.sort(LeadCalendarService.comparator("submittedAt", "asc", Map.of()));
+        assertEquals(List.of(1L, 3L, 2L, 4L), values.stream().map(LeadCalendarMapper.DueLead::getId).toList());
+    }
     @Test void usesAuthenticatedUserAndTenantForCounts() { rows(row(1, 9, "A"), row(2, 10, "S")); var days = service.days(query(), 7L); assertEquals(2, days.getFirst().count()); assertEquals(start, days.getFirst().date()); verifyNoInteractions(managementService, followUpService); }
     @Test void emptyMonthHasNoInventedCounts() { rows(); assertTrue(service.days(query(), 7L).isEmpty()); }
     @Test void deadlineSortHasStableTieBreakerAndReverse() { var rows = new ArrayList<>(List.of(row(3, 9, "S"), row(1, 9, "A"), row(2, 10, "B"))); rows.sort(LeadCalendarService.comparator("deadline", "asc", Map.of())); assertEquals(List.of(1L, 3L, 2L), rows.stream().map(LeadCalendarMapper.DueLead::getId).toList()); rows.sort(LeadCalendarService.comparator("deadline", "desc", Map.of())); assertEquals(2L, rows.getFirst().getId()); }
@@ -58,7 +70,7 @@ class LeadCalendarServiceTest {
         var older = row(1, 11, "A"); older.setOwnershipStartedAt(start.minusDays(2).atStartOfDay());
         var newer = row(2, 9, "A"); newer.setOwnershipStartedAt(start.minusDays(1).atStartOfDay());
         rows(newer, row(3, 8, "S"), older);
-        var q = query(); q.setSort("ownershipStartedAt"); q.setPageSize(1); q.setPageNo(2);
+        var q = query(); q.setSort("ownershipStartedAt"); q.setDirection("asc"); q.setPageSize(1); q.setPageNo(2);
         var lead = new LeadManagementRespVO(); lead.setId(2L);
         when(managementService.getLead(2L, 7L)).thenReturn(lead);
         var page = service.cards(q, 7L);
@@ -75,6 +87,8 @@ class LeadCalendarServiceTest {
             q.setDirection("desc");
             assertTrue(validator.validate(q).isEmpty());
             q.setSort("submittedAt");
+            assertTrue(validator.validate(q).isEmpty());
+            q.setSort("unsupported");
             assertTrue(validator.validate(q).stream().anyMatch(v -> v.getPropertyPath().toString().equals("sort")));
         }
     }

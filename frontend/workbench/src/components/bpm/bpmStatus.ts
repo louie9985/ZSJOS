@@ -46,8 +46,6 @@ export const BPM_VARIABLE_LABELS: Record<string, string> = {
   externalStartUserName: '发起人',
   startTime: '发起时间',
   processDefinitionName: '流程名称',
-  assignee: '审批人',
-  coll_userList: '抄送人',
   reason: '原因',
   description: '说明',
   submittedAt: '提交时间',

@@ -1,58 +1,37 @@
-import { LeadAppealPendingTag } from '../components/LeadAppealSummary'
 import SubordinateSalesCard from "../components/SubordinateSalesCard";
 import SubordinateSalesStatusFilter from "../components/SubordinateSalesStatusFilter";
-import { createIdempotencyKey } from '../services/idempotency'
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Button, Empty, Form, Input, InputNumber, List, Modal, Popover, Select, Skeleton, Space, Statistic, Switch, Tabs, Tag, Tooltip, Typography, message } from "antd";
-import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
+import { Alert, Button, Empty, Form, Input, InputNumber, List, Modal, Popover, Select, Skeleton, Space, Statistic, Switch, Tabs, Tag, Typography, message } from "antd";
+import type { ColumnsType } from "antd/es/table/interface";
 import {
   ArrowLeftOutlined,
-  DeleteOutlined,
-  ExportOutlined,
   PoweroffOutlined,
-  RollbackOutlined,
-  SwapOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import EmployeeAvatar from "../components/EmployeeAvatar";
-import EmployeeSelect from "../components/EmployeeSelect";
 import {
   api,
-  type AssignmentUser,
   type AdvancedFilterGroup,
   type BusinessTaskBucket,
-  type DictData,
-  type ManagedLead,
-  type SubordinateBatchResult,
   type SubordinateSales,
   type SubordinateTask,
 } from "../services/api";
 import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
-import LeadDetail from "../components/LeadDetail";
-import { DICT_TYPE, LEAD_STATUS_LABELS } from "../constants";
-import { dictionaryDisplayLabel, leadSnapshotLabel, protocolDisplayLabel } from "../services/leadManagement";
+import LeadManagementPage from "./LeadManagementPage";
 import { formatTimestamp } from "../services/time";
 import {
   formatCurrency,
   subordinateTaskTypeLabel,
   appendSubordinateSalesRows,
   receiveStatusLabel,
-  summarizeBatchResult,
   todayStatusLabel,
 } from "../services/subordinateSales";
-import {
-  SUPERVISOR_LEAD_ACTION_LABELS,
-  subordinateAssignmentStatusLabel,
-  supervisorLeadSelectionEligibility,
-  type SupervisorLeadBatchAction,
-} from "../services/subordinateLeadActions";
 
 const PAGE_SIZE = 20;
 type ReasonAction =
   | { type: "account"; sales: SubordinateSales; value: boolean }
   | { type: "dispatch"; sales: SubordinateSales; value: boolean };
-type BatchAction = SupervisorLeadBatchAction;
 
 function Metrics({ sales }: { sales: SubordinateSales }) {
   const metrics = [
@@ -105,124 +84,38 @@ function CategoryCounts({ sales }: { sales: SubordinateSales }) {
   );
 }
 
-function BatchResultModal({
-  result,
-  open,
-  onClose,
-}: {
-  result?: SubordinateBatchResult;
-  open: boolean;
-  onClose: () => void;
-}) {
-  return (
-    <Modal
-      open={open}
-      title={result ? summarizeBatchResult(result) : "批量结果"}
-      footer={<Button onClick={onClose}>关闭</Button>}
-      onCancel={onClose}
-    >
-      <List
-        size="small"
-        dataSource={result?.items || []}
-        renderItem={(item) => (
-          <List.Item>
-            <Space>
-              <Tag color={item.success ? "success" : "error"}>
-                {item.success ? "成功" : "失败"}
-              </Tag>
-              <span>{item.leadNo || '编号不可用'}</span>
-              <Typography.Text type={item.success ? undefined : "danger"}>
-                {item.message}
-              </Typography.Text>
-            </Space>
-          </List.Item>
-        )}
-      />
-    </Modal>
-  );
-}
-
-function ManagedLeadDetail({ leadId, onBack, onChanged }: { leadId: number; onBack: () => void; onChanged: () => void }) {
-  const [lead, setLead] = useState<ManagedLead>()
-  const [categories, setCategories] = useState<DictData[]>([])
-  const [channels, setChannels] = useState<DictData[]>([])
-  const [categoryError, setCategoryError] = useState(false)
-  const [channelError, setChannelError] = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const load = useCallback(async () => {
-    setLoading(true); setError(''); setCategoryError(false); setChannelError(false)
-    const results = await Promise.allSettled([
-      api.managedLead(leadId),
-      api.dictDataByType(DICT_TYPE.LEAD_CATEGORY),
-      api.dictDataByType(DICT_TYPE.LEAD_SOURCE_CHANNEL)
-    ])
-    if (results[0].status === 'fulfilled') setLead(results[0].value)
-    else {
-      setLead(undefined)
-      setError(results[0].reason instanceof Error ? results[0].reason.message : '客资详情加载失败')
-    }
-    if (results[1].status === 'fulfilled') setCategories(results[1].value)
-    else { setCategories([]); setCategoryError(true) }
-    if (results[2].status === 'fulfilled') setChannels(results[2].value)
-    else { setChannels([]); setChannelError(true) }
-    setLoading(false)
-  }, [leadId])
-  useEffect(() => { void load() }, [load])
-
-  return <div className="subordinate-lead-detail">
-    <div className="subordinate-detail-heading">
-      <Button icon={<ArrowLeftOutlined/>} onClick={onBack}>返回员工详情</Button>
-      <div><Typography.Title level={4}>{lead?.submittedName || '客资详情'}</Typography.Title><Typography.Text type="secondary">{lead?.leadNo}</Typography.Text></div>
-    </div>
-    {loading ? <Skeleton active paragraph={{ rows: 10 }}/>
-      : error ? <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>
-        : lead ? <LeadDetail lead={lead} categories={categories}
-          categoryLabel={value => dictionaryDisplayLabel(categories, value, categoryError)}
-          channelLabel={value => dictionaryDisplayLabel(channels, value, channelError)}
-          mode="manager-readonly" autoExpandFollowUp={false} onDirtyChange={() => undefined}
-          onChanged={() => { void load(); onChanged() }}/>
-          : <Empty description="客资详情不可用"/>}
-  </div>
-}
-
 function SalesDetail({
   sales,
   permissions,
   onBack,
   onChanged,
   onReasonAction,
+  onLeadDirtyChange,
+  canLeaveLeads,
 }: {
   sales: SubordinateSales;
   permissions: string[];
   onBack: () => void;
   onChanged: () => void;
   onReasonAction: (action: ReasonAction) => void;
+  onLeadDirtyChange: (dirty: boolean) => void;
+  canLeaveLeads: () => boolean;
 }) {
   const [tab, setTab] = useState("overview");
-  const [recycledOnly, setRecycledOnly] = useState(false);
-  const [leads, setLeads] = useState<ManagedLead[]>([]);
-  const [leadTotal, setLeadTotal] = useState(0);
-  const [leadPage, setLeadPage] = useState(1);
-  const [leadKeyword, setLeadKeyword] = useState("");
-  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
-  const [selected, setSelected] = useState<React.Key[]>([]);
-  const [selectedLeadMap, setSelectedLeadMap] = useState<Map<number, ManagedLead>>(new Map());
   const [tasks, setTasks] = useState<SubordinateTask[]>([]);
   const [taskTotal, setTaskTotal] = useState(0);
   const [taskBucket, setTaskBucket] = useState<BusinessTaskBucket>("today");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [batchOpen, setBatchOpen] = useState(false);
-  const [batchType, setBatchType] = useState<BatchAction>("transfer");
-  const batchIdempotencyKey = useRef<string | undefined>(undefined);
-  const [candidates, setCandidates] = useState<AssignmentUser[]>([]);
-  const [batchSaving, setBatchSaving] = useState(false);
-  const [batchResult, setBatchResult] = useState<SubordinateBatchResult>();
-  const [resultOpen, setResultOpen] = useState(false);
-  const [detailLeadId, setDetailLeadId] = useState<number>();
-  const [form] = Form.useForm();
+  const [taskLoading, setTaskLoading] = useState(false);
+  const [taskError, setTaskError] = useState("");
+  const taskRequest = useRef(0);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      taskRequest.current++;
+    };
+  }, []);
   const [newcomerForm] = Form.useForm<{ enabled: boolean; dailyQuota: number }>();
   const [newcomerOpen, setNewcomerOpen] = useState(false);
   const [newcomerSaving, setNewcomerSaving] = useState(false);
@@ -242,170 +135,34 @@ function SalesDetail({
     }
   };
 
-  const loadLeads = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const page = await api.subordinateSalesLeads(sales.userId, {
-        pageNo: leadPage,
-        pageSize: PAGE_SIZE,
-        recycledOnly,
-        keyword: leadKeyword || undefined,
-        advancedFilter,
-      });
-      setLeads(page.list);
-      setSelectedLeadMap(current => {
-        if (!current.size) return current;
-        const next = new Map(current);
-        page.list.forEach(lead => {
-          if (next.has(lead.id)) next.set(lead.id, lead);
-        });
-        return next;
-      });
-      setLeadTotal(page.total);
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "客资加载失败");
-    } finally {
-      setLoading(false);
-    }
-  }, [advancedFilter, leadKeyword, leadPage, recycledOnly, sales.userId]);
   const loadTasks = useCallback(async () => {
-    setLoading(true);
-    setError("");
+    if (!mounted.current) return;
+    const request = ++taskRequest.current;
+    setTaskLoading(true);
+    setTaskError("");
+    setTasks([]);
+    setTaskTotal(0);
     try {
       const page = await api.subordinateSalesTasks(sales.userId, {
         pageNo: 1,
         pageSize: 100,
         bucket: taskBucket,
       });
+      if (request !== taskRequest.current) return;
       setTasks(page.list);
       setTaskTotal(page.total);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "待办加载失败");
+      if (request !== taskRequest.current) return;
+      setTaskError(loadError instanceof Error ? loadError.message : "待办加载失败");
     } finally {
-      setLoading(false);
+      if (request === taskRequest.current) setTaskLoading(false);
     }
   }, [sales.userId, taskBucket]);
   useEffect(() => {
-    setTab("overview");
-    setSelected([]);
-    setSelectedLeadMap(new Map());
-    setLeadPage(1);
-    setError("");
-  }, [sales?.userId]);
-  useEffect(() => {
-    if (tab === "leads") void loadLeads();
-  }, [loadLeads, tab]);
-  useEffect(() => {
     if (tab === "tasks") void loadTasks();
+    return () => { taskRequest.current++; };
   }, [loadTasks, tab]);
 
-  const selectedLeads = selected
-    .map(key => selectedLeadMap.get(Number(key)))
-    .filter((lead): lead is ManagedLead => Boolean(lead));
-  const eligibility = (type: BatchAction) =>
-    supervisorLeadSelectionEligibility(type, selected.length, selectedLeads);
-
-  const openBatch = async (type: BatchAction) => {
-    const selection = eligibility(type);
-    if (!selection.allowed) {
-      message.warning(selection.message);
-      return;
-    }
-    setBatchType(type);
-    batchIdempotencyKey.current = createIdempotencyKey();
-    form.resetFields();
-    setBatchOpen(true);
-    if (type !== "transfer" && type !== "publicSea") return;
-    try {
-      setCandidates([]);
-      setCandidates(type === 'transfer'
-        ? await api.subordinateBatchTransferCandidates(selected.map(Number))
-        : await api.subordinateTransferCandidates());
-    } catch (loadError) {
-      message.error(
-        loadError instanceof Error ? loadError.message : "销售候选加载失败",
-      );
-    }
-  };
-  const submitBatch = async () => {
-    const values = await form.validateFields();
-    setBatchSaving(true);
-    try {
-      const ids = selected.map(Number);
-      const action = ({ transfer: 'transfer', restore: 'restore', recycle: 'recycle',
-        claimPool: 'release-claim-pool', publicSea: 'release-public-sea' } as const)[batchType]
-      const result = await api.batchSupervisorLeadAction(action, ids, {
-        reason: values.reason.trim(),
-        targetUserId: values.targetUserId,
-        collaboratorUserId: values.collaboratorUserId,
-        idempotencyKey: batchIdempotencyKey.current ||= createIdempotencyKey(),
-      });
-      setBatchResult(result);
-      setResultOpen(true);
-      setBatchOpen(false);
-      setSelected([]);
-      setSelectedLeadMap(new Map());
-      batchIdempotencyKey.current = undefined;
-      await loadLeads();
-      onChanged();
-    } catch (saveError) {
-      message.error(
-        saveError instanceof Error ? saveError.message : "批量操作失败",
-      );
-    } finally {
-      setBatchSaving(false);
-    }
-  };
-  const leadColumns: ColumnsType<ManagedLead> = [
-    {
-      title: "姓名",
-      dataIndex: "submittedName",
-      fixed: "left",
-      width: 120,
-      render: (value, row) => (
-        <Button type="link" onClick={() => setDetailLeadId(row.id)}>
-          {value}
-        </Button>
-      ),
-    },
-    {
-      title: "手机号",
-      dataIndex: "submittedMobile",
-      width: 130,
-      render: (value) => value || "-",
-    },
-    {
-      title: "客资状态",
-      dataIndex: "status",
-      width: 110,
-      render: (value, row) => <Space wrap><Tag>{value ? protocolDisplayLabel(LEAD_STATUS_LABELS, value, '未知状态') : '—'}</Tag><LeadAppealPendingTag lead={row} /></Space>,
-    },
-    {
-      title: "分配状态",
-      dataIndex: "assignmentStatus",
-      width: 130,
-      render: (value) => <Tag>{subordinateAssignmentStatusLabel(value)}</Tag>,
-    },
-    {
-      title: "分类",
-      dataIndex: "leadCategory",
-      width: 120,
-      render: (_, row) => leadSnapshotLabel(row.leadCategoryLabelSnapshot, row.leadCategory),
-    },
-    {
-      title: "来源",
-      dataIndex: "sourceChannel",
-      width: 120,
-      render: (_, row) => leadSnapshotLabel(row.sourceChannelLabelSnapshot, row.sourceChannel),
-    },
-    {
-      title: "提交时间",
-      dataIndex: "submittedAt",
-      width: 170,
-      render: (value) => formatTimestamp(value),
-    },
-  ];
   const taskColumns: ColumnsType<SubordinateTask> = [
     {
       title: "客资",
@@ -430,39 +187,6 @@ function SalesDetail({
         ),
     },
   ];
-  const rowSelection: TableRowSelection<ManagedLead> = {
-    selectedRowKeys: selected,
-    onChange: (keys, rows) => {
-      setSelected(keys);
-      const selectedIds = new Set(keys.map(Number));
-      setSelectedLeadMap(current => {
-        const next = new Map([...current].filter(([id]) => selectedIds.has(id)));
-        rows.forEach(row => next.set(row.id, row));
-        return next;
-      });
-    },
-    preserveSelectedRowKeys: true,
-  };
-  const batchActions: Array<{
-    type: BatchAction;
-    permission: string;
-    icon: React.ReactNode;
-    danger?: boolean;
-  }> = [
-    { type: "transfer", permission: "zsjos:subordinate-sales:lead-transfer", icon: <SwapOutlined /> },
-    { type: "restore", permission: "zsjos:subordinate-sales:lead-restore", icon: <RollbackOutlined /> },
-    { type: "recycle", permission: "zsjos:subordinate-sales:lead-recycle", icon: <DeleteOutlined />, danger: true },
-    { type: "claimPool", permission: "zsjos:subordinate-sales:lead-release-claim-pool", icon: <ExportOutlined />, danger: true },
-    { type: "publicSea", permission: "zsjos:subordinate-sales:lead-release-public-sea", icon: <ExportOutlined />, danger: true },
-  ];
-  if (detailLeadId)
-    return (
-      <ManagedLeadDetail
-        leadId={detailLeadId}
-        onChanged={() => { void loadLeads(); onChanged() }}
-        onBack={() => setDetailLeadId(undefined)}
-      />
-    );
   return (
     <div className="subordinate-sales-detail">
       <div className="subordinate-detail-hero">
@@ -510,7 +234,11 @@ function SalesDetail({
       </div>
       <Tabs
         activeKey={tab}
-        onChange={setTab}
+        onChange={value => {
+          if (tab === "leads" && !canLeaveLeads()) return;
+          taskRequest.current++;
+          setTab(value);
+        }}
         items={[
           {
             key: "overview",
@@ -592,56 +320,7 @@ function SalesDetail({
             key: "leads",
             label: "名下客资",
             children: (
-              <>
-                <Space><Button type={!recycledOnly ? 'primary' : 'default'} onClick={() => { setRecycledOnly(false); setLeadPage(1); setSelected([]); setSelectedLeadMap(new Map()); }}>名下客资</Button><Button type={recycledOnly ? 'primary' : 'default'} onClick={() => { setRecycledOnly(true); setLeadPage(1); setSelected([]); setSelectedLeadMap(new Map()); }}>回收待处理</Button></Space>
-                <AdvancedFilterToolbar scene="lead" pageKey="subordinate_sales_leads" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={leadKeyword} value={advancedFilter} onKeyword={setLeadKeyword} onChange={setAdvancedFilter}/>
-                <div className="subordinate-batch-bar">
-                  <Typography.Text>已选 {selected.length} 条</Typography.Text>
-                  <Space wrap>
-                    {batchActions.map(action => {
-                      const selection = eligibility(action.type);
-                      const hasPermission = permissions.includes(action.permission);
-                      const disabled = !hasPermission || !selection.allowed;
-                      return (
-                        <Tooltip key={action.type} title={hasPermission ? selection.message : "无操作权限"}>
-                          <span>
-                            <Button icon={action.icon} disabled={disabled} danger={action.danger}
-                              onClick={() => void openBatch(action.type)}>
-                              {SUPERVISOR_LEAD_ACTION_LABELS[action.type]}
-                            </Button>
-                          </span>
-                        </Tooltip>
-                      );
-                    })}
-                  </Space>
-                </div>
-                {error && (
-                  <Alert
-                    type="error"
-                    showIcon
-                    message={error}
-                    action={
-                      <Button size="small" onClick={() => void loadLeads()}>
-                        重试
-                      </Button>
-                    }
-                  />
-                )}
-                <BusinessTable tableKey="subordinate-sales-page-1" columnMode="native"
-                  rowKey="id"
-                  loading={loading}
-                  rowSelection={rowSelection}
-                  columns={leadColumns}
-                  dataSource={leads}
-                  scroll={{ x: 960 }}
-                  pagination={{
-                    current: leadPage,
-                    pageSize: PAGE_SIZE,
-                    total: leadTotal,
-                    onChange: setLeadPage,
-                  }}
-                />
-              </>
+              tab === 'leads' ? <LeadManagementPage key={sales.userId} permissions={permissions} salesUserId={sales.userId} onScopeChanged={onChanged} onDirtyChange={onLeadDirtyChange} /> : null
             ),
           },
           {
@@ -651,7 +330,7 @@ function SalesDetail({
               <>
                 <Select
                   value={taskBucket}
-                  onChange={setTaskBucket}
+                  onChange={value => { taskRequest.current++; setTaskBucket(value); }}
                   style={{ width: 160, marginBottom: 12 }}
                   options={[
                     { value: "overdue", label: "逾期" },
@@ -660,11 +339,11 @@ function SalesDetail({
                     { value: "unscheduled", label: "未排期" },
                   ]}
                 />
-                {error && (
+                {taskError && (
                   <Alert
                     type="error"
                     showIcon
-                    message={error}
+                    message={taskError}
                     action={
                       <Button size="small" onClick={() => void loadTasks()}>
                         重试
@@ -674,7 +353,7 @@ function SalesDetail({
                 )}
                 <BusinessTable tableKey="subordinate-sales-page-2" columnMode="native"
                   rowKey="id"
-                  loading={loading}
+                  loading={taskLoading}
                   columns={taskColumns}
                   dataSource={tasks}
                   pagination={false}
@@ -703,54 +382,6 @@ function SalesDetail({
           <Typography.Text type="secondary">今日已接 {sales.newcomerAcceptedToday} 条；修改额度不会清除已用数量。</Typography.Text>
         </Form>
       </Modal>
-      <Modal
-        open={batchOpen}
-        title={`批量${SUPERVISOR_LEAD_ACTION_LABELS[batchType]}客资`}
-        confirmLoading={batchSaving}
-        onOk={() => void submitBatch()}
-        onCancel={() => setBatchOpen(false)}
-      >
-        <Alert type="info" showIcon message={eligibility(batchType).message} style={{ marginBottom: 16 }} />
-        <Form form={form} layout="vertical">
-          {batchType === "transfer" ? (
-            <Form.Item
-              name="targetUserId"
-              label="目标销售"
-              rules={[{ required: true, message: "请选择目标销售" }]}
-            >
-              <EmployeeSelect
-                showSearch
-                optionFilterProp="label"
-                users={candidates}
-              />
-            </Form.Item>
-          ) : batchType === "publicSea" ? (
-            <Form.Item name="collaboratorUserId" label="公海跟进销售（可不填）">
-              <EmployeeSelect
-                allowClear
-                showSearch
-                optionFilterProp="label"
-                users={candidates}
-              />
-            </Form.Item>
-          ) : null}
-          <Form.Item
-            name="reason"
-            label="操作原因"
-            rules={[
-              { required: true, whitespace: true, message: "请填写操作原因" },
-              { max: 500 },
-            ]}
-          >
-            <Input.TextArea rows={4} maxLength={500} showCount />
-          </Form.Item>
-        </Form>
-      </Modal>
-      <BatchResultModal
-        open={resultOpen}
-        result={batchResult}
-        onClose={() => setResultOpen(false)}
-      />
     </div>
   );
 }
@@ -773,6 +404,9 @@ export default function SubordinateSalesPage({
   const [error, setError] = useState("");
   const [loadMoreError, setLoadMoreError] = useState("");
   const [selectedSales, setSelectedSales] = useState<SubordinateSales>();
+  const leadDirty = useRef(false);
+  const onLeadDirtyChange = useCallback((dirty: boolean) => { leadDirty.current = dirty }, []);
+  const canLeaveLeads = () => !leadDirty.current || window.confirm("当前客资表单尚未提交，切换将丢失已填写内容。确定继续吗？");
   const [reasonAction, setReasonAction] = useState<ReasonAction>();
   const [reasonSaving, setReasonSaving] = useState(false);
   const [pausingAll, setPausingAll] = useState(false);
@@ -932,7 +566,7 @@ export default function SubordinateSalesPage({
     <section className="workspace-page subordinate-sales-page">
       <div className="subordinate-toolbar">
         <Space wrap>
-          <SubordinateSalesStatusFilter value={accountStatus} onChange={setAccountStatus} />
+          <SubordinateSalesStatusFilter value={accountStatus} onChange={value => { if (canLeaveLeads()) setAccountStatus(value) }} />
           <AdvancedFilterToolbar
             scene="subordinate_sales"
             pageKey="subordinate_sales"
@@ -940,10 +574,10 @@ export default function SubordinateSalesPage({
             keyword={keyword}
             value={advancedFilter}
             onKeyword={(value) => {
-              setKeyword(value);
+              if (canLeaveLeads()) setKeyword(value);
             }}
             onChange={(value) => {
-              setAdvancedFilter(value);
+              if (canLeaveLeads()) setAdvancedFilter(value);
             }}
           />
           <Select
@@ -951,7 +585,7 @@ export default function SubordinateSalesPage({
             placeholder="页面状态"
             value={presence}
             onChange={(value) => {
-              setPresence(value);
+              if (canLeaveLeads()) setPresence(value);
             }}
             style={{ width: 130 }}
             options={[
@@ -964,7 +598,7 @@ export default function SubordinateSalesPage({
             placeholder="接单状态"
             value={accepting}
             onChange={(value) => {
-              setAccepting(value);
+              if (canLeaveLeads()) setAccepting(value);
             }}
             style={{ width: 130 }}
             options={[
@@ -1003,7 +637,7 @@ export default function SubordinateSalesPage({
               <>
               {rows.map((row) => (
                 <SubordinateSalesCard key={row.userId} sales={row}
-                  selected={selectedSales?.userId === row.userId} onSelect={() => setSelectedSales(row)} />
+                  selected={selectedSales?.userId === row.userId} onSelect={() => { if (selectedSales?.userId !== row.userId && canLeaveLeads()) setSelectedSales(row) }} />
               ))}
               <div ref={sentinelRef} className="subordinate-sales-load-sentinel" aria-hidden="true" />
               {loadingMore && <div className="subordinate-sales-load-state"><Button type="text" size="small" loading>正在加载更多</Button></div>}
@@ -1021,9 +655,12 @@ export default function SubordinateSalesPage({
         <main className="subordinate-sales-detail-pane">
           {selectedSales ? (
             <SalesDetail
+              key={selectedSales.userId}
               sales={selectedSales}
               permissions={permissions}
-              onBack={() => setSelectedSales(undefined)}
+              onBack={() => { if (canLeaveLeads()) setSelectedSales(undefined) }}
+              onLeadDirtyChange={onLeadDirtyChange}
+              canLeaveLeads={canLeaveLeads}
               onChanged={() => void refreshSelectedSales()}
               onReasonAction={openReasonAction}
             />

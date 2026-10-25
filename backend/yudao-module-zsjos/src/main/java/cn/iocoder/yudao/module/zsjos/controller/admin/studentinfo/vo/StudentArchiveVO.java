@@ -30,7 +30,7 @@ public interface StudentArchiveVO {
     @Data class Save {
         @NotNull @Min(0) private Integer revision;
         @NotBlank @Size(max=64) private String idempotencyKey;
-        @NotBlank @Size(max=500) private String reason;
+        @Size(max=500) private String reason;
         @NotNull @Size(max=32) private Map<String, Object> changes;
     }
 }

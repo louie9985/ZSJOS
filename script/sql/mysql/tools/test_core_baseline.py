@@ -137,6 +137,12 @@ def verify_fresh(client):
         print('Applying', migration.module, migration.version, flush=True)
         client.execute_file(migration.path)
         db.record_migration(client, migration)
+        if migration.module == 'core' and migration.version == 'V323':
+            # V341 supersedes this historical width contract. Replay V323 while
+            # its documented predecessor shape is still applicable, not after widening.
+            before_v323 = (signature(client), ledgers(client))
+            client.execute_file(migration.path)
+            assert before_v323 == (signature(client), ledgers(client))
     drift = db.schema_drift(client, manifests)
     assert not drift, drift
     assert not db.pending_migrations(manifests, db.installed_versions(client))
@@ -154,7 +160,9 @@ def verify_fresh(client):
         print('WARN data-grade findings require separate business assessment; '
               'this run verifies migration execution and structure', flush=True)
     before = (signature(client), ledgers(client))
-    for version in VERSIONS:
+    for version in (*VERSIONS, 'V340', 'V341', 'V342'):
+        if version == 'V323':
+            continue  # Replayed above before the superseding V341 width upgrade.
         migration = next(item for item in db.migrations_for('core', manifests['core'])
                          if item.version == version)
         client.execute_file(migration.path)

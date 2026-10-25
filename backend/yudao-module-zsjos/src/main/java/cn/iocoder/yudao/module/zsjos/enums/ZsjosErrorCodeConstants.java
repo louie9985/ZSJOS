@@ -473,7 +473,11 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_ALREADY_STARTED = new ErrorCode(1_900_011_021, "账号已完成启动诊断，请刷新后填写周期诊断");
     ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_POSITIONING_REQUIRED = new ErrorCode(1_900_011_022, "请先为当前账号应用有效的定位卡，再填写启动诊断");
     ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_TASK_UNAVAILABLE = new ErrorCode(1_900_011_024, "本轮诊断任务尚未生成、已处理或轮次已结束，请刷新待办");
+    ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_METRICS_CHANGED = new ErrorCode(1_900_011_026, "统计数据已变化，请刷新指标并核对后再次提交");
+    ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_BATCH_SCOPE_INVALID = new ErrorCode(1_900_011_027, "只能一起填写同一学员课程服务、同一定位轮次及同一周节点的诊断");
+    ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_BATCH_SELECTION_INVALID = new ErrorCode(1_900_011_028, "请添加一至一百个不同的可填写账号");
     ErrorCode MEDIA_ACCOUNT_DIAGNOSIS_INITIAL_REQUIRED = new ErrorCode(1_900_011_023, "请先完成启动诊断，再填写周期诊断");
+    ErrorCode MEDIA_ACCOUNT_DELETE_REVIEWER_INVALID = new ErrorCode(1_900_011_025, "所属编导未配置、已停用或缺少账号删除审批权限");
     ErrorCode MEDIA_REBIND_REVIEWER_INVALID = new ErrorCode(1_900_011_009, "账号换绑审批人未配置或不可用");
     ErrorCode MEDIA_REBIND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_011_008, "账号换绑流程尚未部署或暂不可用");
 
@@ -629,6 +633,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode POSITIONING_INTERVIEW_VERSION = new ErrorCode(1_900_090_003, "定位访谈已被修改，请重新加载后重试");
     ErrorCode POSITIONING_INTERVIEW_ATTACHMENT = new ErrorCode(1_900_090_004, "访谈稿不存在、无权引用或不属于当前学员");
     ErrorCode POSITIONING_INTERVIEW_TRANSCRIPT_REQUIRED = new ErrorCode(1_900_090_005, "请至少上传一份本次访谈稿");
+    ErrorCode POSITIONING_ATTACHMENT_TOTAL_EXCEEDED = new ErrorCode(1_900_158_000, "附件总大小不能超过 1GB，请移除部分文件后重试");
     ErrorCode POSITIONING_INTERVIEW_REPLAY = new ErrorCode(1_900_090_006, "该定位访谈请求标识已用于其他内容");
 
 }

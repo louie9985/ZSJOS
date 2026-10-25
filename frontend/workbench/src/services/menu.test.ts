@@ -23,6 +23,16 @@ const menu = (values: Partial<RawMenu> & Pick<RawMenu, 'id' | 'name'>): RawMenu 
 })
 
 describe('workbench menu conversion', () => {
+  it.each([RENDERABLE_APP_ROUTES, MOBILE_RENDERABLE_APP_ROUTES])('retains the server-authorized student-entry child', supported => {
+    const raw = [menu({ id: 6735, name: '工作台', path: '/zsjos', children: [
+      menu({ id: 904345, parentId: 6735, name: '学员录入', path: 'student-entry', component: 'zsjos/studentEntry/index', workbenchRenderMode: 'native' }),
+    ] })]
+    const visible = filterRenderableMenus(buildMenuTree(raw), supported)
+    expect(findMenuByPath(visible, APP_ROUTES.STUDENT_ENTRY)?.name).toBe('学员录入')
+    expect(filterRenderableMenus([], supported)).toEqual([])
+    expect(findMenuByPath(filterRenderableMenus(buildMenuTree([{ ...raw[0], children: [{ ...raw[0].children![0], path: APP_ROUTES.STUDENT_ENTRY }] }], '/', true), supported), APP_ROUTES.STUDENT_ENTRY)).toBeDefined()
+  })
+
   it.each(['PC', 'MOBILE'])('keeps authorized points entries in %s navigation', platform => {
     const routes = buildMenuTree([menu({ id: 6735, name: '工作台', path: '/zsjos', children: [
       menu({ id: 602348, parentId: 6735, name: '积分兑换码', path: 'points-redemption', component: 'zsjos-workbench', workbenchRenderMode: 'native' }),

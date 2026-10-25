@@ -4,8 +4,7 @@ import { describe, expect, it } from 'vitest'
 const leadSearchPages = [
   'src/pages/LeadManagementPage.tsx',
   'src/pages/LeadClaimPoolPage.tsx',
-  'src/pages/LeadPublicSeaPoolPage.tsx',
-  'src/pages/SubordinateSalesPage.tsx'
+  'src/pages/LeadPublicSeaPoolPage.tsx'
 ]
 
 describe('lead keyword search', () => {

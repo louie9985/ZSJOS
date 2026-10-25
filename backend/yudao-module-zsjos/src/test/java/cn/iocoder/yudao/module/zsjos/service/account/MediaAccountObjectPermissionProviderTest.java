@@ -122,6 +122,34 @@ class MediaAccountObjectPermissionProviderTest {
     }
 
     @Test
+    void deletionPathsUseExactCurrentOwnersAndFrozenAccountsCannotBeDeletedAgain() {
+        var account = new MediaAccountDO().setId(1L).setStudentPersonId(40L).setCreateServiceRelationId(30L)
+                .setDirectorUserId(998L).setOwnerOperatorUserId(999L).setRunStatus("active");
+        account.setTenantId(1L);
+        var relation = new ServiceRelationDO().setId(30L).setPersonId(40L).setStatus("active")
+                .setAcceptanceStatus("accepted").setOperatorUserId(10L).setContentDirectorUserId(20L);
+        relation.setTenantId(1L);
+        when(mapper.selectById(1L)).thenReturn(account);
+        when(relationMapper.selectById(30L)).thenReturn(relation);
+        assertTrue(provider.hasPermission(1L, "delete-request", 10L));
+        assertFalse(provider.hasPermission(1L, "delete-direct", 10L));
+        assertTrue(provider.hasPermission(1L, "delete-direct", 20L));
+        assertFalse(provider.hasPermission(1L, "delete-request", 20L));
+        assertFalse(provider.hasPermission(1L, "delete-direct", 998L));
+        when(permissionApi.hasTenantReadAllAccess(999L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(999L, "zsjos:media-account:query-all")).thenReturn(true);
+        assertFalse(provider.hasPermission(1L, "delete-direct", 999L));
+        assertFalse(provider.hasPermission(1L, "delete-request", 999L));
+        relation.setOperatorUserId(20L);
+        assertTrue(provider.hasPermission(1L, "delete-direct", 20L));
+        assertFalse(provider.hasPermission(1L, "delete-request", 20L));
+        account.setRunStatus("delete_pending").setDeleteStatus("pending").setDeleteRequestedByUserId(10L);
+        assertFalse(provider.hasPermission(1L, "delete-direct", 20L));
+        assertTrue(provider.hasPermission(1L, "withdraw-delete", 10L));
+        assertFalse(provider.hasPermission(1L, "withdraw-delete", 20L));
+    }
+
+    @Test
     void retiredStageTransitionActionsAreNeverAuthorized() {
         when(mapper.selectById(1L)).thenReturn(new MediaAccountDO().setId(1L)
                 .setOwnerOperatorUserId(230L).setDirectorUserId(248L));

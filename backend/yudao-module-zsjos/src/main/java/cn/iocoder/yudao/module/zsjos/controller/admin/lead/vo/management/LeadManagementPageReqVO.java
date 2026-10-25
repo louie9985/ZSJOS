@@ -50,6 +50,9 @@ public class LeadManagementPageReqVO extends PageParam {
     @Pattern(regexp = "ascend|descend", message = "客资排序方向不正确")
     private String sortOrder;
 
+    @Schema(description = "当前用户待处理客资优先，仅用于分页列表")
+    private Boolean pendingTasksFirst;
+
     @Pattern(regexp = "all|follow_up_pending|unreachable|invalid", message = "客资提醒视图不正确")
     private String view;
 
@@ -81,7 +84,7 @@ public class LeadManagementPageReqVO extends PageParam {
     @Valid private AdvancedFilterGroupReqVO advancedFilter;
     private String cursor;
     @Min(1) @Max(100) private Integer limit = 20;
-    @Schema(hidden = true) private LocalDateTime cursorActivityAt;
+    @Schema(hidden = true) private LocalDateTime cursorSubmittedAt;
     @Schema(hidden = true) private Long cursorId;
 
     /**

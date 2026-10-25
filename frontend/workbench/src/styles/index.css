@@ -45,6 +45,7 @@
 @import './components/attachment.css';
 @import './components/dispatch.css';
 @import './components/advanced-filter.css';
+@import './components/filter-select.css';
 @import './components/business-inbox.css';
 @import './components/business-table.css';
 @import './components/date-time-text.css';

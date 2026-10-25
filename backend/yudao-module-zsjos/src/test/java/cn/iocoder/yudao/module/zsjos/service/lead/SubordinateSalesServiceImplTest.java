@@ -274,6 +274,39 @@ class SubordinateSalesServiceImplTest {
         assertThrows(ServiceException.class, () -> service.batchLeadAction("transfer", request, 10L));
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "12345678-1234-4234-8234-123456789012",
+            "1234567890123456789012345678901234567890"})
+    void batchPublicSeaKeysFitStorageAndRemainStableAcrossRetries(String batchKey) {
+        List<Long> ids = List.of(999L, 1000L, Long.MAX_VALUE);
+        when(leadMapper.selectBatchIds(Set.copyOf(ids))).thenReturn(ids.stream()
+                .map(id -> new LeadDO().setId(id).setLeadNo("KZ-test-" + id)).toList());
+        var request = new SubordinateBatchLeadActionReqVO();
+        request.setLeadIds(ids);
+        request.setReason("释放公海池");
+        request.setIdempotencyKey(batchKey);
+
+        for (int attempt = 0; attempt < 2; attempt++) {
+            var result = service.batchLeadAction("release-public-sea", request, 10L);
+            assertEquals(3, result.getSuccessCount());
+            assertEquals(0, result.getFailureCount());
+        }
+        request.setIdempotencyKey("x" + batchKey.substring(1));
+        service.batchLeadAction("release-public-sea", request, 10L);
+
+        var keys = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(commandService, org.mockito.Mockito.times(9)).releasePublicSeaOne(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq("释放公海池"), keys.capture());
+        List<String> values = keys.getAllValues();
+        org.junit.jupiter.api.Assertions.assertTrue(values.stream().allMatch(key -> key.length() <= 40));
+        assertEquals(values.subList(0, 3), values.subList(3, 6));
+        assertEquals(6L, java.util.stream.Stream.concat(values.subList(0, 3).stream(),
+                values.subList(6, 9).stream()).distinct().count());
+        if (batchKey.length() == 36) assertEquals(batchKey + ":999", values.get(0));
+    }
+
     @Test
     void emptyPendingTaskPageDoesNotQueryLeadsWithEmptyIds() {
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));

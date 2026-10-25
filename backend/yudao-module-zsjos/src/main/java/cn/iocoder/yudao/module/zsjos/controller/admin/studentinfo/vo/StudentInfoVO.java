@@ -21,7 +21,7 @@ public final class StudentInfoVO {
         private Boolean sensitive;
         @NotBlank private String group;
         @Min(2) @Max(9) private Integer maxImages;
-        @Min(1) @Max(10) private Integer maxSizeMb;
+        @Min(1) @Max(100) private Integer maxSizeMb;
         private List<String> allowedExtensions;
     }
     @Data public static class Config {
@@ -56,7 +56,21 @@ public final class StudentInfoVO {
         private Boolean sent;
     }
     @Data public static class Submit {
+        @NotNull @jakarta.validation.constraints.Min(0) private Long revision;
         @NotNull @Size(max=32) private Map<String, Object> values;
+    }
+    @Data public static class DraftWrite {
+        @NotNull @jakarta.validation.constraints.Min(0) private Long revision;
+        @NotNull @Size(max=32) private Map<String,String> values;
+    }
+    @Data public static class DraftSelection {
+        private String code, label, dictType;
+    }
+    @Data public static class Draft {
+        private long revision;
+        private LocalDateTime savedAt;
+        private Map<String,String> values = Map.of();
+        private Map<String,DraftSelection> selections = Map.of();
     }
     @Data public static class Option {
         private String value;
@@ -64,6 +78,7 @@ public final class StudentInfoVO {
         public Option(String value, String label) { this.value = value; this.label = label; }
     }
     @Data public static class Runtime {
+        private Draft draft;
         private String status;
         private Long tenantId;
         private Integer configVersion;

@@ -1,3 +1,4 @@
+import { APP_ROUTES } from '../constants'
 import { useEffect, useState } from 'react'
 import { Drawer, Menu } from 'antd'
 import { NAV_INLINE_INDENT } from '../constants'
@@ -21,13 +22,13 @@ export default function MobileNavDrawer({ open, onClose, navigation, activePrima
   const items = buildNavMenuItems(navigation, { badgeResolver })
   // 用受控展开键而不是 defaultOpenKeys：defaultOpenKeys 只在挂载时读取一次，
   // 直达深层路由 / 刷新 / 浏览器返回时无法展开完整祖先链。
-  const [openKeys, setOpenKeys] = useState<string[]>(() => getNavigationOpenKeys(navigation, activePagePath ?? ''))
+  const [openKeys, setOpenKeys] = useState<string[]>(() => [...new Set([...getNavigationOpenKeys(navigation, APP_ROUTES.BPM_TODO), ...getNavigationOpenKeys(navigation, activePagePath ?? '')])])
 
   // 每次打开抽屉时，把展开状态同步到当前活动页面的完整祖先链，
   // 保证返回、刷新和直接打开深层路由后当前目录仍被展开。
   useEffect(() => {
     if (open && activePagePath) {
-      setOpenKeys(getNavigationOpenKeys(navigation, activePagePath))
+      setOpenKeys([...new Set([...getNavigationOpenKeys(navigation, APP_ROUTES.BPM_TODO), ...getNavigationOpenKeys(navigation, activePagePath)])])
     }
   }, [open, activePagePath, navigation])
 

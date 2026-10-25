@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "../../components/filterSelectDisplay"
 import { usePerformanceModule } from './PerformanceModule'
 import { Alert, Button, Collapse, Drawer, Empty, Input, Select, Space, Tag, Typography } from 'antd'
 import { useRef, useState } from 'react'
@@ -25,7 +26,7 @@ export default function OrderDetailDrawer({ entry, title, permissions, onClose, 
  }
  function selector(label: string, key: keyof OrderDetailQuery, values?: ConversionOption[]) {
   return <Select aria-label={label} placeholder={label} allowClear showSearch optionFilterProp="label" style={{ width: '100%' }} value={filters[key]}
-   onChange={value => filter(key, value as string | undefined)} options={(values ?? []).map(option => ({ value: option.key, label: `${option.label} (${option.count})` }))}/>
+   onChange={value => filter(key, value as string | undefined)} options={(values ?? []).map(option => ({ value: option.key, label: `${option.label} (${option.count})` }))} {...filterSelectDisplayProps}/>
  }
  return <Drawer title={`${title} · ${entry.label} · 订单明细`} open width="min(1180px, 100vw)" onClose={onClose}
   styles={{ body: { padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } }}>

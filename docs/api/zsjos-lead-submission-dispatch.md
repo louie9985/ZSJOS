@@ -71,7 +71,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 统一客资管理页不再使用 `simpleStatus`，改由 `audience=management` 的已发布筛选方案解析 `inboxGroup`（一级业务归类）、`inboxStage`（二级当前环节）与 `inboxQuick`（三级快捷条件）三个互斥选中项，各行条件与一级条件取交集，且不改变 `relationScope=all` 已计算的对象可见范围。一级归类为 `all`、`pending_qualification`、`valid`、`invalid`、`closed`、`manual`；`manual` 复用自拓语义（`source_type in (sales_self_sourced, education_self_sourced)`）。二级“当前环节”的待首跟与待判定按当前归属周期首次跟进事实区分，判定截止时间不作为已完成首跟的证据；“正常推进”表示已判有效且 Opportunity 尚未进入成交审批或成交。三级“快捷条件”的 `today`/`overdue` 以 `zsjos_business_task.due_at` 为准（待办 `pending` 且 `task_type in (lead_first_follow_up, lead_follow_up_reminder)`），`transferred_pending` 表示当前归属周期由主管转派产生且本周期尚未首跟。`simpleStatus` 参数保留给兼职端 H5 等既有调用方，语义不变。
 
-统一客资分页接口支持成对提交 `sortField` 与 `sortOrder=ascend|descend`，排序作用于完整筛选结果后再分页。`sortField` 只接受 Lead 根表的持久化字段白名单：`leadNo`、`submittedName`、`submittedMobile`、`submittedWechatId`、`sourceType`、`leadCategory`、`sourceChannelId`、`assignmentStatus`、`dispatchMode`、`assignmentAttemptCount`、`publicPoolAt`、`countedAt`、`currentAssignmentFirstFollowUpAt`、`currentAssignmentFirstFollowUpDeadlineAt`、`qualificationStartedAt`、`qualificationDeadlineAt`、`suspendedAt`、`validDescription`、`invalidDescription`、`appealDeadlineAt`、`closedAt`、`closeReason`、`nextFollowUpAt`、`submittedAt`、`lastActivityAt`、`qualifiedAt`、`convertedAt`、`remark`、`updateTime`。每种显式排序均追加 `id DESC` 作为并列值的稳定次序；未提交完整排序参数时仍使用 `lastActivityAt DESC, id DESC`。提交人、所属销售、产品等关联投影名称不在排序白名单中，前端不得将当前页投影值伪装为全量排序。游标接口的令牌固定编码 `lastActivityAt + id`，即使请求携带排序参数也继续使用默认游标顺序；自定义排序只适用于普通分页接口。
+统一客资分页接口支持成对提交 `sortField` 与 `sortOrder=ascend|descend`，排序作用于完整筛选结果后再分页。`sortField` 只接受 Lead 根表的持久化字段白名单：`leadNo`、`submittedName`、`submittedMobile`、`submittedWechatId`、`sourceType`、`leadCategory`、`sourceChannelId`、`assignmentStatus`、`dispatchMode`、`assignmentAttemptCount`、`publicPoolAt`、`countedAt`、`currentAssignmentFirstFollowUpAt`、`currentAssignmentFirstFollowUpDeadlineAt`、`qualificationStartedAt`、`qualificationDeadlineAt`、`suspendedAt`、`validDescription`、`invalidDescription`、`appealDeadlineAt`、`closedAt`、`closeReason`、`nextFollowUpAt`、`submittedAt`、`lastActivityAt`、`qualifiedAt`、`convertedAt`、`remark`、`updateTime`。每种显式排序均追加 `id DESC` 作为并列值的稳定次序；未提交完整排序参数时使用 `submittedAt DESC, id DESC`（客资提交时间从新到旧）。提交人、所属销售、产品等关联投影名称不在排序白名单中，前端不得将当前页投影值伪装为全量排序。游标接口的令牌固定编码 `submittedAt + id`，上下文带 `submitted-v1` 协议标记以拒绝旧活动时间令牌，即使请求携带排序参数也继续使用默认游标顺序；自定义排序只适用于普通分页接口。
 
 `lastActivityAt` 只表示已成功提交的客资业务变化，并在同一事务中按事件实际发生时间单调推进。基本资料、归属与分配、跟进、资格判定、申诉/投诉、公海协作、正式销售反馈及直接改变非复购 Lead 的订单结果属于业务变化；查看、选中、已读、临时附件上传和提醒发送不属于。较早事件、失败请求、权限拒绝、幂等重放和版本冲突不得覆盖较新的活动时间。
 
@@ -357,3 +357,5 @@ Admin LeadCreateDialog 与 Workbench LeadSubmissionPage 继续传相同的选择
 员工跟进中、今日待跟进、逾期待跟进的负责人范围按当前跟进执行人过滤，分页和总数采用相同条件。
 不带跟进筛选的正式归属列表和提交人查询保持既有范围。跟进日历与待办同时按 B 展示，
 详细生命周期与历史兼容规则见 [公海池 API](zsjos-lead-public-sea-pool.md#公海跟进责任与待办)。
+
+工作台全部/我的/我提交的客资、下属销售内嵌客资列表、Vue Admin、合作方 H5 均沿用服务端提交时间默认排序。工作台默认不请求待办优先，不按未读状态重排；待办、未读标记继续显示，打开详情或静默刷新不推进列表位置。显式排序继续由服务端对完整筛选结果排序后分页。

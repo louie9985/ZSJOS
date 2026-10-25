@@ -1,0 +1,97 @@
+[
+  {
+    "source": "desktop/src/core/browserSourceParser.test.ts",
+    "sha256": "cccd9d099620abd53a920517598c9364db549e14f4c1f25b367a7773613e86ee",
+    "bytes": 844
+  },
+  {
+    "source": "desktop/src/core/dayClassifier.test.ts",
+    "sha256": "48d4c347ea7083f643f4b2390718ae367b30bfe27b79bf0da71c6ee2f53c8012",
+    "bytes": 9639
+  },
+  {
+    "source": "desktop/src/core/departmentSchedules.test.ts",
+    "sha256": "7daf3c27756dbfd09a80b191f9a93f6ae85c84f63254747ba282458da6fea851",
+    "bytes": 4426
+  },
+  {
+    "source": "desktop/src/core/exportedReportParser.test.ts",
+    "sha256": "79f7f0f368984e7ac305f452cac10aba31cfb16e67cdb2f0855a61e99ae9c602",
+    "bytes": 4166
+  },
+  {
+    "source": "desktop/src/core/recoveredMonthlyParameters.test.ts",
+    "sha256": "11c90b34185dc7cb9351a5911dbb0f0ae18e0ed04c355ee9436c2dba31963689",
+    "bytes": 2651
+  },
+  {
+    "source": "desktop/src/core/reviewBuilder.test.ts",
+    "sha256": "c5d96ed032cad87fb7578b4bfa21552db5d88df8c674d1fd95452a7869b75e51",
+    "bytes": 12319
+  },
+  {
+    "source": "desktop/src/core/reviewIssues.test.ts",
+    "sha256": "e6df6270240657b40c79f5d11497e9da214a3eaf2d94bd626e553df99f80b98d",
+    "bytes": 4926
+  },
+  {
+    "source": "desktop/src/core/septemberAttendance.test.ts",
+    "sha256": "2d5439445c1eccf3f1233f2308aea1586c04eaecfbaf608a99cd56fd7f229698",
+    "bytes": 2312
+  },
+  {
+    "source": "desktop/src/core/sourceSummaryReview.test.ts",
+    "sha256": "4cc1c1f7f0690448770d23936a9b7265990175cab4a70758e081a8db94f03030",
+    "bytes": 1367
+  },
+  {
+    "source": "desktop/src/core/statusStyles.test.ts",
+    "sha256": "00f9d23ce7e30c90dca841f025441248c75ff4caf567e8cb65ff45885ed9b20f",
+    "bytes": 1542
+  },
+  {
+    "source": "desktop/src/core/summary.test.ts",
+    "sha256": "12906495357d97b65efbb8924f0b858fdfa4c52083024202530f72154f40d344",
+    "bytes": 20535
+  },
+  {
+    "source": "desktop/src/core/summaryFields.test.ts",
+    "sha256": "e537d36f873735d564179ac2d895be140bd5fb6e0aa6174b4afc9f52a60e532f",
+    "bytes": 1379
+  },
+  {
+    "source": "desktop/src-tauri/src/excel_engine.rs",
+    "sha256": "3fc89eff7150d2ec3d51ddadf12c7050070218ef1f25faf863ec34e6278b3bae",
+    "bytes": 54602
+  },
+  {
+    "source": "desktop/src-tauri/src/lib.rs",
+    "sha256": "c55e8e5ccd979b8f2879cf2bfc2c4b27faa71f7d08f4c5a3fad68ef3cb9d3b86",
+    "bytes": 11160
+  },
+  {
+    "source": "docs/回归测试用例.md",
+    "sha256": "7bee24d1eb701849dd5e368d9617bf8edc41e68e230d4fb532c3c09d99840741",
+    "bytes": 13852
+  },
+  {
+    "source": "desktop/src/core/fixtures/september2026.json",
+    "sha256": "d878da9e8263cfca1462d54112137c631597c7c9cc45dca619120d77cbb1dcf4",
+    "bytes": 2737
+  },
+  {
+    "source": "desktop/src/core/browserSourceParser.ts",
+    "sha256": "c5a0f89f82c4a52b98f50d451a1766cdb27192913a64f98a56171b2cfbe29c0c",
+    "bytes": 5089
+  },
+  {
+    "source": "desktop/src/core/exportedReportParser.ts",
+    "sha256": "018cb8172e81b1ed96746bbf69eec0cd82051b8b28814c88d39612bc7028b858",
+    "bytes": 7838
+  },
+  {
+    "source": "上下班打卡_月报_20260501-20260531 (1).xlsx",
+    "sha256": "c04d25edc50f3e45e4578e439025d337d0619c998c1bc1d1bddb9a6174153c9d",
+    "bytes": 32582
+  }
+]

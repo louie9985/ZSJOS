@@ -1,20 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import StudentArchiveExtraPanel from './StudentArchiveExtraPanel';
+import { useStudentArchiveEditor } from './StudentArchiveEditGuard';
 import {
   Alert,
   Button,
   Card,
   Cascader,
   Collapse,
-  Descriptions,
   Empty,
-  Form,
-  Image,
   Input,
-  Modal,
   Select,
   Space,
   Spin,
+  Tag,
   Upload,
 } from "antd";
 import { EditOutlined } from "@ant-design/icons";
@@ -28,33 +26,50 @@ import {
   type StudentInfoField,
   type StudentInfoImage,
 } from "../services/studentInfo";
+import AttachmentCard, { type AttachmentResource } from './AttachmentCard';
+import { formatTimestamp } from '../services/time';
 import "../styles/pages/student-archive.css";
+import '../styles/components/student-info-panel.css';
+
+const groupTitles: Record<string, string> = {
+  basic: '基本信息', education: '学历与报考', career: '职业与学习目的', materials: '证明材料',
+};
 
 export default function StudentArchivePanel({
   relationId,
 }: {
   relationId: number;
 }) {
+  return <StudentArchivePanelContent key={relationId} relationId={relationId} />;
+}
+
+function StudentArchivePanelContent({ relationId }: { relationId: number }) {
   const [data, setData] = useState<StudentArchive>(),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [editor, setEditor] = useState<ArchiveEdit>(),
-    [reason, setReason] = useState(""),
     [editingField, setEditingField] = useState<string>();
   const [areas, setAreas] = useState<
       Awaited<ReturnType<typeof studentArchiveApi.areas>>
     >([]),
     [changed, setChanged] = useState<Record<string, unknown>>({}),
-    [images, setImages] = useState<StudentInfoImage[]>([]),
-    [urls, setUrls] = useState<Record<number, string>>({});
+    [images, setImages] = useState<StudentInfoImage[]>([]);
   const sequence = useRef(0),
-    key = useRef("");
-  const load = async (sensitive = false) => {
+    key = useRef(""),
+    pendingUploads = useRef(0);
+  useStudentArchiveEditor(Boolean(editor) && Object.keys(changed).length > 0, Boolean(editor) && busy);
+  const load = async () => {
     const n = ++sequence.current;
     setBusy(true);
     setError("");
+    setData(undefined);
     try {
-      const d = await studentArchiveApi.detail(relationId, sensitive);
+      let d = await studentArchiveApi.detail(relationId);
+      if (n !== sequence.current) return;
+      // Resolve disclosure from the server's permission projection before showing the record.
+      if (d.information.status === 'SUBMITTED' && d.information.canReadSensitive) {
+        d = await studentArchiveApi.detail(relationId, true);
+      }
       if (n === sequence.current) setData(d);
     } catch (e) {
       if (n === sequence.current) {
@@ -69,19 +84,17 @@ export default function StudentArchivePanel({
     setData(undefined);
     setEditor(undefined);
     setEditingField(undefined);
-    setUrls({});
+    setChanged({});
+    setImages([]);
+    pendingUploads.current = 0;
     void load();
     return () => {
       sequence.current++;
     };
   }, [relationId]);
-  useEffect(
-    () => () => {
-      Object.values(urls).forEach(URL.revokeObjectURL);
-    },
-    [urls],
-  );
-  const edit = async (fieldKey?: string) => {
+  const edit = async (fieldKey: string) => {
+    if (busy || editingField) return;
+    const generation = sequence.current;
     setBusy(true);
     setError("");
     try {
@@ -89,17 +102,17 @@ export default function StudentArchivePanel({
         studentArchiveApi.edit(relationId),
         studentArchiveApi.areas(),
       ]);
+      if (generation !== sequence.current) return;
       setEditor(e);
       setAreas(a);
       setChanged({});
       setImages(e.images);
-      setReason("");
       setEditingField(fieldKey);
       key.current = crypto.randomUUID();
     } catch (e) {
-      setError(studentInfoError(e));
+      if (generation === sequence.current) setError(studentInfoError(e));
     } finally {
-      setBusy(false);
+      if (generation === sequence.current) setBusy(false);
     }
   };
   const change = (field: string, value: unknown) => {
@@ -113,24 +126,23 @@ export default function StudentArchivePanel({
       next.map((i) => i.id),
     );
   };
-  const preview = async () => {
-    setBusy(true);
-    try {
-      const entries = await Promise.all(
-        data!.information.images.map(
-          async (i) =>
-            [i.id, await studentArchiveApi.image(relationId, i)] as const,
-        ),
-      );
-      setUrls(Object.fromEntries(entries));
-    } catch (e) {
-      setError(studentInfoError(e));
-    } finally {
-      setBusy(false);
-    }
+  const attachment = (image: StudentInfoImage): AttachmentResource => {
+    const generation = sequence.current;
+    const metadata = { name: image.name, type: image.contentType, size: image.size };
+    const loadContent = async (): Promise<AttachmentResource> => {
+      if (generation !== sequence.current) throw new Error('档案已切换，请重新查看附件');
+      const url = await studentArchiveApi.image(relationId, image);
+      if (generation !== sequence.current) {
+        URL.revokeObjectURL(url);
+        throw new Error('档案已切换，请重新查看附件');
+      }
+      return { ...metadata, url, loadContent };
+    };
+    return { ...metadata, loadContent };
   };
   const save = async () => {
-    if (!editor || !reason.trim()) return;
+    if (!editor || busy || !Object.keys(changed).length) return;
+    const generation = sequence.current;
     setBusy(true);
     setError("");
     try {
@@ -138,16 +150,17 @@ export default function StudentArchivePanel({
         relationId,
         editor.revision,
         changed,
-        reason,
+        "",
         key.current,
       );
+      if (generation !== sequence.current) return;
       setEditor(undefined);
       setEditingField(undefined);
       await load();
     } catch (e) {
-      setError(studentInfoError(e));
+      if (generation === sequence.current) setError(studentInfoError(e));
     } finally {
-      setBusy(false);
+      if (generation === sequence.current) setBusy(false);
     }
   };
   const control = (f: StudentInfoField) => {
@@ -163,14 +176,8 @@ export default function StudentArchivePanel({
       return (
         <Space orientation="vertical">
           {selected.map((i) => (
-            <Space key={i.id}>
-              <span>
-                {i.side === "front"
-                  ? "身份证正面"
-                  : i.side === "back"
-                    ? "身份证反面"
-                    : i.name}
-              </span>
+            <div className="archive-edit-attachment" key={i.id}>
+              <AttachmentCard name={i.name} load={async () => attachment(i)} />
               <Button
                 disabled={locked || busy}
                 onClick={() =>
@@ -182,7 +189,7 @@ export default function StudentArchivePanel({
               >
                 移除
               </Button>
-            </Space>
+            </div>
           ))}
           {(f.key === "identity_images" ? ["front", "back"] : [""]).map(
             (side) => (
@@ -206,10 +213,14 @@ export default function StudentArchivePanel({
                     setError("请选择符合字段格式和大小要求的附件");
                     return false;
                   }
+                  const generation = sequence.current;
+                  pendingUploads.current++;
                   setBusy(true);
+                  setError("");
                   void studentArchiveApi
                     .upload(relationId, f.key, side, file)
                     .then((i) => {
+                      if (generation !== sequence.current) return;
                       setImages((all) => {
                         const next = [...all, i];
                         setChanged((c) => ({
@@ -222,8 +233,15 @@ export default function StudentArchivePanel({
                       });
                       key.current = crypto.randomUUID();
                     })
-                    .catch((e) => setError(studentInfoError(e)))
-                    .finally(() => setBusy(false));
+                    .catch((e) => {
+                      if (generation === sequence.current) setError(studentInfoError(e));
+                    })
+                    .finally(() => {
+                      if (generation === sequence.current) {
+                        pendingUploads.current--;
+                        setBusy(pendingUploads.current > 0);
+                      }
+                    });
                   return false;
                 }}
               >
@@ -244,7 +262,9 @@ export default function StudentArchivePanel({
       return (
         <Select
           allowClear
-          disabled={locked}
+          autoFocus
+          aria-label={f.label}
+          disabled={locked || busy}
           value={value as string}
           options={(editor?.options[f.key] || []).map((o) => ({
             value: o.value,
@@ -256,7 +276,9 @@ export default function StudentArchivePanel({
     if (f.type === "area")
       return (
         <Cascader
-          disabled={locked}
+          autoFocus
+          aria-label={f.label}
+          disabled={locked || busy}
           value={value as number[]}
           options={areas}
           fieldNames={{ value: "id", label: "name", children: "children" }}
@@ -264,7 +286,9 @@ export default function StudentArchivePanel({
         />
       );
     const props = {
-      disabled: locked,
+      "aria-label": f.label,
+      autoFocus: true,
+      disabled: locked || busy,
       value: typeof value === "string" ? value : "",
       onChange: (
         e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -276,13 +300,16 @@ export default function StudentArchivePanel({
       <Input {...props} />
     );
   };
+  const groups = new Map<string, StudentInfoField[]>();
+  for (const field of [...(data?.information.fields || [])].sort((a, b) => a.sort - b.sort)) {
+    groups.set(field.group, [...(groups.get(field.group) || []), field]);
+  }
   return (
     <section className="lead-detail-tab-content student-archive-section">
-      <Card className="student-archive-card" title={<div className="archive-card-title"><span><small>01 · 报名资料</small><strong>报名收集资料</strong><em>提交快照保留，字段可逐项维护</em></span><Button size="small" loading={busy} onClick={() => void load()}>刷新</Button></div>}>
-      <Space wrap>
-        {data?.information.canExport && (
+      <Card className="student-archive-card" title={<div className="archive-card-title"><span><small>01 · 报名资料</small><strong>报名收集资料</strong><em>提交快照保留，字段可逐项维护</em></span><Button size="small" loading={busy} disabled={busy || !!editor} onClick={() => void load()}>刷新</Button></div>}>
+      {data?.information.canExport && <Space wrap>
           <Button
-            disabled={busy}
+            disabled={busy || !!editor}
             onClick={() => {
               setBusy(true);
               void studentArchiveApi
@@ -293,56 +320,62 @@ export default function StudentArchivePanel({
           >
             导出学员档案
           </Button>
-        )}
-        {data?.information.status === "SUBMITTED" &&
-          data.information.canReadSensitive && (
-            <>
-              <Button disabled={busy} onClick={() => void load(true)}>
-                查看完整敏感信息
-              </Button>
-              <Button disabled={busy} onClick={() => void preview()}>
-                查看材料附件
-              </Button>
-            </>
-          )}
-      </Space>
+      </Space>}
       {error && (
         <Alert
           type="error"
           title={error}
-          action={<Button onClick={() => void load()}>重试</Button>}
+          action={!editor && <Button disabled={busy} onClick={() => void load()}>重试</Button>}
         />
       )}
-      {busy && !editor ? (
+      {busy && !data ? (
         <Spin />
       ) : data?.information.status !== "SUBMITTED" ? (
-        <Empty description="暂无已提交的收集资料" />
+        !error && <Empty description="暂无已提交的收集资料" />
       ) : (
         <>
-          <p>{data.productName} · 本次报名档案</p>
-          <Descriptions
-            column={{ xs: 1, sm: 2 }}
-            items={data.information.fields.map((f) => ({
-              key: f.key,
-              label: <span className="archive-description-label">{f.label}{data.canMaintain && <Button className="archive-field-edit" type="text" size="small" icon={<EditOutlined />} aria-label={`修改${f.label}`} onClick={() => void edit(f.key)} />}</span>,
-              children:
-                f.type === "images" ? (
-                  <Image.PreviewGroup>
-                    {data.information.images
-                      .filter((i) => i.fieldKey === f.key)
-                      .map((i) =>
-                        urls[i.id] ? (
-                          <span key={i.id}>{i.contentType.startsWith("image/") ? <Image src={urls[i.id]} width={80} /> : <a href={urls[i.id]} download={i.name}>{i.name}</a>}</span>
-                        ) : (
-                          <span key={i.id}>已上传附件 </span>
-                        ),
-                      )}
-                  </Image.PreviewGroup>
-                ) : (
-                  data.information.values[f.key] || "—"
-                ),
-            }))}
-          />
+          <div className="student-info-panel archive-registration-content">
+            <div className="student-info-layout">
+              <div className="student-info-main">{[...groups].map(([group, fields]) => <section className="student-info-section" key={group}>
+                <h4>{groupTitles[group] || '其他资料'}</h4>
+                <dl className="student-info-fields">{fields.map(f => {
+                  const value = data.information.values[f.key];
+                  const isEditing = Boolean(editor && editingField === f.key);
+                  const files = data.information.images.filter(image => image.fieldKey === f.key);
+                  const wide = isEditing || f.type === 'images' || f.type === 'textarea' || (value?.length || 0) > 120;
+                  return <div key={f.key} className={`student-info-field archive-registration-field${wide ? ' is-wide' : ''}`}>
+                    <dt><span className="archive-description-label">{f.label}{data.canMaintain && !["age", "gender"].includes(f.key) && (!(f.sensitive || f.type === "images") || data.information.canReadSensitive) && <Button className="archive-field-edit" type="text" size="small" icon={<EditOutlined />} aria-label={`修改${f.label}`} disabled={busy || !!editor} onClick={() => void edit(f.key)} />}</span></dt>
+                    <dd>{isEditing ? <div className="archive-inline-editor" role="group" aria-label={`编辑${f.label}`}>
+                      {control(f)}
+                      <Space className="archive-inline-actions" wrap>
+                        <Button type="primary" size="small" loading={busy} disabled={busy || !Object.keys(changed).length} onClick={() => void save()}>保存</Button>
+                        <Button size="small" disabled={busy} onClick={() => { setEditor(undefined); setEditingField(undefined); setChanged({}); setError(""); }}>取消</Button>
+                      </Space>
+                    </div> : f.type === 'images' ? files.length ? <>
+                      <div className="student-info-attachments">{files.map(image => data.information.canReadSensitive
+                        ? <AttachmentCard key={`${relationId}:${data.revision}:${image.id}`} name={image.name} load={async () => attachment(image)} />
+                        : <span key={image.id}>{image.name}</span>)}</div>
+                      {!data.information.canReadSensitive && <span className="archive-sensitive-hint">暂无材料附件查看权限</span>}
+                    </> : <span className="archive-empty">未提交附件</span>
+                      : value == null || value === '' ? <span className="archive-empty">未填写</span>
+                        : f.type === 'dict' || f.type === 'area' ? <Tag color="cyan" className="student-info-option">{value}</Tag> : value}
+                      {f.note && <div className="student-info-field-note">{f.note}</div>}
+                    </dd>
+                  </div>;
+                })}</dl>
+              </section>)}</div>
+              <aside className="student-info-aside" aria-label="报名档案信息"><section className="student-info-section">
+                <h4>档案信息</h4>
+                <dl className="student-info-fields">
+                  <div className="student-info-field"><dt>报名课程</dt><dd>{data.productName || '未记录'}</dd></div>
+                  <div className="student-info-field"><dt>提交时间</dt><dd>{formatTimestamp(data.information.submittedAt)}<div className="student-info-field-note">北京时间</div></dd></div>
+                  <div className="student-info-field"><dt>表单版本</dt><dd>{data.information.configVersion == null ? '未记录' : `V${data.information.configVersion}`}</dd></div>
+                  <div className="student-info-field"><dt>维护版本</dt><dd>{data.revision}</dd></div>
+                </dl>
+                {!data.information.canReadSensitive && <p className="archive-sensitive-hint">当前账号无敏感信息查看权限，相关内容由服务端脱敏。</p>}
+              </section></aside>
+            </div>
+          </div>
           <Collapse
             items={[
               {
@@ -351,8 +384,8 @@ export default function StudentArchivePanel({
                 children: data.history.length
                   ? data.history.map((h) => (
                       <p key={h.revision}>
-                        第 {h.revision} 次修改 · {h.modifiedAt} · {h.operatorName} ·{" "}
-                        {h.reason}
+                        第 {h.revision} 次修改 · {formatTimestamp(h.modifiedAt)} · {h.operatorName}
+                        {h.reason && <> · {h.reason}</>}
                       </p>
                     ))
                   : "暂无维护记录",
@@ -361,42 +394,6 @@ export default function StudentArchivePanel({
           />
         </>
       )}
-      <Modal
-        open={!!editor}
-        title={`修改${data?.information.fields.find(f => f.key === editingField)?.label || "报名信息"}`}
-        width={760}
-        onCancel={() => {
-          if (!busy) { setEditor(undefined); setEditingField(undefined); }
-        }}
-        onOk={() => void save()}
-        confirmLoading={busy}
-        okButtonProps={{
-          disabled: !reason.trim() || !Object.keys(changed).length,
-        }}
-        destroyOnHidden
-      >
-        <p>
-          原始提交保留，保存后生成新档案版本。未修改的字典和地区保留原标签。
-        </p>
-        <Form layout="vertical">
-          {data?.information.fields.filter((f) => !editingField || f.key === editingField).map((f) => (
-            <Form.Item key={f.key} label={f.label} required={f.required}>
-              {control(f)}
-            </Form.Item>
-          ))}
-          <Form.Item label="维护原因" required>
-            <Input.TextArea
-              value={reason}
-              maxLength={500}
-              onChange={(e) => {
-                setReason(e.target.value);
-                key.current = crypto.randomUUID();
-              }}
-            />
-          </Form.Item>
-        </Form>
-        {error && <Alert type="error" title={error} />}
-      </Modal>
       </Card>
       <StudentArchiveExtraPanel key={relationId} relationId={relationId} />
     </section>

@@ -28,7 +28,10 @@ public class MediaAccountProfileController {
     @PostMapping("/diagnosis")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:edit','zsjos:media-account:maintenance')")
     public CommonResult<Integer> diagnosis(@PathVariable Long id, @Valid @RequestBody DiagnosisRequest req) {
-        return success(service.submitDiagnosis(id, req, getLoginUserId()));
+        if (!"diagnosis_initial".equals(req.getTemplateType()) && req.getPreviousEntryId()==null)
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED);
+        return success(service.submitLegacyDiagnosis(id, req, getLoginUserId()));
     }
     @GetMapping("/history")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:query','zsjos:media-account:maintenance')")

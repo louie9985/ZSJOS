@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.positioning;
 
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaServiceReadiness;
+
 import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
 
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardSaveReqVO;
@@ -105,13 +107,32 @@ public class PositioningCardService {
         if (!Objects.equals(card.getDirectorUserId(), userId)) throw exception(POSITIONING_CARD_PERMISSION_DENIED);
         assignmentService.requireMaster(card);
         var fields = JsonUtils.parseArray(card.getFieldsSnapshotJson(), DirectorFormTemplateVO.Field.class);
+        PositioningAttachmentLimits.requireWithinBudget(List.of((long) bytes.length));
         // 与定位访谈同一白名单：文档、图片、音频、视频，且扩展名须与真实内容一致。
         String detected = PositioningAttachmentTypes.detectAllowed(name, bytes);
         if (fields.stream().noneMatch(f -> f.getKey().equals(fieldKey) && Boolean.TRUE.equals(f.getEnabled()) && "attachment".equals(f.getType()))
-                || bytes.length == 0 || bytes.length > 100 * 1024 * 1024 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+                || bytes.length == 0 || detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
         var file = positioningFileApi.createFileInfo(bytes, PositioningAttachmentTypes.storageName(name),
                 fileDirectory(id) + fieldKey, detected);
         return new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), positioningFileApi.presignGetUrl(file.getId(), 300));
+    }
+
+    @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "submit-review")
+    public CardFile uploadAttachmentFile(Long id, String fieldKey, org.springframework.web.multipart.MultipartFile upload, Long userId) throws java.io.IOException {
+        var card = require(id); requireStatus(card, POSITIONING_CO_CREATING);
+        if (!Objects.equals(card.getDirectorUserId(), userId)) throw exception(POSITIONING_CARD_PERMISSION_DENIED);
+        assignmentService.requireMaster(card);
+        var fields = JsonUtils.parseArray(card.getFieldsSnapshotJson(), DirectorFormTemplateVO.Field.class);
+        if (upload == null || upload.isEmpty() || fields.stream().noneMatch(f -> f.getKey().equals(fieldKey)
+                && Boolean.TRUE.equals(f.getEnabled()) && "attachment".equals(f.getType()))) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        PositioningAttachmentLimits.requireWithinBudget(List.of(upload.getSize()));
+        try (var input = upload.getInputStream(); var source = PositioningUploadSource.stage(input, upload.getSize())) {
+            String detected = PositioningAttachmentTypes.detectAllowed(upload.getOriginalFilename(), source.path());
+            if (detected == null) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+            var file = positioningFileApi.createFileInfoFromPath(source.path(), PositioningAttachmentTypes.storageName(upload.getOriginalFilename()),
+                    fileDirectory(id) + fieldKey, detected);
+            return new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), positioningFileApi.presignGetUrl(file.getId(), 300));
+        }
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "read")
@@ -135,6 +156,7 @@ public class PositioningCardService {
                 if (file == null || file.getPath() == null || !file.getPath().startsWith(fileDirectory(id) + field.getKey() + "/")) throw exception(DIRECTOR_FORM_VALUE_INVALID);
                 files.add(new CardFile(file.getId(), file.getName(), file.getType(), file.getSize(), null));
             }
+            PositioningAttachmentLimits.requireWithinBudget(files.stream().map(CardFile::size).toList());
             snapshot.getDictSnapshots().put(field.getKey(), files);
         }
     }
@@ -225,7 +247,7 @@ public class PositioningCardService {
         if (relation == null || !Objects.equals(relation.getContentDirectorUserId(), userId)
                 || !Objects.equals(relation.getTenantId(),tenantId)
                 || !Objects.equals(relation.getPersonId(), studentPersonId)
-                || !"active".equals(relation.getStatus()) || !"accepted".equals(relation.getAcceptanceStatus())
+                || !"active".equals(relation.getStatus()) || !MediaServiceReadiness.ready(relation)
                 || !isPositioningComplete(relation.getDirectorStage())) {
             throw exception(POSITIONING_REFERENCE_INVALID);
         }
@@ -365,7 +387,7 @@ public class PositioningCardService {
         if (relation == null || !Objects.equals(relation.getPersonId(), studentPersonId)
                 || !Objects.equals(relation.getContentDirectorUserId(), userId)
                 || !Objects.equals(relation.getTenantId(), tenantId)
-                || !"active".equals(relation.getStatus()) || !"accepted".equals(relation.getAcceptanceStatus())
+                || !"active".equals(relation.getStatus()) || !MediaServiceReadiness.ready(relation)
                 || !isPositioningComplete(relation.getDirectorStage())) throw exception(POSITIONING_REFERENCE_INVALID);
         return relation;
     }
@@ -484,7 +506,7 @@ public class PositioningCardService {
         var relation = tenantId == null ? relationMapper.selectById(card.getServiceRelationId())
                 : relationMapper.selectByIdForUpdate(card.getServiceRelationId(), tenantId);
         if (relation == null || !"active".equals(relation.getStatus())
-                || !"accepted".equals(relation.getAcceptanceStatus())
+                || !MediaServiceReadiness.ready(relation)
                 || relation.getOperatorUserId() == null) {
             throw exception(POSITIONING_OPERATOR_REQUIRED);
         }
@@ -814,9 +836,9 @@ public class PositioningCardService {
         var effective = masterId == null ? null : submissionMapper.selectLatestConfirmedByCard(masterId);
         return new cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningServiceOverviewRespVO(serviceRelationId, masterId,
                 masterId == null && !cards.isEmpty() && director && createPermission && "active".equals(relation.getStatus())
-                        && "accepted".equals(relation.getAcceptanceStatus()) && isPositioningComplete(relation.getDirectorStage()),
+                        && MediaServiceReadiness.ready(relation) && isPositioningComplete(relation.getDirectorStage()),
                 cards.isEmpty() && director && createPermission && "active".equals(relation.getStatus())
-                        && "accepted".equals(relation.getAcceptanceStatus()) && isPositioningComplete(relation.getDirectorStage()),
+                        && MediaServiceReadiness.ready(relation) && isPositioningComplete(relation.getDirectorStage()),
                 director && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:submit-review") && relation.getOperatorUserId() != null,
                 cards.stream().filter(row -> objectPermissionProvider.hasPermission(row.getId(), "read", userId)).map(row -> toResp(row, userId)).toList(),
                 master == null || !objectPermissionProvider.hasPermission(master.getId(), "read", userId) ? null : toResp(master, userId),

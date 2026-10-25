@@ -25,6 +25,8 @@ public class ServiceRelationDO extends TenantBaseDO {
     private String studentNameSource;
     /** Media relationships may exist without participating in teaching delivery. */
     private Boolean teachingDelivery;
+    /** Null preserves legacy acceptance; explicit readiness is independent of teaching acceptance. */
+    private Boolean mediaReady;
     /** Historical enrollment can own a service without a sale; never create a placeholder order. */
     private Long orderId;
     private Long orderItemId;
@@ -32,6 +34,11 @@ public class ServiceRelationDO extends TenantBaseDO {
     /** Delivery class; null is retained only for legacy rows before class migration. */
     private Long classId;
     private String status;
+    private Boolean teachingClosed;
+    private Long teachingPreviousClassId;
+    private LocalDateTime teachingClosedAt;
+    /** Enables taskless stage forms only after an explicit restoration. */
+    private Boolean teachingRestored;
     private Long ownerUserId;
     private String acceptanceStatus;
     private Long acceptedByUserId;

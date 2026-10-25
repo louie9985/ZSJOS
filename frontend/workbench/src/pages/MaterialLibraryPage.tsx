@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "../components/filterSelectDisplay"
 import MaterialCover from '../components/MaterialCover'
 import MaterialSearchContent, { MaterialHighlight } from '../components/MaterialSearchContent'
 import ResourceLink from '../components/ResourceLink'
@@ -47,6 +48,7 @@ import BpmProcessPanel from '../components/bpm/BpmProcessPanel'
 import ViralAccountMaterialForm from '../components/ViralAccountMaterialForm'
 import ViralContentMaterialForm from '../components/ViralContentMaterialForm'
 import { api, ApiError, type DictData } from '../services/api'
+import { materialLifecycleApi } from '../services/materialLifecycleApi'
 import { hasPermission } from '../services/managementAccess'
 import {
   materialApi,
@@ -449,6 +451,15 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   const [versionsLoading, setVersionsLoading] = useState(false)
   const [versionsError, setVersionsError] = useState('')
   const [formOpen, setFormOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelError, setCancelError] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Material>()
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const deletingRef = useRef(false)
   const [dicts, setDicts] = useState<Record<string, Array<{ value: string; label: string }>>>({})
   const [dictError, setDictError] = useState('')
   const [dictLoading, setDictLoading] = useState(false)
@@ -511,8 +522,12 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
     }
   }, [view])
 
+  const consumedMaterialLink = useRef<string | undefined>(undefined)
   useEffect(() => {
-    const materialId = Number(searchParams.get('materialId'))
+    const link = searchParams.get('materialId') || ''
+    if (consumedMaterialLink.current === link) return
+    consumedMaterialLink.current = link
+    const materialId = Number(link)
     if (materialId) { setFormOpen(true); void loadDetail(materialId) }
   }, [loadDetail, searchParams])
 
@@ -599,13 +614,54 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
   const displayedTypeCode = types.find(type => type.id === selected?.materialTypeId)?.code
   const onFormSaved = async () => {
     setFormOpen(false)
+    setEditing(false)
     await load(1, selectedId)
   }
 
   const currentVersion = selected?.currentVersion
   const openMaterial = async (id: number) => {
+    setEditing(false)
     setFormOpen(true)
     await loadDetail(id)
+  }
+  const canCancel = view === 'mine' && currentVersion?.status === 'IN_APPROVAL'
+    && Boolean(currentVersion.processInstanceId) && selected?.availableActions.includes('CANCEL')
+    && hasPermission(permissions, 'bpm:process-instance:cancel')
+  const canEdit = view === 'mine' && currentVersion?.status !== 'IN_APPROVAL'
+    && selected?.availableActions.includes('UPDATE') && hasPermission(permissions, 'zsjos:material:update')
+  const canDelete = (material: Material) => view === 'mine'
+    && material.availableActions.includes('DELETE_DRAFT') && hasPermission(permissions, 'zsjos:material:delete-draft')
+  const requestDelete = (material: Material) => {
+    if (!canDelete(material) || deletingRef.current || (formOpen && editing)) return
+    setDeleteError(''); setDeleteTarget(material)
+  }
+  const deleteDraft = async () => {
+    if (!deleteTarget || !canDelete(deleteTarget) || deletingRef.current) return
+    deletingRef.current = true; setDeleting(true); setDeleteError('')
+    try {
+      await materialApi.deleteDraft(deleteTarget.id, deleteTarget.version)
+      // Invalidate in-flight reads before refreshing so an old response cannot restore a deleted draft.
+      listRequestRef.current += 1; detailRequestRef.current += 1
+      setRows(current => current.filter(item => item.id !== deleteTarget.id))
+      setSelected(undefined); setSelectedId(undefined); setDetailLoading(false)
+      setFormOpen(false); setEditing(false); setVersionsOpen(false); setVersions([])
+      setDeleteTarget(undefined)
+      message.success('草稿已删除')
+      await load(1)
+    } catch (cause) { setDeleteError(errorText(cause)) }
+    finally { deletingRef.current = false; setDeleting(false) }
+  }
+  const cancelApproval = async () => {
+    if (!canCancel || !currentVersion?.processInstanceId || !selectedId || !cancelReason.trim() || cancelling) return
+    setCancelling(true); setCancelError('')
+    try {
+      await materialLifecycleApi.cancel(currentVersion.processInstanceId, cancelReason.trim())
+      setCancelOpen(false); setEditing(false)
+      await load(1, selectedId)
+      // A status filter can exclude the newly restored draft; keep its detail available.
+      await loadDetail(selectedId)
+    } catch (cause) { setCancelError(errorText(cause)) }
+    finally { setCancelling(false) }
   }
   return <section className={`workspace-page material-library-page material-library-${layoutMode}${view === 'mine' ? ' material-library-mine' : ''}`}>
     <header className="material-library-filter-shell">
@@ -630,10 +686,10 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           allowClear showSearch={{ optionFilterProp: 'label' }} placeholder={filter.label} value={filter.value} onChange={filter.onChange}
           loading={dictLoading} disabled={dictLoading || !dicts[filter.dictType]}
           options={dicts[filter.dictType] || []} classNames={{ popup: { root: 'material-library-filter-options' } }}
-          labelRender={({ label }) => <span className="material-library-filter-label">{label}</span>} />)}
+          {...filterSelectDisplayProps} labelRender={({ label }) => <span className="material-library-filter-label">{label}</span>} />)}
         <Select className="material-library-select" allowClear placeholder="素材类型" value={materialTypeId} onChange={setMaterialTypeId}
           loading={metadataLoading} disabled={metadataLoading || Boolean(metadataError)}
-          options={types.map(type => ({ value: type.id, label: type.name }))} />
+          options={types.map(type => ({ value: type.id, label: type.name }))}  {...filterSelectDisplayProps}/>
         <Segmented<LayoutMode> className="material-library-layout-switch" aria-label="素材布局" value={layoutMode} onChange={changeLayout}
           options={[
             { value: 'large', label: <span title="大图布局" aria-label="大图布局"><AppstoreOutlined /><span className="material-layout-label">大图</span></span> },
@@ -675,6 +731,8 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
                   {item.currentVersion?.submittedAt && <span>最近提交：<DateTimeText value={item.currentVersion.submittedAt} /></span>}
                   {item.currentVersion?.rejectionReason && <span>驳回原因：{item.currentVersion.rejectionReason}</span>}
                   {item.currentVersion?.effectiveAt && <span>生效时间：<DateTimeText value={item.currentVersion.effectiveAt} /></span>}
+                  {canDelete(item) && <Button type="link" danger disabled={deleting || (formOpen && editing)}
+                    onClick={() => requestDelete(item)}>删除草稿</Button>}
                 </> : <span><LikeOutlined /> {item.likeCount}　<LinkOutlined /> {item.referenceCount}</span>}
                 <MaterialSearchContent material={item} keyword={keyword} onSearch={searchMaterials}
                   onLocate={() => void openMaterial(item.id)} />
@@ -697,6 +755,21 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           </Space>} />
       </List.Item>} />}
     </Drawer>
+    <Modal title="确认删除草稿？" open={Boolean(deleteTarget)} zIndex={1200} okText="确认删除" cancelText="取消"
+      confirmLoading={deleting} okButtonProps={{ danger: true, disabled: !deleteTarget || !canDelete(deleteTarget) }}
+      cancelButtonProps={{ disabled: deleting }} closable={!deleting} keyboard={!deleting} mask={{ closable: false }}
+      onCancel={() => { if (!deletingRef.current) setDeleteTarget(undefined) }} onOk={() => void deleteDraft()}>
+      {deleteTarget && <p>将删除“{deleteTarget.title}”（{deleteTarget.materialNo}），删除后无法在草稿箱恢复。</p>}
+      {deleteError && <Alert type="error" showIcon message={deleteError} />}
+    </Modal>
+    <Modal title="撤回审批" open={cancelOpen} okText="确认撤回" cancelText="取消"
+      confirmLoading={cancelling} okButtonProps={{ disabled: !cancelReason.trim() }}
+      cancelButtonProps={{ disabled: cancelling }} closable={!cancelling} mask={{ closable: false }}
+      onCancel={() => setCancelOpen(false)} onOk={() => void cancelApproval()}>
+      <Input.TextArea aria-label="撤回原因" placeholder="请填写撤回原因" value={cancelReason} disabled={cancelling}
+        onChange={event => setCancelReason(event.target.value)} />
+      {cancelError && <Alert type="error" showIcon message={cancelError} />}
+    </Modal>
     <Drawer
       title="查看爆款拆解"
       open={formOpen} onClose={() => setFormOpen(false)} width="min(1480px, 100vw)" destroyOnClose>
@@ -710,17 +783,20 @@ export default function MaterialLibraryPage({ permissions = [] }: { permissions?
           {view === 'mine' && selected.currentEffectiveVersionId && selected.currentDraftVersionId && <span>旧生效版本继续可用</span>}
         </div>
         <div className="material-layout-summary-actions">
+          {canCancel && <Button onClick={() => { setCancelReason(''); setCancelError(''); setCancelOpen(true) }}>撤回审批</Button>}
+          {canDelete(selected) && !editing && <Button danger disabled={deleting} onClick={() => requestDelete(selected)}>删除草稿</Button>}
+          {canEdit && !editing && <Button type="primary" onClick={() => setEditing(true)}>{currentVersion?.status === 'DRAFT' ? '继续编辑' : '修改并重新送审'}</Button>}
           <Button icon={<HistoryOutlined />} onClick={() => void openVersions()}>版本记录</Button>
         </div>
       </div>}
       {view === 'mine' && currentVersion?.status === 'IN_APPROVAL' && currentVersion.processInstanceId
         && hasPermission(permissions, 'bpm:process-instance:query') && <BpmProcessPanel
-          compact decisionOnly allowDecision={false} canUpdate={false} users={[]}
+          compact decisionOnly loadComments={hasPermission(permissions, 'bpm:task:query')} allowDecision={false} canUpdate={false} users={[]}
           processInstanceId={currentVersion.processInstanceId} />}
       {displayedTypeCode === 'viral_content'
-        ? viralContentType && <ViralContentMaterialForm key={selected?.id} mode="view" type={viralContentType}
+        ? viralContentType && <ViralContentMaterialForm key={`${selected?.id}-${editing}`} mode={editing && canEdit ? 'edit' : 'view'} type={viralContentType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />
-        : displayedTypeCode === 'viral_account' && viralType && <ViralAccountMaterialForm key={selected?.id} mode="view" type={viralType}
+        : displayedTypeCode === 'viral_account' && viralType && <ViralAccountMaterialForm key={`${selected?.id}-${editing}`} mode={editing && canEdit ? 'edit' : 'view'} type={viralType}
           material={selected} dicts={dicts} submitAllowed={hasPermission(permissions, 'zsjos:material:submit')} onClose={() => setFormOpen(false)} onSaved={() => void onFormSaved()} />}
       </>}
     </Drawer>

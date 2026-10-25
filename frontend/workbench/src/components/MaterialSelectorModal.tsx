@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import BusinessTable from './BusinessTable'
 import { SearchOutlined } from '@ant-design/icons'
 import { Alert, Button, Checkbox, Empty, Image, Input, Modal, Select, Space, Spin, Tag, Typography } from 'antd'
@@ -140,19 +141,19 @@ export default function MaterialSelectorModal({
           value={filters.materialTypeId}
           options={types.map(type => ({ value: type.id, label: type.name }))}
           onChange={value => search({ ...filters, materialTypeId: value })}
-        />
+         {...filterSelectDisplayProps}/>
         <Select
           allowClear placeholder="状态" style={{ width: 130 }}
           value={filters.status}
           options={statusOptions}
           onChange={value => search({ ...filters, status: value })}
-        />
+         {...filterSelectDisplayProps}/>
         <Select
           allowClear placeholder="来源" style={{ width: 150 }}
           value={filters.source}
           options={sourceOptions}
           onChange={value => search({ ...filters, source: value })}
-        />
+         {...filterSelectDisplayProps}/>
         <Button type="primary" loading={loading} onClick={() => search(filters)}>查询</Button>
         <Button onClick={() => search({})}>重置</Button>
       </Space>

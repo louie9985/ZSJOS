@@ -5,16 +5,16 @@ import type { MyStudent, StudentServiceSummary } from '../services/api'
 import type { BusinessSort } from '../services/businessListSort'
 import DateTimeText from './DateTimeText'
 import ProductSpecs from './ProductSpecs'
-import { NameAvatar } from './LeadDetailOverview'
 import DetailFieldGrid from './DetailFieldGrid'
+import TaskIndicator from './LeadTaskIndicator'
 
-export type ServiceStudent = MyStudent & { serviceRelationId: number; summary?: StudentServiceSummary }
+export type ServiceStudent = MyStudent & { serviceRelationId: number; summary?: StudentServiceSummary; pendingTasks?: import('../services/api').StudentServiceSubject['pendingTasks'] }
 type Column = ProColumns<ServiceStudent> & { display?: (row: ServiceStudent) => ReactNode }
 const svc = (r: ServiceStudent) => r.services[0]
 const history = (s?: string) => s || '历史未记录'
 export const assignedName = (id?: number, name?: string) => name || (id ? '人员姓名未提供' : '未分配')
 export const acceptanceLabel = (value?: string) => value === 'accepted' ? '已接收' : value === 'pending' ? '待接收' : '历史未记录'
-const statusLabel = (s?: string) => ({ active: '服务中', paused: '已暂停', completed: '已结业', terminated: '已终止' }[s || ''] || '未知状态')
+const statusLabel = (s?: string) => ({ active: '服务中', paused: '已暂停', completed: '已结业', closed: '已关闭', terminated: '已终止' }[s || ''] || '未知状态')
 const taskLabel = (s?: string) => ({ student_first_contact: '首联', student_study_plan: '制定学习计划', student_contact: '普通联系', student_delivery_stage: '交付阶段' }[s || ''] || '未知类型')
 const orderType = (s?: string) => ({ first_purchase: '首购', repurchase: '复购' }[s || ''] || '历史未记录')
 const orderStatus = (s?: string) => ({ pending_approval: '审批中', revision_required: '待修改', effective: '已生效', superseded: '已被接续', terminated: '已终止' }[s || ''] || '未知状态')
@@ -30,12 +30,12 @@ const order = (key: keyof NonNullable<StudentServiceSummary['orderHandoff']>, fo
 
 export function studentServiceColumnDefinitions(): Column[] {
   return [
-    { ...column('name', '学员姓名', r => <Space><NameAvatar name={r.name || '学员'} seed={r.personNo} size={30} subjectType="student" /><Typography.Text strong>{r.name || '未填写姓名'}</Typography.Text></Space>, 180, true), fixed: 'left' },
+    { ...column('name', '学员姓名', r => <Space size={6}><TaskIndicator lead={r} compact /><Typography.Text strong>{r.name || '未填写姓名'}</Typography.Text></Space>, 180, true), fixed: 'left' },
     column('personNo', '学员编号', r => history(r.personNo), 160, true),
     column('mobile', '手机号', r => r.mobile ? <Typography.Text copyable onClick={e => e.stopPropagation()}>{r.mobile}</Typography.Text> : '未填写', 160, true),
     column('wechatId', '微信号', r => r.wechatId ? <Typography.Text copyable onClick={e => e.stopPropagation()}>{r.wechatId}</Typography.Text> : '未填写', 170, true),
-    { ...column('courses', '课程服务', r => <Space orientation="vertical" size={2}><strong>{svc(r)?.courseName || svc(r)?.skuName || '历史课程信息缺失'}</strong><span>{svc(r)?.skuName}</span><ProductSpecs product={svc(r) || {}} /></Space>, 280, true), ellipsis: false },
-    column('className', '班级', r => r.summary?.systemClass ? '待分班' : svc(r)?.className || '未分班', 180, true),
+    { ...column('courses', '课程服务', r => <Space orientation="vertical" size={2}><strong>{svc(r)?.courseName || svc(r)?.skuName || '历史课程信息缺失'}</strong><span>{svc(r)?.skuName}</span><ProductSpecs product={svc(r) || {}} /></Space>, 280, true), minWidth: 280, ellipsis: false },
+    column('className', '班级', r => r.summary?.classKind === 'PENDING' || (r.summary?.systemClass && !r.summary.classKind) ? '待分班' : svc(r)?.className || '未分班', 180, true),
     column('ownerUserName', '学习规划师（班主任）', r => assignedName(svc(r)?.ownerUserId, svc(r)?.ownerUserName), 190),
     column('acceptanceStatus', '接收状态', r => <Tag color={svc(r)?.acceptanceStatus === 'accepted' ? 'green' : 'orange'}>{acceptanceLabel(svc(r)?.acceptanceStatus)}</Tag>, 120),
     column('serviceStatus', '服务状态', r => statusLabel(svc(r)?.status), 120, true),

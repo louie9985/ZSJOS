@@ -386,6 +386,11 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   transform: translateY(-50%);
 }
 
+/* 目录的数量提示为展开箭头留位。 */
+.ant-menu-submenu-title .menu-task-badge {
+  inset-inline-end: var(--crm-sp-5);
+}
+
 /* 收起状态：只显示图标，按钮缩为正方形 */
 .primary-sider.ant-layout-sider-collapsed .primary-nav-item {
   padding: var(--crm-sp-3) 0;

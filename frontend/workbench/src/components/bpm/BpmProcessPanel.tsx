@@ -51,6 +51,7 @@ export default function BpmProcessPanel({
   businessAdvance,
   compact = false,
   actionsOutside = false,
+  loadComments = true,
   onActionSuccess
 }: {
   processInstanceId?: string
@@ -65,6 +66,7 @@ export default function BpmProcessPanel({
   businessAdvance?: BpmBusinessAdvanceAction
   compact?: boolean
   actionsOutside?: boolean
+  loadComments?: boolean
   onActionSuccess?: () => void
 }) {
   const [detail, setDetail] = useState<BpmApprovalDetail>()
@@ -84,7 +86,7 @@ export default function BpmProcessPanel({
     try {
       const [approvalDetail, commentList] = await Promise.all([
         api.bpmApprovalDetail({ processInstanceId, taskId }),
-        api.bpmCommentList(processInstanceId).catch(() => { setCommentError('历史评论加载失败，请重试'); return [] as BpmComment[] })
+        loadComments ? api.bpmCommentList(processInstanceId).catch(() => { setCommentError('历史评论加载失败，请重试'); return [] as BpmComment[] }) : Promise.resolve([] as BpmComment[])
       ])
       setDetail(approvalDetail)
       setComments(commentList)
@@ -94,7 +96,7 @@ export default function BpmProcessPanel({
     } finally {
       setLoading(false)
     }
-  }, [processInstanceId, taskId])
+  }, [processInstanceId, taskId, loadComments])
 
   useEffect(() => { void load() }, [load])
 
@@ -174,7 +176,7 @@ export default function BpmProcessPanel({
           )}
         </Space>,
         children: <>
-          {commentError && <Alert type="warning" showIcon message={commentError} action={<Button onClick={() => void load()}>重试</Button>} />}
+          {loadComments && commentError && <Alert type="warning" showIcon message={commentError} action={<Button onClick={() => void load()}>重试</Button>} />}
           {error && <Alert
             type="error"
             showIcon
@@ -188,7 +190,7 @@ export default function BpmProcessPanel({
               ? <Timeline className="bpm-approval-timeline" items={timelineItems}/>
               : !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无审批记录"/>}
 
-          {comments.length > 0 && <div className="bpm-process-panel-comments">
+          {loadComments && comments.length > 0 && <div className="bpm-process-panel-comments">
             <Typography.Text strong>流程评论</Typography.Text>
             {comments.map(comment => <div key={comment.id} className="bpm-approval-comment">
               <Space size={8}>

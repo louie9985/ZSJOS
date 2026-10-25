@@ -17,7 +17,9 @@ public class DeliveryClassDO extends TenantBaseDO {
     @TableId private Long id;
     private String classNo;
     private String className;
+    private Long groupId;
     private Boolean systemClass;
+    private String classKind;
     private Long productId;
     private String productNameSnapshot;
     private String selectedAttrsJson;

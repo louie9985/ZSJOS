@@ -60,6 +60,19 @@ public class FtpFileClient extends AbstractFileClient<FtpFileClientConfig> {
     }
 
     @Override
+    public String uploadFile(java.nio.file.Path source, String path, String type) throws java.io.IOException {
+        String filePath = getFilePath(path);
+        String fileName = FileUtil.getName(filePath);
+        reconnectIfTimeout();
+        try (var input = java.nio.file.Files.newInputStream(source)) {
+            if (!ftp.upload(StrUtil.removeSuffix(filePath, fileName), fileName, input)) {
+                throw new FtpException("流式文件上传失败");
+            }
+        }
+        return super.formatFileUrl(config.getDomain(), path);
+    }
+
+    @Override
     public void delete(String path) {
         String filePath = getFilePath(path);
         reconnectIfTimeout();

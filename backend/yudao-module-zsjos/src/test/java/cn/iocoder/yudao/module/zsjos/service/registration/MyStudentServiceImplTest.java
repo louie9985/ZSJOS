@@ -51,6 +51,34 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class MyStudentServiceImplTest {
+    @org.junit.jupiter.api.BeforeEach
+    void denyUnconfiguredFeaturePermissions() {
+        org.mockito.Mockito.lenient().when(permissionApi.hasAnyPermissions(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(false);
+    }
+
+    @Test void teachingQueryAllUsesLegacyAllPageAndKeepsMediaScopeIndependent() {
+        var req = new MyStudentPageReqVO();
+        when(permissionApi.hasAnyPermissions(28L, StudentReadScope.QUERY_ALL)).thenReturn(true);
+        when(personMapper.selectAllStudentPage(req, List.of())).thenReturn(PageResult.empty());
+        assertEquals(0L, service.getMyPage(28L, req).getTotal());
+        when(personMapper.selectMediaStudentPage(req, 28L, List.of())).thenReturn(PageResult.empty());
+        assertEquals(0L, service.getMediaPage(28L, req).getTotal());
+        verifyNoInteractions(classScopeService);
+        verify(personMapper, never()).selectAllMediaStudentPage(any(), anyCollection());
+    }
+
+    @Test void teachingQueryAllDoesNotLoseOtherOwnersDuringLegacyAdvancedFilter() {
+        var req = new MyStudentPageReqVO();
+        var filter = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO();
+        req.setAdvancedFilter(filter);
+        when(permissionApi.hasAnyPermissions(28L, StudentReadScope.QUERY_ALL)).thenReturn(true);
+        when(advancedFilterService.matchStudentPersonIds(filter, 28L, true)).thenReturn(List.of(900L));
+        when(personMapper.selectAllStudentPage(req, List.of(900L))).thenReturn(PageResult.empty());
+        service.getMyPage(28L, req);
+        verify(advancedFilterService).matchStudentPersonIds(filter, 28L, true);
+        verify(advancedFilterService, never()).matchStudentPersonIds(filter, 28L);
+    }
     @Test
     void historicalStudentWithoutOrderRetainsServiceAndCourseSnapshot() {
         ServiceRelationDO relation = new ServiceRelationDO();
@@ -296,7 +324,7 @@ class MyStudentServiceImplTest {
         when(personMapper.selectMediaStudentPage(reqVO, 28L, List.of()))
                 .thenReturn(new PageResult<>(List.of(person), 1L));
         when(mediaAccountMapper.selectParticipantStudentIds(28L, List.of(42L))).thenReturn(List.of(42L));
-        when(relationMapper.selectActiveByPersonIds(List.of(42L))).thenReturn(List.of());
+        when(relationMapper.selectMediaActiveByPersonIds(List.of(42L))).thenReturn(List.of());
         when(personMapper.selectById(42L)).thenReturn(person);
 
         PageResult<MyStudentRespVO> result = service.getMediaPage(28L, reqVO);
@@ -304,6 +332,23 @@ class MyStudentServiceImplTest {
         assertEquals(1, result.getTotal());
         org.junit.jupiter.api.Assertions.assertNull(result.getList().getFirst().getName());
         assertEquals(List.of(), result.getList().getFirst().getServices());
+    }
+
+    @Test
+    void mediaPageProjectsIndependentServiceBeforeTeachingAcceptance() {
+        var req = new MyStudentPageReqVO(); req.setPageNo(1); req.setPageSize(20);
+        var person = new PersonDO(); person.setId(42L);
+        var relation = new ServiceRelationDO(); relation.setId(44L); relation.setPersonId(42L);
+        relation.setStatus("active"); relation.setAcceptanceStatus("pending"); relation.setMediaReady(true);
+        relation.setTeachingDelivery(false); relation.setContentDirectorUserId(28L);
+        relation.setStudentNameSnapshot("独立录入姓名"); relation.setStudentNameSource("independent_entry");
+        when(personMapper.selectMediaStudentPage(req, 28L, List.of())).thenReturn(new PageResult<>(List.of(person),1L));
+        when(relationMapper.selectMediaActiveByPersonIds(List.of(42L))).thenReturn(List.of(relation));
+        when(personMapper.selectById(42L)).thenReturn(person);
+        var result = service.getMediaPage(28L, req);
+        assertEquals("独立录入姓名", result.getList().getFirst().getName());
+        assertEquals(44L, result.getList().getFirst().getServices().getFirst().getServiceRelationId());
+        assertEquals("pending", result.getList().getFirst().getServices().getFirst().getAcceptanceStatus());
     }
 
     @Test
@@ -327,7 +372,7 @@ class MyStudentServiceImplTest {
         assertEquals(STUDENT_NOT_EXISTS.getCode(), assertThrows(ServiceException.class,
                 () -> service.getMyStudentByService(28L, 72L)).getCode());
         verify(relationMapper, never()).selectOwnedByPersonIds(anyCollection(), any());
-        verify(relationMapper, never()).selectActiveByPersonIds(anyCollection());
+        verify(relationMapper, never()).selectMediaActiveByPersonIds(anyCollection());
     }
 
     @Test
@@ -453,6 +498,25 @@ class MyStudentServiceImplTest {
         first.setStudentNameSnapshot("后续核实回填");
         assertEquals("后续核实回填", service.getMyStudent(28L, 70L).getName());
         verify(orderMapper, never()).selectBatchIds(org.mockito.ArgumentMatchers.anyCollection());
+    }
+
+    @Test
+    void aggregateKeywordDoesNotMatchNameHiddenByFirstVisibleServiceSnapshot() {
+        var person = new PersonDO(); person.setId(70L); person.setName("Person主档姓名");
+        when(advancedFilterService.matchStudentPersonIds(any(), org.mockito.ArgumentMatchers.eq(28L))).thenReturn(List.of());
+        when(personMapper.selectMyStudentPage(any(MyStudentPageReqVO.class), org.mockito.ArgumentMatchers.eq(28L), anyCollection()))
+                .thenReturn(new PageResult<>(List.of(person), 1L));
+        var first = detailRelation(71L, 28L); first.setOrderId(81L); first.setStudentNameSnapshot("首选快照");
+        var second = detailRelation(72L, 28L); second.setOrderId(82L); second.setStudentNameSnapshot("历史订单姓名");
+        when(relationMapper.selectAssignedByUserAndPersonIds(org.mockito.ArgumentMatchers.eq(28L), anyCollection(), org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(List.of(first, second));
+        when(personMapper.selectById(70L)).thenReturn(person);
+        var order = new SalesOrderDO(); order.setId(81L); order.setOrderNo("SO-81");
+        var laterOrder = new SalesOrderDO(); laterOrder.setId(82L); laterOrder.setOrderNo("SO-82");
+        order.setCreateTime(LocalDateTime.of(2026, 1, 1, 0, 0)); laterOrder.setCreateTime(LocalDateTime.of(2026, 2, 1, 0, 0));
+        when(orderMapper.selectBatchIds(Set.of(81L, 82L))).thenReturn(List.of(order, laterOrder));
+        var request = new MyStudentPageReqVO(); request.setKeyword("历史订单姓名");
+        assertEquals(0L, service.getMyPage(28L, request).getTotal());
     }
 
     @Test

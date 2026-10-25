@@ -3,12 +3,14 @@ import { App } from 'antd'
 import { MemoryRouter } from 'react-router-dom'
 import ThemeProvider from '../src/components/Theme/ThemeProvider'
 import { MyStudentsPage } from '../src/pages/RegistrationPages'
+import { teachingServiceLifecycleApi } from '../src/services/teachingServiceLifecycle'
 import { api, http, type StudentServiceSubject } from '../src/services/api'
 import '../src/styles/index.css'
 
 const params = new URLSearchParams(location.search)
 localStorage.setItem('crm-theme', JSON.stringify({ inboxLayoutMode: params.get('layout') || 'inbox' }))
 const long = params.has('long')
+if (params.has('tasks')) teachingServiceLifecycleApi.detail = async () => ({ closed: false, availableActions: [], history: [] })
 const rows: StudentServiceSubject[] = [1, 2].map(id => ({
   personId: 7, personNo: 'XY-FIXTURE-7', name: '示例学员',
   serviceRelationId: id,
@@ -21,14 +23,18 @@ const rows: StudentServiceSubject[] = [1, 2].map(id => ({
     operatorUserId: 40 + id,
   },
 }))
-const state = { fail: false, delay: 0 }
+const state = { fail: false, delay: 0, completed: false, invalidate: () => window.dispatchEvent(new Event('zsjos-workbench-task-invalidated')) }
 Object.assign(window, { sidebarFixture: state })
 http.defaults.adapter = async () => { throw Error('No live API in fixture') }
-api.myStudentServices = async () => ({ list: structuredClone(rows), total: rows.length })
+const projected = () => rows.map(row => ({ ...structuredClone(row), pendingTasks: params.has('tasks') && row.serviceRelationId === 2 && !state.completed ? [
+  { id: 51, taskType: 'student_contact', title: '学员跟进', dueAt: Date.now() - 86400000, overdue: true },
+  { id: 52, taskType: 'student_first_contact_assistance', title: '首联协助', overdue: false },
+] : [] }))
+api.myStudentServices = async query => { if (params.has('tasks') && !query.pendingTasksFirst) throw Error('未请求待办置顶'); return { list: projected().sort((a,b) => Number(Boolean(b.pendingTasks.length)) - Number(Boolean(a.pendingTasks.length))), total: rows.length } }
 api.myStudentService = async id => {
   if (id === 1 && state.delay) await new Promise(resolve => setTimeout(resolve, state.delay))
   if (state.fail) throw Error('服务读取失败')
-  return structuredClone(rows.find(row => row.serviceRelationId === id)!)
+  return projected().find(row => row.serviceRelationId === id)!
 }
 api.advancedFilterCatalog = async () => ({ fields: [], relativeDateOptions: [] })
 api.advancedFilterTemplates = async () => []

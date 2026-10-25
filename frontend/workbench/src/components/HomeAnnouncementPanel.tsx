@@ -156,7 +156,8 @@ export default function HomeAnnouncementPanel({ enabled }: { enabled: boolean })
   }
   useEffect(() => { void load(); return () => { generation.current++ } }, [load])
   useRealtimeEvent('notice-published', () => { if (enabled) { publication.current++; setIncoming(true) } })
-  return <AnnouncementPanelView enabled={enabled} items={items} loading={loading} error={error}
+  const displayedItems = items.map(item => summary.confirmedReadIds.has(item.id) && !item.read ? { ...item, read: true } : item)
+  return <AnnouncementPanelView enabled={enabled} items={displayedItems} loading={loading} error={error}
     hasMore={hasMore} loadingMore={loadingMore} moreError={moreError} onLoadMore={() => void loadMore()}
     unreadCount={summary.unreadCount} summaryLoading={summary.loading} summaryError={summary.error} hasSummary={summary.hasLoaded}
     incoming={incoming} onRefresh={() => void load()} onRefreshSummary={() => void summary.refresh()}

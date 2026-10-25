@@ -1,10 +1,12 @@
 import request from '@/config/axios'
 
 export interface DeliveryClass {
+  availableActions?: Array<'UPDATE' | 'MOVE_GROUP' | 'COMPLETE'>
   id: number
   classNo: string
   className: string
   systemClass: boolean
+  classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION'
   categoryId?: number
   categoryNameSnapshot?: string
   categoryPathSnapshot?: string
@@ -30,6 +32,7 @@ export interface ProductAttr { attrKey: string; attrName: string; required: bool
 export interface ProductSku { id: number; skuRef: string; skuName: string; attrValues: Record<string, string>; specs: ProductSpec[] }
 export interface ProductOption { productId: number; productRef: string; productName: string; categoryId: number; attrs: ProductAttr[]; skus: ProductSku[] }
 export interface DeliveryClassStudent {
+  availableActions?: Array<'DIRECT_TRANSFER' | 'REQUEST_TRANSFER'>
   serviceRelationId: number
   personId: number
   personNo?: string
@@ -47,6 +50,7 @@ export interface DeliveryClassOption {
   classNo: string
   className: string
   systemClass: boolean
+  classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION'
   categoryId?: number
   categoryName?: string
   homeroomUserId?: number

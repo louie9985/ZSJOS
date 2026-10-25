@@ -47,7 +47,7 @@ public class StudentInfoImageService {
     public Image archiveUpload(StudentInfoFormDO form,String fieldKey,String side,MultipartFile upload) {
         var field=imageField(form,fieldKey);
         if ("identity_images".equals(fieldKey) ? !Set.of("front","back").contains(side) : side!=null && !side.isEmpty()) throw exception(FIELD_INVALID,field.getLabel());
-        if (upload.isEmpty() || upload.getSize()>field.getMaxSizeMb()*1024L*1024) throw exception(FIELD_INVALID,"图片大小");
+        validateAttachmentSize(upload,field);
         try {
             byte[] content=upload.getBytes(); String type=validateAttachment(content,upload.getOriginalFilename(),field);
             var stored=files.createFileInfo(crypt(content,true),UUID.randomUUID()+".bin","student-info-private/"+form.getId(),"application/octet-stream");
@@ -84,7 +84,7 @@ public class StudentInfoImageService {
             if (identity ? !Set.of("front","back").contains(side) : side!=null && !side.isEmpty()) throw exception(FIELD_INVALID,field.getLabel());
             var existing=images.byForm(form.getId()).stream().filter(i->fieldKey.equals(i.getFieldKey())).toList();
             if (identity ? existing.stream().anyMatch(i->side.equals(i.getSide())) : existing.size()>=field.getMaxImages()) throw exception(FIELD_INVALID,"图片数量");
-            if (upload.isEmpty() || upload.getSize()>field.getMaxSizeMb()*1024L*1024) throw exception(FIELD_INVALID,"图片大小");
+            validateAttachmentSize(upload,field);
             try {
                 byte[] content=upload.getBytes(); String type=validateAttachment(content,upload.getOriginalFilename(),field);
                 byte[] encrypted=crypt(content,true);
@@ -160,6 +160,10 @@ public class StudentInfoImageService {
         else { if (data.length<28) throw exception(FIELD_INVALID,"图片内容"); System.arraycopy(data,0,nonce,0,12); }
         Cipher cipher=Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(encrypt ? Cipher.ENCRYPT_MODE : Cipher.DECRYPT_MODE,new SecretKeySpec(derived,"AES"),new GCMParameterSpec(128,nonce));
         return encrypt ? ByteBuffer.allocate(12+data.length+16).put(nonce).put(cipher.doFinal(data)).array() : cipher.doFinal(data,12,data.length-12);
+    }
+    private void validateAttachmentSize(MultipartFile upload, Field field) {
+        if (upload.isEmpty()) throw exception(ATTACHMENT_EMPTY);
+        if (upload.getSize()>field.getMaxSizeMb()*1024L*1024) throw exception(ATTACHMENT_TOO_LARGE,field.getMaxSizeMb());
     }
     private String validateAttachment(byte[] content, String name, Field field) throws Exception {
         return StudentInfoAttachmentValidator.validate(content, name,

@@ -15,11 +15,36 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StudentObjectPermissionProviderTest {
+    @org.junit.jupiter.api.BeforeEach
+    void denyUnconfiguredFeaturePermissions() {
+        org.mockito.Mockito.lenient().when(permissionApi.hasAnyPermissions(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(false);
+    }
+
     @InjectMocks StudentObjectPermissionProvider provider;
     @Mock ServiceRelationMapper relationMapper;
     @Mock PermissionApi permissionApi;
     @Mock DeliveryClassScopeService scopeService;
     @Mock AdminUserApi adminUserApi;
+
+    @Test void queryAllLegacyPersonReadRequiresATeachingServiceAndGrantsNoCommand() {
+        when(permissionApi.hasAnyPermissions(7L, StudentReadScope.QUERY_ALL)).thenReturn(true);
+        var relation = new ServiceRelationDO(); relation.setTeachingDelivery(true);
+        when(relationMapper.selectOwnedByPersonIds(List.of(9L), null)).thenReturn(List.of(relation));
+        assertTrue(provider.hasPermission(9L, "read", 7L));
+        assertFalse(provider.hasPermission(9L, "contact", 7L));
+        relation.setTeachingDelivery(false);
+        assertFalse(provider.hasPermission(9L, "read", 7L));
+        assertFalse(provider.hasPermission(10L, "read", 7L));
+    }
+
+    @Test void teachingQueryAllDoesNotRemoveExistingMediaCollaborationRead() {
+        when(permissionApi.hasAnyPermissions(7L, StudentReadScope.QUERY_ALL)).thenReturn(true);
+        var relation = new ServiceRelationDO(); relation.setTeachingDelivery(false);
+        when(relationMapper.selectOwnedByPersonIds(List.of(9L), null)).thenReturn(List.of(relation));
+        when(relationMapper.existsActiveByCollaboratorAndPerson(7L, 9L)).thenReturn(true);
+        assertTrue(provider.hasPermission(9L, "read", 7L));
+    }
 
     @Test void legacyPersonReadUsesPendingScopeButDoesNotGrantCommands() {
         when(permissionApi.hasAnyPermissions(7L,"zsjos:delivery-class:query",DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);

@@ -32,7 +32,8 @@ describe('content approval snapshot presentation', () => {
       primaryProblems: [{ labelSnapshot: '历史瓶颈' }] }] } } as unknown as ContentReviewBatch
     const html = renderToStaticMarkup(<AccountProfiles batch={batch} accountLink={() => '快照账号'} />)
     expect(html).toContain('<details open="">')
-    expect((html.match(/<dd><span class="ant-tag/g) || []).length).toBe(9)
+    expect(html).toContain('阶段时长未记录')
+    expect((html.match(/<dd><span class="ant-tag/g) || []).length).toBe(8)
     for (const value of ['快照期段', '快照状态', '历史瓶颈', '每周三次']) expect(html).toContain(value)
   })
 })

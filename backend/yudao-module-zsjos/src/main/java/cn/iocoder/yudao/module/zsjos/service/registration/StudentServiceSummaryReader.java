@@ -96,7 +96,7 @@ public class StudentServiceSummaryReader {
                 value.setLatestContact(record);
             }
             var clazz = classMap.get(relation.getClassId());
-            if (clazz != null) { value.setClassNo(clazz.getClassNo()); value.setSystemClass(clazz.getSystemClass()); value.setClassDepartment(clazz.getDeptNameSnapshot()); value.setClassExamSchedule(clazz.getExamScheduleSnapshot()); }
+            if (clazz != null) { value.setClassNo(clazz.getClassNo()); value.setSystemClass(clazz.getSystemClass()); value.setClassKind(clazz.getClassKind()); value.setClassDepartment(clazz.getDeptNameSnapshot()); value.setClassExamSchedule(clazz.getExamScheduleSnapshot()); }
             var handoff = new StudentServiceSummaryVO.OrderHandoff(); value.setOrderHandoff(handoff);
             var order = orderMap.get(relation.getOrderId());
             handoff.setAccess(relation.getOrderId() == null ? "absent" : "denied");

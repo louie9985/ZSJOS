@@ -109,6 +109,7 @@ public class RegistrationCaseRespVO {
         private String classNo;
         private String className;
         private Boolean systemClass;
+        private String classKind;
         private Long homeroomUserId;
         private String homeroomUserName;
         private String errorCode;

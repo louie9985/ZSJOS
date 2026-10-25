@@ -20,6 +20,22 @@ class MediaAccountControllerPermissionTest {
     }
 
     @Test
+    void deletionCommandsRequireConfiguredPermissionAndSeparateObjectActions() throws Exception {
+        var requestType = cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDeleteReqVO.class;
+        for (String name : java.util.List.of("requestDelete", "deleteDirectly")) {
+            assertEquals("@ss.hasPermission('zsjos:media-account:delete')",
+                    MediaAccountController.class.getMethod(name, Long.class, requestType)
+                            .getAnnotation(PreAuthorize.class).value());
+        }
+        var service = cn.iocoder.yudao.module.zsjos.service.account.MediaAccountDeleteService.class;
+        assertEquals("delete-request", service.getMethod("submit", Long.class, String.class, Long.class)
+                .getAnnotation(cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission.class).action());
+        var direct = service.getMethod("deleteDirectly", Long.class, String.class, Long.class);
+        assertEquals("delete-direct", direct.getAnnotation(cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission.class).action());
+        assertEquals(Exception.class, direct.getAnnotation(org.springframework.transaction.annotation.Transactional.class).rollbackFor()[0]);
+    }
+
+    @Test
     void orderedStageTransitionRoutesAreNotExposed() {
         assertFalse(java.util.Arrays.stream(MediaAccountController.class.getDeclaredMethods())
                 .map(method -> method.getAnnotation(PostMapping.class))

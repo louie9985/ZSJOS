@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import { Alert, Button, Select, Space, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { api, type SimpleUser } from '../services/api'
@@ -26,7 +27,7 @@ export default function BusinessReadScope({ value, onChange }: {
       options={[{ value: 'SELF', label: '本人' }, { value: 'ALL', label: '全部（只读）' }, { value: 'USER', label: '指定人员（只读）' }]} />
     {value.readScope === 'USER' && <Select aria-label="指定人员" placeholder="请选择人员" showSearch optionFilterProp="label"
       loading={loading} value={value.targetUserId} onChange={targetUserId => onChange({ ...value, targetUserId })}
-      options={users.map(user => ({ value: user.id, label: user.nickname }))} style={{ minWidth: 180 }} />}
+      options={users.map(user => ({ value: user.id, label: user.nickname }))} style={{ minWidth: 180 }}  {...filterSelectDisplayProps}/>}
     {error && <Alert type="error" message={error} action={<Button onClick={() => setAttempt(n => n + 1)}>重试</Button>} />}
     {value.readScope !== 'SELF' && <Typography.Text type="secondary">当前为只读查看，不代替他人办理业务</Typography.Text>}
   </Space>

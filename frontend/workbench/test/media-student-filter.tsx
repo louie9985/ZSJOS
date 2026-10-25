@@ -27,7 +27,10 @@ function matches(student: typeof students[number], group?: AdvancedFilterGroup):
 http.defaults.adapter = async config => {
   const url = config.url || ''
   let data: unknown = []
-  if (url.endsWith('/media-students/page') || url.endsWith('/media-students/search-page')) {
+  if (url.startsWith('/zsjos/student-entry/')) {
+    data = url.endsWith('/options') ? { directors: [{ id: 22, name: '责任编导甲' }], classes: [], courses: [] }
+      : url.endsWith('/check') ? { status: 'new', services: [] } : { personId: 42, personNo: 'XY-SYNTHETIC', serviceRelationId: 44, canRead: false }
+  } else if (url.endsWith('/media-students/page') || url.endsWith('/media-students/search-page')) {
     const query = config.method === 'post' ? JSON.parse(config.data) : config.params
     fixture.queries.push({ ...query, method: config.method })
     const delay = fixture.nextDelay; fixture.nextDelay = 0
@@ -58,5 +61,5 @@ http.defaults.adapter = async config => {
 }
 function FixtureGuard() { useWorkbenchPageGuard('/zsjos/media-students', async () => fixture.allowNavigation); return null }
 createRoot(document.getElementById('root')!).render(<ConfigProvider><ThemeProvider><App><MemoryRouter initialEntries={['/zsjos/media-students']}>
-  <WorkbenchPageNavigation canOpen={() => true}><FixtureGuard /><div style={{ height: '100vh' }}><MediaStudentsPage permissions={['zsjos:media-student:query-my']} /></div></WorkbenchPageNavigation>
+  <WorkbenchPageNavigation canOpen={() => true}><FixtureGuard /><div style={{ height: '100vh' }}><MediaStudentsPage permissions={['zsjos:media-student:query-my', ...(new URLSearchParams(location.search).has('entry') ? ['zsjos:student:create'] : [])]} /></div></WorkbenchPageNavigation>
 </MemoryRouter></App></ThemeProvider></ConfigProvider>)

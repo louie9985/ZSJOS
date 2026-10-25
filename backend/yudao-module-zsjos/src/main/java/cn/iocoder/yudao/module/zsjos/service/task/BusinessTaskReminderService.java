@@ -89,6 +89,12 @@ public class BusinessTaskReminderService {
     }
 
     private int emitForTask(Long taskId, LocalDateTime now, List<NotifyTimingRuleRespDTO> rules) {
+        var candidate = taskMapper.selectById(taskId);
+        if (candidate != null && "student_service".equals(candidate.getBizType())
+                && List.of("student_first_contact","student_study_plan","student_contact","student_delivery_stage","student_first_contact_assistance").contains(candidate.getTaskType())) {
+            var relation = relationMapper.selectByIdForUpdate(candidate.getBizId(),TenantContextHolder.getRequiredTenantId());
+            if (relation == null || cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation)) return 0;
+        }
         BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
         if (task == null || !TASK_STATUS_PENDING.equals(task.getStatus()) || task.getDueAt() == null) return 0;
         taskMapper.applyCurrentFollowUpAssignees(List.of(task));

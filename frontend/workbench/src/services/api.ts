@@ -719,7 +719,7 @@ export type RegistrationClassAssignment = {
   orderItemId: number; productId?: number; productName?: string; categoryId?: number | null;
   specs?: import('./productSpecs').ProductSpec[];
   categoryName?: string; categoryPath?: string; classId?: number; classNo?: string;
-  className?: string; systemClass?: boolean; homeroomUserId?: number;
+  className?: string; systemClass?: boolean; classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION'; homeroomUserId?: number;
   homeroomUserName?: string; errorCode?: string; errorReason?: string;
 };
 export type StudyPlanner = { id: number; nickname: string };
@@ -772,7 +772,7 @@ export type StudentServiceSummary = {
   deliveryStage?: string; deliveryStageLabel?: string; examDate?: string;
   currentTask?: { id: number; type: string; status: string; dueAt?: Timestamp; overdue?: boolean };
   latestContact?: StudentContactRecord;
-  classNo?: string; systemClass?: boolean; classDepartment?: string; classExamSchedule?: string;
+  classNo?: string; systemClass?: boolean; classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION'; classDepartment?: string; classExamSchedule?: string;
   pausedAt?: Timestamp; pauseReason?: string; completedAt?: Timestamp; terminatedAt?: Timestamp; terminationReason?: string;
   orderHandoff?: { access: 'readable' | 'denied' | 'absent'; orderType?: string; status?: string;
     formalSalesUserName?: string; submitterUserName?: string; formalOwnerIdentity?: string;
@@ -780,7 +780,7 @@ export type StudentServiceSummary = {
     classType?: string; servicePeriodLabel?: string; agreedExamTime?: string; studentSpecialRequirements?: string; remark?: string; materialDeliveryContact?: string };
   infoSubmission?: { access: 'readable' | 'denied' | 'absent'; status?: string; submittedAt?: Timestamp };
 };
-export type StudentServiceSubject = Omit<MyStudent, "services"> & { serviceRelationId: number; service: MyStudent["services"][number]; summary?: StudentServiceSummary };
+export type StudentServiceSubject = Omit<MyStudent, "services"> & { serviceRelationId: number; service: MyStudent["services"][number]; summary?: StudentServiceSummary; pendingTasks?: ManagedLead['pendingTasks'] };
 export type MyStudent = {
   inServicePeriod?: boolean;
   personId: number;
@@ -795,6 +795,7 @@ export type MyStudent = {
     registrationCaseId?: number;
     studentName?: string;
     serviceRelationId: number;
+    teachingClosed?: boolean;
     leadId?: number;
     leadNo?: string;
     orderId?: number;
@@ -1062,6 +1063,8 @@ export type DirectorStageForm = {
   interviewAt?: Timestamp;
 };
 export type StudentContactAction =
+  | "DIRECT_TRANSFER"
+  | "REQUEST_TRANSFER"
   | "UPDATE_FIRST_CONTACT_CHECKLIST"
   | "ACCEPT"
   | "FIRST_CONTACT"
@@ -1098,6 +1101,8 @@ export type StudentFirstContactProgress = {
   items: Array<{ key: string; title: string; sort: number; completed: boolean; attachmentRequired: boolean; attachmentFileIds: number[] }>;
 };
 export type StudentContactContext = {
+  teachingClosed?: boolean;
+  manualTaskType?: string;
   firstContactProgress?: StudentFirstContactProgress;
   serviceRelationId: number;
   acceptanceStatus?: string;
@@ -1457,6 +1462,7 @@ export type ManagedLeadAttachment = {
 export type ManagedLeadRemarkAttachment = Omit<ManagedLeadAttachment, 'id'> & { infraFileId: number };
 export type ManagedLeadRemark = { id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string; attachments?: ManagedLeadRemarkAttachment[] };
 export type ManagedLead = {
+  pendingTasks?: Array<{ id: number; taskType: string; title: string; dueAt?: Timestamp; overdue: boolean }>;
   appealSummary?: Pick<LeadAppeal, "id" | "roundNo" | "status" | "reviewStage" | "submittedAt"> & { canHandle: boolean };
   ownerIdentity?: string;
   ownerIdentityLabel?: string;
@@ -1685,6 +1691,7 @@ export type LeadSortField =
   | "remark"
   | "updateTime";
 export type ManagedLeadPageParams = {
+  pendingTasksFirst?: boolean;
   pageNo: number;
   pageSize: number;
   keyword?: string;
@@ -3493,8 +3500,10 @@ export function buildMenuTree(
 }
 
 export type DeliveryClass = {
+  availableActions?: Array<'UPDATE' | 'MOVE_GROUP' | 'COMPLETE'>;
+  groupId?: number; groupName?: string;
   projects?: DeliveryClassProject[];
-  id: number; classNo: string; className: string; systemClass: boolean;
+  id: number; classNo: string; className: string; systemClass: boolean; classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION';
   categoryId?: number; categoryNameSnapshot?: string; categoryPathSnapshot?: string;
   examScheduleId?: number; examScheduleSnapshot?: string; homeroomUserId?: number;
   homeroomUserNameSnapshot?: string; deptId?: number; deptNameSnapshot?: string;
@@ -3504,16 +3513,17 @@ export type DeliveryClass = {
   scheduleType?: string; exactDate?: string; startDate?: string; endDate?: string; createTime?: Timestamp;
 }
 export type DeliveryClassStudent = {
+  availableActions?: Array<'DIRECT_TRANSFER' | 'REQUEST_TRANSFER'>;
   serviceRelationId: number; personId: number; personNo?: string; studentName?: string;
   categoryId?: number; categoryName?: string;
   serviceStatus: string; acceptanceStatus?: string; ownerUserId?: number; ownerUserName?: string;
   activatedAt?: string; version: number;
 }
-export type DeliveryClassOption = { id: number; classNo: string; className: string; systemClass: boolean; categoryId?: number; categoryName?: string; examScheduleId?: number; examScheduleName?: string; homeroomUserId?: number; homeroomUserName?: string }
+export type DeliveryClassOption = { id: number; classNo: string; className: string; systemClass: boolean; classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION'; categoryId?: number; categoryName?: string; examScheduleId?: number; examScheduleName?: string; homeroomUserId?: number; homeroomUserName?: string }
 export type HomeroomCandidate = { id: number; name: string; deptId?: number; deptName?: string }
 export type DeliveryClassProject = { id: number; name: string; path: string }
 export type DeliveryClassFilterContext = { projects: DeliveryClassProject[]; homerooms: HomeroomCandidate[]; pendingClass?: DeliveryClass | null }
-export type DeliveryClassPageQuery = { readScope?: 'SELF' | 'ALL' | 'USER'; targetUserId?: number; pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number; projectCategoryId?: number; examDateStart?: string; examDateEnd?: string; excludeSystemClass?: boolean }
+export type DeliveryClassPageQuery = { readScope?: 'SELF' | 'ALL' | 'USER'; targetUserId?: number; pageNo: number; pageSize: number; status?: string; keyword?: string; categoryId?: number; examScheduleId?: number; homeroomUserId?: number; projectCategoryId?: number; examDateStart?: string; examDateEnd?: string; excludeSystemClass?: boolean; assignableOnly?: boolean; commandTargetsOnly?: boolean }
 export type DeliveryClassCategoryOption = { id: number; parentId: number; name: string }
 export type DeliveryClassExamOption = { id: number; scheduleType: string; displayName: string; exactDate?: string; startDate?: string; endDate?: string }
 export type DeliveryClassProductOption = ExamProductOption
@@ -3531,8 +3541,8 @@ export const api = {
     categories: async () => unwrap<DeliveryClassCategoryOption[]>(await http.get('/zsjos/delivery-class/category-options')),
       exams: async (categoryId?: number, productId?: number, selectedAttrs?: Record<string, string>, selectedSkuIds?: number[]) => unwrap<DeliveryClassExamOption[]>(await http.get('/zsjos/delivery-class/exam-options', { params: { categoryId, productId, selectedAttrsJson: JSON.stringify(selectedAttrs || {}), selectedSkuIdsJson: selectedSkuIds?.length ? JSON.stringify(selectedSkuIds) : undefined } })),
     create: async (data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId?: number; startDate?: string; endDate?: string; homeroomUserId: number }) => unwrap<number>(await http.post('/zsjos/delivery-class/create', data)),
-    createBatch: async (data: { className: string; startDate: string; homeroomUserIds: number[] }) => unwrap<number[]>(await http.post('/zsjos/delivery-class/batch-create', data)),
-    update: async (id: number, data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId?: number; startDate?: string; endDate?: string; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
+    createBatch: async (data: { className: string; startDate?: string; homeroomUserIds: number[] }) => unwrap<number[]>(await http.post('/zsjos/delivery-class/batch-create', data)),
+    update: async (id: number, data: { className: string; productId?: number; selectedAttrs?: Record<string, string>; selectedSkuIds?: number[]; categoryId?: number; examScheduleId?: number; startDate?: string; endDate?: string; preserveExamDate?: boolean; homeroomUserId: number; version?: number }) => unwrap<boolean>(await http.put(`/zsjos/delivery-class/${id}`, data)),
     complete: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/${id}/complete`)),
     directTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/delivery-class/service/${relationId}/direct-transfer`, data)),
     requestTransfer: async (relationId: number, data: { targetClassId: number; version: number; reason: string }) => unwrap<number>(await http.post(`/zsjos/class-transfer/service/${relationId}`, data)),
@@ -3910,6 +3920,8 @@ export const api = {
       ),
     requestDelete: async (id: number, reason: string) =>
       unwrap<string>(await http.post(`/zsjos/media-account/${id}/request-delete`, { reason })),
+    deleteDirectly: async (id: number, reason: string) =>
+      unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/delete`, { reason })),
     withdrawDelete: async (id: number) =>
       unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/withdraw-delete`)),
   },
@@ -5633,14 +5645,7 @@ export const api = {
     })),
   subordinateSalesLeads: async (
     salesUserId: number,
-    params: {
-      pageNo: number;
-      pageSize: number;
-      keyword?: string;
-      status?: string;
-      recycledOnly?: boolean;
-      advancedFilter?: AdvancedFilterGroup;
-    },
+    params: ManagedLeadPageParams & { recycledOnly?: boolean },
   ) =>
     params.advancedFilter
       ? unwrap<PageResult<ManagedLead>>(
@@ -5993,7 +5998,7 @@ export const api = {
     data: { version: number; idempotencyKey: string; reason: string },
   ) =>
     unwrap<boolean>(await http.post(`/zsjos/registration/${id}/close`, data)),
-  myStudentServices: async (params: BusinessSort & { ownerUserId?: number; acceptanceStatus?: string; deliveryStage?: string; taskState?: string; pageNo: number; pageSize: number; personId?: number; keyword?: string; classId?: number; serviceStatus?: string; readScope?: string; targetUserId?: number; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+  myStudentServices: async (params: BusinessSort & { pendingTasksFirst?: boolean; ownerUserId?: number; acceptanceStatus?: string; deliveryStage?: string; taskState?: string; pageNo: number; pageSize: number; personId?: number; keyword?: string; classId?: number; serviceStatus?: string; readScope?: string; targetUserId?: number; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
     ? unwrap<PageResult<StudentServiceSubject>>(await http.post("/zsjos/student/my-service/search-page", params))
     : unwrap<PageResult<StudentServiceSubject>>(await http.get("/zsjos/student/my-service-page", { params })),
   myStudentService: async (id: number) => unwrap<StudentServiceSubject>(await http.get(`/zsjos/student/my-service/${id}`)),
@@ -6003,7 +6008,7 @@ export const api = {
     pageNo: number;
     pageSize: number;
     keyword?: string;
-    serviceStatus?: "active" | "paused" | "completed";
+    serviceStatus?: "active" | "paused" | "completed" | "closed";
     classId?: number;
     advancedFilter?: AdvancedFilterGroup;
   }) =>

@@ -45,6 +45,12 @@ class PersonMapperStudentScopeSqlTest {
         assertFalse(withoutBindings.contains("{"), sql + " <- unresolved placeholder left in the fragment");
     }
 
+    @Test void closedFilterUsesTeachingStateAndDefaultExcludesClosed() {
+        assertTrue(resolve(ALL_PREFIX,null,"closed").contains("CASE WHEN sr.teaching_closed=1 THEN 'closed'"));
+        assertTrue(resolve(ALL_PREFIX,null,null).contains("sr.teaching_closed=0"));
+        assertFalse(resolve(ALL_PREFIX,42L,null).contains("sr.teaching_closed=0"));
+    }
+
     @Test
     void managedPageWithoutServiceStatusBuilds() {
         String sql = resolve(MANAGED_PREFIX, null, null);
@@ -54,7 +60,7 @@ class PersonMapperStudentScopeSqlTest {
     @Test
     void managedPageWithServiceStatusBuilds() {
         String sql = resolve(MANAGED_PREFIX, null, "paused");
-        assertTrue(sql.contains("sr.status=#{ew.paramNameValuePairs."), sql);
+        assertTrue(sql.contains("ELSE sr.status END)=#{ew.paramNameValuePairs."), sql);
     }
 
     @Test
@@ -73,6 +79,6 @@ class PersonMapperStudentScopeSqlTest {
     @Test
     void allDepartmentPageWithServiceStatusBuilds() {
         String sql = resolve(ALL_PREFIX, null, "completed");
-        assertTrue(sql.contains("sr.status=#{ew.paramNameValuePairs."), sql);
+        assertTrue(sql.contains("ELSE sr.status END)=#{ew.paramNameValuePairs."), sql);
     }
 }

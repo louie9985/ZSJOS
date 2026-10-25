@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cloneFilterGroup, conditionCount, filterCount, removeFilterAtPath } from './AdvancedFilter'
+import { cloneFilterGroup, conditionCount, filterCount, normalizeFilterGroup, removeFilterAtPath } from './AdvancedFilter'
 
 describe('filterCount', () => {
   it('counts only complete conditions across the two supported levels', () => {
@@ -95,5 +95,23 @@ describe('advanced filter draft helpers', () => {
     expect(withoutRoot.conditions).toEqual([])
     const withoutChild = removeFilterAtPath(cloneFilterGroup(applied), [-1, 0])
     expect(withoutChild.groups[0].conditions).toEqual([])
+    expect(normalizeFilterGroup(withoutChild)).toEqual({ ...applied, groups: [] })
+    expect(applied.groups[0].conditions).toHaveLength(1)
+  })
+
+  it('removes empty groups while preserving remaining AND/OR relationships', () => {
+    const condition = { fieldKey: 'lead.name', operator: 'contains', value: '张' }
+    const group = { logic: 'OR' as const, conditions: [condition], groups: [] }
+    expect(normalizeFilterGroup({ logic: 'AND', conditions: [], groups: [
+      { logic: 'OR', conditions: [], groups: [] }, group,
+      { logic: 'AND', conditions: [{ fieldKey: 'lead.mobile', operator: 'contains' }], groups: [] },
+    ] })).toEqual({ logic: 'AND', conditions: [], groups: [group] })
+    expect(normalizeFilterGroup({ logic: 'OR', conditions: [condition], groups: [] })?.logic).toBe('OR')
+  })
+
+  it('returns undefined after removing every condition or clearing the filter', () => {
+    expect(normalizeFilterGroup(undefined)).toBeUndefined()
+    const withoutRoot = removeFilterAtPath(cloneFilterGroup(applied), [0])
+    expect(normalizeFilterGroup(removeFilterAtPath(withoutRoot, [-1, 0]))).toBeUndefined()
   })
 })

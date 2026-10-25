@@ -55,10 +55,11 @@ public class ClassTransferServiceImpl implements ClassTransferService {
                 TenantContextHolder.getRequiredTenantId());
         if (relation == null || !List.of("active", "paused", "completed").contains(relation.getStatus())
                 || !Objects.equals(relation.getVersion(), req.getVersion())) throw exception(CLASS_TRANSFER_INVALID);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         DeliveryClassDO source = classMapper.selectById(relation.getClassId());
         DeliveryClassDO target = classMapper.selectByIdForUpdate(req.getTargetClassId(), relation.getTenantId());
-        if (source == null || Boolean.TRUE.equals(source.getSystemClass()) || target == null
-                || Boolean.TRUE.equals(target.getSystemClass()) || !"SERVING".equals(target.getStatus())
+        if (!DeliveryClassKind.assignable(source) || target == null
+                || !DeliveryClassKind.assignable(target) || !"SERVING".equals(target.getStatus())
                 || Objects.equals(source.getId(), target.getId())) throw exception(CLASS_TRANSFER_INVALID);
         deliveryClassService.validateHomeroom(target.getHomeroomUserId());
         if (mapper.selectPendingByRelation(relationId) != null) throw exception(CLASS_TRANSFER_ACTIVE);
@@ -115,7 +116,8 @@ public class ClassTransferServiceImpl implements ClassTransferService {
     public void handleProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
         ClassTransferRequestDO found = mapper.selectByProcessInstanceId(processInstanceId);
-        if (found == null) return;
+        if (found == null || !"pending".equals(found.getStatus())) return;
+        relationMapper.selectByIdForUpdate(found.getServiceRelationId(), found.getTenantId());
         ClassTransferRequestDO request = mapper.selectByIdForUpdate(found.getId(), found.getTenantId());
         if (request == null || !"pending".equals(request.getStatus())) return;
         LocalDateTime now = LocalDateTime.now();
@@ -129,12 +131,12 @@ public class ClassTransferServiceImpl implements ClassTransferService {
                     && Objects.equals(targetOwner.getStatus(), CommonStatusEnum.ENABLE.getStatus())
                     && permissionApi.hasAnyPermissions(targetOwner.getId(), DeliveryClassService.PERMISSION_QUERY_MY)
                     && permissionApi.hasAnyPermissions(targetOwner.getId(), "zsjos:student:query-my");
-            boolean stale = relation == null || !List.of("active", "paused", "completed").contains(relation.getStatus())
+            boolean stale = relation == null || cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation) || !List.of("active", "paused", "completed").contains(relation.getStatus())
                     || !Objects.equals(relation.getClassId(), request.getFromClassId())
                     || !Objects.equals(relation.getOwnerUserId(), request.getFromHomeroomUserId())
                     || !Objects.equals(relation.getVersion(), request.getServiceRelationVersion())
-                    || source == null || Boolean.TRUE.equals(source.getSystemClass())
-                    || target == null || !"SERVING".equals(target.getStatus()) || Boolean.TRUE.equals(target.getSystemClass())
+                    || !DeliveryClassKind.assignable(source)
+                    || target == null || !"SERVING".equals(target.getStatus()) || !DeliveryClassKind.assignable(target)
                     || !Objects.equals(target.getHomeroomUserId(), request.getTargetHomeroomUserId())
                     || !targetOwnerEligible;
             if (stale) {

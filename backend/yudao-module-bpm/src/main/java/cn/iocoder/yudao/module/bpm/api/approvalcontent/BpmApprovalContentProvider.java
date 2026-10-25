@@ -67,4 +67,13 @@ public interface BpmApprovalContentProvider {
      * 展示流程本身（节点、审批记录），只是不展示业务内容。
      */
     BpmApprovalDetailVO detail(String businessId, Long viewerId);
+
+    /** Approval rounds with persisted snapshots must resolve the exact authorized instance. */
+    default BpmApprovalBriefVO brief(String businessId, Long viewerId, String processInstanceId) {
+        return brief(businessId, viewerId);
+    }
+
+    default BpmApprovalDetailVO detail(String businessId, Long viewerId, String processInstanceId) {
+        return detail(businessId, viewerId);
+    }
 }

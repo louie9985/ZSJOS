@@ -1,0 +1,23 @@
+# Collection upload error messages
+
+## Registration — 2026-10-22 18:05 Beijing
+
+- Workstream: local-collection-upload-errors-20261022; environment: local (ZSJOS_AGENT_ENV unset, environment marker absent).
+- Owner: Codex /root; branch: main; worktree: D:/ZSJ-OS; base HEAD: 404387de566fcb9abf4b264f0e005bf0566ea209.
+- Goal: distinguish empty attachments from oversized attachments in collection uploads and reject empty files immediately in the H5 picker.
+- Non-goals: changing allowed formats, size/count limits, permissions, saved attachments, database state, deployment, service lifecycle or Git operations.
+- Ownership: root owns frontend/h5/src/pages/studentInfo/CollectionImages.vue, frontend/h5/tests/collection-http-upload-browser.py, docs/api/student-information-collection.md and this record. Contributor trace_backend_upload owns StudentInfoConstants.java, StudentInfoImageService.java and StudentInfoImagesAndRulesTest.java in backend/yudao-module-zsjos. Preserve existing uncommitted changes in all files; prior collection workstream is delivered and ownership released.
+- Dependencies: existing service exceptions, H5 upload component and test facilities; no added dependencies. Shared message contract: empty file = 文件为空，请保存有效内容后重新上传; oversized file = 单个附件不能超过 {}MB. Use distinct backend error codes and the field's actual limit.
+- Verification: focused Java upload tests for public/archive rejection, error codes/messages and no file reads/storage writes; H5 typecheck and isolated production build; real Chromium desktop/mobile validation for empty/oversized files, server-returned errors and normal upload/retry/removal; inspect both Admin and Workbench consumers of archive upload errors; scoped diff/UTF-8 checks. Build/browser output uses an owned OS temporary directory.
+- Target branch / integration order: None.
+
+## Delivery — 2026-10-22 18:10 Beijing
+
+- Execution context: same environment, branch, worktree and HEAD as registration. User authorized fixing the misleading upload notification.
+- Result: public and archive upload distinguish empty attachments (1900090012) from oversized attachments (1900090013), using the actual field limit in the latter message. H5 rejects empty selections immediately without requests, pending rows or used attachment slots. Existing format, size/count, content, ownership and storage rules remain unchanged.
+- Changed files: the six source/test/documentation files and this handoff record named in registration. Existing 100MB, DOCX/document display and draft changes were preserved; no unrelated files intentionally changed.
+- Backend verification: focused Maven reactor command `mvn -f backend/pom.xml -pl yudao-module-zsjos -am test '-Dtest=StudentInfoImagesAndRulesTest' '-Dsurefire.failIfNoSpecifiedTests=false'` passed, including module/source/test compilation. 7 tests, 0 failures/errors/skips. Tests cover empty and oversized rejection for public 100MB and archive historical 10MB limits, exact error codes/messages, no reads/storage/attachment inserts on rejection, and existing boundary/format/encryption/reference rules. Log: C:/Users/EDY/AppData/Local/Temp/zsjos-collection-upload-errors-java-20261022.log.
+- H5 verification: `vue-tsc -p tsconfig.json --incremental --tsBuildInfoFile <owned-temp>/h5.tsbuildinfo` and Vite production build to the owned temp directory passed. Updated collection-http-upload-browser.py passed real Chromium HTTP 1440/390/320, HTTPS 390 and no-crypto HTTP 390. It covers repeated empty DOCX, empty PDF/PNG with no request or failed queue, exact toast, server-returned oversized message, client oversized rejection, and normal upload/download/retry/delete/submit. API transport is synthetic and isolated; desktop/mobile empty-file screenshots were visually inspected. Evidence: C:/Users/EDY/AppData/Local/Temp/zsjos-collection-upload-errors-20261022/{build.log,browser.log,empty-file-1440-http.png,empty-file-390-http.png}.
+- Compatibility: inspected Workbench ApiError -> studentInfoError and Admin Axios ElMessage paths; both surface server msg for the new business codes. Admin's existing inline fallback remains generic alongside the specific global toast; unchanged and outside this H5 request. No client request/response shape or permission changes. Updated API documentation records both codes.
+- Final checks: scoped git diff --check and strict UTF-8 validation passed. No dependency, database, role grant, service restart, deployment, commit or push.
+- Remaining: deploy matching frontend/backend to affect running systems; live service acceptance was not performed. Local scope complete; ownership released. Dependency/integration impact: None.

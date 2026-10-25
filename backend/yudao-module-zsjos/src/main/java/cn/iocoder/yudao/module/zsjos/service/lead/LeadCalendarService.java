@@ -77,6 +77,12 @@ public class LeadCalendarService {
     }
 
     static Comparator<DueLead> comparator(String sort, String direction, Map<String, Integer> categoryOrder) {
+        if ("submittedAt".equals(sort)) {
+            Comparator<java.time.LocalDateTime> timeOrder = "asc".equals(direction)
+                    ? Comparator.naturalOrder() : Comparator.reverseOrder();
+            return Comparator.comparing(DueLead::getSubmittedAt, Comparator.nullsLast(timeOrder))
+                    .thenComparing(DueLead::getId, Comparator.reverseOrder());
+        }
         if ("ownershipStartedAt".equals(sort)) {
             Comparator<java.time.LocalDateTime> timeOrder = "desc".equals(direction)
                     ? Comparator.reverseOrder() : Comparator.naturalOrder();

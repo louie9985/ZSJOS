@@ -182,6 +182,7 @@ public class MediaAccountProfileService {
     @ZsjosPermission(bizType="media-account",bizId="#id",action="edit")
     public Integer patch(Long id, Patch req, Long userId) {
         MediaAccountDO a=lock(id);requireMaintain(a,userId);
+        if (req.getChanges() != null && req.getChanges().containsKey(MediaAccountStageTiming.RECOVERY_KEY)) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
         var config=configs.getPublished();
         MediaAccountFieldPolicy.validate(config.getFields(),req.getChanges(),a,userId);
         String fingerprint=fingerprint("PROFILE",req.getVersion(),req.getConfigVersionId(),req.getChanges());
@@ -254,6 +255,25 @@ public class MediaAccountProfileService {
 
     @Transactional(rollbackFor=Exception.class)
     @ZsjosPermission(bizType="media-account",bizId="#id",action="edit")
+    public Integer submitLegacyDiagnosis(Long id, DiagnosisRequest req, Long userId) {
+        if(!"diagnosis_initial".equals(req.getTemplateType())) {
+            if(req.getPreviousEntryId()==null)throw exception(MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED);
+            var previous=entries.selectById(req.getPreviousEntryId());
+            if(previous==null || !Objects.equals(id,previous.getAccountId()))throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
+            if (!"DIAGNOSIS".equals(previous.getKind()) || previous.getContent() == null)
+                throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+            Map<?, ?> content;
+            try { content = JsonUtils.getObjectMapper().readValue(previous.getContent(), Map.class); }
+            catch (RuntimeException invalid) { throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID); }
+            if (content == null)
+                throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+            if(content.containsKey("nodeKey"))throw exception(MEDIA_ACCOUNT_PROFILE_UPGRADE_REQUIRED);
+        }
+        return submitDiagnosis(id,req,userId);
+    }
+
+    @Transactional(rollbackFor=Exception.class)
+    @ZsjosPermission(bizType="media-account",bizId="#id",action="edit")
     public Integer submitDiagnosis(Long id, DiagnosisRequest req, Long userId) {
         if ("adjustment_28d".equals(req.getTemplateType())) req.setTemplateType("diagnosis_28d");
         boolean initial = "diagnosis_initial".equals(req.getTemplateType());
@@ -312,6 +332,12 @@ public class MediaAccountProfileService {
                     && previousContent.get("secondaryProblemLabel") instanceof String savedLabel ? savedLabel
                     : diagnosisLabel("zsjos_media_account_primary_problem", req.getSecondaryProblem());
         }
+        var diagnosisAt = java.time.LocalDateTime.now(MediaAccountStageTiming.ZONE).withNano(0);
+        var enteredAt = MediaAccountStageTiming.enteredAt(account, req.getCurrentStage(), diagnosisAt);
+        // Historical recovery provenance applies only to the recovered stage interval.
+        Map<String, Object> timingValues = readValues(account);
+        boolean clearRecovery = !Objects.equals(account.getSStage(), req.getCurrentStage())
+                && timingValues.remove(MediaAccountStageTiming.RECOVERY_KEY) != null;
         var snapshots = new ArrayList<MediaAccountDetailSnapshotVO>();
         snapshots.add(diagnosisSnapshot("stage", "当前期段", req.getCurrentStage(), stageLabel));
         snapshots.add(diagnosisSnapshot("current_status", "账号状态", req.getAccountStatus(), statusLabel));
@@ -319,6 +345,8 @@ public class MediaAccountProfileService {
         if (mapper.update(null, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId,id)
                 .eq(MediaAccountDO::getVersion,req.getVersion()).set(MediaAccountDO::getVersion,req.getVersion()+1)
                 .set(MediaAccountDO::getSStage,req.getCurrentStage()).set(MediaAccountDO::getSStageLabelSnapshot,stageLabel)
+                .set(MediaAccountDO::getSStageEnteredAt, enteredAt)
+                .set(clearRecovery, MediaAccountDO::getDetailValuesJson, JsonUtils.toJsonString(timingValues))
                 .set(MediaAccountDO::getCurrentStatusValue,req.getAccountStatus()).set(MediaAccountDO::getCurrentStatusLabelSnapshot,statusLabel)
                 .set(MediaAccountDO::getPrimaryProblemCodeValue,req.getPrimaryProblem()).set(MediaAccountDO::getPrimaryProblemCodeLabelSnapshot,problemLabel)) != 1)
             throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
@@ -337,8 +365,9 @@ public class MediaAccountProfileService {
         if (hasSecondary) content.put("secondaryProblemLabel", secondaryLabel);
         var entry = entry(id,userId,req.getIdempotencyKey(),fp,req.getVersion()+1,"DIAGNOSIS",req.getTemplateType(),
                 initial ? "启动诊断" : "周期诊断",JsonUtils.toJsonString(content));
+        entry.setCreateTime(diagnosisAt);
         entry.setSnapshotJson(JsonUtils.toJsonString(snapshots)); entries.insert(entry);
-        if (completionKey != null && !businessTaskCommandService.completeByKey(completionKey, java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai"))))
+        if (completionKey != null && !businessTaskCommandService.completeByKey(completionKey, diagnosisAt))
             throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
         collaborationNotify.account(MEDIA_ACCOUNT_DIAGNOSIS_COMPLETED, account, userId,
                 "diagnosis-completed:" + id + ":" + req.getIdempotencyKey(), Map.of("cycle", req.getCycle()));

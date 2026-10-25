@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import DesktopCollectionSelect from './DesktopCollectionSelect.vue'
 const props=defineProps<{id:string;label:string;modelValue:string;options:{value:string;label:string}[];disabled:boolean}>()
 const emit=defineEmits<{ 'update:modelValue':[string] }>()
+// Keep the existing mobile branch, including its draft/confirm behavior, unchanged.
+const desktopQuery=window.matchMedia('(min-width: 601px)')
+const desktop=ref(desktopQuery.matches)
+const updateDesktop=()=>{desktop.value=desktopQuery.matches;open.value=false}
+desktopQuery.addEventListener('change',updateDesktop)
+onBeforeUnmount(()=>desktopQuery.removeEventListener('change',updateDesktop))
 const open=ref(false),search=ref(''),selected=ref<string[]>([])
 const longList=computed(()=>props.options.length>10)
 const display=computed(()=>props.options.find(x=>x.value===props.modelValue)?.label || '')
@@ -11,7 +18,8 @@ watch(()=>props.disabled,value=>{if(value)open.value=false})
 function confirm(){if(!props.disabled){emit('update:modelValue',selected.value[0]||'');open.value=false}}
 </script>
 <template>
- <div class="collection-select norem">
+ <DesktopCollectionSelect v-if="desktop" v-bind="props" @update:model-value="emit('update:modelValue',$event)" />
+ <div v-else class="collection-select norem">
   <button :id="id" type="button" class="collection-select-trigger norem" :class="{placeholder:!display}" :disabled="disabled" :aria-label="label" aria-haspopup="dialog" :aria-expanded="open" @click="open=true"><span>{{display||'请选择'}}</span><van-icon name="arrow-down" /></button>
   <van-popup v-model:show="open" position="bottom" round class="collection-select-popup norem">
    <template v-if="longList"><div class="collection-select-toolbar norem"><button type="button" @click="open=false">取消</button><strong>选择{{label}}</strong><button type="button" class="confirm" :disabled="!selected[0]" @click="confirm">确定</button></div><van-search v-model="search" :placeholder="'搜索'+label"/><div class="collection-select-options norem" role="listbox" :aria-label="label"><button v-for="option in filtered" :key="option.value" type="button" role="option" :aria-selected="selected[0]===option.value" @click="selected=[option.value]"><span>{{option.label}}</span><van-icon v-if="selected[0]===option.value" name="success" /></button><van-empty v-if="!filtered.length" description="没有匹配选项"/></div></template>

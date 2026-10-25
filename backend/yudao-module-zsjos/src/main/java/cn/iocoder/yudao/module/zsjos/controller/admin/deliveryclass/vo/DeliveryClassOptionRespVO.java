@@ -8,6 +8,7 @@ public class DeliveryClassOptionRespVO {
     private String classNo;
     private String className;
     private Boolean systemClass;
+    private String classKind;
     private Long categoryId;
     private String categoryName;
     private Long examScheduleId;

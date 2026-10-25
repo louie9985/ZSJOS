@@ -94,6 +94,7 @@ class ContentReviewBatchServiceTest {
     @Mock private ContentReviewAccessService accessService;
     @Mock private ContentReviewObjectPermissionProvider reviewPermissionProvider;
     @Mock private ContentService contentService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.content.ContentVersionService contentVersionService;
     @Mock private ContentObjectPermissionProvider contentPermissionProvider;
     @Mock private MaterialService materialService;
     @Mock private BpmProcessInstanceApi processInstanceApi;
@@ -106,6 +107,60 @@ class ContentReviewBatchServiceTest {
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(TENANT_ID);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"new", "replace", "clear", "legacy", "empty"})
+    void draftReviewerRoundTripNeverAssignsReviewerOrStartsBpm(String mode) {
+        var batch = reviewBatch(BATCH_DRAFT, STAGE_DRAFT).setStudentPersonId(77L)
+                .setDirectorUserId(null).setProcessInstanceId(null);
+        boolean existingSelection = !Set.of("new", "empty").contains(mode);
+        batch.setContextSnapshotJson(existingSelection ? "{\"draftReviewerSelection\":{\"directorUserId\":22,\"processDefinitionId\":\"old\"}}" : "{}");
+        var account = new MediaAccountDO().setId(90L).setStudentPersonId(77L).setOwnerOperatorUserId(OPERATOR_ID).setDirectorUserId(5L);
+        when(accountMapper.selectByIdForUpdate(90L, TENANT_ID)).thenReturn(account);
+        when(accountMapper.selectById(90L)).thenReturn(account);
+        when(batchMapper.selectByIdForUpdate(50L, TENANT_ID)).thenReturn(batch);
+        when(batchMapper.selectById(50L)).thenReturn(batch);
+        when(contentService.create(any(), eq(OPERATOR_ID))).thenReturn(1001L);
+        when(contentVersionService.create(any(), eq(OPERATOR_ID))).thenReturn(11L);
+        var content = reviewableContent(1001L, 90L, 1, 0);
+        when(contentMapper.selectById(1001L)).thenReturn(content);
+        when(contentMapper.selectByIds(any())).thenReturn(List.of(content));
+        when(contentVersionMapper.selectByIdForUpdate(11L, TENANT_ID)).thenReturn(completeVersion(11L, 1001L));
+        when(contentPermissionProvider.hasPermission(1001L, "read", OPERATOR_ID)).thenReturn(true);
+        var purpose = new DictDataRespDTO(); purpose.setValue("purpose"); purpose.setLabel("作品目的");
+        var format = new DictDataRespDTO(); format.setValue("format"); format.setLabel("作品形式");
+        when(dictDataApi.getDictDataList("zsjos_content_purpose")).thenReturn(List.of(purpose));
+        when(dictDataApi.getDictDataList("zsjos_content_format")).thenReturn(List.of(format));
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO();
+        request.setStudentPersonId(77L); request.setAccountIds(List.of(90L)); request.setExpectedVersion(0);
+        var work = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO.Work();
+        work.setTitle("测试内容"); work.setCoverFileId(99L); work.setPlannedPublishAt(LocalDateTime.now().plusDays(1));
+        work.setPurposeValue("purpose"); work.setFormatValue("format"); request.setWorks(List.of(work));
+        if (Set.of("new", "replace").contains(mode)) {
+            var selection = new cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewDraftReviewerSelectionVO();
+            selection.setDirectorUserId(23L); selection.setProcessDefinitionId("v2"); request.setDraftReviewerSelection(selection);
+        } else if ("clear".equals(mode)) request.setDraftReviewerSelection(null);
+        assertEquals(50L, service.saveStudentDraft(50L, request, OPERATOR_ID));
+        var response = service.get(50L, OPERATOR_ID);
+        if (Set.of("clear", "empty").contains(mode)) {
+            org.junit.jupiter.api.Assertions.assertNull(response.getDraftReviewerSelection());
+            assertFalse(batch.getContextSnapshotJson().contains("draftReviewerSelection"));
+        } else {
+            assertEquals("legacy".equals(mode) ? 22L : 23L, response.getDraftReviewerSelection().getDirectorUserId());
+            assertEquals("legacy".equals(mode) ? "old" : "v2", response.getDraftReviewerSelection().getProcessDefinitionId());
+        }
+        org.junit.jupiter.api.Assertions.assertNull(batch.getDirectorUserId());
+        org.junit.jupiter.api.Assertions.assertNull(batch.getRelationSnapshotJson());
+        assertEquals(5L, account.getDirectorUserId());
+        verifyNoInteractions(selectionService, processInstanceApi, studentReviewAccess);
+    }
+
+    @Test void explicitNullDraftSelectionDiffersFromOmittedLegacyField() {
+        var omitted = JsonUtils.parseObject("{}", cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO.class);
+        var cleared = JsonUtils.parseObject("{\"draftReviewerSelection\":null}", cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewStudentDraftCreateReqVO.class);
+        assertFalse(omitted.isDraftReviewerSelectionProvided());
+        assertTrue(cleared.isDraftReviewerSelectionProvided());
     }
 
     @Test
@@ -145,13 +200,19 @@ class ContentReviewBatchServiceTest {
         account.setDetailValuesJson("{\"product_goal\":\"提交时目标\",\"work_format\":\"产品形式\"}");
         account.setPrimaryProblemCodeLabelSnapshot("当前诊断瓶颈");
         account.setNickname("当前账号名称").setPlatformAccountId("current-platform-account");
-        account.setSStage("S3").setSStageLabelSnapshot("保存的阶段");
+        account.setSStage("S3").setSStageLabelSnapshot("保存的阶段").setSStageEnteredAt(LocalDateTime.of(2026, 1, 1, 23, 59));
         account.setCurrentStatusValue("active").setCurrentStatusLabelSnapshot("保存的状态");
         service.submit(batch.getId(),request,OPERATOR_ID);
         var submittedContext = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(batchMapper).markSubmitted(eq(batch),eq(0),anyString(),eq("def2"),eq("content"),eq(2),anyString(),eq(22L),anyString(),submittedContext.capture(),any());
+        var submittedAt = org.mockito.ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(batchMapper).markSubmitted(eq(batch),eq(0),anyString(),eq("def2"),eq("content"),eq(2),anyString(),eq(22L),anyString(),submittedContext.capture(),submittedAt.capture());
         Map<String,Object> frozen = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(submittedContext.getValue(), Map.class);
         Map<?,?> profile = (Map<?,?>)((List<?>)frozen.get("accountSnapshots")).getFirst();
+        assertEquals(cn.iocoder.yudao.module.zsjos.service.account.MediaAccountStageTiming.millis(submittedAt.getValue()),
+                ((Number) profile.get("sStageDurationAsOf")).longValue());
+        assertEquals(java.time.temporal.ChronoUnit.DAYS.between(account.getSStageEnteredAt().toLocalDate(), submittedAt.getValue().toLocalDate()),
+                ((Number) profile.get("sStageDurationDays")).longValue());
+        assertEquals(profile.get("sStageDurationDays"), ((Map<?, ?>) frozen.get("account")).get("sStageDurationDays"));
         assertEquals("提交时目标", profile.get("productGoal"));
         assertEquals("当前诊断瓶颈", profile.get("bottleneckLabel"));
         assertEquals(account.getNickname(), profile.get("nickname"));
@@ -876,8 +937,8 @@ class ContentReviewBatchServiceTest {
         var account = new MediaAccountDO().setId(90L).setNickname("当前改名").setSStage("current");
         Map<String, Object> stored = Map.of("id", 90L, "nickname", "历史账号", "platformLabel", "历史平台",
                 "sStageLabel", "历史期段", "currentStatusLabel", "历史状态", "operatorName", "历史运营");
-        Map<String, Object> result = ReflectionTestUtils.invokeMethod(service, "reviewAccountSnapshot", account,
-                Map.of("accountSnapshots", List.of(stored)), Map.of("nickname", "本轮标题", "platformLabel", "伪造平台",
+        Map<String, Object> result = ReflectionTestUtils.invokeMethod(service, "draftAccountSnapshot", account,
+                Map.of("nickname", "本轮标题", "platformLabel", "伪造平台",
                         "operatorName", "伪造运营", "stageValue", "current"));
         assertEquals("当前改名", result.get("nickname"));
         assertEquals(null, result.get("platformLabel"));
@@ -886,6 +947,19 @@ class ContentReviewBatchServiceTest {
         assertEquals(null, result.get("operatorName"));
         assertEquals("历史账号", stored.get("nickname"));
         verifyNoInteractions(dictDataApi, adminUserApi);
+    }
+
+    @Test void previewAccountsShareOneCutoffAndKeepMissingStartUnknown() {
+        var first = profileAccount().setStudentPersonId(50L).setSStage("S1")
+                .setSStageEnteredAt(LocalDateTime.of(2026, 1, 1, 0, 0));
+        var second = profileAccount().setId(4L).setStudentPersonId(50L).setSStage("S2");
+        first.setTenantId(TENANT_ID); second.setTenantId(TENANT_ID);
+        when(accountMapper.selectById(3L)).thenReturn(first);
+        when(accountMapper.selectById(4L)).thenReturn(second);
+        var rows = service.previewAccounts(null, 50L, List.of(3L, 4L), OPERATOR_ID);
+        assertEquals(rows.getFirst().getSStageDurationAsOf(), rows.getLast().getSStageDurationAsOf());
+        assertTrue(rows.getFirst().getSStageDurationDays() > 0);
+        assertEquals(null, rows.getLast().getSStageDurationDays());
     }
 
     @Test

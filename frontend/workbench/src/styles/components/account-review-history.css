@@ -1,0 +1,65 @@
+/* UTF-8. History uses the same section headers and field rows as account details. */
+.account-review-history-heading,
+.account-review-history-event,
+.account-review-history-entry-heading,
+.account-review-history-footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-3);
+}
+.account-review-history-heading { justify-content: space-between; margin-bottom: var(--crm-sp-5); }
+.account-review-history-event { margin-bottom: var(--crm-sp-3); overflow-wrap: anywhere; }
+.account-review-history-latest { color: var(--crm-color-primary); font-size: var(--crm-font-sm); }
+.account-review-history-entry {
+  min-width: 0;
+  padding: var(--crm-card-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  overflow-wrap: anywhere;
+}
+.account-review-history-entry-heading { justify-content: space-between; margin-bottom: var(--crm-sp-4); }
+.account-review-history-layout { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--crm-sp-5); }
+.account-review-history-main { grid-column: span 9; min-width: 0; }
+.account-review-history-aside { grid-column: span 3; min-width: 0; }
+.account-review-history-section + .account-review-history-section { margin-top: var(--crm-sp-5); }
+.account-review-history-section > h4 {
+  margin: 0 0 var(--crm-sp-3);
+  padding: var(--crm-sp-2) var(--crm-sp-3);
+  border-inline-start: 3px solid var(--crm-color-primary);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-text);
+  font-size: var(--crm-font-base);
+  font-weight: 600;
+}
+.account-review-history-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--crm-sp-5); margin: 0; }
+.account-review-history-field {
+  display: grid;
+  grid-template-columns: minmax(80px, 32%) minmax(0, 1fr);
+  gap: var(--crm-sp-3);
+  min-width: 0;
+  padding-block: var(--crm-sp-3);
+  border-bottom: 1px solid var(--crm-border);
+}
+.account-review-history-field.is-wide { grid-column: 1 / -1; grid-template-columns: minmax(80px, 15%) minmax(0, 1fr); }
+.account-review-history-field dt { color: var(--crm-text-secondary); }
+.account-review-history-field dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.account-review-history-aside .account-review-history-fields { grid-template-columns: minmax(0, 1fr); }
+.account-review-history-aside .account-review-history-field { grid-template-columns: minmax(0, 1fr); gap: var(--crm-sp-1); }
+.account-review-history-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.account-review-history-attachments { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--crm-sp-3); }
+.account-review-history-footer { justify-content: space-between; }
+.account-review-history-footer > .ant-btn:last-child { margin-inline-start: auto; }
+.account-review-history-state { display: grid; place-items: center; min-height: 180px; }
+@media (max-width: 768px) {
+  .account-review-history-main,
+  .account-review-history-aside { grid-column: 1 / -1; }
+  .account-review-history-aside { grid-row: 1; }
+  .account-review-history-fields,
+  .account-review-history-attachments { grid-template-columns: minmax(0, 1fr); }
+  .account-review-history-field,
+  .account-review-history-field.is-wide { grid-template-columns: minmax(0, 1fr); gap: var(--crm-sp-1); }
+  .account-review-history-event { align-items: flex-start; flex-direction: column; gap: var(--crm-sp-1); }
+}

@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.dal.mysql.registration;
 
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaServiceReadiness;
+
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
@@ -42,7 +44,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .in(ServiceRelationDO::getPersonId, personIds).eqIfPresent(ServiceRelationDO::getStatus, status)
                 .orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId));
     }
-    @Select("SELECT * FROM zsjos_service_relation WHERE teaching_delivery=1 AND status='active' AND acceptance_status='accepted' "
+    @Select("SELECT * FROM zsjos_service_relation WHERE teaching_delivery=1 AND teaching_closed=0 AND status='active' AND acceptance_status='accepted' "
             + "AND delivery_stage='supervision' AND exam_date IS NOT NULL AND exam_notice_sent_at IS NULL "
             + "AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     List<ServiceRelationDO> selectExamNoticeCandidates(@Param("tenantId") Long tenantId);
@@ -56,6 +58,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
     default int transferClass(Long id, Long classId, Long ownerUserId, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getTeachingDelivery, true)
+                .eq(ServiceRelationDO::getTeachingClosed, false)
                 .eq(ServiceRelationDO::getId, id)
                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
                 .eq(ServiceRelationDO::getVersion, version)
@@ -64,24 +67,21 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .set(ServiceRelationDO::getVersion, version + 1));
     }
     @Select("SELECT * FROM zsjos_service_relation WHERE person_id=#{personId} AND status='active' "
-            + "AND acceptance_status='accepted' AND tenant_id=#{tenantId} AND deleted=b'0' ORDER BY id FOR UPDATE")
+            + "AND (media_ready=1 OR (media_ready IS NULL AND acceptance_status='accepted')) AND tenant_id=#{tenantId} AND deleted=b'0' ORDER BY id FOR UPDATE")
     List<ServiceRelationDO> selectActiveAcceptedByPersonForUpdate(@Param("personId") Long personId,
                                                                    @Param("tenantId") Long tenantId);
 
     default List<ServiceRelationDO> selectActiveByCollaborator(Long userId) {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getStatus, "active")
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
-                .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
-                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))
+                .apply(MediaServiceReadiness.COLLABORATOR_SQL, userId)
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
 
     default List<ServiceRelationDO> selectActiveByContentDirector(Long userId) {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .apply(MediaServiceReadiness.SQL)
                 .eq(ServiceRelationDO::getContentDirectorUserId, userId)
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
@@ -90,7 +90,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .apply(MediaServiceReadiness.SQL)
                 .eq(ServiceRelationDO::getContentDirectorUserId, userId)
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
@@ -99,10 +99,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
-                .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
-                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))
+                .apply(MediaServiceReadiness.COLLABORATOR_SQL, userId)
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
 
@@ -110,15 +107,13 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
-                .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
-                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))) > 0;
+                .apply(MediaServiceReadiness.COLLABORATOR_SQL, userId)) > 0;
     }
 
     default int accept(Long id, Long userId, LocalDateTime now, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getTeachingDelivery, true)
+                .eq(ServiceRelationDO::getTeachingClosed, false)
                 .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getStatus, "active")
                 .eq(ServiceRelationDO::getOwnerUserId, userId)
                 .eq(ServiceRelationDO::getAcceptanceStatus, "pending")
@@ -134,7 +129,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .apply(MediaServiceReadiness.SQL)
                 .eq(ServiceRelationDO::getOperatorUserId, userId)) > 0;
     }
 
@@ -142,7 +137,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .apply(MediaServiceReadiness.SQL)
                 .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
                         .or().eq(ServiceRelationDO::getOperatorUserId, userId))) > 0;
     }
@@ -151,13 +146,14 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
-                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .apply(MediaServiceReadiness.SQL)
                 .eq(ServiceRelationDO::getContentDirectorUserId, userId)) > 0;
     }
 
     default int updateFirstContactProgress(Long id, Long ownerId, Integer version, String json) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getTeachingDelivery, true)
+                .eq(ServiceRelationDO::getTeachingClosed, false)
                 .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getOwnerUserId, ownerId)
                 .eq(ServiceRelationDO::getStatus, "active").eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .eq(ServiceRelationDO::getVersion, version)
@@ -169,6 +165,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                                      String deliveryDataJson, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getTeachingDelivery, true)
+                .eq(ServiceRelationDO::getTeachingClosed, false)
                 .eq(ServiceRelationDO::getId, id)
                 .eq(ServiceRelationDO::getStatus, "active")
                 .eq(ServiceRelationDO::getOwnerUserId, userId)
@@ -184,6 +181,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                                String stage, LocalDateTime now) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getTeachingDelivery, true)
+                .eq(ServiceRelationDO::getTeachingClosed, false)
                 .eq(ServiceRelationDO::getId, id)
                 .eq(ServiceRelationDO::getStatus, "active").eq(ServiceRelationDO::getVersion, version)
                 .set(ServiceRelationDO::getExamDate, examDate)
@@ -197,6 +195,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
 
     default int markExamNoticeSent(Long id, LocalDate examDate, LocalDateTime sentAt, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getTeachingClosed,false)
                 .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getVersion, version)
                 .eq(ServiceRelationDO::getExamDate, examDate).isNull(ServiceRelationDO::getExamNoticeSentAt)
                 .set(ServiceRelationDO::getLastNotifiedExamDate, examDate)
@@ -335,6 +334,15 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .orderByDesc(ServiceRelationDO::getUpdateTime).orderByDesc(ServiceRelationDO::getId));
     }
 
+    default List<ServiceRelationDO> selectMediaActiveByPersonIds(Collection<Long> personIds) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .in(ServiceRelationDO::getPersonId, personIds)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .apply(MediaServiceReadiness.SQL)
+                .orderByDesc(ServiceRelationDO::getUpdateTime).orderByDesc(ServiceRelationDO::getId));
+    }
+
     /**
      * Tenant-wide owned read, used only when the reader's data scope covers every department.
      */
@@ -384,11 +392,8 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .eqIfPresent(ServiceRelationDO::getStatus, status);
         query.and(scope -> scope.and(owner -> owner.eq(ServiceRelationDO::getOwnerUserId, userId)
                                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed")))
-                        .or(collaborator -> collaborator.eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
-                                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
-                                .and(users -> users.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
-                                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))));
+                        .or(collaborator -> collaborator.apply(MediaServiceReadiness.COLLABORATOR_SQL, userId)
+                                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))));
         query.orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId);
         return selectList(query);
     }

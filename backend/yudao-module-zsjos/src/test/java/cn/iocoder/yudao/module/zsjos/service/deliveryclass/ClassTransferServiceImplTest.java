@@ -35,8 +35,9 @@ class ClassTransferServiceImplTest {
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
-    @Test
-    void approvedResultTransfersOnceAndFinishesRequest() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void approvedResultTransfersOnceAndFinishesRequest(boolean unscheduled) {
         ClassTransferRequestDO request = pendingRequest();
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(10L); relation.setClassId(100L); relation.setOwnerUserId(11L);
@@ -44,6 +45,7 @@ class ClassTransferServiceImplTest {
         DeliveryClassDO source = sourceClass();
         DeliveryClassDO target = targetClass();
         target.setCategoryId(null);
+        if (unscheduled) { source.setClassKind("UNSCHEDULED"); source.setSystemClass(true); target.setClassKind("UNSCHEDULED"); target.setSystemClass(true); }
         when(requestMapper.selectByProcessInstanceId("process-1")).thenReturn(request);
         when(requestMapper.selectByIdForUpdate(1L, 1L)).thenReturn(request);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
@@ -87,7 +89,6 @@ class ClassTransferServiceImplTest {
         ClassTransferRequestDO request = pendingRequest();
         request.setStatus("approved");
         when(requestMapper.selectByProcessInstanceId("process-1")).thenReturn(request);
-        when(requestMapper.selectByIdForUpdate(1L, 1L)).thenReturn(request);
 
         service.handleProcessResult("process-1", BpmProcessInstanceStatusEnum.APPROVE.getStatus(), "重复事件");
 

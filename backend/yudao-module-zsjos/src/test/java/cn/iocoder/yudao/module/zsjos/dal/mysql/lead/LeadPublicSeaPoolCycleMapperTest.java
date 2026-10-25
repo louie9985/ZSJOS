@@ -17,6 +17,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class LeadPublicSeaPoolCycleMapperTest {
+    @Test void defaultOrderUsesTenantScopedLeadSubmissionBeforePagination() {
+        String sql = query(null, null, null, null).getSqlSegment();
+        assertTrue(sql.contains("ORDER BY (SELECT l.submitted_at FROM zsjos_lead l"), sql);
+        assertTrue(sql.contains("l.tenant_id = zsjos_lead_public_sea_pool_cycle.tenant_id AND l.deleted = b'0') DESC,lead_id DESC,id DESC"), sql);
+        assertFalse(sql.contains("entered_at ASC"));
+    }
     @Test
     void keywordMatchesBusinessNumberAndContactsWithinExistingScope() {
         var query = query("following", List.of(10L), 42L, List.of(99L), "  KZ20260928'  ");

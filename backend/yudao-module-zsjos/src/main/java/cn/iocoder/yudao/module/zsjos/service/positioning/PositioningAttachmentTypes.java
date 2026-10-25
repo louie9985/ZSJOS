@@ -68,14 +68,28 @@ public final class PositioningAttachmentTypes {
      * @param data 文件内容
      * @return 通过时为 Tika 探测到的 MIME；不通过时返回 null
      */
+    public static String detectAllowed(String name, java.nio.file.Path source) throws java.io.IOException {
+        if (name == null || java.nio.file.Files.size(source) == 0) return null;
+        String detected;
+        try (var input = java.nio.file.Files.newInputStream(source)) {
+            detected = new org.apache.tika.Tika().detect(input, name);
+        }
+        byte[] prefix;
+        try (var input = java.nio.file.Files.newInputStream(source)) { prefix = input.readNBytes(8192); }
+        return allowDetected(name, detected, prefix);
+    }
+
     public static String detectAllowed(String name, byte[] data) {
         if (name == null || data == null || data.length == 0) return null;
+        return allowDetected(name, FileTypeUtils.getMineType(data, name), data);
+    }
+
+    private static String allowDetected(String name, String detected, byte[] data) {
         int dot = name.lastIndexOf('.');
         if (dot < 0 || dot == name.length() - 1) return null;
         String extension = name.substring(dot + 1).toLowerCase(Locale.ROOT);
         Set<String> candidates = ALLOWED.get(extension);
         if (candidates == null) return null;
-        String detected = FileTypeUtils.getMineType(data, name);
         if (detected == null || detected.isBlank()) return null;
         detected = detected.toLowerCase(Locale.ROOT);
         if (candidates.contains(detected)) return detected;

@@ -14,6 +14,7 @@ public class StudentServiceSummaryVO {
     private StudentContactRecordRespVO latestContact;
     private String classNo;
     private Boolean systemClass;
+    private String classKind;
     private String classDepartment;
     private String classExamSchedule;
     private LocalDateTime pausedAt;

@@ -34,13 +34,13 @@ public class StudentArchiveExtraController {
     }
     @PostMapping("/attachments")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:update') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:update') && @ss.hasPermission('zsjos:student-archive:sensitive-read')")
     public CommonResult<StudentInfoVO.Image> upload(@PathVariable Long relationId,@RequestParam String fieldKey,@RequestParam MultipartFile file) {
         return success(service.upload(relationId,fieldKey,file));
     }
     @GetMapping("/attachments/{id}")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:sensitive-read')")
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
     public byte[] download(@PathVariable Long relationId,@PathVariable Long id,HttpServletResponse response) {
         response.setHeader("Cache-Control","no-store"); response.setHeader("X-Content-Type-Options","nosniff");

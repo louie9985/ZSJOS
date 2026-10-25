@@ -264,6 +264,7 @@ export default function BpmApprovalDetail({
    * 那是流程内部的路由变量，审批人看不懂，也不该看到。全部过滤掉时整块不渲染。
    */
   const fallbackItems = useMemo(() => {
+    if (businessCard?.bizType === 'media_account_delete' || businessBrief?.bizType === 'media_account_delete') return [];
     const summary = processInstance?.summary ?? []
     if (summary.length > 0) {
       return summary
@@ -284,7 +285,7 @@ export default function BpmApprovalDetail({
         label: item.label,
         value: formatBpmVariable(item.value)
       }))
-  }, [processInstance?.formVariables, processInstance?.summary])
+  }, [processInstance?.formVariables, processInstance?.summary, businessCard?.bizType, businessBrief?.bizType])
 
   /** 该流程有没有接入业务内容卡——没有时才需要解释"为什么只有流程信息"。 */
   const hasBusinessCard = !!(businessCard?.groups?.length || businessBrief?.fields?.length)

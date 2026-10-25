@@ -24,10 +24,11 @@ class MaterialApprovalServiceTest {
     @Mock MaterialTypeMapper typeMapper;
     @Mock MaterialApprovalRoundMapper roundMapper;
     @Mock MaterialService materialService;
+    @Mock cn.iocoder.yudao.module.system.api.permission.PermissionApi permissions;
     MaterialVersionDO version;
     MaterialDO material;
     BpmTaskRespDTO task;
-    @BeforeEach void setup() { TenantContextHolder.setTenantId(1L); }
+    @BeforeEach void setup() { TenantContextHolder.setTenantId(1L); lenient().when(permissions.hasAnyPermissions(eq(9L),any(String[].class))).thenReturn(true); }
     @AfterEach void clear() { TenantContextHolder.clear(); }
     void data(String type) {
         task = new BpmTaskRespDTO().setId("task").setProcessInstanceId("process")
@@ -108,4 +109,26 @@ class MaterialApprovalServiceTest {
         when(taskApi.getTodoTaskPage(eq(9L),any())).thenReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(java.util.List.of(),0L));
         var req=new MaterialApprovalPageReqVO();req.setTypeCode("viral_content");assertTrue(service.page(req,9L).getList().isEmpty());verifyNoInteractions(versionMapper,materialMapper,roundMapper);
     }
+    @ParameterizedTest @ValueSource(booleans={true,false})
+    void genericDecisionRequiresItsSpecificBusinessPermission(boolean approve) {
+        var context=new BpmTaskActionContext().setUserId(9L).setAction(approve?"APPROVE":"REJECT")
+                .setBusinessKey("material-version:3").setTaskId("task").setProcessInstanceId("process")
+                .setProcessDefinitionKey("zsjos_viral_content_review");
+        when(permissions.hasAnyPermissions(9L,approve?"zsjos:material-approval:approve":"zsjos:material-approval:reject")).thenReturn(false);
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MATERIAL_PERMISSION_DENIED.getCode(),
+                assertThrows(ServiceException.class,() -> service.validateTaskAction(context)).getCode());
+        verifyNoInteractions(versionMapper,materialMapper,taskApi);
+    }
+    @Test void genericDecisionValidatesExactCurrentRoundWithoutRecursivelyApproving() {
+        data("viral_content");when(taskApi.getTodoTask(9L,"task")).thenReturn(task);
+        when(materialMapper.selectByIdForUpdate(1L,1L)).thenReturn(material);
+        when(versionMapper.selectByIdForUpdate(3L,1L)).thenReturn(version);
+        var context=new BpmTaskActionContext().setUserId(9L).setAction("APPROVE").setBusinessKey("material-version:3")
+                .setTaskId("task").setProcessInstanceId("process").setProcessDefinitionKey("zsjos_viral_content_review");
+        assertDoesNotThrow(() -> service.validateTaskAction(context));
+        version.setProcessInstanceId("new-round");
+        assertThrows(ServiceException.class,() -> service.validateTaskAction(context));
+        verify(taskApi,never()).approveTask(anyLong(),any());
+    }
+
 }

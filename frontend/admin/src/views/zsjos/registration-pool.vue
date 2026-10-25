@@ -124,7 +124,7 @@
           <div v-for="assignment in detail.classAssignments" :key="assignment.orderItemId" class="checklist-item">
             <div><strong>{{ assignment.productName || '历史产品信息缺失' }}</strong><ProductSpecs :product="assignment" /><div class="checklist-meta">{{ assignment.categoryName || '产品分类' }}<span v-if="assignment.errorReason"> · {{ assignment.errorReason }}</span></div></div>
             <el-select v-model="classDraft[assignment.orderItemId]" class="!w-320px" filterable placeholder="选择班级（含待分班）" :disabled="!canUpdate || detail.assignable !== true || !isEditable(detail.status) || classSaving" :loading="classOptionsLoading" :no-data-text="classOptionsError ? '班级加载失败，请重试' : '暂无未结课班级，请联系班级管理员'" @visible-change="(visible) => visible && loadClassOptions()">
-              <el-option v-for="option in classOptions" :key="option.id" :value="option.id" :label="option.systemClass ? '待分班' : `${option.className} · ${option.homeroomUserName || '未配置班主任'}`" />
+              <el-option v-for="option in classOptions" :key="option.id" :value="option.id" :label="option.classKind === 'PENDING' || (option.systemClass && !option.classKind) ? '待分班' : `${option.className} · ${option.homeroomUserName || '未配置班主任'}`" />
               <el-option v-if="assignment.classId && !classOptions.some(option => option.id === assignment.classId)" :value="assignment.classId" :label="assignment.className || '已选班级'" disabled />
             </el-select>
           </div>

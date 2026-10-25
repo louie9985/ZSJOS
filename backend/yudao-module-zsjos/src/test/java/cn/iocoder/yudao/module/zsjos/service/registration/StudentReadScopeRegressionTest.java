@@ -54,6 +54,31 @@ class StudentReadScopeRegressionTest {
     }
     @AfterEach void cleanup() { TenantContextHolder.clear(); }
 
+    @Test void classQueryAllReadsClassAndRosterWithoutGrantingStudentDetailOrClassCommands() {
+        var row = new DeliveryClassDO().setId(40L).setDeptId(80L).setHomeroomUserId(99L).setSystemClass(false);
+        when(classes.selectById(40L)).thenReturn(row);
+        when(permissions.hasAnyPermissions(7L, DeliveryClassService.PERMISSION_QUERY_ALL)).thenReturn(true);
+        var provider = new DeliveryClassObjectPermissionProvider();
+        ReflectionTestUtils.setField(provider, "mapper", classes);
+        ReflectionTestUtils.setField(provider, "permissionApi", permissions);
+        ReflectionTestUtils.setField(provider, "scopeService", scope);
+        assertTrue(provider.hasPermission(40L, "read", 7L));
+        assertFalse(provider.hasPermission(40L, "update", 7L));
+        assertFalse(provider.hasPermission(40L, "complete", 7L));
+        var service = new DeliveryClassServiceImpl(); ReflectionTestUtils.setField(service, "permissionApi", permissions);
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "query-all-roster"), ServiceRelationDO.class);
+        var query = (com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<?>) ReflectionTestUtils.invokeMethod(service, "studentReadQuery", 40L, 7L);
+        assertNotNull(query);
+        assertFalse(query.getSqlSegment().contains("owner_user_id"));
+        assertTrue(query.getSqlSegment().contains("teaching_delivery"));
+        assertTrue(query.getSqlSegment().contains("class_id"));
+        assertTrue(query.getSqlSegment().contains("status IN"));
+        assertTrue(query.getParamNameValuePairs().containsValue(40L));
+        var relation = relation(10L, 99L); when(relations.selectById(10L)).thenReturn(relation);
+        assertFalse(objects.hasPermission(10L, "read", 7L));
+    }
+
     @Test void ordinaryQueryPlusSelfNeverLooksUpSameDepartmentMembers() {
         var query = reads.query(7L, new StudentServicePageReqVO());
         assertEquals(7L, query.getParameters().get("owner0"));

@@ -282,9 +282,9 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                         .or().eq(LeadDO::getOwnerUserId, visibleUserId));
             }
         }
-        if (reqVO.getCursorActivityAt() != null && reqVO.getCursorId() != null) {
-            query.and(wrapper -> wrapper.lt(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
-                    .or(nested -> nested.eq(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
+        if (reqVO.getCursorSubmittedAt() != null && reqVO.getCursorId() != null) {
+            query.and(wrapper -> wrapper.lt(LeadDO::getSubmittedAt, reqVO.getCursorSubmittedAt())
+                    .or(nested -> nested.eq(LeadDO::getSubmittedAt, reqVO.getCursorSubmittedAt())
                             .lt(LeadDO::getId, reqVO.getCursorId())));
         }
         applyManagementOrder(query, reqVO);
@@ -297,6 +297,17 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                             boolean queryAll,
                                                             LeadInboxFilterQuery inboxFilter,
                                                             List<Long> matchedLeadIds) {
+        return selectManagementPageByScope(reqVO, visibleSourceUserIds, visibleOwnerUserIds,
+                queryAll, inboxFilter, matchedLeadIds, List.of());
+    }
+
+    default PageResult<LeadDO> selectManagementPageByScope(LeadManagementPageReqVO reqVO,
+                                                            List<Long> visibleSourceUserIds,
+                                                            List<Long> visibleOwnerUserIds,
+                                                            boolean queryAll,
+                                                            LeadInboxFilterQuery inboxFilter,
+                                                            List<Long> matchedLeadIds,
+                                                            List<Long> priorityLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
@@ -327,10 +338,16 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 applyManagementScope(query, visibleSourceUserIds, visibleOwnerUserIds);
             }
         }
-        if (reqVO.getCursorActivityAt() != null && reqVO.getCursorId() != null) {
-            query.and(wrapper -> wrapper.lt(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
-                    .or(nested -> nested.eq(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
+        if (reqVO.getCursorSubmittedAt() != null && reqVO.getCursorId() != null) {
+            query.and(wrapper -> wrapper.lt(LeadDO::getSubmittedAt, reqVO.getCursorSubmittedAt())
+                    .or(nested -> nested.eq(LeadDO::getSubmittedAt, reqVO.getCursorSubmittedAt())
                             .lt(LeadDO::getId, reqVO.getCursorId())));
+        }
+        if (!priorityLeadIds.isEmpty()) {
+            // IDs are typed Long values derived by the service, never a client-provided SQL fragment.
+            String ids = priorityLeadIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            query.getExpression().add(com.baomidou.mybatisplus.core.enums.SqlKeyword.ORDER_BY,
+                    () -> "CASE WHEN id IN (" + ids + ") THEN 0 ELSE 1 END ASC");
         }
         applyManagementOrder(query, reqVO);
         return selectPage(reqVO, query);
@@ -397,11 +414,11 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
 
     private static void applyManagementOrder(LambdaQueryWrapperX<LeadDO> query,
                                              LeadManagementPageReqVO reqVO) {
-        // Cursor tokens encode lastActivityAt + id, so cursor endpoints must retain that order.
+        // Cursor boundaries and ordering must use the same immutable submission time and ID.
         if ((reqVO.getCursor() != null && !reqVO.getCursor().isBlank())
-                || reqVO.getCursorActivityAt() != null || reqVO.getCursorId() != null
+                || reqVO.getCursorSubmittedAt() != null || reqVO.getCursorId() != null
                 || reqVO.getSortField() == null || reqVO.getSortOrder() == null) {
-            query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
+            query.orderByDesc(LeadDO::getSubmittedAt).orderByDesc(LeadDO::getId);
             return;
         }
         SFunction<LeadDO, ?> sortColumn = switch (reqVO.getSortField()) {
@@ -576,7 +593,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         if (reqVO.getView() == null || reqVO.getView().isBlank() || "all".equals(reqVO.getView())) {
             applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));
         }
-        query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
+        query.orderByDesc(LeadDO::getSubmittedAt).orderByDesc(LeadDO::getId);
         return selectPage(reqVO, query);
     }
 
@@ -669,8 +686,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                        LocalDateTime from, LocalDateTime to) {
         LambdaQueryWrapperX<LeadDO> query = partnerMetricQuery(partnerId, from, to);
         if (statuses != null && !statuses.isEmpty()) query.in(LeadDO::getStatus, statuses);
-        return selectPage(pageParam, query.orderByDesc(LeadDO::getCountedAt)
-                .orderByDesc(LeadDO::getSubmittedAt).orderByDesc(LeadDO::getId));
+        return selectPage(pageParam, query.orderByDesc(LeadDO::getSubmittedAt).orderByDesc(LeadDO::getId));
     }
 
     @Select("SELECT partner_id AS partner_id, NULL AS source_user_id, COUNT(*) AS value FROM zsjos_lead "

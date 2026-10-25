@@ -1,3 +1,6 @@
+import { lazy, Suspense } from "react"
+const ZsjkqtPage = lazy(() => import("../features/zsjkqt/ZsjkqtPage"))
+import StudentEntryPage from '../pages/StudentEntryPage'
 import EducationTeamPage from '../pages/EducationTeamPage'
 import DeliveryPerformancePage from '../pages/DeliveryPerformancePage'
 import DeliveryPerformanceTargetPage from '../pages/DeliveryPerformanceTargetPage'
@@ -85,6 +88,7 @@ interface RouteHostProps {
  */
 export default function RouteHost({ menu, permissions, roles, tenantReadAll = false, onOpenAssignment }: RouteHostProps) {
   const location = useLocation()
+  if (menu?.path === APP_ROUTES.ZSJKQT) return <Suspense fallback={<div>正在加载中世健考勤通…</div>}><ZsjkqtPage permissions={permissions} /></Suspense>
 
   // BPM 审批中心：通过 location.pathname 判断，因为 /bpm/task/done 可能没有对应的 menu
   if (location.pathname === APP_ROUTES.BPM_TODO || location.pathname === APP_ROUTES.BPM_DONE) {
@@ -99,6 +103,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_FOLLOW_UP_CALENDAR) return <LeadFollowUpCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.EXAM_CALENDAR) return <ExamCalendarPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.COURSE_CALENDAR) return <CourseCalendarPage permissions={permissions}/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.STUDENT_ENTRY) return <StudentEntryPage permissions={permissions} />
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MY_CLASSES) return <DeliveryClassPage permissions={permissions} />
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage/>

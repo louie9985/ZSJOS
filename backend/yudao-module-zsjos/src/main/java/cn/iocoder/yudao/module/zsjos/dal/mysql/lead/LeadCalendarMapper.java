@@ -21,6 +21,7 @@ public interface LeadCalendarMapper {
         private String category;
         private LocalDateTime deadline;
         private LocalDateTime ownershipStartedAt;
+        private LocalDateTime submittedAt;
     }
 
     @SelectProvider(type = LeadCalendarSearchSql.class, method = "due")

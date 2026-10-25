@@ -19,7 +19,10 @@ public class MyStudentPageReqVO extends PageParam {
     private String readScope;
     private Long targetUserId;
     @Size(max = 100) private String keyword;
-    @Pattern(regexp = "active|paused|completed", message = "学员服务状态不正确") private String serviceStatus;
+    /** Internal broad candidate filter; authorized display matching remains in the service. */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String projectionKeyword;
+    @Pattern(regexp = "active|paused|completed|closed", message = "学员服务状态不正确") private String serviceStatus;
     private Long classId;
     private Boolean inServicePeriod;
     /** Media student list only: current operator on a service visible in this read scope. */

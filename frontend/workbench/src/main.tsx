@@ -1,3 +1,4 @@
+import ApprovalNavigationMenu from './layouts/ApprovalNavigationMenu'
 import DeliveryReminder from "./components/DeliveryReminder";
 import { readEducationNavigationContext, replaceDeliveryEmployeeEntry } from './services/educationTeamNavigation'
 import DiagnosisReminder from "./components/DiagnosisReminder";
@@ -45,6 +46,7 @@ import {
   getAuthenticatedHomeTarget,
   getInitialTarget,
   getPrimaryTarget,
+  getNavigationOpenKeys,
   type PrimaryNavigationItem
 } from './services/menu'
 import { APP_ROUTES, MOBILE_ROUTE_BASE, LAYOUT_SIZES, MINI_RAIL_W, MOBILE_RENDERABLE_APP_ROUTES, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, type AuthPlatform } from './constants'
@@ -161,13 +163,6 @@ function ShellContent({ info, navigationOrder, authPlatform, onLogout, onUserCha
   const { resolve: resolveMenuTaskBadge } = useMenuTaskBadges()
   const { unreadCount: announcementUnreadCount } = useAnnouncements()
   const { unreadCount: notifyUnreadCount } = useNotifyMessages()
-  const resolveNavigationBadge = useMemo(
-    () => createNavigationBadgeResolver(resolveMenuTaskBadge, {
-      announcement: announcementUnreadCount,
-      message: notifyUnreadCount
-    }),
-    [announcementUnreadCount, notifyUnreadCount, resolveMenuTaskBadge]
-  )
   const [primaryCollapsed, setPrimaryCollapsed] = useState(false)
 
   // 调试日志：检查权限信息
@@ -206,6 +201,13 @@ function ShellContent({ info, navigationOrder, authPlatform, onLogout, onUserCha
     return filterRenderableMenus(buildMenuTree(info.workbenchMenus, '/', true), renderableRoutes)
   }, [authPlatform, authorizedMenus, info.workbenchLayoutMeta?.fallback, info.workbenchMenus])
   const navigationMenus = useMemo(() => applyNavigationOrder(navigationSource, navigationOrder), [navigationSource, navigationOrder])
+  const resolveNavigationBadge = useMemo(
+    () => createNavigationBadgeResolver(resolveMenuTaskBadge, {
+      announcement: announcementUnreadCount,
+      message: notifyUnreadCount
+    }, navigationMenus),
+    [announcementUnreadCount, notifyUnreadCount, resolveMenuTaskBadge, navigationMenus]
+  )
   const navigation = useMemo(() => buildTwoLevelNavigation(navigationMenus), [navigationMenus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const leadDetailDeepLink = useMemo(() => {
@@ -266,9 +268,9 @@ function ShellContent({ info, navigationOrder, authPlatform, onLogout, onUserCha
   // 左单列模式：路由切换时自动展开当前一级组。
   useEffect(() => {
     if (activePrimary) {
-      setSingleSiderOpenKeys(prev => prev.includes(activePrimary.key) ? prev : [...prev, activePrimary.key])
+      setSingleSiderOpenKeys([...new Set([...getNavigationOpenKeys(navigation, APP_ROUTES.BPM_TODO), ...getNavigationOpenKeys(navigation, location.pathname), activePrimary.key])])
     }
-  }, [activePrimary])
+  }, [activePrimary, navigation, location.pathname])
 
   useEffect(() => {
     if (!activePrimary || location.pathname !== activePrimary.menu.path || activePrimary.pages.length === 0) return
@@ -398,7 +400,9 @@ function ShellContent({ info, navigationOrder, authPlatform, onLogout, onUserCha
           </Tooltip>
         </div>
         <div className="secondary-menu-scroll">
-          <Menu
+          <ApprovalNavigationMenu
+            menus={activePrimary?.menu.children ?? []}
+            activePath={location.pathname}
             mode="inline"
             inlineIndent={NAV_INLINE_INDENT}
             inlineCollapsed={secondaryCollapsed}
@@ -641,7 +645,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
     : <LoginPage platform={authPlatform} initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLoginRedirectPending(true); setLogged(true) }}/>
   if (error) return <div className="center-page"><Result status={error === SERVER_CONNECTION_ERROR_MESSAGE ? '500' : 'error'} title={error} subTitle={error === SERVER_CONNECTION_ERROR_MESSAGE ? '权限信息暂时无法加载，请检查网络后重试。' : '权限信息加载失败，请重试或返回登录。'} extra={<Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }}>返回登录</Button></Space>}/></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
-  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><RealtimeProvider platform={authPlatform}><ForcedFormProvider><DiagnosisReminder enabled={(info.permissions || []).some(p => ["zsjos:media-account:edit", "zsjos:media-account:maintenance"].includes(p))}/><DeliveryReminder enabled={(info.permissions || []).includes("zsjos:student-delivery:query")}/><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider><MenuTaskBadgeProvider>
+  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><RealtimeProvider platform={authPlatform}><ForcedFormProvider><DiagnosisReminder enabled={(info.permissions || []).some(p => ["zsjos:media-account:edit", "zsjos:media-account:maintenance"].includes(p))}/><DeliveryReminder enabled={(info.permissions || []).includes("zsjos:student-delivery:query")}/><AnnouncementProvider key={JSON.stringify([authPlatform, readSharedTenantId(), info.user.id])} enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider><MenuTaskBadgeProvider bpmEnabled={(info.permissions || []).includes('bpm:task:query')}>
     <Shell authPlatform={authPlatform} info={info} navigationOrder={navigationOrder} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)

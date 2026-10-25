@@ -146,7 +146,8 @@ describe('BPM 通用审批组件', () => {
   it('完成审核按钮只在流程面板内，不再留在页面顶部按钮区', () => {
     const reviewPage = readFileSync('src/pages/ContentReviewBatchPage.tsx', 'utf8')
     // 推进流程的动作通过 businessAdvance 交给流程面板承载。
-    expect(reviewPage).toContain('businessAdvance={advanceAction}')
+    expect(reviewPage).toContain('businessAdvance={historyOriginId ? undefined : advanceAction}')
+    expect(reviewPage).toContain('historyOriginId || taskReadOnly ? undefined')
     expect(reviewPage).toContain('完成编导审核')
     expect(reviewPage).toContain('完成终审')
     // 顶部按钮区不得再直接挂完成按钮。

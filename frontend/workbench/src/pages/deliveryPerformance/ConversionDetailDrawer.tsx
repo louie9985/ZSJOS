@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "../../components/filterSelectDisplay"
 import { usePerformanceModule } from './PerformanceModule'
 import { Alert, Button, Collapse, Drawer, Empty, Input, Select, Space, Tag, Typography } from 'antd'
 import { useRef, useState } from 'react'
@@ -19,7 +20,7 @@ export default function ConversionDetailDrawer({ query, metric, title, permissio
  function filter(key: keyof ConversionQuery, value: string | undefined) { setFilters(current => ({ ...current, [key]: value })); setPage(1); listRef.current?.scrollTo(0, 0) }
  function selector(label: string, key: keyof ConversionQuery, options?: ConversionOption[]) {
   return <Select aria-label={label} placeholder={label} allowClear showSearch optionFilterProp="label" style={{ width: '100%' }}
-   value={filters[key]} onChange={value => filter(key, value as string | undefined)} options={(options ?? []).map(option => ({ value: option.key, label: `${option.label} (${option.count})` }))}/>
+   value={filters[key]} onChange={value => filter(key, value as string | undefined)} options={(options ?? []).map(option => ({ value: option.key, label: `${option.label} (${option.count})` }))} {...filterSelectDisplayProps}/>
  }
  const options = optionState.current
  const review = sourceReviewRequired(state.data?.summary ?? metric)

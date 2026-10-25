@@ -11,7 +11,7 @@ public final class LeadCalendarSearchSql {
         // Aggregate every pending task before filtering dates: a later task must not move a lead's earliest deadline.
         return """
             FROM (
-              SELECT l.id, l.lead_category AS category, MIN(t.due_at) AS deadline
+              SELECT l.id, l.lead_category AS category, l.submitted_at AS submittedAt, MIN(t.due_at) AS deadline
               FROM zsjos_lead l JOIN zsjos_business_task t ON t.biz_id=l.id
                 AND t.tenant_id=l.tenant_id AND t.deleted=0
               WHERE l.tenant_id=#{tenantId} AND l.deleted=0
@@ -22,13 +22,13 @@ public final class LeadCalendarSearchSql {
                 AND t.due_at IS NOT NULL
                 AND (LOCATE(#{req.keyword},l.lead_no)>0 OR LOCATE(#{req.keyword},l.submitted_name)>0
                   OR LOCATE(#{req.keyword},l.submitted_mobile)>0 OR LOCATE(#{req.keyword},l.submitted_wechat_id)>0)
-              GROUP BY l.id,l.lead_category
+              GROUP BY l.id,l.lead_category,l.submitted_at
             ) due WHERE 1=1
             """.formatted(LeadFollowUpResponsibilitySql.responsible("l"), LeadFollowUpResponsibilitySql.taskAssignee("t")) + (req.getRangeStart() == null ? "" : " AND DATE(deadline)>=#{req.rangeStart}")
                 + (req.getRangeEnd() == null ? "" : " AND DATE(deadline)<=#{req.rangeEnd}");
     }
     public static String due() {
-        return "SELECT l.id, l.lead_category AS category, l.ownership_started_at AS ownershipStartedAt, MIN(t.due_at) AS deadline "
+        return "SELECT l.id, l.lead_category AS category, l.ownership_started_at AS ownershipStartedAt, l.submitted_at AS submittedAt, MIN(t.due_at) AS deadline "
                 + "FROM zsjos_lead l JOIN zsjos_business_task t ON t.biz_id=l.id "
                 + "AND t.tenant_id=l.tenant_id AND t.deleted=0 "
                 + "WHERE l.tenant_id=#{tenantId} AND l.deleted=0 AND "
@@ -36,7 +36,7 @@ public final class LeadCalendarSearchSql {
                 + LeadFollowUpResponsibilitySql.taskAssignee("t") + "=#{userId} "
                 + "AND t.assignee_type='user' AND t.biz_type='lead' AND t.status='pending' "
                 + "AND t.task_type IN ('lead_first_follow_up','lead_follow_up_reminder') AND t.due_at IS NOT NULL "
-                + "GROUP BY l.id,l.lead_category,l.ownership_started_at HAVING MIN(t.due_at)>=#{start} AND MIN(t.due_at)<#{end}";
+                + "GROUP BY l.id,l.lead_category,l.ownership_started_at,l.submitted_at HAVING MIN(t.due_at)>=#{start} AND MIN(t.due_at)<#{end}";
     }
 
     public static String count(Map<String, Object> args) {
@@ -45,7 +45,9 @@ public final class LeadCalendarSearchSql {
     public static String page(Map<String, Object> args) {
         var req = (LeadCalendarSearchReqVO) args.get("req");
         return "SELECT id,category,deadline " + source(req) + " "
-                + CalendarSearchQuery.order(req, "deadline", "deadline", "id", LocalDate.now(ZoneId.of("Asia/Shanghai")))
+                + ("nearest".equals(req.getSort())
+                    ? CalendarSearchQuery.order(req, "deadline", "deadline", "id", LocalDate.now(ZoneId.of("Asia/Shanghai")))
+                    : "ORDER BY submittedAt " + ("asc".equals(req.getSort()) ? "ASC" : "DESC") + ", id DESC")
                 + " LIMIT #{req.pageSize} OFFSET #{offset}";
     }
 }

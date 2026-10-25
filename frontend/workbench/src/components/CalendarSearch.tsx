@@ -10,15 +10,16 @@ import '../styles/components/calendar-search.css'
 
 type Props<T> = {
   scopeKey?: string; scopeLabel: string; initialKeyword?: string; disabled?: boolean
+  defaultSort?: CalendarSearchQuery['sort']; dateSortLabel?: string
   search: (query: CalendarSearchQuery, signal: AbortSignal) => Promise<SearchPage<T>>
   present: (row: T) => SearchPresentation
   onLocate: (row: T, signal: AbortSignal) => Promise<void>
 }
 
-export default function CalendarSearch<T>({ scopeKey = '', scopeLabel, initialKeyword = '', disabled, search, present, onLocate }: Props<T>) {
+export default function CalendarSearch<T>({ scopeKey = '', scopeLabel, initialKeyword = '', disabled, search, present, onLocate, defaultSort = 'nearest', dateSortLabel = '日期' }: Props<T>) {
   const [open, setOpen] = useState(false), [keyword, setKeyword] = useState(initialKeyword)
   const [range, setRange] = useState<[string, string]>()
-  const [sort, setSort] = useState<CalendarSearchQuery['sort']>('nearest')
+  const [sort, setSort] = useState<CalendarSearchQuery['sort']>(defaultSort)
   const [query, setQuery] = useState<CalendarSearchQuery>()
   const [data, setData] = useState<SearchPage<T>>({ list: [], total: 0 })
   const [loading, setLoading] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('')
@@ -32,7 +33,7 @@ export default function CalendarSearch<T>({ scopeKey = '', scopeLabel, initialKe
     const reset = () => {
       controller.current?.abort(); locationController.current?.abort(); attempted.current = false
       setOpen(false); setKeyword(''); setRange(undefined); setQuery(undefined); setData({ list: [], total: 0 })
-      setLoading(false); setLocating(undefined); setError(''); setNotice(''); setSort('nearest')
+      setLoading(false); setLocating(undefined); setError(''); setNotice(''); setSort(defaultSort)
     }
     const storage = (event: StorageEvent) => {
       const keys: string[] = [STORAGE_KEYS.TENANT_ID, STORAGE_KEYS.IMPERSONATION, ...Object.values(AUTH_STORAGE_KEYS).map(value => value.accessToken)]
@@ -48,7 +49,7 @@ export default function CalendarSearch<T>({ scopeKey = '', scopeLabel, initialKe
     controller.current?.abort(); locationController.current?.abort()
     attempted.current = false
     setQuery(undefined); setData({ list: [], total: 0 }); setKeyword(initialKeyword); setRange(undefined)
-    setSort('nearest'); setError(''); setNotice(''); setLoading(false); setLocating(undefined)
+    setSort(defaultSort); setError(''); setNotice(''); setLoading(false); setLocating(undefined)
     return () => { controller.current?.abort(); locationController.current?.abort() }
     // initialKeyword seeds a new context; ordinary typing in the source page must not reset completed searches.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -92,7 +93,7 @@ export default function CalendarSearch<T>({ scopeKey = '', scopeLabel, initialKe
           onChange={event => { setKeyword(event.target.value); if (!event.target.value) { controller.current?.abort(); locationController.current?.abort(); setQuery(undefined); setData({ list: [], total: 0 }); setError(''); setNotice(''); setLoading(false); setLocating(undefined) } }} onSearch={submit} />
         <div className="calendar-search-filters">
           <DatePicker.RangePicker value={range ? [dayjs(range[0]), dayjs(range[1])] : null} onChange={dates => setRange(dates?.[0] && dates[1] ? [dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')] : undefined)} />
-          <Select aria-label="搜索结果排序" value={sort} onChange={value => { setSort(value); if (query) void run({ ...query, sort: value, pageNo: 1 }) }} options={[{ value: 'nearest', label: '距今天最近' }, { value: 'asc', label: '日期从早到晚' }, { value: 'desc', label: '日期从新到旧' }]} />
+          <Select aria-label="搜索结果排序" value={sort} onChange={value => { setSort(value); if (query) void run({ ...query, sort: value, pageNo: 1 }) }} options={[{ value: 'nearest', label: '距今天最近' }, { value: 'asc', label: `${dateSortLabel}从早到晚` }, { value: 'desc', label: `${dateSortLabel}从新到旧` }]} />
         </div>
         {query && <Typography.Text type="secondary">当前结果：“{query.keyword}” · {query.rangeStart ? `${query.rangeStart} 至 ${query.rangeEnd}` : '不限日期'}</Typography.Text>}
         {notice && <Alert type="warning" showIcon title={notice} />}

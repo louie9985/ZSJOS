@@ -95,4 +95,17 @@ class MediaStudentFilterQueryTest {
         r.setTenantId(2L); assertEquals(Set.of(101L,102L),match(g));
         r.setTenantId(1L); r.setPersonId(999L); assertEquals(Set.of(101L,102L),match(g));
     }
+    @Test void deletedRuntimeAccountsCannotMatchMediaFiltersButPendingDeletionsRemain() {
+        account(90,1,0,190,90L,10L,null,"deleted-platform","good");
+        account(91,1,0,191,91L,10L,null,"pending-platform","good");
+        jdbc.update("UPDATE zsjos_media_account SET run_status='deleted' WHERE id=90");
+        jdbc.update("UPDATE zsjos_media_account SET run_status='delete_pending' WHERE id=91");
+        assertTrue(match(group("AND",condition("platform","in",List.of("deleted-platform")))).isEmpty());
+        assertEquals(Set.of(191L),match(group("AND",condition("platform","in",List.of("pending-platform")))));
+        assertFalse(service.mediaStudentOperatorIds(10L).contains(90L));
+        assertTrue(service.mediaStudentOperatorIds(10L).contains(91L));
+        when(permissions.hasTenantReadAllAccess(10L)).thenReturn(true);
+        assertTrue(match(group("AND",condition("platform","in",List.of("deleted-platform")))).isEmpty());
+    }
+
 }

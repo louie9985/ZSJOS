@@ -124,7 +124,7 @@ export default function PositioningInterviewDialog({ relationId, onClose, onChan
           } },
         ]} />
       <section className="positioning-interview-files"><Typography.Title level={5}>本次访谈稿</Typography.Title>
-        <Typography.Paragraph type="secondary">支持文档、图片、音频、视频，每份不超过 100MB。完成前至少上传一份。</Typography.Paragraph>
+        <Typography.Paragraph type="secondary">支持文档、图片、音频、视频，附件总大小不超过 1GB。完成前至少上传一份。</Typography.Paragraph>
         {review ? <div className="positioning-file-grid">{context.attachments.map(file => <AttachmentCard key={file.fileId} name={file.fileName} load={() => reviewFile(review,'interview',file.fileId)} />)}</div> : <PositioningAttachmentPicker items={attachmentItems} accept={POSITIONING_ATTACHMENT_ACCEPT} disabled={!canSave} busy={busy}
           hint="选择后立即上传" onChange={() => undefined} onUpload={files => void upload(files)}
           onRemove={item => { if (item.uploaded) void remove(item.uploaded.id) }}

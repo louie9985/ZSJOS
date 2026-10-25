@@ -1,5 +1,10 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
+学员直接新增：`/zsjos/student-entry` 在两端使用 `zsjos:student:create` 页面/操作权限，服务端组件
+`zsjos/studentEntry/index` 分别映射 React `StudentEntryPage` 和 Vue 原生录入页。
+编导运营和班级管理添加按钮复用此权限；候选跨部门选择不增加历史学员读取权。
+见[学员直接新增契约](../api/student-entry.md)。
+
 学生交付中心端替换补充：按认证后的服务端交付域归属确认，移除原下属员工菜单和旧地址的可打开路由，仅使用获授权的教务团队入口；销售端下属销售入口保留。无教务授权不得回退旧入口或推导新权限。
 
 教务团队（2026-10-18）：`zsjos/educationTeam/index` → Workbench `/zsjos/education-team` 独立原生页面；Vue Admin 的菜单过滤器排除该组件，销售端下属销售页面保留。权限使用 `zsjos:education-team:*`，不继承下属员工授权，详见 [教务团队 API](../api/education-team.md)。
@@ -164,3 +169,12 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 2026-10-08：主管直接改判有效仅在 Workbench 客资管理与下属销售详情提供，复用 `SUPERVISOR_OVERTURN_VALID` 动作和独立按钮权限。Vue Admin 不增加此操作，其客资详情及申诉处理保持原入口；新增动作字段兼容读取。V289 仅添加菜单按钮与通知元数据，不分配角色。见 [操作与发布说明](../api/supervisor-lead-overturn.md)。
 
 2026-10-19：下属销售恢复销售岗位及销售身份范围，教务团队使用独立六项今日指标。两页均沿用现有布局，不新增表格视图。服务端 V334 恢复下属销售菜单名称，不调整角色授权。
+
+
+### 中世健考勤通（2026-10-22）
+
+HRM 下 `/hrm/zsjkqt` 由 React Workbench 原生 `ZsjkqtPage` 渲染；服务端菜单组件使用既有
+`zsjos-workbench` 标记，Vue Admin 的现有 `filterAdminRoutes` 过滤该 React 专属页面。
+父级 HRM 及其余页面的 `admin_embed` 配置保持现状，子页面 `workbenchRenderMode=native`。
+单一 `zsjos:zsjkqt:access` 权限覆盖整个独立考勤应用；管理员通过角色管理授权，迁移不分配角色。
+详见 [考勤通接口与数据契约](../api/zsjkqt.md)。

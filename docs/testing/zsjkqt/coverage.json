@@ -1,0 +1,632 @@
+{
+  "schemaVersion": 1,
+  "capturedOn": "2026-10-22",
+  "sourceRoot": "D:/AttendanceAutomation",
+  "archiveInventory": "docs/testing/zsjkqt/inventory.json",
+  "archiveVerification": {
+    "files": 19,
+    "sourceHashMatches": true,
+    "archiveHashMatches": true,
+    "activeUnchangedTestFiles": 10,
+    "method": "SHA-256 and byte length against inventory; byte equality for unchanged active TypeScript tests"
+  },
+  "desktopInventory": {
+    "typescriptFiles": 12,
+    "typescriptUnchangedFiles": 10,
+    "typescriptUnchangedExecutedCasesAtMigration": 102,
+    "excelJsFilesPorted": 2,
+    "excelJsCasesPorted": 4,
+    "rustExcelCasesPorted": 15,
+    "rustPersonnelCasesPorted": 3,
+    "manualNumberedScenarios": 46
+  },
+  "automatedMappings": [
+    {
+      "source": "desktop/src/core/browserSourceParser.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/browserSourceParser.test.ts",
+      "mode": "ported-to-java",
+      "cases": [
+        {
+          "originalCase": "parses the sample WeCom attendance workbook from a File object",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "parses_sample_wecom_workbook_from_file"
+        }
+      ]
+    },
+    {
+      "source": "desktop/src/core/dayClassifier.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/dayClassifier.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/departmentSchedules.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/departmentSchedules.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/departmentSchedules.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/exportedReportParser.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/exportedReportParser.test.ts",
+      "mode": "ported-to-java",
+      "cases": [
+        {
+          "originalCase": "parses a strict exported attendance report without recalculating values",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "parses_strict_exported_report_without_recalculating_values"
+        },
+        {
+          "originalCase": "rejects old exported sheets without a year in the sheet name",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "rejects_old_exported_sheets_without_year"
+        },
+        {
+          "originalCase": "uses hidden metadata when present",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "uses_hidden_metadata_when_present"
+        }
+      ]
+    },
+    {
+      "source": "desktop/src/core/recoveredMonthlyParameters.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/recoveredMonthlyParameters.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/recoveredMonthlyParameters.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/reviewBuilder.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/reviewBuilder.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/reviewBuilder.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/reviewIssues.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/reviewIssues.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/reviewIssues.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/septemberAttendance.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/septemberAttendance.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/septemberAttendance.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/sourceSummaryReview.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/sourceSummaryReview.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/sourceSummaryReview.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/statusStyles.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/statusStyles.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/statusStyles.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/summary.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/summary.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/summary.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src/core/summaryFields.test.ts",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/summaryFields.test.ts",
+      "mode": "unchanged-typescript",
+      "targetFile": "frontend/workbench/src/features/zsjkqt/core/summaryFields.test.ts",
+      "byteIdenticalAtMigration": true
+    },
+    {
+      "source": "desktop/src-tauri/src/excel_engine.rs",
+      "archive": "docs/testing/zsjkqt/original/desktop/src-tauri/src/excel_engine.rs",
+      "mode": "ported-to-java",
+      "cases": [
+        {
+          "originalCase": "date_header_uses_month_day_and_weekday",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "date_header_uses_month_day_and_weekday"
+        },
+        {
+          "originalCase": "exported_sheet_month_requires_year",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "exported_sheet_month_requires_year"
+        },
+        {
+          "originalCase": "exported_attendance_report_can_be_reimported",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "exported_attendance_report_can_be_reimported"
+        },
+        {
+          "originalCase": "summary_columns_follow_actual_month_length",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "summary_columns_follow_actual_month_length"
+        },
+        {
+          "originalCase": "status_display_uses_text_for_plain_statuses",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "status_display_uses_text_for_plain_statuses"
+        },
+        {
+          "originalCase": "combined_status_text_labels_both_halves",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "combined_status_text_labels_both_halves"
+        },
+        {
+          "originalCase": "only_plain_statuses_use_normal_text_style",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "only_plain_statuses_use_normal_text_style"
+        },
+        {
+          "originalCase": "notable_statuses_use_separate_style_keys",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "notable_statuses_use_separate_style_keys"
+        },
+        {
+          "originalCase": "non_plain_status_styles_have_background_fills",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "non_plain_status_styles_have_background_fills"
+        },
+        {
+          "originalCase": "combined_status_style_uses_most_notable_half",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "combined_status_style_uses_most_notable_half"
+        },
+        {
+          "originalCase": "employees_are_grouped_by_first_seen_department_order",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "employees_are_grouped_by_first_seen_department_order"
+        },
+        {
+          "originalCase": "blank_manual_status_change_is_not_exported_as_issue",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "blank_manual_status_change_is_not_exported_as_issue"
+        },
+        {
+          "originalCase": "blank_statuses_are_not_exported_even_when_system_issues_exist",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "blank_statuses_are_not_exported_even_when_system_issues_exist"
+        },
+        {
+          "originalCase": "system_abnormal_issue_is_exported",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "system_abnormal_issue_is_exported"
+        },
+        {
+          "originalCase": "manual_abnormal_status_change_is_exported",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+          "targetCase": "manual_abnormal_status_change_is_exported"
+        }
+      ]
+    },
+    {
+      "source": "desktop/src-tauri/src/lib.rs",
+      "archive": "docs/testing/zsjkqt/original/desktop/src-tauri/src/lib.rs",
+      "mode": "ported-to-java",
+      "cases": [
+        {
+          "originalCase": "upsert_personnel_profile_adds_new_employee",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtServiceTest.java",
+          "targetCase": "upsert_personnel_profile_adds_new_employee"
+        },
+        {
+          "originalCase": "upsert_personnel_profile_updates_existing_employee_and_preserves_other_data",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtServiceTest.java",
+          "targetCase": "upsert_personnel_profile_updates_existing_employee_and_preserves_other_data"
+        },
+        {
+          "originalCase": "upsert_personnel_profile_rejects_non_object_root",
+          "targetFile": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtServiceTest.java",
+          "targetCase": "upsert_personnel_profile_rejects_non_object_root"
+        }
+      ]
+    }
+  ],
+  "manualChecklist": {
+    "source": "docs/回归测试用例.md",
+    "archive": "docs/testing/zsjkqt/original/docs/回归测试用例.md",
+    "scenarios": [
+      {
+        "id": "SUM-001",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-002",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-003",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-004",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-005",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-006",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-007",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-008",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-009",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-010",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-011",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-012",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-013",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-014",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-015",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-016",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts",
+          "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-017",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SUM-018",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-001",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/septemberAttendance.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-002",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/septemberAttendance.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-003",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/septemberAttendance.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-004",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/septemberAttendance.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-005",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/septemberAttendance.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-006",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/septemberAttendance.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-007",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-008",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-009",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "SEP-010",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts",
+          "frontend/workbench/src/features/zsjkqt/core/reviewBuilder.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "CLS-001",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "CLS-002",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "CLS-003",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "CLS-004",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "CLS-005",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/dayClassifier.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "UI-001",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/reviewIssues.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "UI-002",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [],
+        "individualBrowserAcceptance": "not-established-by-archive-verification",
+        "relatedImplementation": "frontend/workbench/src/features/zsjkqt/ui/App.tsx"
+      },
+      {
+        "id": "UI-003",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [],
+        "individualBrowserAcceptance": "not-established-by-archive-verification",
+        "relatedImplementation": "frontend/workbench/src/features/zsjkqt/ui/App.tsx"
+      },
+      {
+        "id": "UI-004",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [],
+        "individualBrowserAcceptance": "not-established-by-archive-verification",
+        "relatedImplementation": "frontend/workbench/src/features/zsjkqt/ui/App.tsx"
+      },
+      {
+        "id": "REV-001",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "REV-002",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "REV-003",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "REV-004",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/summary.test.ts"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "STY-001",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "STY-002",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "STY-003",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/statusStyles.test.ts",
+          "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "STY-004",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/statusStyles.test.ts",
+          "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      },
+      {
+        "id": "STY-005",
+        "retention": "unchanged-original-checklist",
+        "relatedActiveTestFiles": [
+          "frontend/workbench/src/features/zsjkqt/core/statusStyles.test.ts",
+          "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java"
+        ],
+        "individualBrowserAcceptance": "not-established-by-archive-verification"
+      }
+    ]
+  },
+  "fixtures": [
+    {
+      "source": "desktop/src/core/fixtures/september2026.json",
+      "archive": "docs/testing/zsjkqt/original/desktop/src/core/fixtures/september2026.json",
+      "sha256": "d878da9e8263cfca1462d54112137c631597c7c9cc45dca619120d77cbb1dcf4"
+    },
+    {
+      "source": "上下班打卡_月报_20260501-20260531 (1).xlsx",
+      "archive": "docs/testing/zsjkqt/original/上下班打卡_月报_20260501-20260531 (1).xlsx",
+      "sha256": "c04d25edc50f3e45e4578e439025d337d0619c998c1bc1d1bddb9a6174153c9d"
+    }
+  ],
+  "newCoverage": {
+    "typescriptSessionTests": "frontend/workbench/src/features/zsjkqt/draftSession.test.ts",
+    "javaServiceTests": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtServiceTest.java",
+    "javaExcelTests": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtExcelEngineTest.java",
+    "mysql": "script/sql/mysql/tools/test_zsjkqt.py",
+    "menuConsumers": "frontend/workbench/src/features/zsjkqt/menu.test.ts",
+    "javaBoundaryTests": "backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/zsjkqt/ZsjkqtBoundaryTest.java",
+    "browserFixture": "frontend/workbench/test/zsjkqt.html",
+    "browserScript": "frontend/workbench/test/zsjkqt-browser.py"
+  },
+  "executionBoundary": "Archive integrity and mapping are separate from pass/fail execution; current delivery evidence is recorded in handoff/local-zsjkqt-migration-20261022.md. No live account/deployment acceptance is implied."
+}

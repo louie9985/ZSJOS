@@ -14,9 +14,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class AdvancedFilterFieldCatalogTest {
     private final AdvancedFilterService service = new AdvancedFilterService();
 
-    @Test void studentServiceNameUsesItsOrderAndLeadNameBindingIsUnchanged() {
+    @Test void studentServiceNameUsesItsSnapshotAndLeadNameBindingIsUnchanged() {
         var field = AdvancedFilterFieldCatalog.fields().get("person.name");
-        assertEquals("ro.student_name", field.bindings().get("student_service").expression());
+        assertEquals("sr.student_name_snapshot", field.bindings().get("student_service").expression());
         assertNull(field.bindings().get("student_service").relation());
         assertEquals("p.name", field.bindings().get("lead").expression());
     }
@@ -128,7 +128,7 @@ class AdvancedFilterFieldCatalogTest {
         Map<String, Integer> expected = Map.of("lead", 81, "order", 72, "lead_appeal", 80,
                 "duplicate_review", 18, "registration", 79, "student", 77,
                 "subordinate_sales", 26, "cashback", 20, "withdrawal", 25);
-        assertEquals(209, AdvancedFilterFieldCatalog.fields().size());
+        assertEquals(231, AdvancedFilterFieldCatalog.fields().size());
         expected.forEach((scene, count) -> {
             var fields = service.catalog(scene).fields();
             assertEquals(count, fields.size(), scene);

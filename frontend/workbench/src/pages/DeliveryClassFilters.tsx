@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "../components/filterSelectDisplay"
 import { Button, DatePicker, Input, Select, Space, Typography } from 'antd'
 import dayjs from 'dayjs'
 import type { DeliveryClassFilterContext } from '../services/api'
@@ -13,10 +14,10 @@ export default function DeliveryClassFilters({ value, onChange, context, loading
     <div className="delivery-class-filter-fields">
       <label>项目<Select aria-label="项目" showSearch optionFilterProp="label" allowClear placeholder="全部项目" loading={loading} disabled={!context}
         value={value.projectCategoryId} onChange={projectCategoryId => onChange({ ...value, projectCategoryId })}
-        options={context?.projects.map(row => ({ value: row.id, label: row.path || row.name }))} /></label>
+        options={context?.projects.map(row => ({ value: row.id, label: row.path || row.name }))}  {...filterSelectDisplayProps}/></label>
       <label>班主任<Select aria-label="班主任筛选" showSearch optionFilterProp="label" allowClear placeholder="全部班主任" loading={loading} disabled={!context}
         value={value.homeroomUserId} onChange={homeroomUserId => onChange({ ...value, homeroomUserId })}
-        options={context?.homerooms.map(row => ({ value: row.id, label: row.name + (row.deptName ? ' · ' + row.deptName : '') }))} /></label>
+        options={context?.homerooms.map(row => ({ value: row.id, label: row.name + (row.deptName ? ' · ' + row.deptName : '') }))}  {...filterSelectDisplayProps}/></label>
       <label>搜索班级<Input.Search aria-label="搜索班级" allowClear value={keyword} placeholder="班级名称 / 编号" onChange={event => onKeyword(event.target.value)} onSearch={onSearch} /></label>
       <Button onClick={onReset}>重置</Button>
     </div>

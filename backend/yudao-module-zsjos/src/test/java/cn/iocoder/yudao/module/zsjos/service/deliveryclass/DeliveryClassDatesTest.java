@@ -18,9 +18,9 @@ class DeliveryClassDatesTest {
         assertNull(DeliveryClassDates.fromSnapshot("2026-11-02~2026-10-30"));
     }
 
-    @Test void acceptsManualDatesAndLegacyIdsButRejectsMissingOrReversedDates() {
+    @Test void acceptsMissingDatesManualDatesAndLegacyIdsButRejectsInvalidRanges() {
         var req = new DeliveryClassSaveReqVO();
-        assertFalse(req.isExamDateValid());
+        assertTrue(req.isExamDateValid());
         req.setExamScheduleId(1L);
         assertTrue(req.isExamDateValid());
         req.setExamScheduleId(null);

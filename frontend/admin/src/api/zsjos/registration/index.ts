@@ -84,6 +84,7 @@ export interface RegistrationClassAssignment {
   classId?: number
   className?: string
   systemClass?: boolean
+  classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION'
   homeroomUserName?: string
   errorCode?: string
   errorReason?: string
@@ -99,6 +100,8 @@ export interface StudentService {
   classId?: number
   className?: string
   ownerUserName?: string
+  version?: number
+  teachingClosed?: boolean
   serviceRelationId: number
   orderId: number
   orderNo: string

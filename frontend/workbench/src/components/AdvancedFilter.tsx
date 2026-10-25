@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import { DeleteOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons'
 import { Alert, Badge, Button, DatePicker, Empty, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tag, message, type InputRef } from 'antd'
 import dayjs from 'dayjs'
@@ -35,6 +36,11 @@ const effectiveGroup = (group: AdvancedFilterGroup): AdvancedFilterGroup => ({
   conditions: group.conditions.filter(isComplete),
   groups: group.groups.map(effectiveGroup).filter(item => item.conditions.length > 0 || item.groups.length > 0)
 })
+export const normalizeFilterGroup = (group?: AdvancedFilterGroup): AdvancedFilterGroup | undefined => {
+  if (!group) return undefined
+  const effective = effectiveGroup(group)
+  return effective.conditions.length || effective.groups.length ? effective : undefined
+}
 export const conditionCount = (group?: AdvancedFilterGroup): number => group
   ? group.conditions.length + group.groups.reduce((sum, item) => sum + conditionCount(item), 0) : 0
 export const filterCount = (group?: AdvancedFilterGroup): number => group
@@ -72,21 +78,21 @@ function ConditionRow({ value, fields, relativeDateOptions, onChange, onRemove }
   if (field && !noValue) {
     if (field.valueType === 'duration') {
       control = <div className="advanced-filter-duration-control">
-        <Select showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} placeholder="开始时间" value={value.startFieldKey} options={durationDateOptions} onChange={item => onChange({ ...value, startFieldKey: item })}/>
-        <Select showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} placeholder="结束时间" value={value.endFieldKey} options={durationDateOptions} onChange={item => onChange({ ...value, endFieldKey: item })}/>
+        <Select showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} placeholder="开始时间" value={value.startFieldKey} options={durationDateOptions} onChange={item => onChange({ ...value, startFieldKey: item })} {...filterSelectDisplayProps}/>
+        <Select showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} placeholder="结束时间" value={value.endFieldKey} options={durationDateOptions} onChange={item => onChange({ ...value, endFieldKey: item })} {...filterSelectDisplayProps}/>
         <Select popupMatchSelectWidth={FILTER_COMPACT_POPUP_WIDTH} value={value.unit || 'hour'} options={durationUnitOptions} onChange={unit => onChange({ ...value, unit })}/>
         {value.operator === 'between'
           ? <Space.Compact block><InputNumber placeholder="最小值" value={number(value.valueFrom)} onChange={item => onChange({ ...value, valueFrom: item })}/><InputNumber placeholder="最大值" value={number(value.valueTo)} onChange={item => onChange({ ...value, valueTo: item })}/></Space.Compact>
           : <InputNumber placeholder="比较值" value={number(value.value)} onChange={item => onChange({ ...value, value: item })}/>}
       </div>
     } else if (value.operator === 'relative') {
-      control = <Select popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={value.value as string | undefined} options={relativeDateOptions} onChange={item => onChange({ ...value, value: item })}/>
+      control = <Select popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={value.value as string | undefined} options={relativeDateOptions} onChange={item => onChange({ ...value, value: item })} {...filterSelectDisplayProps}/>
     } else if (value.operator === 'between') {
       control = <Space.Compact block>{field.valueType === 'date'
         ? <><DatePicker showTime value={date(value.valueFrom)} onChange={item => dateValue('valueFrom', item)}/><DatePicker showTime value={date(value.valueTo)} onChange={item => dateValue('valueTo', item)}/></>
         : <><InputNumber value={value.valueFrom as number | undefined} onChange={item => onChange({ ...value, valueFrom: item })}/><InputNumber value={value.valueTo as number | undefined} onChange={item => onChange({ ...value, valueTo: item })}/></>}</Space.Compact>
     } else if (field.valueType === 'select') {
-      control = <Select mode="multiple" showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={(value.value as Array<string | number>) || []} options={field.options} loading={field.optionsLoading} notFoundContent={field.optionsError ? <Button type="link" size="small" onClick={field.retryOptions}>加载失败，重试</Button> : '暂无可选项'} onChange={item => onChange({ ...value, value: item })}/>
+      control = <Select mode="multiple" showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={(value.value as Array<string | number>) || []} options={field.options} loading={field.optionsLoading} notFoundContent={field.optionsError ? <Button type="link" size="small" onClick={field.retryOptions}>加载失败，重试</Button> : '暂无可选项'} onChange={item => onChange({ ...value, value: item })} {...filterSelectDisplayProps}/>
     } else if (field.valueType === 'number') {
       control = <InputNumber value={value.value as number | undefined} onChange={item => onChange({ ...value, value: item })}/>
     } else if (field.valueType === 'date') {
@@ -94,7 +100,7 @@ function ConditionRow({ value, fields, relativeDateOptions, onChange, onRemove }
     } else control = <Input value={(value.value as string) || ''} onChange={event => onChange({ ...value, value: event.target.value })}/>
   }
   return <div className="advanced-filter-condition">
-    <Select showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={field?.fieldKey} onChange={setField} options={fieldOptions}/>
+    <Select showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={field?.fieldKey} onChange={setField} options={fieldOptions} {...filterSelectDisplayProps}/>
     <Select popupMatchSelectWidth={FILTER_COMPACT_POPUP_WIDTH} value={value.operator} onChange={setOperator} options={(field?.operators || []).map(item => ({ value: item, label: operatorLabels[item] || item }))}/>
     <div className="advanced-filter-value-control">{control}</div>
     <Button aria-label="删除条件" type="text" danger icon={<DeleteOutlined/>} onClick={onRemove}/>
@@ -201,14 +207,14 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
   const show = () => { setSelectedTemplateId(undefined); setDraft(cloneFilterGroup(value)); setOpen(true) }
   const cancel = () => { setDraft(cloneFilterGroup(value)); setOpen(false) }
   const apply = async () => {
-    const effective = effectiveGroup(draft)
+    const effective = normalizeFilterGroup(draft)
     setApplying(true)
     try {
-      if (await onChange(filterCount(effective) ? effective : undefined) !== false) setOpen(false)
+      if (await onChange(effective) !== false) setOpen(false)
     } finally { setApplying(false) }
   }
   const clearApplied = async () => {
-    if (await onChange(undefined) !== false) setDraft(blank())
+    if (await onChange(normalizeFilterGroup(undefined)) !== false) setDraft(blank())
   }
   const applyTemplate = (id?: number) => {
     const template = templates.find(item => item.id === id)
@@ -284,11 +290,11 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
   const submitKeyword = () => onKeyword(searchText.trim())
   return <>
     <div className="advanced-filter-toolbar">{leading}{!collapsed && <Input ref={inputRef} disabled={disabled} allowClear value={searchText} placeholder={placeholder} suffix={<SearchOutlined role="button" aria-label="搜索" tabIndex={0} onClick={submitKeyword} onKeyDown={event => event.key === 'Enter' && submitKeyword()}/>} onChange={event => { setSearchText(event.target.value); if (!event.target.value) onKeyword('') }} onPressEnter={submitKeyword}/>}<Badge count={filterCount(value)}><Button aria-label="高级筛选" title="高级筛选" disabled={disabled} size={collapsed ? 'small' : 'middle'} type={filterCount(value) ? 'primary' : collapsed ? 'text' : 'default'} icon={<FilterOutlined/>} onClick={show}>{!collapsed && '筛选'}</Button></Badge></div>
-    {!collapsed && active.length > 0 && <div className="advanced-filter-tags">{active.map(({ condition, path }, index) => { const field = fields.find(item => item.fieldKey === condition.fieldKey); const label = condition.fieldKey === 'duration.diff' ? summarize(condition) : `${field?.label || '筛选字段'} ${operatorLabels[condition.operator]} ${summarize(condition)}`; return <Tag closable key={`${condition.fieldKey}-${index}`} onClose={event => { event.preventDefault(); const next = removeFilterAtPath(cloneFilterGroup(value), path); onChange(filterCount(next) ? next : undefined) }}>{label}</Tag> })}<Button size="small" type="link" onClick={clearApplied}>清空全部</Button></div>}
+    {!collapsed && active.length > 0 && <div className="advanced-filter-tags">{active.map(({ condition, path }, index) => { const field = fields.find(item => item.fieldKey === condition.fieldKey); const label = condition.fieldKey === 'duration.diff' ? summarize(condition) : `${field?.label || '筛选字段'} ${operatorLabels[condition.operator]} ${summarize(condition)}`; return <Tag closable key={`${condition.fieldKey}-${index}`} onClose={event => { event.preventDefault(); const next = removeFilterAtPath(cloneFilterGroup(value), path); onChange(normalizeFilterGroup(next)) }}>{label}</Tag> })}<Button size="small" type="link" onClick={clearApplied}>清空全部</Button></div>}
     <ResizableDrawer className="advanced-filter-drawer" open={open} placement="right" width="min(560px, 100vw)" defaultSize={560} minSize={420} storageKey={ADVANCED_FILTER_DRAWER_WIDTH_STORAGE_KEY} title="高级筛选" onClose={cancel} footer={<div className="advanced-filter-footer"><Button onClick={() => setDraft(blank())}>重置</Button><Space><Button onClick={cancel}>取消</Button><Button aria-label="应用筛选" type="primary" loading={applying} disabled={disabled || catalogState !== 'ready'} onClick={() => void apply()}>应用筛选</Button></Space></div>}>
       {pageKey && <div className="advanced-filter-template-panel">
         <div className="advanced-filter-template-actions">
-          <Select allowClear value={selectedTemplateId} className="advanced-filter-template-select" loading={templateState === 'loading'} status={templateState === 'error' ? 'error' : undefined} placeholder="选择筛选模板" optionFilterProp="label" popupMatchSelectWidth={FILTER_TEMPLATE_POPUP_WIDTH} showSearch options={templateOptions} onChange={applyTemplate}/>
+          <Select allowClear value={selectedTemplateId} className="advanced-filter-template-select" loading={templateState === 'loading'} status={templateState === 'error' ? 'error' : undefined} placeholder="选择筛选模板" optionFilterProp="label" popupMatchSelectWidth={FILTER_TEMPLATE_POPUP_WIDTH} showSearch options={templateOptions} onChange={applyTemplate} {...filterSelectDisplayProps}/>
           <Button icon={<SaveOutlined/>} disabled={!filterCount(draft)} onClick={openSave}>保存模板</Button>
         </div>
         {templateState === 'error' && <Alert type="warning" showIcon message="筛选模板加载失败" action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void loadTemplates()}>重试</Button>}/>}

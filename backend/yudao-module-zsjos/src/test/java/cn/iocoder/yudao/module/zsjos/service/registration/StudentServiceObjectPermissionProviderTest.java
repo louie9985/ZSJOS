@@ -23,6 +23,12 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StudentServiceObjectPermissionProviderTest {
+    @org.junit.jupiter.api.BeforeEach
+    void denyUnconfiguredFeaturePermissions() {
+        org.mockito.Mockito.lenient().when(permissionApi.hasAnyPermissions(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(false);
+    }
+
 
     @InjectMocks private StudentServiceObjectPermissionProvider provider;
     @Mock private ServiceRelationMapper relationMapper;
@@ -30,6 +36,53 @@ class StudentServiceObjectPermissionProviderTest {
     @Mock private DeliveryClassScopeService deliveryClassScopeService;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
+
+    @Test void queryAllReadsOnlyTeachingServicesAndDoesNotGrantCommandsOrTransferActions() {
+        var relation = new ServiceRelationDO(); relation.setId(10L); relation.setOwnerUserId(99L);
+        relation.setStatus("active"); relation.setTeachingDelivery(true);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(permissionApi.hasAnyPermissions(7L, StudentReadScope.QUERY_ALL)).thenReturn(true);
+        assertTrue(provider.hasPermission(10L, "read", 7L));
+        for (String action : List.of("accept", "contact", "update-basic-info", "delivery-stage", "class-transfer", "close-service"))
+            assertFalse(provider.hasPermission(10L, action, 7L));
+        assertTrue(provider.transferActions(10L, 7L).isEmpty());
+        relation.setTeachingDelivery(false);
+        assertFalse(provider.hasPermission(10L, "read", 7L));
+        relation.setTeachingDelivery(true); relation.setStatus("terminated");
+        assertFalse(provider.hasPermission(10L, "read", 7L));
+    }
+
+    @Test void transferActionsRequireBothFeatureAndObjectPermission() {
+        var relation = new ServiceRelationDO(); relation.setId(10L); relation.setOwnerUserId(7L);
+        relation.setStatus("active"); relation.setTeachingDelivery(true);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(permissionApi.hasAnyPermissions(7L, "zsjos:class-transfer:create")).thenReturn(true);
+        assertTrue(provider.transferActions(10L, 7L).contains("REQUEST_TRANSFER"));
+        relation.setOwnerUserId(99L);
+        assertTrue(provider.transferActions(10L, 7L).isEmpty());
+        relation.setOwnerUserId(7L); relation.setTeachingClosed(true);
+        assertTrue(provider.transferActions(10L, 7L).isEmpty());
+    }
+
+    @Test void closedTeachingDeniesCommandsButPreservesMediaActions() {
+        var relation=new ServiceRelationDO();relation.setId(10L);relation.setStatus("active");relation.setTeachingClosed(true);
+        relation.setOwnerUserId(7L);relation.setContentDirectorUserId(8L);relation.setAcceptanceStatus("accepted");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        for (String action: List.of("accept","contact","delivery-stage","class-transfer","direct-transfer","update-basic-info","update-exam-date","archive-update"))
+            assertFalse(provider.hasPermission(10L,action,7L));
+        assertTrue(provider.hasPermission(10L,"close-service",7L));
+        assertFalse(provider.hasPermission(10L,"close-service",9L));
+        assertTrue(provider.hasPermission(10L,"director-precheck",8L));
+    }
+    @Test void restoreObjectScopeDoesNotExpandSelfIntoDepartmentAccess() {
+        var relation=new ServiceRelationDO();relation.setId(10L);relation.setStatus("active");relation.setOwnerUserId(7L);
+        var owner=new AdminUserRespDTO();owner.setId(7L);owner.setDeptId(80L);
+        when(relationMapper.selectById(10L)).thenReturn(relation);when(adminUserApi.getUser(7L)).thenReturn(owner);
+        when(deliveryClassScopeService.containsRead(9L,80L)).thenReturn(false);
+        assertFalse(provider.hasPermission(10L,"restore-service",9L));
+        when(deliveryClassScopeService.containsRead(9L,80L)).thenReturn(true);
+        assertTrue(provider.hasPermission(10L,"restore-service",9L));
+    }
 
     @Test
     void pendingServiceReadDoesNotGrantOwnerCommandsOrExposeOtherClasses() {
@@ -139,6 +192,9 @@ class StudentServiceObjectPermissionProviderTest {
 
         source.setSystemClass(true);
         assertTrue(provider.hasPermission(10L, "direct-transfer", 8L));
+        source.setClassKind("UNSCHEDULED"); source.setHomeroomUserId(20L);
+        assertFalse(provider.hasPermission(10L, "direct-transfer", 8L));
+        assertTrue(provider.hasPermission(10L, "direct-transfer", 9L));
     }
 
     @Test
@@ -190,4 +246,22 @@ class StudentServiceObjectPermissionProviderTest {
         relation.setOwnerUserId(9L);
         assertTrue(provider.hasPermission(10L, "read", 9L));
     }
+    @Test void batchTransferActionsPreserveOwnerDepartmentClosedAndReadAllBoundaries() {
+        var first=new ServiceRelationDO().setId(1L).setClassId(10L).setOwnerUserId(7L).setStatus("active").setTeachingDelivery(true);
+        var foreign=new ServiceRelationDO().setId(2L).setClassId(20L).setOwnerUserId(99L).setStatus("active").setTeachingDelivery(true);
+        var closed=new ServiceRelationDO().setId(3L).setClassId(10L).setOwnerUserId(7L).setStatus("active").setTeachingDelivery(true).setTeachingClosed(true);
+        when(permissionApi.hasAnyPermissions(7L,"zsjos:delivery-class:direct-transfer")).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(7L,"zsjos:class-transfer:create")).thenReturn(true);
+        when(deliveryClassScopeService.resolve(7L)).thenReturn(new DeliveryClassScopeService.Scope(false,Set.of(80L)));
+        when(deliveryClassMapper.selectByIds(List.of(10L,20L))).thenReturn(List.of(
+                new DeliveryClassDO().setId(10L).setDeptId(80L).setClassKind("NORMAL"),
+                new DeliveryClassDO().setId(20L).setDeptId(90L).setClassKind("NORMAL")));
+        var result=provider.transferActions(List.of(first,foreign,closed),7L);
+        org.junit.jupiter.api.Assertions.assertEquals(List.of("DIRECT_TRANSFER","REQUEST_TRANSFER"),result.get(1L));
+        assertTrue(result.get(2L).isEmpty());assertFalse(result.containsKey(3L));
+        org.mockito.Mockito.verify(deliveryClassMapper,org.mockito.Mockito.times(1)).selectByIds(org.mockito.ArgumentMatchers.anyCollection());
+        org.mockito.Mockito.verifyNoInteractions(relationMapper);
+        org.mockito.Mockito.verify(permissionApi,org.mockito.Mockito.never()).hasTenantReadAllAccess(org.mockito.ArgumentMatchers.anyLong());
+    }
+
 }

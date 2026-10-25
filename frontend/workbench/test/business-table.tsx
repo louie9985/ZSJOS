@@ -8,6 +8,7 @@ import { useTheme } from '../src/components/Theme/ThemeContext'
 import '../src/styles/index.css'
 
 const rows = Array.from({ length: 35 }, (_, index) => ({ id: index + 1, name: `验收记录${index + 1}`, enabled: false, amount: index }))
+const widthCheck = new URLSearchParams(location.search).has('width')
 function Fixture() {
   const theme = useTheme()
   const [keyword, setKeyword] = useState('')
@@ -29,6 +30,7 @@ function Fixture() {
       <span id="fixture-state">排序 {sorts} 刷新 {refreshes} 已选 {selection.length} 第 {page} 页 每页 {size}</span>
     </Space>
     <BusinessTable tableKey="fixture-main" rowKey="id" dataSource={status === 'empty' ? [] : data.slice((page - 1) * size, page * size)}
+      columnsState={widthCheck ? { defaultValue: { note: { show: false } }, persistenceKey: 'fixture-width-columns', persistenceType: 'localStorage' } : undefined}
       error={status === 'error' ? '测试网络错误' : undefined} unauthorized={status === 'denied'}
       onReload={() => { setRefreshes(value => value + 1); setStatus('ready') }}
       filters={<Input.Search aria-label="搜索记录" value={keyword} onChange={event => { setKeyword(event.target.value); setPage(1) }} />}
@@ -41,7 +43,11 @@ function Fixture() {
         { key: 'amount', title: '金额', dataIndex: 'amount', width: 220 },
         { key: 'note', title: '说明', width: 280, render: () => '这是一段用于验证单行省略和主题字号的较长说明文字' },
         { key: 'action', title: '操作', width: 100, render: () => <Button type="link">详细</Button> },
+        ...(widthCheck ? [{ key: 'internal', title: '不展示字段', width: 8000, hideInTable: true }] : []),
       ]} />
+    {widthCheck && [500, 1800].map(minimum => <BusinessTable key={minimum} tableKey={`fixture-numeric-${minimum}`} mode="compact" columnMode="native"
+      rowKey="id" dataSource={rows.slice(0, 1)} pagination={false} scroll={{ x: minimum }}
+      columns={[{ title: '分组', children: [{ key: 'name', title: '名称', dataIndex: 'name', width: 700 }, { key: 'amount', title: '金额', dataIndex: 'amount', width: 400 }] }]} />)}
     <BusinessTable tableKey="fixture-compact" mode="compact" columnMode="native" rowKey="id" dataSource={rows.slice(0, 1)} pagination={false}
       columns={[
         { key: 'bool', title: '原始布尔值', dataIndex: 'enabled', render: value => value ? '错误' : '正确：停用' },

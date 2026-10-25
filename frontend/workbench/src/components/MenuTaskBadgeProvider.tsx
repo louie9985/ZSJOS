@@ -1,3 +1,5 @@
+import { APP_ROUTES } from '../constants'
+import { BUSINESS_APPROVAL_PROCESS_KEYS } from '../services/approvalNavigation'
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, AuthenticationError, api, type MenuTaskSummary } from '../services/api'
 import { MENU_TASK_INVALIDATED_EVENT } from '../services/menuTaskRefresh'
@@ -7,13 +9,29 @@ import { useRealtime, useRealtimeEvent } from './RealtimeProvider'
 type ContextValue = { summary?: MenuTaskSummary; loading: boolean; error: string; refresh: () => Promise<void>; resolve: MenuTaskBadgeResolver }
 const Context = createContext<ContextValue | null>(null)
 
-export default function MenuTaskBadgeProvider({ children, enabled = true }: PropsWithChildren<{ enabled?: boolean }>) {
+export default function MenuTaskBadgeProvider({ children, enabled = true, bpmEnabled = false }: PropsWithChildren<{ enabled?: boolean; bpmEnabled?: boolean }>) {
   const { status } = useRealtime()
   const [summary, setSummary] = useState<MenuTaskSummary>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [bpmCount, setBpmCount] = useState<number>()
+  const bpmGeneration = useRef(0)
+  const refreshBpm = useCallback(async () => {
+    if (!enabled || !bpmEnabled) return
+    const request = ++bpmGeneration.current
+    try {
+      const result = await api.bpmTaskPage('todo', { pageNo: 1, pageSize: 1, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
+      if (request === bpmGeneration.current) setBpmCount(result.total)
+    } catch (error) {
+      if (request === bpmGeneration.current && (error instanceof AuthenticationError || (error instanceof ApiError && [401, 403].includes(error.code)))) setBpmCount(undefined)
+    }
+  }, [enabled, bpmEnabled])
+  useEffect(() => {
+    setBpmCount(undefined)
+    return () => { bpmGeneration.current++ }
+  }, [enabled, bpmEnabled])
   const generation = useRef(0)
-  const refresh = useCallback(async () => {
+  const refreshBusiness = useCallback(async () => {
     if (!enabled) return
     const request = ++generation.current
     setLoading(true)
@@ -30,6 +48,9 @@ export default function MenuTaskBadgeProvider({ children, enabled = true }: Prop
       if (request === generation.current) setLoading(false)
     }
   }, [enabled])
+  const refresh = useCallback(async () => {
+    await Promise.all([refreshBusiness(), refreshBpm()])
+  }, [refreshBusiness, refreshBpm])
   useEffect(() => {
     if (enabled) void refresh()
     else { setSummary(undefined); setLoading(false); setError('') }
@@ -54,7 +75,11 @@ export default function MenuTaskBadgeProvider({ children, enabled = true }: Prop
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [enabled, refresh, status])
-  const map = useMemo(() => buildMenuTaskBadgeMap(summary), [summary])
+  const map = useMemo(() => {
+    const result = buildMenuTaskBadgeMap(summary)
+    if (enabled && bpmEnabled && bpmCount !== undefined) result.set(APP_ROUTES.BPM_TODO, { count: bpmCount })
+    return result
+  }, [summary, bpmCount, enabled, bpmEnabled])
   const value = useMemo(() => ({ summary, loading, error, refresh, resolve: (path: string) => map.get(path) }), [error, loading, map, refresh, summary])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }

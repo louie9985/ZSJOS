@@ -40,6 +40,18 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                 .set(MediaAccountDO::getDeleteReviewerUserId,reviewer).set(MediaAccountDO::getDeleteReason,reason)
                 .set(MediaAccountDO::getDeleteStatus,"pending").set(MediaAccountDO::getRunStatus,"delete_pending").set(MediaAccountDO::getVersion,version+1));
     }
+    default int deleteDirectly(Long id, Integer version, Long director, String reason) {
+        return update(null, new LambdaUpdateWrapper<MediaAccountDO>()
+                .eq(MediaAccountDO::getId, id).eq(MediaAccountDO::getVersion, version)
+                .ne(MediaAccountDO::getRunStatus, "deleted").ne(MediaAccountDO::getRunStatus, "delete_pending")
+                .and(w -> w.isNull(MediaAccountDO::getDeleteStatus).or().ne(MediaAccountDO::getDeleteStatus, "pending"))
+                .set(MediaAccountDO::getDeleteProcessInstanceId, null)
+                .set(MediaAccountDO::getDeleteRequestedByUserId, director)
+                .set(MediaAccountDO::getDeleteReviewerUserId, director)
+                .set(MediaAccountDO::getDeleteReason, reason).set(MediaAccountDO::getDeleteResultReason, reason)
+                .set(MediaAccountDO::getDeleteStatus, "approved").set(MediaAccountDO::getRunStatus, "deleted")
+                .set(MediaAccountDO::getVersion, version + 1));
+    }
     default MediaAccountDO selectByDeleteProcessInstanceId(String processId) { return selectOne(new LambdaQueryWrapperX<MediaAccountDO>().eq(MediaAccountDO::getDeleteProcessInstanceId,processId)); }
     default int finishDelete(Long id, Integer version, String processId, String status, String reason) {
         return update(null, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId,id).eq(MediaAccountDO::getVersion,version)
@@ -84,7 +96,7 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                                     + "WHERE sr.id=zsjos_media_account.create_service_relation_id "
                                     + "AND sr.person_id=zsjos_media_account.student_person_id "
                                     + "AND sr.tenant_id=zsjos_media_account.tenant_id AND sr.tenant_id={0} AND sr.deleted=b'0' AND sr.status='active' "
-                                    + "AND sr.acceptance_status='accepted' "
+                                    + "AND (sr.media_ready=1 OR (sr.media_ready IS NULL AND sr.acceptance_status='accepted')) "
                                     + "AND (sr.content_director_user_id={1} OR sr.operator_user_id={1}))",
                             tenantId, userId));
         }
@@ -223,13 +235,13 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
             + "AND sr.person_id=p.id AND sr.deleted=b'0' "
             + "AND ((sr.owner_user_id=#{userId} AND sr.status IN ('active','paused','completed')) "
             + "OR ((sr.content_director_user_id=#{userId} OR sr.career_planner_user_id=#{userId} OR sr.operator_user_id=#{userId}) "
-            + "AND sr.status='active' AND sr.acceptance_status='accepted'))) ORDER BY p.id DESC LIMIT 100</script>")
+            + "AND sr.status='active' AND (sr.media_ready=1 OR (sr.media_ready IS NULL AND sr.acceptance_status='accepted'))))) ORDER BY p.id DESC LIMIT 100</script>")
     List<Long> selectVisibleStudentIds(@Param("userId") Long userId, @Param("keyword") String keyword,
                                        @Param("tenantId") Long tenantId);
 
     @Select("SELECT COUNT(1) FROM zsjos_media_account ma "
             + "JOIN zsjos_service_relation sr ON sr.person_id=ma.student_person_id "
-            + "AND sr.tenant_id=ma.tenant_id AND sr.deleted=b'0' AND sr.status='active' AND sr.acceptance_status='accepted' "
+            + "AND sr.tenant_id=ma.tenant_id AND sr.deleted=b'0' AND sr.status='active' AND (sr.media_ready=1 OR (sr.media_ready IS NULL AND sr.acceptance_status='accepted')) "
             + "JOIN zsjos_order o ON o.id=sr.order_id AND o.tenant_id=sr.tenant_id AND o.deleted=b'0' "
             + "WHERE (ma.director_user_id=#{userId} OR ma.owner_operator_user_id=#{userId}) "
             + "AND o.lead_id=#{leadId} AND ma.tenant_id=#{tenantId} AND ma.deleted=b'0'")
@@ -298,7 +310,8 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                 .set(MediaAccountDO::getRebindResultReason, reason)
                 .set(MediaAccountDO::getVersion, version + 1);
         if (studentPersonId != null) {
-            update.set(MediaAccountDO::getStudentPersonId, studentPersonId)
+            update.notIn(MediaAccountDO::getRunStatus, "deleted", "delete_pending")
+                    .set(MediaAccountDO::getStudentPersonId, studentPersonId)
                     .set(MediaAccountDO::getOwnershipType, "student");
         }
         return update(null, update);

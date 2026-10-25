@@ -1,0 +1,65 @@
+/* UTF-8. Shared by the registration dialog and the student overview drawer. */
+.student-info-panel { container-type: inline-size; min-width: 0; }
+.student-info-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--crm-sp-3);
+  padding-block: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-4);
+  background: var(--crm-bg-elevated);
+  border-bottom: 1px solid var(--crm-border);
+}
+.student-info-toolbar .ant-tag { margin: 0; }
+.student-info-layout { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--crm-sp-5); }
+.student-info-main { grid-column: span 9; min-width: 0; }
+.student-info-aside { grid-column: span 3; min-width: 0; }
+.student-info-section + .student-info-section { margin-top: var(--crm-sp-5); }
+.student-info-section > h4 {
+  margin: 0 0 var(--crm-sp-3);
+  padding: var(--crm-sp-2) var(--crm-sp-3);
+  border-inline-start: 3px solid var(--crm-color-primary);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-text);
+  font-size: var(--crm-font-base);
+  font-weight: 600;
+}
+.student-info-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--crm-sp-5); margin: 0; }
+.student-info-field {
+  display: grid;
+  grid-template-columns: minmax(80px, 32%) minmax(0, 1fr);
+  gap: var(--crm-sp-3);
+  min-width: 0;
+  padding-block: var(--crm-sp-3);
+  border-bottom: 1px solid var(--crm-border);
+}
+.student-info-field.is-wide { grid-column: 1 / -1; grid-template-columns: minmax(80px, 15%) minmax(0, 1fr); }
+.student-info-field dt { color: var(--crm-text-secondary); }
+.student-info-field dd { min-width: 0; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.student-info-field-note { margin-top: var(--crm-sp-1); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+.student-info-option {
+  max-width: 100%;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
+  font-size: var(--crm-font-base);
+  padding: var(--crm-sp-1) var(--crm-sp-2);
+}
+.student-info-attachments { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); gap: var(--crm-sp-3); }
+.student-info-attachment-name { overflow-wrap: anywhere; }
+.student-info-aside .student-info-fields { grid-template-columns: minmax(0, 1fr); }
+.student-info-aside .student-info-field { grid-template-columns: minmax(0, 1fr); gap: var(--crm-sp-1); }
+.student-info-loading { display: grid; place-items: center; min-height: 180px; }
+@container (max-width: 760px) {
+  .student-info-main,
+  .student-info-aside { grid-column: 1 / -1; }
+  .student-info-aside { grid-row: 1; }
+  .student-info-fields { grid-template-columns: minmax(0, 1fr); }
+  .student-info-field,
+  .student-info-field.is-wide { grid-template-columns: minmax(0, 1fr); gap: var(--crm-sp-1); }
+}

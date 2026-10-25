@@ -3,7 +3,7 @@ import type { TableProps } from 'antd'
 import { ProTable } from '@ant-design/pro-components'
 import type { ProColumns, ProTableProps } from '@ant-design/pro-components'
 import type { ReactNode } from 'react'
-import { columnKey, fromNativeColumns } from './columns'
+import { clampColumnWidth, columnKey, fromNativeColumns } from './columns'
 import { useColumnWidths } from './useColumnWidths'
 
 type BaseProps = {
@@ -40,7 +40,7 @@ export default function BusinessTable<T extends object>(props: BusinessTableProp
     return columns.map((column, index) => {
       const key = `${prefix}${columnKey(column, index)}`
       if (column.children) return { ...column, key, children: prepare(column.children, `${key}.`) }
-      const width = widths[key] ?? (typeof column.width === 'number' ? column.width : 160)
+      const width = clampColumnWidth(widths[key] ?? (typeof column.width === 'number' ? column.width : 160), column.minWidth)
       const isAction = column.key === 'action' || column.valueType === 'option'
       return {
         ...column, key, width,
@@ -48,7 +48,7 @@ export default function BusinessTable<T extends object>(props: BusinessTableProp
         ...(isAction ? { fixed: column.fixed ?? 'right', hideInSetting: true, className: [column.className, 'business-table-action-cell'].filter(Boolean).join(' ') } : {}),
         onHeaderCell: resizable && !isAction ? col => {
           const original = column.onHeaderCell?.(col) || {}
-          const resizeProps = headerProps(key, width)
+          const resizeProps = headerProps(key, width, column.minWidth)
           return {
             ...original, ...resizeProps,
             className: [original.className, resizeProps.className].filter(Boolean).join(' '),
@@ -62,9 +62,6 @@ export default function BusinessTable<T extends object>(props: BusinessTableProp
     })
   }
   const columns = prepare(sourceColumns)
-  function totalWidth(items: ProColumns<T>[]): number {
-    return items.reduce((sum, column) => sum + (column.children ? totalWidth(column.children) : Number(column.width)), 0)
-  }
   const selectedCount = props.rowSelection && props.rowSelection.selectedRowKeys?.length || 0
   const toolbar = filters || actions || batchActions ? () => [
     <div className="business-table-toolbar" key="business-toolbar">
@@ -89,7 +86,8 @@ export default function BusinessTable<T extends object>(props: BusinessTableProp
         toolBarRender={mode === 'compact' && !toolbar ? false : toolbar}
         columnsState={proProps.columnsState || (mode === 'full' ? { persistenceKey: `crm-table:${tableKey}:columns`, persistenceType: 'localStorage' } : undefined)}
         pagination={pagination === false ? false : { defaultPageSize: 20, showSizeChanger: pagination?.current === undefined, pageSizeOptions: [20, 50, 100], ...pagination }}
-        scroll={{ ...scroll, x: Math.max(totalWidth(columns) + (props.rowSelection ? 48 : 0), typeof scroll?.x === 'number' ? scroll.x : 0) }}
+        // ProTable applies column visibility after this boundary; hidden columns must not reserve space.
+        scroll={{ x: 'max-content', ...scroll }}
         sticky={{ offsetHeader: 0 }}
         locale={{ ...locale, emptyText: error ? '数据加载失败，请重试' : locale?.emptyText ?? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={emptyText} /> }}
         tableAlertRender={false}

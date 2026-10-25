@@ -33,7 +33,8 @@ function choose(event: Event, side: string, max: number) {
   if (files.length > available) showToast(`此处最多 ${max} 个附件`)
   for (const file of files.slice(0, available)) {
     if (!(props.field.allowedExtensions || ['jpg', 'jpeg', 'png']).includes(file.name.split('.').pop()?.toLowerCase() || '')) { showToast('附件格式不符合此字段要求'); continue }
-    if (file.size > (props.field.maxSizeMb || 10) * 1024 * 1024) { showToast(`单个不能超过 ${props.field.maxSizeMb || 10}MB`); continue }
+    if (file.size === 0) { showToast('文件为空，请保存有效内容后重新上传'); continue }
+    if (file.size > (props.field.maxSizeMb || 100) * 1024 * 1024) { showToast(`单个附件不能超过 ${props.field.maxSizeMb || 100}MB`); continue }
     const item: Pending = { uid: createIdempotencyKey(), file, side, status: 'uploading', progress: 0 }; pending.value.push(item); void send(pending.value[pending.value.length - 1])
   }
 }
@@ -46,7 +47,7 @@ async function remove(image: CollectionImage) {
 function discard(uid: string) { pending.value = pending.value.filter(x => x.uid !== uid); status() }
 watch(() => props.images, async images => {
   const current = generation
-  for (const image of images) if (!urls.value[image.id]) {
+  for (const image of images) if (image.contentType.startsWith('image/') && !urls.value[image.id]) {
     try { const url = await collectionApi.image(props.token, image); if (current === generation) urls.value[image.id] = url; else URL.revokeObjectURL(url) } catch { /* attachment metadata remains visible with a retry action */ }
   }
 }, { immediate: true, deep: true })
@@ -61,8 +62,8 @@ onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revo
     <div v-for="slot in slots()" :key="slot.side" class="collection-images__slot norem">
       <span v-if="slot.side" class="collection-images__caption norem">{{ slot.label }}</span>
       <div class="collection-images__list norem">
-        <div v-for="image in sideImages(slot.side)" :key="image.id" class="collection-images__item norem">
-          <button type="button" class="collection-images__preview norem" :aria-label="`预览${field.label}${slot.side ? slot.label : ''}`" @click="preview(image)"><img v-if="urls[image.id] && image.contentType.startsWith('image/')" :src="urls[image.id]" :alt="field.label + slot.label"><span v-else>{{ image.contentType.startsWith('image/') ? '查看图片' : image.name }}</span></button>
+        <div v-for="image in sideImages(slot.side)" :key="image.id" class="collection-images__item norem" :class="{ 'collection-images__document': !image.contentType.startsWith('image/') }">
+          <button type="button" class="collection-images__preview norem" :aria-label="`预览${field.label}${slot.side ? slot.label : ''}`" :title="image.name" @click="preview(image)"><img v-if="urls[image.id] && image.contentType.startsWith('image/')" :src="urls[image.id]" :alt="field.label + slot.label"><span v-else-if="image.contentType.startsWith('image/')">查看图片</span><template v-else><svg class="collection-images__file-icon norem" :class="{ 'collection-images__file-icon-word': image.contentType !== 'application/pdf' }" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path d="M18 4h25l11 11v45H18Z" fill="white" stroke="#aebac8" stroke-linejoin="round"/><path d="M43 4v11h11" fill="#e8edf3" stroke="#aebac8" stroke-linejoin="round"/><path d="M26 45h20m-20 5h20m-20 5h14" stroke="#d4dce6" stroke-width="2"/><rect x="4" y="20" width="34" height="26" rx="3" fill="currentColor"/><text x="21" y="38" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-weight="700" :font-size="image.contentType === 'application/pdf' ? 11 : 18">{{ image.contentType === 'application/pdf' ? 'PDF' : 'W' }}</text></svg><span class="collection-images__file-name norem">{{ image.name }}</span></template></button>
           <button type="button" class="collection-images__delete norem" :disabled="disabled || deleting" :aria-label="`删除${field.label}${slot.label}`" @click="remove(image)">×</button>
         </div>
         <div v-for="item in pending.filter(x => x.side === slot.side)" :key="item.uid" class="collection-images__pending norem">
@@ -72,10 +73,16 @@ onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revo
         <label v-if="canAdd(slot.side, slot.max)" class="collection-images__add norem" :class="{ inactive: disabled }"><van-icon name="plus" size="24"/><span>{{ sideImages(slot.side).length }}/{{ slot.max }}</span><input type="file" :accept="(field.allowedExtensions || ['jpg','jpeg','png']).map(e => '.' + e).join(',')" :multiple="slot.max > 1" :disabled="disabled" :aria-label="`${field.label}${slot.side ? slot.label : '添加附件'}`" @change="choose($event, slot.side, slot.max)"></label>
       </div>
     </div>
-    <p class="collection-images__hint norem">支持 {{ (field.allowedExtensions || ['jpg','jpeg','png']).join('/').toUpperCase() }}，单个不超过 {{ field.maxSizeMb || 10 }}MB</p>
+    <p class="collection-images__hint norem">支持 {{ (field.allowedExtensions || ['jpg','jpeg','png']).join('/').toUpperCase() }}，单个不超过 {{ field.maxSizeMb || 100 }}MB</p>
   </div>
 </template>
 <style scoped>
+.collection-images__item.collection-images__document.norem { width: 96px; height: auto; min-height: 104px; max-width: 100%; background: transparent; }
+.collection-images__document.norem .collection-images__preview.norem { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; min-height: 104px; padding: 4px; text-align: center; font-size: 12px; box-sizing: border-box; cursor: pointer; }
+.collection-images__document.norem .collection-images__preview.norem:hover { background: var(--h5-glass-sunken); }
+.collection-images__file-icon.norem { display: block; flex-shrink: 0; width: 56px; height: 56px; color: #dc2626; }
+.collection-images__file-icon-word.norem { color: #2563eb; }
+.collection-images__file-name.norem { display: -webkit-box; max-width: 100%; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
 /* The teleported image viewer must remain transparent over its own dark overlay. */
 :global(.collection-image-preview.norem.van-popup){border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
 .collection-images__list.norem{display:flex;flex-wrap:wrap;gap:8px}.collection-images__slot.norem{margin-top:8px}.collection-images__caption.norem,.collection-images__hint.norem{font-size:12px;color:var(--h5-text-secondary)}.collection-images__item.norem,.collection-images__add.norem{width:80px;height:80px;position:relative;border-radius:8px;background:var(--h5-glass-sunken);flex-shrink:0}.collection-images__preview.norem{width:100%;height:100%;border:0;background:transparent;padding:0;border-radius:8px;overflow:hidden;color:var(--h5-text-secondary)}.collection-images__preview img{width:100%;height:100%;object-fit:cover}.collection-images__delete.norem{position:absolute;right:-4px;top:-4px;min-width:28px;min-height:28px;border:0;border-radius:50%;background:var(--h5-text-primary);color:var(--h5-card-bg)}.collection-images__add.norem{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--h5-text-placeholder);font-size:12px;overflow:hidden}.collection-images__add input{position:absolute;inset:0;opacity:0;width:100%;height:100%}.collection-images__add.inactive{opacity:.5}.collection-images__pending.norem{max-width:180px;min-height:80px;padding:8px;background:var(--h5-primary-opacity);border-radius:8px;color:var(--h5-text-secondary);overflow-wrap:anywhere;font-size:12px}.collection-images__pending button{margin:6px;border:0;background:transparent;color:var(--h5-primary)}

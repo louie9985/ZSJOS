@@ -1,4 +1,5 @@
 import ContentReviewAccountPreview from './ContentReviewAccountPreview'
+import ContentReviewDraftReviewerField from './ContentReviewDraftReviewerField'
 import { httpsLinkError, plannedTimeError } from '../services/contentReviewErrors'
 import { restoreDraftReferences } from '../services/contentReviewDraft'
 import ContentReviewAttachments from './ContentReviewAttachments'
@@ -103,6 +104,7 @@ export default function ContentApprovalDraft({
   ]))
   return <Space direction="vertical" size="middle" style={{ width: '100%' }}>
     <Alert type="info" showIcon message="内容将同步适用于所选账号" description="账号资料只保存为本次审批快照；作品会按当前列表逐件提交和审批。" />
+    <ContentReviewDraftReviewerField batchId={batchId} studentPersonId={studentPersonId} disabled={disabled} />
     {!optionsLoading && (!purposeOptions.length || !formatOptions.length) && <Alert type="warning" showIcon message="作品目的或作品形式暂无可用选项；已有历史选项可保留，新选择请联系管理员配置" action={onReloadOptions && <Button disabled={disabled} onClick={onReloadOptions}>重新加载</Button>} />}
     <Form.Item name="accountIds" label="发布账号" rules={[{ required: true, type: 'array', min: 1, max: 20, message: '请选择 1 至 20 个发布账号' }]}>
       <Select maxCount={20} disabled={disabled || lockAccounts} mode="multiple" allowClear showSearch optionFilterProp="label" options={accounts.map(account => ({ value: account.id, label: `${accountLabel(account)} · ${account.platformLabel || '平台未记录'}` }))} placeholder="选择一个或多个账号" />

@@ -41,6 +41,7 @@ public class MyStudentRespVO {
         private List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ProductSpecVO> specs;
         private String productSnapshot;
         private String status;
+        private Boolean teachingClosed;
         private LocalDateTime activatedAt;
         private String acceptanceStatus;
         private LocalDateTime acceptedAt;

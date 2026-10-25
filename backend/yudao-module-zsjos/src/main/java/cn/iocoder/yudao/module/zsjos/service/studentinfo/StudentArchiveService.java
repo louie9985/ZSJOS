@@ -59,16 +59,16 @@ public class StudentArchiveService {
 
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
     public Detail detail(Long relationId, boolean sensitive) {
-        if (sensitive && !permitted(SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        if (sensitive && !permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         var relation = relations.selectById(relationId);
         var form = form(relationId);
         var result = new Detail();
         result.setPersonId(relation.getPersonId()); result.setServiceRelationId(relationId);
         result.setRegistrationCaseId(relation.getRegistrationCaseId()); result.setOrderItemId(relation.getOrderItemId());
-        result.setCanMaintain(permitted(ARCHIVE_UPDATE) && form != null && "SUBMITTED".equals(form.getStatus()));
+        result.setCanMaintain(permitted(ARCHIVE_UPDATE) && !cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation) && form != null && "SUBMITTED".equals(form.getStatus()));
         var information = new StudentInfoVO.Detail(); result.setInformation(information); result.setRevision(0);
         information.setStatus(form == null ? "NONE" : form.getStatus());
-        information.setCanReadSensitive(permitted(SENSITIVE)); information.setCanExport(permitted(EXPORT));
+        information.setCanReadSensitive(permitted(ARCHIVE_SENSITIVE)); information.setCanExport(permitted(ARCHIVE_EXPORT));
         if (form == null) return result;
         var config = configs.selectById(form.getConfigVersionId());
         information.setConfigVersion(config == null ? null : config.getVersionNo());
@@ -105,7 +105,7 @@ public class StudentArchiveService {
         Map<String,Object> raw = new LinkedHashMap<>();
         for (var answer : content(form, latest)) {
             var definition = collection.definitions(form).stream().filter(f -> f.getKey().equals(answer.getFieldKey())).findFirst().orElseThrow();
-            if (Boolean.TRUE.equals(answer.getSensitive()) && !permitted(SENSITIVE)) continue;
+            if (Boolean.TRUE.equals(answer.getSensitive()) && !permitted(ARCHIVE_SENSITIVE)) continue;
             raw.put(answer.getFieldKey(), "dict".equals(definition.getType()) ? answer.getValueCode()
                     : "area".equals(definition.getType()) ? Arrays.stream(answer.getAreaCodePath().split("/")).map(Integer::valueOf).toList() : answer.getValueText());
         }
@@ -121,6 +121,7 @@ public class StudentArchiveService {
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="update")
     @Transactional(rollbackFor=Exception.class)
     public Integer save(Long relationId, Save request) {
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relations.selectByIdForUpdate(relationId,cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
         var form = forms.lock(submitted(relationId).getId());
         String fingerprint = cn.hutool.crypto.digest.DigestUtil.sha256Hex(JsonUtils.toJsonString(request));
         var previous = revisions.byKey(request.getIdempotencyKey());
@@ -139,7 +140,7 @@ public class StudentArchiveService {
         if (changes.isEmpty()) throw exception(FIELD_INVALID, "请至少修改一项档案内容");
         for (String key : changes.keySet()) {
             var field = definitions.stream().filter(f -> key.equals(f.getKey()) && f.getEnabled()).findFirst().orElseThrow(() -> exception(FIELD_INVALID, key));
-            if ((Boolean.TRUE.equals(field.getSensitive()) || "images".equals(field.getType())) && !permitted(SENSITIVE))
+            if ((Boolean.TRUE.equals(field.getSensitive()) || "images".equals(field.getType())) && !permitted(ARCHIVE_SENSITIVE))
                 throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
             if (Set.of("age","gender").contains(key) && !changes.containsKey("id_card")) throw exception(FIELD_INVALID, field.getLabel());
         }
@@ -167,7 +168,7 @@ public class StudentArchiveService {
         }
         images.validateArchive(form, definitions, new ArrayList<>(selected));
         var row = new StudentArchiveRevisionDO(); row.setFormId(form.getId()); row.setPersonId(form.getPersonId()); row.setRevision(current+1);
-        row.setOperatorUserId(getLoginUserId()); row.setReason(request.getReason());
+        row.setOperatorUserId(getLoginUserId()); row.setReason(Objects.requireNonNullElse(request.getReason(), ""));
         row.setIdempotencyKey(request.getIdempotencyKey()); row.setRequestHash(fingerprint);
         row.setAnswersJson(JsonUtils.toJsonString(new ArrayList<>(merged.values()))); row.setImageIdsJson(JsonUtils.toJsonString(selected));
         row.setTenantId(form.getTenantId()); revisions.insert(row); return row.getRevision();
@@ -175,19 +176,20 @@ public class StudentArchiveService {
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="update")
     @Transactional(rollbackFor=Exception.class)
     public StudentInfoVO.Image upload(Long relationId, String fieldKey, String side, MultipartFile file) {
-        if (!permitted(SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relations.selectByIdForUpdate(relationId,cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
+        if (!permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         return images.archiveUpload(forms.lock(submitted(relationId).getId()), fieldKey, side, file);
     }
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
     public byte[] image(Long relationId, Long imageId) {
-        if (!permitted(SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        if (!permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         var form = submitted(relationId); var image = imageMapper.selectById(imageId);
         if (image == null || !Objects.equals(image.getFormId(),form.getId())) throw exception(LINK_INVALID);
         return images.archiveRead(form.getId(), imageId);
     }
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
     public Detail export(Long relationId) {
-        if (!permitted(EXPORT)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
-        return detail(relationId,permitted(SENSITIVE));
+        if (!permitted(ARCHIVE_EXPORT)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        return detail(relationId,permitted(ARCHIVE_SENSITIVE));
     }
 }

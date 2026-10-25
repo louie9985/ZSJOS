@@ -21,7 +21,7 @@ public class StudentArchiveController {
     @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentArchiveExtraService extra;
     @GetMapping("/export")
     @ApiAccessLog(requestEnable=false, responseEnable=false)
-    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-info-form:export')")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:export')")
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
     public void export(@PathVariable Long relationId,HttpServletResponse response) throws java.io.IOException {
         var info=service.export(relationId).getInformation();
@@ -54,7 +54,7 @@ public class StudentArchiveController {
     public CommonResult<Detail> detail(@PathVariable Long relationId) { return success(service.detail(relationId,false)); }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @GetMapping("/sensitive")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:sensitive-read')")
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
     public CommonResult<Detail> sensitive(@PathVariable Long relationId) { return success(service.detail(relationId,true)); }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
@@ -67,12 +67,12 @@ public class StudentArchiveController {
     public CommonResult<Integer> save(@PathVariable Long relationId,@Valid @RequestBody Save request) { return success(service.save(relationId,request)); }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @PostMapping("/images")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:update') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:update') && @ss.hasPermission('zsjos:student-archive:sensitive-read')")
     public CommonResult<StudentInfoVO.Image> upload(@PathVariable Long relationId,@RequestParam String fieldKey,
             @RequestParam(defaultValue="") String side,@RequestParam MultipartFile file) { return success(service.upload(relationId,fieldKey,side,file)); }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @GetMapping("/images/{imageId}")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:sensitive-read')")
     public byte[] image(@PathVariable Long relationId,@PathVariable Long imageId,HttpServletResponse response) {
         response.setHeader("Cache-Control","no-store"); response.setHeader("X-Content-Type-Options","nosniff");
         response.setContentType("application/octet-stream"); return service.image(relationId,imageId);

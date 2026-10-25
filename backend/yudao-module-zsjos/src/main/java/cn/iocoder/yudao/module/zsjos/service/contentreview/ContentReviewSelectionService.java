@@ -6,6 +6,10 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewSubmitContextRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.contentreview.ContentReviewBatchMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.zsjos.service.registration.MyStudentService;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -26,6 +30,35 @@ public class ContentReviewSelectionService {
     @Resource private BpmDefinitionReadApi definitionApi;
     @Resource private AdminUserApi userApi;
     @Resource private PermissionApi permissionApi;
+    @Resource private MyStudentService myStudentService;
+    @Resource private MediaAccountMapper accountMapper;
+    @Resource private ContentReviewObjectPermissionProvider reviewPermissionProvider;
+
+    @ZsjosPermission(bizType="content-review-batch", bizId="#batchId", action="submit")
+    public ContentReviewSubmitContextRespVO formBatchContext(Long batchId, Long userId) {
+        reviewPermissionProvider.check(batchId, "submit", userId);
+        var batch = batchMapper.selectById(batchId);
+        if (batch == null || !Objects.equals(batch.getOperatorUserId(), userId)
+                || !Objects.equals(batch.getTenantId(), TenantContextHolder.getTenantId())
+                || !List.of("DRAFT", "NEED_MODIFY", "REJECTED").contains(batch.getStatus()))
+            throw exception(CONTENT_REVIEW_PERMISSION_DENIED);
+        var result = candidates(userId);
+        // A saved draft with no selection may have been explicitly cleared; never refill it from history.
+        if (!"DRAFT".equals(batch.getStatus())) result.setPreviousDirectorUserId(batch.getDirectorUserId());
+        return result;
+    }
+
+    public ContentReviewSubmitContextRespVO formStudentContext(Long studentPersonId, Long userId) {
+        if (studentPersonId == null) throw exception(CONTENT_REVIEW_PERMISSION_DENIED);
+        myStudentService.getMediaStudent(userId, studentPersonId);
+        // Read visibility alone is insufficient: creation requires an account owned by this operator.
+        if (!accountMapper.exists(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MediaAccountDO>()
+                .eq(MediaAccountDO::getStudentPersonId, studentPersonId)
+                .eq(MediaAccountDO::getOwnerOperatorUserId, userId)
+                .eq(MediaAccountDO::getTenantId, TenantContextHolder.getRequiredTenantId())))
+            throw exception(CONTENT_REVIEW_PERMISSION_DENIED);
+        return candidates(userId);
+    }
 
     public boolean hasReadPermissions(Long userId) {
         return READ_PERMISSIONS.stream().allMatch(p -> permissionApi.hasAnyPermissions(userId, p));
@@ -36,6 +69,19 @@ public class ContentReviewSelectionService {
         var batch = batchMapper.selectById(batchId);
         if (batch == null || !Objects.equals(batch.getOperatorUserId(), userId)
                 || !"DRAFT".equals(batch.getStatus())) throw exception(CONTENT_REVIEW_PERMISSION_DENIED);
+        var result = candidates(userId);
+        setPreviousDirector(result, batch.getRevisionOfBatchId());
+        return result;
+    }
+
+    private void setPreviousDirector(ContentReviewSubmitContextRespVO result, Long previousId) {
+        if (previousId == null) return;
+        var previous = batchMapper.selectById(previousId);
+        if (previous != null && Objects.equals(previous.getTenantId(), TenantContextHolder.getTenantId()))
+            result.setPreviousDirectorUserId(previous.getDirectorUserId());
+    }
+
+    private ContentReviewSubmitContextRespVO candidates(Long userId) {
         var definition = configService.requireCurrentDefinition(configService.requireReadyConfig(userId));
         var keys = configService.requireReviewTaskKeys(definition);
         var scope = definitionApi.getStarterSelectionScope(definition.getId(), keys.director());
@@ -48,10 +94,6 @@ public class ContentReviewSelectionService {
                 .filter(u -> scope.getUserIds().contains(u.getId()) && !Objects.equals(u.getId(), userId)
                         && cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.isEnable(u.getStatus()) && hasReadPermissions(u.getId()))
                 .map(u -> new ContentReviewSubmitContextRespVO.Candidate(u.getId(), u.getNickname())).toList());
-        if (batch.getRevisionOfBatchId() != null) {
-            var previous = batchMapper.selectById(batch.getRevisionOfBatchId());
-            if (previous != null) result.setPreviousDirectorUserId(previous.getDirectorUserId());
-        }
         return result;
     }
 }

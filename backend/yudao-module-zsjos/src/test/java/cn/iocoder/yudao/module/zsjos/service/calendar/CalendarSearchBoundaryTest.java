@@ -17,6 +17,20 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class CalendarSearchBoundaryTest {
+    @Test void leadSearchDefaultsToSubmissionWhileOtherCalendarsKeepNearest() throws Exception {
+        var req = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.calendar.LeadCalendarSearchReqVO();
+        assertEquals("desc", req.getSort());
+        assertEquals("nearest", new cn.iocoder.yudao.module.zsjos.controller.admin.calendar.vo.CalendarSearchReqVO().getSort());
+        String sql = cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadCalendarSearchSql.page(java.util.Map.of("req", req));
+        assertTrue(sql.contains("l.submitted_at AS submittedAt"), sql);
+        assertTrue(sql.contains("GROUP BY l.id,l.lead_category,l.submitted_at"), sql);
+        assertTrue(sql.contains("ORDER BY submittedAt DESC, id DESC LIMIT"), sql);
+        req.setSort("asc");
+        assertTrue(cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadCalendarSearchSql.page(java.util.Map.of("req", req)).contains("ORDER BY submittedAt ASC, id DESC"));
+        req.setSort("nearest");
+        assertFalse(cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadCalendarSearchSql.page(java.util.Map.of("req", req)).contains("ORDER BY submittedAt"));
+        assertTrue(cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadCalendarSearchSql.due().contains("l.submitted_at AS submittedAt"));
+    }
     @Test void validatesBlankOversizedKeywordPageAndDateRange() {
         try(var factory=Validation.buildDefaultValidatorFactory()) {
             var validator=factory.getValidator();

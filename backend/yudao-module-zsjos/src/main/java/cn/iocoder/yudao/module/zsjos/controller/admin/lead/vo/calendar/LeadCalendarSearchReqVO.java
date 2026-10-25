@@ -7,6 +7,7 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class LeadCalendarSearchReqVO extends CalendarSearchReqVO {
+    public LeadCalendarSearchReqVO() { setSort("desc"); }
 
 }
 

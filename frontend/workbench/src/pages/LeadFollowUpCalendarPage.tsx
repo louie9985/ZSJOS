@@ -28,8 +28,8 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
   const [loading, setLoading] = useState(false), [error, setError] = useState('')
   const [cards, setCards] = useState<CalendarCard[]>([]), [total, setTotal] = useState(0)
   const [cardLoading, setCardLoading] = useState(false), [cardError, setCardError] = useState('')
-  const [page, setPage] = useState(1), [sort, setSort] = useState<CalendarSort>('deadline')
-  const [direction, setDirection] = useState<CalendarDirection>('asc')
+  const [page, setPage] = useState(1), [sort, setSort] = useState<CalendarSort>('submittedAt')
+  const [direction, setDirection] = useState<CalendarDirection>('desc')
   const [revision, setRevision] = useState(0)
   const [detail, setDetail] = useState<ManagedLead>(), [followUp, setFollowUp] = useState<ManagedLead>()
   const [detailLoading, setDetailLoading] = useState(false), [detailError, setDetailError] = useState('')
@@ -85,7 +85,7 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
 
   if (!canView) return <Alert type="warning" showIcon title="无权查看销售客资跟进日历，请联系管理员配置权限" />
   return <section className="workspace-page lead-calendar-page">
-    <div className="page-heading"><div><Typography.Title level={4}>销售客资跟进日历</Typography.Title><Typography.Text type="secondary">我的待跟进客资 · 按跟进截止日期展示</Typography.Text></div><Space><CalendarSearch scopeLabel="本人未完成的跟进待办" search={calendarSearchApi.lead} present={searchPresentation.lead} onLocate={async (row, signal) => {
+    <div className="page-heading"><div><Typography.Title level={4}>销售客资跟进日历</Typography.Title><Typography.Text type="secondary">我的待跟进客资 · 按跟进截止日期展示</Typography.Text></div><Space><CalendarSearch defaultSort="desc" dateSortLabel="客资提交时间" scopeLabel="本人未完成的跟进待办" search={calendarSearchApi.lead} present={searchPresentation.lead} onLocate={async (row, signal) => {
       const item = searchPresentation.lead(row); const date = dayjs(item.start)
       const fresh = await findCalendarPage(pageNo => leadCalendarApi.cards({ start: item.start, end: date.add(1, 'day').format('YYYY-MM-DD'), pageNo, pageSize: 24, sort, direction }, signal), card => card.lead.id === row.lead.id, signal)
       setHighlightedId(row.lead.id); setAnchor(date); setDay(date); setPage(fresh.pageNo); setCards(fresh.list); setTotal(fresh.total); setRevision(value => value + 1)
@@ -109,8 +109,8 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
     <Modal title={`${day?.format('YYYY年M月D日')} · 待跟进客资`} open={Boolean(day)} onCancel={() => setDay(undefined)} footer={null}
       mask={{ closable: false }} width="min(1440px, calc(100vw - 32px))" destroyOnHidden className="lead-calendar-modal">
       <div className="lead-calendar-toolbar"><Typography.Text type="secondary">共 {total} 个客资</Typography.Text><Space wrap>
-        <Select aria-label="客资排序字段" value={sort} options={[{ value: 'deadline', label: '跟进截止时间' }, { value: 'category', label: '客资分类等级' }, { value: 'ownershipStartedAt', label: '归属开始时间' }]} onChange={value => { setSort(value); setPage(1) }} />
-        <Select aria-label="排序方向" value={direction} options={[{ value: 'asc', label: sort === 'category' ? 'S级优先' : '最早优先' }, { value: 'desc', label: sort === 'ownershipStartedAt' ? '最新优先' : '倒序' }]} onChange={value => { setDirection(value); setPage(1) }} />
+        <Select aria-label="客资排序字段" value={sort} options={[{ value: 'submittedAt', label: '客资提交时间' }, { value: 'deadline', label: '跟进截止时间' }, { value: 'category', label: '客资分类等级' }, { value: 'ownershipStartedAt', label: '归属开始时间' }]} onChange={value => { setSort(value); setPage(1) }} />
+        <Select aria-label="排序方向" value={direction} options={[{ value: 'asc', label: sort === 'category' ? 'S级优先' : '最早优先' }, { value: 'desc', label: (sort === 'ownershipStartedAt' || sort === 'submittedAt') ? '最新优先' : '倒序' }]} onChange={value => { setDirection(value); setPage(1) }} />
         <Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button>
       </Space></div>
       {cardError ? <Alert type="error" showIcon title={cardError} action={<Button onClick={refresh}>重试</Button>} /> : <Spin spinning={cardLoading}>

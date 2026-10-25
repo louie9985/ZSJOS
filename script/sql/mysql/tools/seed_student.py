@@ -178,7 +178,7 @@ def ensure_chain(cur, person_id, name, mobile, director_id, operator_id, tenant_
 
     class_id = None
     if teaching_delivery:
-        cur.execute("SELECT id FROM zsjos_delivery_class WHERE tenant_id=%s AND system_class=b'1' AND deleted=b'0'", (tenant_id,))
+        cur.execute("SELECT id FROM zsjos_delivery_class WHERE tenant_id=%s AND system_class=b'1' AND class_kind='PENDING' AND deleted=b'0'", (tenant_id,))
         pending_classes = cur.fetchall()
         if len(pending_classes) != 1:
             raise SeedError("教学交付需要唯一有效的系统待分班")

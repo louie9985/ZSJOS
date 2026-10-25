@@ -23,6 +23,7 @@ public class ContentReviewBatchRespVO {
     private Boolean canReadStudentForReview;
     private Map<String, Object> relationSnapshot;
     private Map<String, Object> contextSnapshot;
+    private ContentReviewDraftReviewerSelectionVO draftReviewerSelection;
     private String status;
     private String currentStage;
     private String processDefinitionId;

@@ -69,32 +69,69 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Resource private PersonMapper personMapper;
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private DeliveryClassNotifyPublisher notifyPublisher;
+    @Resource private DeliveryClassObjectPermissionProvider objectPermissions;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceObjectPermissionProvider studentPermissions;
 
     @Override
     public PageResult<DeliveryClassRespVO> getManagedPage(Long userId, DeliveryClassPageReqVO req) {
+        if (Boolean.TRUE.equals(req.getCommandTargetsOnly())) req.setAssignableOnly(true);
         ReadScope scope = resolveReadScope(userId, req, true);
-        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
-        return toPageResult(page);
+        PageResult<DeliveryClassDO> page = Boolean.TRUE.equals(req.getAssignableOnly())
+                ? mapper.selectPage(req, scopedQuery(userId, req, true))
+                : mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
+        return toPageResult(page, userId);
     }
 
     @Override
     public PageResult<DeliveryClassRespVO> getMyPage(Long userId, DeliveryClassPageReqVO req) {
         ReadScope scope = resolveReadScope(userId, req, false);
-        PageResult<DeliveryClassDO> page = mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
-        return toPageResult(page);
+        PageResult<DeliveryClassDO> page = Boolean.TRUE.equals(req.getAssignableOnly())
+                ? mapper.selectPage(req, scopedQuery(userId, req, false))
+                : mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
+        return toPageResult(page, userId);
     }
 
     private record ReadScope(Set<Long> departments, Long subject, boolean all, boolean system) {}
 
+    LambdaQueryWrapperX<DeliveryClassDO> scopedQuery(Long userId, DeliveryClassPageReqVO req, boolean managed) {
+        ReadScope scope = resolveReadScope(userId, req, managed);
+        var query = mapper.classQuery(req, scope.departments(), scope.subject(), scope.all(), scope.system());
+        if (Boolean.TRUE.equals(req.getAssignableOnly())) {
+            var role = roleApi.getRoleByCode("study_planner");
+            List<Long> eligible = List.of();
+            if (role != null && Objects.equals(role.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
+                var ids = permissionApi.getUserRoleIdListByRoleIds(Set.of(role.getId()));
+                if (!ids.isEmpty()) eligible = adminUserApi.getUserList(ids).stream()
+                        .filter(u -> Objects.equals(u.getStatus(), CommonStatusEnum.ENABLE.getStatus()))
+                        .map(AdminUserRespDTO::getId).toList();
+            }
+            if (eligible.isEmpty()) query.ne(DeliveryClassDO::getClassKind, DeliveryClassKind.UNSCHEDULED);
+            else {
+                List<Long> owners = eligible;
+                query.and(q -> q.ne(DeliveryClassDO::getClassKind, DeliveryClassKind.UNSCHEDULED)
+                        .or().in(DeliveryClassDO::getHomeroomUserId, owners));
+            }
+        }
+        return query;
+    }
+
     private ReadScope resolveReadScope(Long userId, DeliveryClassPageReqVO req, boolean managed) {
+        if (Boolean.TRUE.equals(req.getCommandTargetsOnly())) {
+            if (!managed || !permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:direct-transfer"))
+                throw exception(DELIVERY_CLASS_PERMISSION_DENIED);
+            var commandScope = scopeService.resolve(userId);
+            return new ReadScope(commandScope.deptIds(), null, commandScope.allDepartments(), false);
+        }
         if (!managed || req.getReadScope() != null || req.getTargetUserId() != null) {
             Long subject = req.getReadScope() != null || req.getTargetUserId() != null
                     ? readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), userId) : userId;
             return new ReadScope(Set.of(), subject, subject == null, subject == null);
         }
-        DeliveryClassScopeService.Scope scope = permissionApi.hasTenantReadAllAccess(userId)
+        boolean readAll = permissionApi.hasTenantReadAllAccess(userId)
+                || permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_ALL);
+        DeliveryClassScopeService.Scope scope = readAll
                 ? new DeliveryClassScopeService.Scope(true, Set.of()) : scopeService.resolveRead(userId);
-        boolean pending = permissionApi.hasTenantReadAllAccess(userId)
+        boolean pending = readAll
                 || permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_MANAGED);
         return new ReadScope(scope.deptIds(), scope.allDepartments() ? null : userId, scope.allDepartments(), pending);
     }
@@ -110,7 +147,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         Map<Long, DeliveryClassFilterContextRespVO.Homeroom> homerooms = new LinkedHashMap<>();
         DeliveryClassRespVO pending = null;
         for (DeliveryClassDO row : rows) {
-            if (Boolean.TRUE.equals(row.getSystemClass())) { pending = toVO(row); continue; }
+            if (DeliveryClassKind.pending(row)) { pending = toVO(row); continue; }
             byClass.getOrDefault(row.getId(), List.of()).forEach(project -> projects.putIfAbsent(project.id(), project));
             if (row.getHomeroomUserId() != null) homerooms.putIfAbsent(row.getHomeroomUserId(),
                     new DeliveryClassFilterContextRespVO.Homeroom(row.getHomeroomUserId(),
@@ -124,9 +161,14 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     @Override
     @ZsjosPermission(bizType = BIZ_TYPE, bizId = "#id", action = "read")
-    public DeliveryClassRespVO get(Long id, Long userId) { return toVO(require(id)); }
+    public DeliveryClassRespVO get(Long id, Long userId) {
+        var row = require(id);
+        var result = toVO(row);
+        result.setAvailableActions(availableActions(row, userId));
+        return result;
+    }
 
-    private PageResult<DeliveryClassRespVO> toPageResult(PageResult<DeliveryClassDO> page) {
+    PageResult<DeliveryClassRespVO> toPageResult(PageResult<DeliveryClassDO> page, Long userId) {
         List<DeliveryClassDO> rows = page.getList();
         Map<Long, Integer> studentCounts = new HashMap<>();
         Map<Long, List<Long>> idsByTenant = rows.stream().collect(Collectors.groupingBy(
@@ -134,9 +176,12 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         idsByTenant.forEach((tenantId, classIds) -> mapper.countStudentsByClassIds(tenantId, classIds).forEach(item ->
                 studentCounts.put(((Number) item.get("classId")).longValue(), ((Number) item.get("studentCount")).intValue())));
         Map<Long, List<DeliveryClassProjectRespVO>> projects = DeliveryClassProjects.load(mapper, rows);
+        ClassActionScope actionScope = rows.stream().anyMatch(row -> !Boolean.TRUE.equals(row.getSystemClass()))
+                ? actionScope(userId) : ClassActionScope.NONE;
         return new PageResult<>(rows.stream().map(row -> {
             DeliveryClassRespVO vo = toVO(row, studentCounts.getOrDefault(row.getId(), 0));
             vo.setProjects(projects.getOrDefault(row.getId(), List.of()));
+            vo.setAvailableActions(availableActions(row, actionScope));
             return vo;
         }).toList(), page.getTotal());
     }
@@ -146,14 +191,52 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     public PageResult<DeliveryClassStudentRespVO> students(Long id, Long userId, PageParam pageParam) {
         require(id);
         PageResult<ServiceRelationDO> page = relationMapper.selectPage(pageParam, studentReadQuery(id, userId));
-        return new PageResult<>(page.getList().stream().map(this::student).toList(), page.getTotal());
+        var actions = studentPermissions.transferActions(page.getList(), userId);
+        return new PageResult<>(page.getList().stream().map(relation -> {
+            var result = student(relation);
+            result.setAvailableActions(actions.getOrDefault(relation.getId(), List.of()));
+            return result;
+        }).toList(), page.getTotal());
+    }
+
+    private record ClassActionScope(boolean update, boolean complete, Long department,
+                                    DeliveryClassScopeService.Scope scope) {
+        static final ClassActionScope NONE = new ClassActionScope(false, false, null,
+                new DeliveryClassScopeService.Scope(false, Set.of()));
+    }
+
+    private ClassActionScope actionScope(Long userId) {
+        boolean update = permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:update");
+        boolean complete = permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:complete");
+        if (!update && !complete) return ClassActionScope.NONE;
+        var user = adminUserApi.getUser(userId);
+        var scope = objectPermissions.commandScope(userId, user);
+        return new ClassActionScope(update, complete, user == null ? null : user.getDeptId(),
+                scope == null ? ClassActionScope.NONE.scope() : scope);
+    }
+
+    List<String> availableActions(DeliveryClassDO row, Long userId) {
+        return Boolean.TRUE.equals(row.getSystemClass()) ? List.of() : availableActions(row, actionScope(userId));
+    }
+
+    private List<String> availableActions(DeliveryClassDO row, ClassActionScope actor) {
+        if (Boolean.TRUE.equals(row.getSystemClass()) || row.getDeptId() == null
+                || !(actor.scope().allDepartments() || actor.scope().deptIds().contains(row.getDeptId()))) return List.of();
+        List<String> actions = new ArrayList<>();
+        if (actor.update() && Objects.equals(actor.department(), row.getDeptId())) {
+            if (!"COMPLETED".equals(row.getStatus())) actions.add("UPDATE");
+            if (row.getClassKind() == null || DeliveryClassKind.NORMAL.equals(row.getClassKind())) actions.add("MOVE_GROUP");
+        }
+        if (actor.complete() && "SERVING".equals(row.getStatus())) actions.add("COMPLETE");
+        return actions;
     }
 
     LambdaQueryWrapperX<ServiceRelationDO> studentReadQuery(Long classId, Long userId) {
         var query = new LambdaQueryWrapperX<ServiceRelationDO>().eq(ServiceRelationDO::getTeachingDelivery, true)
                 .eq(ServiceRelationDO::getClassId, classId)
                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"));
-        if (!permissionApi.hasTenantReadAllAccess(userId)) {
+        if (!permissionApi.hasTenantReadAllAccess(userId)
+                && !permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_ALL)) {
             boolean managed = permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query", PERMISSION_QUERY_MANAGED);
             var scope = managed ? scopeService.resolveRead(userId) : new DeliveryClassScopeService.Scope(false, Set.of());
             if (!scope.allDepartments() && !Objects.equals(classId, scopeService.readablePendingClassId(userId))) {
@@ -175,12 +258,19 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     public List<DeliveryClassOptionRespVO> options(Long categoryId, boolean includePending) {
         List<DeliveryClassDO> rows = mapper.selectList(new LambdaQueryWrapperX<DeliveryClassDO>()
                 .eq(DeliveryClassDO::getStatus, "SERVING")
+                .ne(DeliveryClassDO::getClassKind, DeliveryClassKind.EXCEPTION)
                 .and(categoryId != null, q -> q.eq(DeliveryClassDO::getSystemClass, true)
                         .or().eq(DeliveryClassDO::getCategoryId, categoryId))
                 .orderByDesc(DeliveryClassDO::getSystemClass).orderByAsc(DeliveryClassDO::getClassName)
                 .orderByAsc(DeliveryClassDO::getId));
-        return rows.stream().filter(row -> includePending || !Boolean.TRUE.equals(row.getSystemClass()))
+        return rows.stream().filter(row -> includePending || !DeliveryClassKind.pending(row))
+                .filter(row -> !DeliveryClassKind.UNSCHEDULED.equals(row.getClassKind()) || validAssignmentOwner(row))
                 .map(this::toOption).toList();
+    }
+
+    private boolean validAssignmentOwner(DeliveryClassDO row) {
+        try { validateHomeroom(row.getHomeroomUserId()); return true; }
+        catch (cn.iocoder.yudao.framework.common.exception.ServiceException invalid) { return false; }
     }
 
     @Override
@@ -297,9 +387,10 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
                         : req.getStartDate() == null ? req.getExamScheduleId() : null)
                 .setExamScheduleSnapshot(snapshot).setHomeroomUserId(homeroom.getId())
                 .setHomeroomUserNameSnapshot(homeroom.getNickname()).setVersion(current.getVersion() + 1);
-        // updateById ignores nulls; independent dates must explicitly clear the previous calendar association.
+        // Null dates explicitly clear both the previous calendar association and its frozen snapshot.
         if (mapper.update(current, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<DeliveryClassDO>()
-                .eq(DeliveryClassDO::getId, id).set(DeliveryClassDO::getExamScheduleId, current.getExamScheduleId())) != 1) {
+                .eq(DeliveryClassDO::getId, id).set(DeliveryClassDO::getExamScheduleId, current.getExamScheduleId())
+                .set(DeliveryClassDO::getExamScheduleSnapshot, snapshot)) != 1) {
             throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
         }
         if (!Objects.equals(oldOwner, homeroom.getId())) {
@@ -337,7 +428,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         DeliveryClassDO target = mapper.selectByIdForUpdate(req.getTargetClassId(), relation.getTenantId());
         validateTransferTarget(relation, target);
         DeliveryClassDO source = require(relation.getClassId());
-        if ((!Boolean.TRUE.equals(source.getSystemClass()) && !scopeService.contains(userId, source.getDeptId()))
+        if ((!DeliveryClassKind.pending(source) && !scopeService.contains(userId, source.getDeptId()))
                 || !scopeService.contains(userId, target.getDeptId())) throw exception(DELIVERY_CLASS_PERMISSION_DENIED);
         transferLocked(relation, target, target.getHomeroomUserId(), req.getReason().trim(),
                 "direct-transfer:" + relationId + ":v" + relation.getVersion());
@@ -349,7 +440,8 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private void validateTransferTarget(ServiceRelationDO relation, DeliveryClassDO target) {
-        if (target == null || Boolean.TRUE.equals(target.getSystemClass()) || !"SERVING".equals(target.getStatus())
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
+        if (!DeliveryClassKind.assignable(target) || !"SERVING".equals(target.getStatus())
                 || Objects.equals(relation.getClassId(), target.getId())) throw exception(DELIVERY_CLASS_TRANSFER_INVALID);
         require(relation.getClassId());
         validateHomeroom(target.getHomeroomUserId());
@@ -380,7 +472,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             ZsjosProductCategoryDO category = categoryMapper.selectById(product.getCategoryId());
             row.setCategoryName(category == null ? null : category.getName());
         }
-        row.setServiceStatus(relation.getStatus()); row.setAcceptanceStatus(relation.getAcceptanceStatus());
+        row.setServiceStatus(cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.status(relation)); row.setAcceptanceStatus(relation.getAcceptanceStatus());
         row.setOwnerUserId(relation.getOwnerUserId()); row.setActivatedAt(relation.getActivatedAt());
         row.setVersion(relation.getVersion());
         if (relation.getOwnerUserId() != null) {
@@ -435,6 +527,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             return new DeliveryClassDates(req.getStartDate(),
                     req.getEndDate() == null ? req.getStartDate() : req.getEndDate()).snapshot();
         }
+        if (req.getExamScheduleId() == null) return null;
         // Older clients may still submit only an existing schedule ID.
         ExamScheduleDO schedule = scheduleMapper.selectById(req.getExamScheduleId());
         if (schedule == null || !"PUBLISHED".equals(schedule.getRecordStatus()) || !isUnended(schedule)) {
@@ -477,7 +570,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     private DeliveryClassOptionRespVO toOption(DeliveryClassDO row) {
         DeliveryClassOptionRespVO vo = new DeliveryClassOptionRespVO();
         vo.setId(row.getId()); vo.setClassNo(row.getClassNo()); vo.setClassName(row.getClassName());
-        vo.setSystemClass(row.getSystemClass()); vo.setCategoryId(row.getCategoryId());
+        vo.setClassKind(row.getClassKind()); vo.setSystemClass(row.getSystemClass()); vo.setCategoryId(row.getCategoryId());
         vo.setCategoryName(row.getCategoryNameSnapshot()); vo.setExamScheduleId(row.getExamScheduleId());
         vo.setExamScheduleName(row.getExamScheduleSnapshot()); vo.setHomeroomUserId(row.getHomeroomUserId());
         vo.setHomeroomUserName(row.getHomeroomUserNameSnapshot());

@@ -64,6 +64,9 @@ public interface FileApi {
     /**
      * 保存文件，并返回可用于业务持久化的文件标识和元数据。
      */
+    /** Upload a trusted local source without materializing its contents in heap. */
+    FileInfoRespDTO createFileInfoFromPath(@NotNull java.nio.file.Path source, String name, String directory, String type);
+
     FileInfoRespDTO createFileInfo(@NotEmpty(message = "文件内容不能为空") byte[] content,
                                    String name, String directory, String type);
 

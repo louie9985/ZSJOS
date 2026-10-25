@@ -104,7 +104,7 @@ class LeadMapperSqlTest {
     }
 
     @Test
-    void managementOrderDefaultsToActivityAndKeepsCursorOrder() throws Exception {
+    void managementOrderDefaultsToSubmissionAndKeepsCursorOrder() throws Exception {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
         Method method = LeadMapper.class.getDeclaredMethod("applyManagementOrder",
                 LambdaQueryWrapperX.class, LeadManagementPageReqVO.class);
@@ -118,8 +118,44 @@ class LeadMapperSqlTest {
         method.invoke(null, query, reqVO);
 
         String sql = query.getSqlSegment().replaceAll("\\s+", " ");
-        assertTrue(sql.contains("ORDER BY last_activity_at DESC,id DESC"), sql);
+        assertTrue(sql.contains("ORDER BY submitted_at DESC,id DESC"), sql);
         assertFalse(sql.contains("submitted_name ASC"), sql);
+    }
+
+    @Test
+    void absentOrIncompleteSortUsesSubmissionTime() throws Exception {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        Method method = LeadMapper.class.getDeclaredMethod("applyManagementOrder",
+                LambdaQueryWrapperX.class, LeadManagementPageReqVO.class);
+        method.setAccessible(true);
+        for (String field : new String[] {null, "lastActivityAt"}) {
+            var req = new LeadManagementPageReqVO(); req.setSortField(field);
+            var query = new LambdaQueryWrapperX<LeadDO>(); method.invoke(null, query, req);
+            assertTrue(query.getSqlSegment().contains("ORDER BY submitted_at DESC,id DESC"));
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void cursorBoundaryUsesSubmissionAndIdInBothManagementQueries() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        for (boolean scoped : new boolean[] {false, true}) {
+            LeadMapper mapper = mock(LeadMapper.class, CALLS_REAL_METHODS);
+            doReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(), 0L)).when(mapper)
+                    .selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+            var req = new LeadManagementPageReqVO();
+            req.setCursorSubmittedAt(LocalDateTime.of(2026, 10, 22, 9, 0)); req.setCursorId(8L);
+            if (scoped) mapper.selectManagementPageByScope(req, List.of(1L), List.of(1L), false, null, null);
+            else mapper.selectManagementPage(req, 1L, List.of(), null, null);
+            var capture = org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+            verify(mapper).selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), capture.capture());
+            String sql = capture.getValue().getSqlSegment();
+            assertTrue(sql.contains("submitted_at <"), sql);
+            assertTrue(sql.contains("submitted_at ="), sql);
+            assertTrue(sql.contains("id <"), sql);
+            assertTrue(sql.contains("ORDER BY submitted_at DESC,id DESC"), sql);
+            assertFalse(sql.contains("last_activity_at"), sql);
+        }
     }
 
     @Test

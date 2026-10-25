@@ -14,4 +14,11 @@ class LeadManagementControllerPermissionTest {
 
         assertTrue(annotation.value().contains("'zsjos:media-student:query-my'"));
     }
+    @Test
+    void managementProfileAcceptsBothExistingPagePermissionsWithoutOpeningTheAllList() throws Exception {
+        String metadata = LeadManagementController.class.getMethod("getManagementInboxFilterProfile")
+                .getAnnotation(PreAuthorize.class).value();
+        assertTrue(metadata.contains("'zsjos:lead:query'"));
+        assertTrue(metadata.contains("'zsjos:subordinate-sales:query'"));
+    }
 }

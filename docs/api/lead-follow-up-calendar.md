@@ -27,7 +27,7 @@
 前端按当前月历的 42 天网格请求统计，日期弹窗按一天请求卡片。
 时间戳继续使用现有 epoch 毫秒契约。`pageNo` 从 1 开始，`pageSize` 默认 24、最大 48。
 
-`sort=deadline|category|ownershipStartedAt`，`direction=asc|desc`。默认截止时间升序。
+`sort=submittedAt|deadline|category|ownershipStartedAt`，`direction=asc|desc`。默认客资提交时间降序（并列按客资内部 ID 降序，缺失时间置后）；仍按最早待办截止日归档。
 「归属开始时间」使用 Lead 的 `ownership_started_at`（当前销售正式持有起点），
 支持最早优先和最新优先，在分页前对当前日期范围内全部符合条件的客资排序。
 使用当前正式归属轮次的时间，不替换为提交、派单或公海协助人指派时间。

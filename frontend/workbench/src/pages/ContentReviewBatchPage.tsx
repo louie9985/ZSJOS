@@ -1,5 +1,8 @@
+import StageDurationTag from '../components/StageDurationTag'
+import type { EmbeddedApproval } from '../components/bpm/embeddedApproval'
 import { locateContentError, contentSaveError, contentResultUncertain, contentReviewDetailError, type ContentSavePhase } from '../services/contentReviewErrors'
 import { useContentReviewSubmit } from '../components/ContentReviewReviewerSelect'
+import { requireContentReviewReviewer, submitWithFormReviewer } from '../services/contentReviewReviewer'
 import ContentApprovalDraft from '../components/ContentApprovalDraft'
 import ContentReviewWorkDetail from '../components/ContentReviewWorkDetail'
 import { restoreDraftAccounts, restoreDraftWorks } from '../services/contentReviewDraft'
@@ -84,8 +87,10 @@ const snapshotText = (snapshot: Record<string, unknown>, key: string, fallback =
  * 不实时查账号表：否则账号改名或换阶段会改写历史审批记录。
  */
 export function AccountProfiles({ batch, accountLink }: { batch: ContentReviewBatch; accountLink: (account: ContentReviewAccount) => React.ReactNode }) {
-  const snapshots = (Array.isArray(batch.contextSnapshot.accountSnapshots)
-    ? batch.contextSnapshot.accountSnapshots : []) as Array<Record<string, unknown>>
+  const snapshots = (Array.isArray(batch.contextSnapshot.accountSnapshots) && batch.contextSnapshot.accountSnapshots.length
+    ? batch.contextSnapshot.accountSnapshots
+    : batch.contextSnapshot.account && typeof batch.contextSnapshot.account === 'object'
+      ? [batch.contextSnapshot.account] : []) as Array<Record<string, unknown>>
   if (!snapshots.length) return null
   const text = (value: unknown) => {
     const result = value === null || value === undefined ? '' : String(value).trim()
@@ -109,7 +114,7 @@ export function AccountProfiles({ batch, accountLink }: { batch: ContentReviewBa
       </div>
       <div><dt>责任运营</dt><dd>{badge(snapshot.operatorName ? `${snapshot.operatorName}${snapshot.operatorNameResolved === true ? '（现用姓名）' : ''}` : undefined, 'blue')}</dd></div>
       <div><dt>责任编导</dt><dd>{badge(snapshot.directorName ? `${snapshot.directorName}${snapshot.directorNameResolved === true ? '（现用姓名）' : ''}` : undefined, 'purple')}</dd></div>
-      <div><dt>当前期段</dt><dd>{badge(snapshot.sStageLabel || snapshot.stageLabelSnapshot || '未记录', 'geekblue')}</dd></div>
+      <div><dt>当前期段</dt><dd><Space wrap size={0}>{badge(snapshot.sStageLabel || snapshot.stageLabelSnapshot || '未记录', 'geekblue')}<StageDurationTag value={snapshot} /></Space></dd></div>
       <div><dt>账号状态</dt><dd>{badge(snapshot.currentStatusLabel || snapshot.currentStatusLabelSnapshot || '未记录', 'cyan')}</dd></div>
       <div className="content-review-profile-background"><details open><summary>运营背景与账号信息</summary><dl>
         <div><dt>平台账号</dt><dd>{badge(snapshot.platformAccountId, 'cyan')}</dd></div>
@@ -122,12 +127,13 @@ export function AccountProfiles({ batch, accountLink }: { batch: ContentReviewBa
   })}</div>
 }
 
-function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
+function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange, onBusyChange }: {
   batch: ContentReviewBatch
   item: ContentReviewItem
   stage: 'director' | 'final'
   onDirtyChange: (id: number, dirty: boolean) => void
   onSaved: () => void
+  onBusyChange?: (id: number, busy: boolean) => void
 }) {
   const { message } = App.useApp()
   const existingDecision = stage === 'director' ? item.directorDecision : item.finalDecision
@@ -153,7 +159,7 @@ function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
     if (!batch.currentTaskId) return message.warning('当前审核任务已变化，请刷新待办后确认')
     if (!decision) return message.warning('请选择审核结论')
     if (decision === 'RETURNED' && !comment.trim()) return message.warning('退回时必须填写原因')
-    setLoading(true)
+    setLoading(true); onBusyChange?.(item.id, true)
     try {
       const data = { taskId: batch.currentTaskId, expectedVersion: item.version, decision, comment: comment.trim() || undefined }
       if (stage === 'director') await contentReviewApi.directorDecision(batch.id, item.id, data)
@@ -163,7 +169,7 @@ function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
     } catch (cause) {
       message.error(errorText(cause))
     } finally {
-      setLoading(false)
+      setLoading(false); onBusyChange?.(item.id, false)
     }
   }
 
@@ -180,7 +186,6 @@ function DecisionEditor({ batch, item, stage, onSaved, onDirtyChange }: {
 }
 
 export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: ContentReviewBatch; open: boolean; onClose: () => void; onSaved: (id: number) => void }) {
-  const submitContentReview = useContentReviewSubmit()
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
@@ -211,7 +216,8 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
     activeDraftVersion.current = batch.version
     setSaveError(''); setUncertain(false)
     form.resetFields()
-    form.setFieldsValue({ accountIds: restoredAccounts.accountIds, accountSnapshots: restoredAccounts.accountSnapshots, works: restoreDraftWorks(batch) })
+    form.setFieldsValue({ accountIds: restoredAccounts.accountIds, accountSnapshots: restoredAccounts.accountSnapshots,
+      draftReviewerSelection: batch.status === 'DRAFT' ? batch.draftReviewerSelection : undefined, works: restoreDraftWorks(batch) })
   }, [batch, form, open, restoredAccounts])
   const save = async (submitAfterSave: boolean) => {
     if (saveLock.current || loading || optionsLoading || optionsError || uncertain) return
@@ -221,6 +227,7 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
     setSaveError('')
     try {
       await form.validateFields()
+      const reviewer = submitAfterSave ? requireContentReviewReviewer(form) : undefined
       setLoading(true)
       const current = activeDraftId.current ? await contentReviewApi.get(activeDraftId.current) : undefined
       if (current && current.status !== 'DRAFT') {
@@ -233,6 +240,7 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
         studentPersonId: batch.studentPersonId!,
         accountIds: batch.accountIds?.length ? batch.accountIds : [batch.accountId],
         accountSnapshots: values.accountSnapshots,
+        draftReviewerSelection: values.draftReviewerSelection || null,
         expectedVersion: activeDraftVersion.current,
         works: works.map((work: Record<string, unknown>) => ({ ...work, plannedPublishAt: work.plannedPublishAt ? (work.plannedPublishAt as dayjs.Dayjs).format('YYYY-MM-DDTHH:mm:ss') : undefined }))
       }
@@ -250,7 +258,7 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
         form.setFieldValue(['works', index, 'sourceVersionId'], item.contentVersionId)
       })
       phase = 'submit'
-      if (submitAfterSave && !await submitContentReview(id, savedBatch.version)) { message.info('草稿已保存，尚未提交审批'); return }
+      if (reviewer) await submitWithFormReviewer(form, id, savedBatch.version, reviewer)
       message.success(submitAfterSave ? '已提交审批' : '修改已保存')
       onClose(); onSaved(id)
     } catch (cause) {
@@ -270,12 +278,12 @@ export function DraftEditDialog({ batch, open, onClose, onSaved }: { batch: Cont
         </div>)} />}
       <Typography.Paragraph type="secondary">保存修改不会发起审批；点击重新提交审批会保存修改并直接发起新一轮审批。明确失败时可修正后重试；结果待确认时先查询批次状态。</Typography.Paragraph>
       {optionsError && <Alert type="error" showIcon message={optionsError} action={<Button onClick={() => void loadOptions()}>重试</Button>} />}
-      <ContentApprovalDraft batchId={batch.id} studentPersonId={batch.studentPersonId} optionsLoading={optionsLoading} onReloadOptions={() => void loadOptions()} disabled={loading || optionsLoading || Boolean(optionsError)} lockAccounts accounts={restoredAccounts.accounts} purposeOptions={purposeOptions} formatOptions={formatOptions} />
+      {open && <ContentApprovalDraft batchId={batch.id} studentPersonId={batch.studentPersonId} optionsLoading={optionsLoading} onReloadOptions={() => void loadOptions()} disabled={loading || optionsLoading || Boolean(optionsError)} lockAccounts accounts={restoredAccounts.accounts} purposeOptions={purposeOptions} formatOptions={formatOptions} />}
     </Form>
   </Modal>
 }
 
-export default function ContentReviewBatchPage({ permissions = [] }: { permissions?: string[] }) {
+export default function ContentReviewBatchPage({ permissions = [], embedded }: { permissions?: string[]; embedded?: EmbeddedApproval }) {
   const submitContentReview = useContentReviewSubmit()
   const { message, modal } = App.useApp()
   const navigation = useWorkbenchPageNavigation()
@@ -298,6 +306,9 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
   const [detailError, setDetailError] = useState('')
+  const [finished, setFinished] = useState(false)
+  const [busyItems, setBusyItems] = useState<Record<number, boolean>>({})
+  const updateBusy = useCallback((id: number, busy: boolean) => setBusyItems(current => ({ ...current, [id]: busy })), [])
   const [completeStage, setCompleteStage] = useState<'director' | 'final'>()
   const [dirtyItems, setDirtyItems] = useState<Record<number, boolean>>({})
   const updateDirty = useCallback((id: number, dirty: boolean) => setDirtyItems(current =>
@@ -316,6 +327,11 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   const submitLock = useRef(false)
   const [historyOriginId, setHistoryOriginId] = useState<number>()
   const historyRun = useRef(0)
+  useEffect(() => {
+    embedded?.onState(Object.values(dirtyItems).some(Boolean) || Boolean(completeStage && completeReason.trim()),
+      completeLoading || Object.values(busyItems).some(Boolean))
+  }, [embedded?.onState, dirtyItems, completeStage, completeReason, completeLoading, busyItems])
+  useEffect(() => () => { embedded?.onState(false, false) }, [embedded?.onState])
   const [publishForm] = Form.useForm<{ platformUrl: string; publishedAt: dayjs.Dayjs }>()
 
   const confirmChange = (action: () => void) => {
@@ -325,7 +341,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   useWorkbenchPageGuard(APP_ROUTES.CONTENT_REVIEW, async destination => {
     if (destination || !Object.values(dirtyItems).some(Boolean)) return true
     return new Promise(resolve => modal.confirm({ title: '关闭审批页并放弃未保存意见？', okText: '放弃并关闭', cancelText: '继续审核', onOk: () => resolve(true), onCancel: () => resolve(false) }))
-  })
+  }, !embedded)
   useEffect(() => {
     const node = detailPane.current
     if (!node) return
@@ -336,7 +352,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
 
   const location = useLocation()
   const navigate = useNavigate()
-  const linkedBatchValue = new URLSearchParams(location.search).get('batchId')
+  const linkedBatchValue = embedded ? String(embedded.query.batchId) : new URLSearchParams(location.search).get('batchId')
   const linkedBatchNumber = Number(linkedBatchValue)
   const linkedBatchId = linkedBatchValue !== null && Number.isSafeInteger(linkedBatchNumber) && linkedBatchNumber > 0
     ? linkedBatchNumber : undefined
@@ -360,6 +376,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     detailRun.current++
     const targetId = preferredId ?? linkedBatchId
     // A notification target is independent from list filters, pagination and list availability.
+    if (embedded) { if (targetId) await loadDetail(targetId); return }
     const detailRequest = targetId ? loadDetail(targetId) : undefined
     if (linkedBatchId || invalidBatchLink) setMobileDetail(true)
     if (invalidBatchLink && !preferredId) {
@@ -389,7 +406,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
       }
     } finally { if (run === listRun.current) setLoading(false) }
     await detailRequest
-  }, [keyword, loadDetail, mine, category, filters, linkedBatchId, invalidBatchLink])
+  }, [keyword, loadDetail, mine, category, filters, linkedBatchId, invalidBatchLink, !!embedded])
 
   useEffect(() => { void load(1) }, [load])
   useEffect(() => {
@@ -404,6 +421,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
 
   const submitBatch = async () => {
     if (!selected || submitLock.current) return
+    if (selected.studentPersonId) { setDraftEditOpen(true); return }
     submitLock.current = true; setSubmitting(true)
     try {
       if (!await submitContentReview(selected.id, selected.version)) return
@@ -435,6 +453,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
         }
       })
       const id = await contentReviewApi.saveStudentDraft(selected.id, {
+        draftReviewerSelection: selected.draftReviewerSelection || null,
         studentPersonId: selected.studentPersonId,
         accountIds: selected.accountIds?.length ? selected.accountIds : [selected.accountId],
         works
@@ -484,6 +503,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
       else await contentReviewApi.completeFinal(selected.id, data)
       message.success(completeDecision === 'RETURNED' ? '本批次已退回运营修改' : completeStage === 'director' ? '编导已通过，进入终审' : '终审已通过，内容待发布')
       setCompleteStage(undefined)
+      if (embedded) { setFinished(true); embedded.onComplete() }
       await load(page, selected.id)
     } catch (cause) { message.error(errorText(cause)) }
     finally { setCompleteLoading(false) }
@@ -509,10 +529,11 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
     } finally { setCompleteLoading(false) }
   }
 
-  const stage = historyOriginId ? undefined : selected?.availableActions.includes('DIRECTOR_DECIDE') ? 'director'
+  const taskReadOnly = Boolean(embedded && (embedded.done || finished || selected?.currentTaskId !== embedded.taskId))
+  const stage = historyOriginId || taskReadOnly ? undefined : selected?.availableActions.includes('DIRECTOR_DECIDE') ? 'director'
     : selected?.availableActions.includes('FINAL_DECIDE') ? 'final' : undefined
   const canSeeAll = hasPermission(permissions, 'zsjos:content-review:query-all')
-  const canUpdateTask = !historyOriginId && hasPermission(permissions, 'bpm:task:update')
+  const canUpdateTask = !historyOriginId && !taskReadOnly && hasPermission(permissions, 'bpm:task:update')
 
   /**
    * 本级"交卷"动作。后端 requireDirectorDecisions / requireFinalDecisions 会再校验一次，
@@ -557,7 +578,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
   }
 
   return <section className="workspace-page content-review-page">
-    <header className="content-review-filter-shell">
+    {!embedded && <><header className="content-review-filter-shell">
       <div><Typography.Title level={4}>内容审核</Typography.Title>
         <Typography.Text type="secondary">查看内容，给出反馈，推进审批</Typography.Text></div>
       <div className="content-review-toolbar">
@@ -565,9 +586,9 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
       </div>
     </header>
     <Tabs className="content-review-status-tabs" activeKey={category} items={contentReviewCategories.map(({ key, label }) => ({ key, label }))}
-      onChange={value => confirmChange(() => { setCategory(value); setFilters(current => ({ ...current, stage: undefined })); setMobileDetail(false) })} />
+      onChange={value => confirmChange(() => { setCategory(value); setFilters(current => ({ ...current, stage: undefined })); setMobileDetail(false) })} /></>}
     <div className={`content-review-layout${mobileDetail ? ' content-review-show-detail' : ''}`}>
-      <aside className="content-review-list-pane">
+      {!embedded && <aside className="content-review-list-pane">
         <ContentReviewInbox rows={rows} selectedId={selectedId} loading={loading} error={error} total={total}
           keyword={keyword} category={category} filters={filters} mine={mine} canSeeAll={canSeeAll} statusText={statusText}
           onSearch={value => confirmChange(() => setKeyword(value))} onFilters={value => confirmChange(() => setFilters(value))}
@@ -578,12 +599,13 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
           }) }} />
         {total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={total}
           onChange={value => confirmChange(() => void load(value))} />}
-      </aside>
+      </aside>}
       <main ref={detailPane} className="content-review-detail-pane">
-        <Button className="content-review-mobile-back" icon={<ArrowLeftOutlined />} onClick={() => setMobileDetail(false)}>返回收件箱</Button>
+        {!embedded && <Button className="content-review-mobile-back" icon={<ArrowLeftOutlined />} onClick={() => setMobileDetail(false)}>返回收件箱</Button>}
         {detailLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : detailError
           ? <Alert type="error" showIcon message={detailError} action={<Space>{selectedId && <Button size="small" onClick={() => void loadDetail(selectedId, historyOriginId)}>重试</Button>}{historyOriginId && <Button size="small" onClick={() => void loadDetail(historyOriginId)}>返回原批次</Button>}</Space>} />
           : selected ? <>
+            {embedded && !embedded.done && !finished && selected.currentTaskId !== embedded.taskId && <Alert type="warning" showIcon message="该任务已处理或已流转，当前内容仅供查看，请刷新待办" />}
             {historyOriginId && <Alert className="content-review-history-notice" type="info" showIcon message="历史轮次 · 只读" action={<Button onClick={() => confirmChange(() => void loadDetail(historyOriginId))}>返回原批次</Button>} />}
             <div className="content-review-heading"><div>
               <Typography.Title level={4}>{selected.studentName || '未记录学员姓名'} · 内容审核</Typography.Title>
@@ -595,7 +617,7 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
               <Tag color="blue">{selected.items.length} 条内容</Tag>
               <Typography.Text type="secondary">审批编号：{selected.batchNo}</Typography.Text>
             </div>
-            {!historyOriginId && selected.availableActions.some(action => ['SUBMIT', 'RESUBMIT', 'CANCEL'].includes(action)) && <div className="content-review-detail-actions">
+            {!embedded && !historyOriginId && selected.availableActions.some(action => ['SUBMIT', 'RESUBMIT', 'CANCEL'].includes(action)) && <div className="content-review-detail-actions">
               <Space wrap>
               {!historyOriginId && selected.availableActions.includes('SUBMIT') && <><Button icon={<ReloadOutlined />} onClick={() => setDraftEditOpen(true)}>编辑并保存草稿</Button><Button type="primary" loading={submitting} icon={<SendOutlined />} onClick={() => void submitBatch()}>提交审批</Button></>}
               {!historyOriginId && selected.availableActions.includes('RESUBMIT') && <Button type="primary" onClick={() => setDraftEditOpen(true)}>修改后重新提交</Button>}
@@ -628,9 +650,9 @@ export default function ContentReviewBatchPage({ permissions = [] }: { permissio
               </Space></div>
               <ContentReviewWorkDetail key={`${selected.id}:${item.id}`} item={item} batchId={selected.id} />
               {stage && (stage === 'director' || item.directorDecision === 'APPROVED') && <DecisionEditor batch={selected} item={item} stage={stage}
-                onDirtyChange={updateDirty}
+                onDirtyChange={updateDirty} onBusyChange={updateBusy}
                 onSaved={() => { const id = selected.id; void contentReviewApi.get(id).then(value => { if (selectedIdRef.current === id) setSelected(value) }).catch(cause => message.error(errorText(cause))) }} />}
-              {!historyOriginId && selected.availableActions.includes('REGISTER_PUBLISH') && item.resultStatus === 'READY_TO_PUBLISH'
+              {!embedded && !historyOriginId && selected.availableActions.includes('REGISTER_PUBLISH') && item.resultStatus === 'READY_TO_PUBLISH'
                 && <Button icon={<ClockCircleOutlined />} onClick={() => setPublishItem(item)}>登记发布</Button>}
               {item.publishedPlatformUrl && <ResourceLink href={item.publishedPlatformUrl} title="查看已发布内容" />}
             </section>)}</div>

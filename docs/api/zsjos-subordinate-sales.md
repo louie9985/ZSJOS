@@ -7,10 +7,28 @@ Base path: `/admin-api/zsjos/subordinate-sales`. All endpoints require authentic
 - `GET /page`: permission `zsjos:subordinate-sales:query`; supports `keyword`, `accountStatus`, `presence`, `accepting`, `pageNo`, and `pageSize`.
 - `GET /{salesUserId}/overview`: returns the same metric contract for one managed sales user.
 - `GET /{salesUserId}/leads`: reuses the Lead management table response and limits rows to current ownership by that managed sales user.
+  Workbench 直接调用与独立“客资管理”相同的 `LeadManagementPage` React 组件，传入 `salesUserId`，复用服务端三级筛选方案、搜索/高级筛选、完整列、排序、列设置、分页、详情和操作表单。不是 iframe、复制页面或单独维护的小表格。后续修改共享组件时两处一起生效。
+  - 列表仍只调用 `GET /{salesUserId}/leads` 或带高级筛选的 `POST /{salesUserId}/leads/search-page`，不回退到全量客资接口。`audience=management`、`inboxGroup`、`inboxStage`、`inboxQuick` 使用管理员发布的 management 方案解析，和关键词、高级筛选、排序条件取交集。
+  - 服务端覆盖调用者传入的负责人、关系范围和回收归属条件，继续检查下属关系、销售身份、租户与逻辑删除。普通筛选仅当前负责人为所选销售；“当前环节 → 回收待处理”仅查询已回收且原销售为所选销售的记录；不把已转派给其他人的客资纳入当前名下。
+  - 复用 `GET /zsjos/lead/inbox/management/filter-profile` 获取配置；该只读元数据端点允许 `zsjos:lead:query` 或 `zsjos:subordinate-sales:query`，不扩大列表、详情或命令授权。方案加载失败显示错误，刷新可重试，不制造本地选项。旧 Admin 调用不带 audience，保持原查询行为。
+  - 表格使用客资管理已有排序白名单、20/50/100 条分页、跨页勾选和 100 条批量上限。分类/环节/快捷条件、关键词、高级筛选、排序变化清空选择；切换销售重新创建同一组件实例，清空旧查询、详情和选择。列设置与独立客资管理分开持久化。
+  - 详情同样使用客资管理的服务端 `visibleTabs` / `availableActions`，不因页面复用扩大权限。批量处置继续使用下属销售操作权限、记录适用性、交集候选和 supervisor 命令接口。成功后刷新共享列表及员工概况；失败保留原因和重试。切换销售、员工详情页签、返回及页面导航时保护未保存表单；关闭详情抽屉保留当前草稿。
+  - 全局深链接和新接单通知不能向此固定销售列表补入其他客资。独立客资管理保留原路由、实时提醒和全局主从/表格选择；此员工详情调用采用表格展示，窄屏横向滚动。
+
 - `GET /{salesUserId}/tasks`: returns current pending first/subsequent follow-up tasks; `bucket` is `overdue`, `today`, `future`, or `unscheduled` using Beijing time. An empty task set returns an empty page and never issues an empty-ID Lead query.
 - `GET /transfer-candidates`: returns enabled, currently eligible sales specialists inside the manager's department tree.
 
 The list includes disabled sales accounts that still hold the stable `sales_specialist` post. `canReceiveNewLeads` is true only when account enabled, sales eligibility valid, presence online, and intake mode accepting. Lead-category metrics follow the enabled System dictionary order and append `未配置` only when historical unmatched values exist.
+
+### Workbench 客资搜索状态（2026-10-21）
+
+关键词去除首尾空白后匹配客资业务编号 `leadNo`、提交姓名、提交手机号、提交微信号；四项为 OR 模糊匹配，再与高级筛选及既有授权、销售归属条件取交集。普通 GET 与高级筛选 POST 共用原有接口，不搜索 Person 主档或订单姓名。
+
+回车和搜索图标提交关键词；重复提交相同关键词也重新查询。清空输入立即清除关键词，保留高级筛选；“清空全部”仅清高级筛选，保留关键词。搜索、筛选应用/标签删除/清空、排序及名下/回收视图切换均回到第一页并清空批量勾选。普通翻页保留条件、排序及跨页勾选。
+
+切换销售重新挂载详情，显示概况；关键词、筛选、名下/回收状态、页码、勾选、旧数据和错误均重置，排序保留。再次打开名下客资时仅查询新销售的第一页，不先发送旧条件。查询开始清空旧数据和总数；失败显示具体错误与当前条件重试入口。加载或失败时禁止批量操作。客资及待办请求分别维护状态，仅最新有效请求可更新结果、错误和加载状态；切换标签、销售或卸载后，旧请求不再影响当前页面。
+
+共享高级筛选在应用及标签删除时移除空子组，保留剩余 AND/OR 关系；条件全部清空则不提交高级筛选，恢复 GET。后端空子组校验保持不变。见[共享筛选验证说明](../frontend/advanced-filter-contract-checks.md)。浏览器回归入口：`python frontend/workbench/test/subordinate-lead-search-browser.py`，仅使用合成数据与隔离 HTTP 适配器，不代表真实账号或部署验收。
 
 ### 员工卡片今日统计
 
@@ -104,4 +122,7 @@ V139/V140/V142. It requires no new SQL migration, menu grant, dictionary entry, 
 
 V334 只恢复规范菜单名称，不改角色菜单关系；V320 保留历史原文。初始化迁移执行器会按 Core 清单自动发现 V334，无需将编号迁移写入 bootstrap.sql。
 
-单条 transfer/restore 继续兼容可选 version；锁内校验并推进版本。幂等重放在首次状态预检之前完成，指纹冲突拒绝；批量仍逐条独立事务并返回逐条结果。回收身份只接受最新回收及必要时紧邻的 accept/claim/transfer 证明，不跨周期回溯。
+单条 transfer/restore 继续兼容可选 version；锁内校验并推进版本。幂等重放在首次状态预检之前完成，指纹冲突拒绝；批量仍逐条独立事务并返回逐条结果。逐条幂等键沿用“批次键:内部客资ID”；超过数据库 40 字符限制时，使用该完整字符串的 SHA-256 十六进制摘要前 40 位，同一批次与客资重试保持一致，历史未超长键保持兼容。无需数据库迁移；历史已完成的失败批次仍重放原结果，修复后须重新发起批次（使用新批次键），不会自动重试或改写历史结果。回收身份只接受最新回收及必要时紧邻的 accept/claim/transfer 证明，不跨周期回溯。
+
+
+顶部销售筛选与切换销售共用未保存跟进确认；下属客资保留服务端排序，不应用员工本人待办优先的二次排序。

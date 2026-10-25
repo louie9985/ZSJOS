@@ -121,6 +121,11 @@ public class LeadFlowRecorder {
         var event=new BusinessEventDO();
         event.setAggregateType("lead"); event.setAggregateId(leadId); event.setEventType("lead_flow_operation");
         event.setOperatorUserId("ADMIN".equals(actorType)?actorId:null);
+        // Every recorded operation carries its persisted status, even when status did not change.
+        // This supplies event-time evidence without treating today's status as a historical value.
+        var beforeStatus=before.values().get("status");var afterStatus=after.values().get("status");
+        event.setFromStatus(beforeStatus==null?null:beforeStatus.code());
+        event.setToStatus(afterStatus==null?null:afterStatus.code());
         var evidence=evidenceService.capture(leadId,relatedType,relatedId,title,newEvents,!before.exists());
         var refs=new LinkedHashMap<String,Object>(); refs.put("flowSnapshot",snapshot); refs.put("flowRemark",evidence.remark());
         event.setRelatedObjectRefs(JsonUtils.toJsonString(refs));

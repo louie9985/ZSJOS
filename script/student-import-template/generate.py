@@ -35,7 +35,7 @@ def queries():
         'attrValues': query('zsjos_product_attr_value', dict(attrId='attr_id', value='value', label='label'), active, 'attr_id,sort,id'),
         'users': query('system_users', dict(id='id', name='nickname', username='username'), active),
         'relations': query('zsjos_user_relation', dict(scene='scene', sourceId='source_user_id', targetId='target_user_id'), active + ' AND scene IN (' + scenes + ')', 'scene,source_user_id,target_user_id'),
-        'classes': query('zsjos_delivery_class', dict(id='id', name='class_name', number='class_no', system='system_class+0', categoryId='category_id', productId='product_id'), tenant + " AND status='SERVING'", 'class_name,id'),
+        'classes': query('zsjos_delivery_class', dict(id='id', name='class_name', number='class_no', system='system_class+0', categoryId='category_id', productId='product_id'), tenant + " AND status='SERVING' AND class_kind<>'EXCEPTION'", 'class_name,id'),
         'areas': query('system_area', dict(id='id', name='name', parentId='parent_id', type='type', leaf='leaf_selectable+0'), 'deleted=0 AND status=0', 'sort,id'),
         'configs': query('zsjos_student_info_form_config', dict(version='version_no', status='status', fields='CAST(fields_json AS JSON)'), tenant + " AND status='PUBLISHED'", 'version_no DESC'),
         'dicts': query('system_dict_data d JOIN system_dict_type t ON t.type=d.dict_type', dict(type='d.dict_type', value='d.value', label='d.label'), 'd.deleted=0 AND d.status=0 AND t.deleted=0 AND t.status=0', 'd.dict_type,d.sort,d.id'),

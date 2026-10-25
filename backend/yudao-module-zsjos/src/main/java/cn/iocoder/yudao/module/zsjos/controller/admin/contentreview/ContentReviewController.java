@@ -42,6 +42,18 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 public class ContentReviewController {
     @Resource private cn.iocoder.yudao.module.zsjos.service.contentreview.ContentReviewSelectionService selectionService;
 
+    @GetMapping("/submit-context")
+    @Operation(summary = "加载内容审批表单编导候选人")
+    @PreAuthorize("@ss.hasPermission('zsjos:content-review:submit')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewSubmitContextRespVO> formSubmitContext(
+            @RequestParam(required = false) Long studentPersonId, @RequestParam(required = false) Long batchId) {
+        if ((studentPersonId == null) == (batchId == null))
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.CONTENT_REVIEW_PERMISSION_DENIED);
+        return success(batchId != null ? selectionService.formBatchContext(batchId, getLoginUserId())
+                : selectionService.formStudentContext(studentPersonId, getLoginUserId()));
+    }
+
     @GetMapping("/batch/{batchId}/submit-context")
     @PreAuthorize("@ss.hasPermission('zsjos:content-review:submit')")
     public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewSubmitContextRespVO> submitContext(

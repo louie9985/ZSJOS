@@ -49,7 +49,9 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
         QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
         if (media) applyMediaOperatorFilter(query, req, null, true);
         query.apply((media ? MEDIA_SERVICE_RELATION_PREDICATE : STUDENT_RELATION_PREDICATE)
-                + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1}))",
+                + (!media && req.getClassId() == null && req.getServiceStatus() == null && !cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.hasExplicitStatus(req.getAdvancedFilter()) ? "AND sr.teaching_closed=0 " : "")
+                + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR "
+                + (media ? "sr.status" : "(CASE WHEN sr.teaching_closed=1 THEN 'closed' ELSE sr.status END)") + "={1}))",
                 req.getClassId(), req.getServiceStatus());
         return selectPage(req, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }
@@ -102,6 +104,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
                                                       java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = studentQuery(reqVO, matchedIds);
         String classPredicate = " AND ({1} IS NULL OR sr.class_id={1})";
+        if (reqVO.getServiceStatus() == null && reqVO.getClassId() == null && !cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.hasExplicitStatus(reqVO.getAdvancedFilter())) classPredicate += " AND sr.teaching_closed=0 ";
         if (reqVO.getServiceStatus() == null) {
             query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                             + "AND sr.teaching_delivery=1 AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
@@ -113,9 +116,9 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
             query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                             + "AND sr.teaching_delivery=1 AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
                             + classPredicate
-                            + "AND ((sr.owner_user_id={0} AND sr.status={2}) "
+                            + "AND ((sr.owner_user_id={0} AND (CASE WHEN sr.teaching_closed=1 THEN 'closed' ELSE sr.status END)={2}) "
                             + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0}) "
-                            + "AND sr.status={2} AND sr.acceptance_status='accepted')))",
+                            + "AND (CASE WHEN sr.teaching_closed=1 THEN 'closed' ELSE sr.status END)={2} AND sr.acceptance_status='accepted')))",
                     userId, reqVO.getClassId(), reqVO.getServiceStatus());
         }
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
@@ -139,7 +142,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
                 + "AND ({1} IS NULL OR sr.class_id={1}) AND ({2} IS NULL OR sr.status={2}) "
                 + "AND ((sr.owner_user_id={0} AND sr.status IN ('active','paused','completed')) "
                 + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0} OR sr.operator_user_id={0}) "
-                + "AND sr.status='active' AND sr.acceptance_status='accepted')))" , userId, reqVO.getClassId(), reqVO.getServiceStatus());
+                + "AND sr.status='active' AND (sr.media_ready=1 OR (sr.media_ready IS NULL AND sr.acceptance_status='accepted')))))" , userId, reqVO.getClassId(), reqVO.getServiceStatus());
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }
 
@@ -155,13 +158,13 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
                 query.apply(scope + ")", req.getOperatorUserId(), req.getClassId(), req.getServiceStatus());
             } else {
                 scope += "AND sr.status IN ('active','paused','completed') AND (sr.owner_user_id={3} "
-                        + "OR (sr.acceptance_status='accepted' AND (sr.content_director_user_id={3} "
+                        + "OR ((sr.media_ready=1 OR (sr.media_ready IS NULL AND sr.acceptance_status='accepted')) AND (sr.content_director_user_id={3} "
                         + "OR sr.career_planner_user_id={3} OR sr.operator_user_id={3}))))";
                 query.apply(scope, req.getOperatorUserId(), req.getClassId(), req.getServiceStatus(), subjectId);
             }
         } else {
             // Default personal projection includes active accepted services visible through account participation.
-            scope += "AND sr.status='active' AND sr.acceptance_status='accepted' "
+            scope += "AND sr.status='active' AND (sr.media_ready=1 OR (sr.media_ready IS NULL AND sr.acceptance_status='accepted')) "
                     + "AND (sr.content_director_user_id={1} OR sr.career_planner_user_id={1} OR sr.operator_user_id={1} "
                     + "OR EXISTS (SELECT 1 FROM zsjos_media_account opma WHERE opma.student_person_id=sr.person_id "
                     + "AND opma.tenant_id=sr.tenant_id AND opma.deleted=b'0' "
@@ -223,20 +226,37 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     private static void applyStatusPredicate(QueryWrapperX<PersonDO> query, MyStudentPageReqVO reqVO,
                                              String scopeClause) {
         StudentScopePredicate predicate = buildStudentScopePredicate(
-                STUDENT_RELATION_PREDICATE + scopeClause, reqVO.getClassId(), reqVO.getServiceStatus());
+                STUDENT_RELATION_PREDICATE + scopeClause, reqVO.getClassId(), reqVO.getServiceStatus(),
+                cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.hasExplicitStatus(reqVO.getAdvancedFilter()));
         query.apply(predicate.sql(), predicate.args());
     }
 
     /** The SQL fragment plus its positional arguments, kept together so the two can never drift. */
     static StudentScopePredicate buildStudentScopePredicate(String prefix, Long classId, String serviceStatus) {
+        return buildStudentScopePredicate(prefix,classId,serviceStatus,false);
+    }
+    static StudentScopePredicate buildStudentScopePredicate(String prefix, Long classId, String serviceStatus, boolean explicitStatus) {
         return serviceStatus == null
-                ? new StudentScopePredicate(prefix + "sr.status IN ('active','paused','completed'))", new Object[]{classId})
-                : new StudentScopePredicate(prefix + "sr.status={1})", new Object[]{classId, serviceStatus});
+                ? new StudentScopePredicate(prefix + (classId == null && !explicitStatus ? "sr.teaching_closed=0 AND " : "") + "sr.status IN ('active','paused','completed'))", new Object[]{classId})
+                : new StudentScopePredicate(prefix + "(CASE WHEN sr.teaching_closed=1 THEN 'closed' ELSE sr.status END)={1})", new Object[]{classId, serviceStatus});
     }
 
     private static QueryWrapperX<PersonDO> studentQuery(MyStudentPageReqVO reqVO,
                                                          java.util.Collection<Long> matchedIds) {
         QueryWrapperX<PersonDO> query = new QueryWrapperX<>();
+        if (reqVO.getProjectionKeyword() != null && !reqVO.getProjectionKeyword().isBlank()) {
+            String keyword = reqVO.getProjectionKeyword();
+            query.and(q -> q.apply("LOCATE({0},zsjos_person.mobile)>0 OR LOCATE({0},zsjos_person.wechat_id)>0 "
+                    + "OR LOCATE({0},zsjos_person.person_no)>0 OR EXISTS (SELECT 1 FROM zsjos_service_relation sk "
+                    + "WHERE sk.person_id=zsjos_person.id AND sk.tenant_id=zsjos_person.tenant_id "
+                    + "AND sk.deleted=0 AND LOCATE({0},sk.student_name_snapshot)>0) "
+                    + "OR EXISTS (SELECT 1 FROM zsjos_order so "
+                    + "JOIN zsjos_service_relation sr ON sr.order_id=so.id AND sr.tenant_id=so.tenant_id "
+                    + "AND sr.deleted=0 AND sr.teaching_delivery=1 WHERE so.person_id=zsjos_person.id "
+                    + "AND so.tenant_id=zsjos_person.tenant_id AND so.deleted=0 AND LOCATE({0},so.order_no)>0) "
+                    + "OR EXISTS (SELECT 1 FROM zsjos_lead lk WHERE lk.person_id=zsjos_person.id "
+                    + "AND lk.tenant_id=zsjos_person.tenant_id AND lk.deleted=0 AND LOCATE({0},lk.lead_no)>0)", keyword));
+        }
         query.eqIfPresent("in_service_period", reqVO.getInServicePeriod());
         if (matchedIds != null) {
             if (matchedIds.isEmpty()) query.eq("id", -1L);

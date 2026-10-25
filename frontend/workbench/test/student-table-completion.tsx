@@ -10,6 +10,7 @@ localStorage.setItem("crm-theme",JSON.stringify({inboxLayoutMode:params.get("lay
 const rows:StudentServiceSubject[]=[1,2].map(id=>({personId:7,personNo:"TEST-7",name:"同一学员",serviceRelationId:id,service:{serviceRelationId:id,courseName:`课程${id}`,className:`班级${id}`,status:"active",acceptanceStatus:"pending",owner:true,version:0}}))
 rows.forEach((r,i)=> { r.mobile='1390000000'+i; r.wechatId='fixture-'+i; r.service.ownerUserId=20+i; r.service.ownerUserName='规划师'+(i+1); r.service.skuName='具体方案'+(i+1); r.summary={deliveryStage:'supervision',deliveryStageLabel:'常规督学', examDate:'2026-11-10',currentTask:{id:30+i,type:'student_contact',status:'pending',dueAt:'2026-10-14 10:00:00',overdue:i===0},orderHandoff:{access:'denied'},infoSubmission:{access:'absent'}} })
 if(params.has('saved'))localStorage.setItem('crm-student-management-table-columns',JSON.stringify({mobile:{show:false,order:2},activatedAt:{show:true,order:20}}))
+if(params.has('long'))rows.forEach((r,i)=> { r.service.courseName=['注册营养师','健康管理师'][i]; r.service.skuName=['注册营养师｜高效定制班','健康管理师｜人社部技能等级｜二级｜VIP高端班'][i]; r.service.specs=[{attrKey:'sale-plan',attrName:'销售规格',label:'高效定制班',value:'custom'}]; r.service.className='测试班级2026-10｜课程学习陪考圈' })
 const state={requests:[] as unknown[], writes:[] as number[],fail:false,delay:0}
 Object.assign(window,{subjectFixture:state})
 http.defaults.adapter=async()=>{throw Error("No live API in fixture")}

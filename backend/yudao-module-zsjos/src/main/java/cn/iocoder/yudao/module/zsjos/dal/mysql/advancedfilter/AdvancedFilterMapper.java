@@ -55,7 +55,7 @@ public interface AdvancedFilterMapper {
             // Only fields required by the existing object permission provider and scoped user options.
             return "SELECT ma.id, ma.tenant_id, ma.student_person_id, ma.owner_operator_user_id, "
                     + "ma.director_user_id, ma.create_service_relation_id, ma.run_status "
-                    + "FROM zsjos_media_account ma WHERE ma.deleted=0 "
+                    + "FROM zsjos_media_account ma WHERE ma.deleted=0 AND (ma.run_status IS NULL OR ma.run_status<>'deleted') "
                     + "AND ma.tenant_id=#{query.parameters.tenantId} AND ma.student_person_id IS NOT NULL "
                     + "AND (${query.whereSql})";
         }

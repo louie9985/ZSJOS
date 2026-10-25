@@ -13,7 +13,10 @@ public class DeliveryClassRespVO {
     private Long id;
     private String classNo;
     private String className;
+    private Long groupId;
+    private String groupName;
     private Boolean systemClass;
+    private String classKind;
     private Long productId;
     private String productNameSnapshot;
     private Map<String, String> selectedAttrs;
@@ -35,6 +38,7 @@ public class DeliveryClassRespVO {
     private String status;
     private Integer studentCount;
     private List<DeliveryClassProjectRespVO> projects = List.of();
+    private List<String> availableActions = List.of();
     private Integer version;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

@@ -105,6 +105,90 @@ class LeadManagementServiceImplTest {
     private PartnerMapper partnerMapper;
     @Mock
     private BusinessTaskMapper businessTaskMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService menuTaskSummaryService;
+
+    @Test
+    void managedSalesFiltersIntersectForcedOwnerAndRejectCallerScopeOverrides() {
+        LeadManagementPageReqVO request = new LeadManagementPageReqVO();
+        request.setAudience("management"); request.setInboxGroup("valid"); request.setInboxQuick("today");
+        request.setOwnerUserId(999L); request.setRecycleSourceOwnerUserId(999L); request.setRelationScope("all");
+        request.setSalesOnly(true);
+        var config = new LeadInboxFilterConfigVO();
+        var filter = new LeadInboxFilterQuery(Set.of("valid"), Set.of(), false,
+                Map.of("status", Set.of("valid"), "follow_up_condition", Set.of("today")));
+        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(inboxFilterConfigService.getPublishedConfig("management")).thenReturn(config);
+        when(inboxFilterConfigService.resolveQuery(config, "valid", request.getInboxSectionOptions())).thenReturn(filter);
+        when(leadMapper.selectManagementPage(request, 20L, List.of(), filter, null)).thenReturn(PageResult.empty());
+        service.getManagedOwnerLeadPage(request, 10L, 20L);
+        assertEquals(20L, request.getOwnerUserId()); assertNull(request.getRecycleSourceOwnerUserId());
+        assertEquals("owned", request.getRelationScope()); assertTrue(request.isSalesOnly());
+        verify(leadMapper).selectManagementPage(request, 20L, List.of(), filter, null);
+    }
+
+    @Test
+    void managedSalesRecycleFilterUsesOnlySelectedSalesAttribution() {
+        LeadManagementPageReqVO request = new LeadManagementPageReqVO();
+        request.setAudience("management"); request.setInboxStage("recycle"); request.setOwnerUserId(999L);
+        var config = new LeadInboxFilterConfigVO();
+        var filter = new LeadInboxFilterQuery(Set.of(), Set.of("recycle_pending"), false,
+                Map.of("assignment_status", Set.of("recycle_pending")));
+        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(inboxFilterConfigService.getPublishedConfig("management")).thenReturn(config);
+        when(inboxFilterConfigService.resolveQuery(config, null, request.getInboxSectionOptions())).thenReturn(filter);
+        when(leadMapper.selectManagementPage(request, null, List.of(), filter, null)).thenReturn(PageResult.empty());
+        service.getManagedOwnerLeadPage(request, 10L, 20L);
+        assertNull(request.getOwnerUserId()); assertEquals(20L, request.getRecycleSourceOwnerUserId());
+        assertEquals("recycle_pending", request.getAssignmentStatus());
+        verify(leadMapper).selectManagementPage(request, null, List.of(), filter, null);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    void managedSalesLegacyAdminCallerRetainsOwnedAndRecycledScope(boolean recycled) {
+        LeadManagementPageReqVO request = new LeadManagementPageReqVO(); request.setRecycledOnly(recycled);
+        when(leadObjectPermissionService.hasTenantReadAll(10L)).thenReturn(true);
+        when(leadMapper.selectManagementPage(request, recycled ? null : 20L, List.of(), null, null)).thenReturn(PageResult.empty());
+        service.getManagedOwnerLeadPage(request, 10L, 20L);
+        assertEquals(recycled ? null : 20L, request.getOwnerUserId());
+        assertEquals(recycled ? 20L : null, request.getRecycleSourceOwnerUserId());
+        verifyNoInteractions(inboxFilterConfigService);
+    }
+
+    @Test
+    void managedSalesOutOfScopeFailsBeforeFilterAndDataQueries() {
+        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(30L));
+        assertThrows(ServiceException.class, () -> service.getManagedOwnerLeadPage(new LeadManagementPageReqVO(), 10L, 20L));
+        verifyNoInteractions(leadMapper, inboxFilterConfigService);
+    }
+
+    @Test
+    void pagePrioritizesOnlyServerResolvedPersonalTasksBeforePaginationWhenRequested() {
+        var req = new LeadManagementPageReqVO();
+        req.setPendingTasksFirst(true);
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
+        when(menuTaskSummaryService.getMyLeadReminderIds(10L)).thenReturn(List.of(88L));
+        when(leadMapper.selectManagementPageByScope(req, List.of(), List.of(10L), false,
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null, List.of(88L)))
+                .thenReturn(PageResult.empty());
+        assertTrue(service.getLeadPage(req, 10L).getList().isEmpty());
+        verify(leadMapper).selectManagementPageByScope(req, List.of(), List.of(10L), false,
+                new LeadInboxFilterQuery(Set.of(), Set.of(), false), null, List.of(88L));
+    }
+
+    @Test
+    void pendingTasksAreBoundToReturnedLeadIdsAndCurrentViewer() {
+        var first = new LeadManagementRespVO(); first.setId(1L);
+        var second = new LeadManagementRespVO(); second.setId(2L);
+        var reminder = new cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.LeadTaskReminderRespVO(
+                80L, "lead_first_follow_up", "首次跟进", null, false);
+        when(menuTaskSummaryService.getMyLeadReminders(20L, List.of(1L, 2L))).thenReturn(Map.of(2L, List.of(reminder)));
+        ReflectionTestUtils.invokeMethod(service, "populatePendingTasks", List.of(first, second), 20L);
+        assertTrue(first.getPendingTasks().isEmpty());
+        assertEquals(List.of(reminder), second.getPendingTasks());
+        verify(menuTaskSummaryService).getMyLeadReminders(20L, List.of(1L, 2L));
+    }
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({"education_self_sourced,self", "partner,specified"})
@@ -240,6 +324,7 @@ class LeadManagementServiceImplTest {
 
         PageResult<LeadManagementRespVO> result = service.getLeadPage(reqVO, 10L);
         verify(appealSummaryService).populate(result.getList(), 10L, false);
+        verify(menuTaskSummaryService).getMyLeadReminders(10L, List.of(1L));
 
         assertEquals(1L, result.getTotal());
         assertEquals(List.of("submitter"), result.getList().getFirst().getRelationTypes());
@@ -291,6 +376,7 @@ class LeadManagementServiceImplTest {
 
         LeadManagementRespVO result = service.getLead(1L, 10L);
         verify(appealSummaryService).populate(List.of(result), 10L, true);
+        verify(menuTaskSummaryService).getMyLeadReminders(10L, List.of(1L));
 
         assertEquals(List.of("submitter", "owner"), result.getRelationTypes());
         assertEquals("销售一号", result.getOwnerUserName());
@@ -342,10 +428,33 @@ class LeadManagementServiceImplTest {
         LeadManagementRespVO result = service.getLead(1L, 10L);
 
         assertEquals("提交销售", result.getSourceUserName());
+        assertEquals("用户10", result.getProviderOwnerNameSnapshot());
         assertEquals(10L, result.getSourceUserId());
         assertNotEquals("负责销售", result.getOwnerUserName());
         assertEquals(result.getOwnerUserName(), result.getQualifiedByUserName());
         assertEquals(null, result.getOwnerUserId());
+    }
+
+    @Test
+    void detailMasksEmployeeProviderSnapshotForOwnerWithoutChangingStoredName() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setDispatchMode("auto");
+        lead.setProviderOwnerNameSnapshot("测试提供人");
+        AdminUserRespDTO submitter = user(10L, 0); submitter.setNickname("更名后的提供人");
+        AdminUserRespDTO owner = user(20L, 0);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, submitter, 20L, owner));
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 20L)).thenReturn(true);
+        when(leadObjectPermissionService.canViewUnmaskedIdentity(20L, lead)).thenReturn(false);
+
+        LeadManagementRespVO result = service.getLead(1L, 20L);
+
+        assertEquals("测****", result.getProviderOwnerNameSnapshot());
+        assertEquals("更******", result.getSourceUserName());
+        assertEquals("测试提供人", lead.getProviderOwnerNameSnapshot());
+        assertEquals("counterparty_masked", result.getIdentityMaskMode());
     }
 
     @Test
@@ -367,6 +476,8 @@ class LeadManagementServiceImplTest {
         assertEquals("指定销售", submitterView.getOwnerUserName());
         assertEquals(20L, submitterView.getOwnerUserId());
         assertEquals("新媒体提交人", ownerView.getSourceUserName());
+        assertEquals("用户10", ownerView.getProviderOwnerNameSnapshot());
+        assertEquals("用户10", submitterView.getProviderOwnerNameSnapshot());
         assertEquals(10L, ownerView.getSourceUserId());
         assertEquals("full", submitterView.getIdentityMaskMode());
         assertEquals("full", ownerView.getIdentityMaskMode());
@@ -388,6 +499,7 @@ class LeadManagementServiceImplTest {
 
         assertEquals("提交销售", result.getSourceUserName());
         assertEquals("负责销售", result.getOwnerUserName());
+        assertEquals("用户10", result.getProviderOwnerNameSnapshot());
         assertEquals(20L, result.getOwnerUserId());
     }
 

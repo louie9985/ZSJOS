@@ -258,6 +258,57 @@ class MediaAccountProfileServiceTest {
             d.setValue(code); d.setLabel("历史标签-" + code); return List.of(d);
         });
     }
+    @Test void sameStageDiagnosisPreservesUnknownStart() {
+        account.setSStage("S2");
+        assertNull(initialDiagnosisStart());
+    }
+
+    @Test void sameStageDiagnosisPreservesKnownStart() {
+        var previous = java.time.LocalDateTime.of(2026, 10, 1, 23, 59);
+        account.setSStage("S2").setSStageEnteredAt(previous);
+        assertEquals(previous, initialDiagnosisStart());
+    }
+
+    @Test void ordinaryProfilePatchRejectsRecoveryMetadata() {
+        when(mapper.selectByIdForUpdate(1L,7L)).thenReturn(account);
+        when(objects.hasPermission(1L,"edit",10L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(10L,"zsjos:media-account:edit","zsjos:media-account:maintenance")).thenReturn(true);
+        var request = new Patch(); request.setVersion(3); request.setConfigVersionId(8L);
+        request.setIdempotencyKey("fake-timing"); request.setChanges(Map.of(MediaAccountStageTiming.RECOVERY_KEY, Map.of("stage", "S2")));
+        assertThrows(ServiceException.class, () -> service.patch(1L, request, 10L));
+        verify(mapper, never()).update(isNull(), any());
+    }
+
+    private Object initialDiagnosisStart() {
+        writable(10L); dictionaries(); applied(); when(mapper.update(isNull(), any())).thenReturn(1);
+        service.submitDiagnosis(1L, diagnosis("diagnosis_initial"), 10L);
+        var captor = ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(mapper).update(isNull(), captor.capture());
+        var wrapper = (com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<MediaAccountDO>) captor.getValue();
+        String column = com.baomidou.mybatisplus.core.metadata.TableInfoHelper.getTableInfo(MediaAccountDO.class)
+                .getFieldList().stream().filter(f -> "sStageEnteredAt".equals(f.getProperty())).findFirst().orElseThrow().getColumn();
+        String assignment = java.util.Arrays.stream(wrapper.getSqlSet().split(","))
+                .filter(part -> part.startsWith(column + "=")).findFirst().orElseThrow();
+        String parameter = assignment.substring(assignment.lastIndexOf('.') + 1, assignment.length() - 1);
+        return wrapper.getParamNameValuePairs().get(parameter);
+    }
+
+    @Test void stageStartAndDiagnosisHistoryShareOneSuccessfulTimestamp() {
+        writable(10L); dictionaries(); applied(); when(mapper.update(isNull(), any())).thenReturn(1);
+        service.submitDiagnosis(1L, diagnosis("diagnosis_initial"), 10L);
+        var entryCaptor = ArgumentCaptor.forClass(MediaAccountProfileEntryDO.class);
+        verify(entries).insert(entryCaptor.capture());
+        var wrapperCaptor = ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(mapper).update(isNull(), wrapperCaptor.capture());
+        var wrapper = (com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<MediaAccountDO>) wrapperCaptor.getValue();
+        var when = entryCaptor.getValue().getCreateTime();
+        assertNotNull(when);
+        var column = com.baomidou.mybatisplus.core.metadata.TableInfoHelper.getTableInfo(MediaAccountDO.class)
+                .getFieldList().stream().filter(f -> "sStageEnteredAt".equals(f.getProperty())).findFirst().orElseThrow().getColumn();
+        assertTrue(wrapper.getSqlSet().contains(column + "="));
+        assertTrue(wrapper.getParamNameValuePairs().containsValue(when));
+    }
+
     @Test void initialDiagnosisFreezesLabelsAndDoesNotCompletePeriodicTask() {
         writable(10L); applied(); dictionaries(); when(mapper.update(isNull(),any())).thenReturn(1);
         assertEquals(4,service.submitDiagnosis(1L,diagnosis("diagnosis_initial"),10L));
@@ -383,4 +434,16 @@ class MediaAccountProfileServiceTest {
             assertFalse(MediaAccountFieldPolicy.canWrite(field(key,"OPERATOR","textarea"),account,20L));
         }
     }
+    @Test void legacyDiagnosisRejectsOtherEntryKindsBeforeParsingTheirContent() {
+        var request=new DiagnosisRequest();request.setTemplateType("diagnosis_7d");request.setPreviousEntryId(88L);
+        var entry=new MediaAccountProfileEntryDO();entry.setId(88L);entry.setAccountId(1L);
+        when(entries.selectById(88L)).thenReturn(entry);
+        for(String kind:List.of("PROFILE","RECORD")) {
+            entry.setKind(kind);entry.setContent("RECORD".equals(kind)?"普通文字":null);
+            assertEquals(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID.getCode(),assertThrows(ServiceException.class,
+                    () -> service.submitLegacyDiagnosis(1L,request,10L)).getCode());
+        }
+        verifyNoInteractions(mapper,diagnosisTasks,businessTaskCommandService);
+    }
+
 }

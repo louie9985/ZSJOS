@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PERSONA_TYPE;
 import static cn.iocoder.yudao.module.zsjos.enums.MaterialConstants.DICT_PROFESSION;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
@@ -73,6 +73,25 @@ class MediaAccountServiceTest {
         assertNull(saved.getValue().getPlatformValue());
         assertNull(saved.getValue().getSStage());
         assertEquals("{}", saved.getValue().getDetailValuesJson());
+    }
+
+    @Test
+    void deletionActionsRequireConfiguredPermissionAndSeparateDirectorFromOperator() {
+        var account = new MediaAccountDO().setId(1L).setRunStatus("active");
+        when(mapper.selectById(1L)).thenReturn(account);
+        when(objectPermissionProvider.hasPermission(eq(1L), anyString(), eq(20L))).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(eq(20L), any(String[].class))).thenReturn(false);
+        assertFalse(service.get(1L, 20L).getAvailableActions().contains("DELETE_ACCOUNT_DIRECTLY"));
+        when(permissionApi.hasAnyPermissions(20L, "zsjos:media-account:delete")).thenReturn(true);
+        when(objectPermissionProvider.hasPermission(1L, "delete-direct", 20L)).thenReturn(true);
+        assertTrue(service.get(1L, 20L).getAvailableActions().contains("DELETE_ACCOUNT_DIRECTLY"));
+        assertFalse(service.get(1L, 20L).getAvailableActions().contains("REQUEST_DELETE_ACCOUNT"));
+        when(objectPermissionProvider.hasPermission(1L, "delete-direct", 20L)).thenReturn(false);
+        when(objectPermissionProvider.hasPermission(1L, "delete-request", 20L)).thenReturn(true);
+        assertTrue(service.get(1L, 20L).getAvailableActions().contains("REQUEST_DELETE_ACCOUNT"));
+        account.setDeleteStatus("pending");
+        assertFalse(service.get(1L, 20L).getAvailableActions().contains("REQUEST_DELETE_ACCOUNT"));
+        assertFalse(service.get(1L, 20L).getAvailableActions().contains("DELETE_ACCOUNT_DIRECTLY"));
     }
 
     @Test

@@ -16,6 +16,8 @@ with sync_playwright() as p:
         page.goto(base + '/test/student-table-completion.html?layout=' + ('inbox' if width == 390 else 'table'))
         if width > 390:
             expect(page.locator('tr.ant-table-row')).to_have_count(2)
+            expect(page.locator('tr.ant-table-row .ant-avatar')).to_have_count(0)
+            expect(page.locator('tr.ant-table-row').first.locator('td').first).to_contain_text('同一学员')
             expect(page.locator('thead').get_by_text('学习规划师（班主任）', exact=True)).to_be_visible()
             expect(page.locator('tr.ant-table-row').first).to_contain_text('规划师1')
             page.locator('tr.ant-table-row').nth(1).click()

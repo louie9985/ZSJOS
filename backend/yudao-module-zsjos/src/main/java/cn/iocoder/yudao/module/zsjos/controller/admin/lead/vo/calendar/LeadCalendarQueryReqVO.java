@@ -14,8 +14,8 @@ public class LeadCalendarQueryReqVO {
     private LocalDate end;
     @Min(1) @Max(100000) private int pageNo = 1;
     @Min(1) @Max(48) private int pageSize = 24;
-    @NotNull @Pattern(regexp = "deadline|category|ownershipStartedAt") private String sort = "deadline";
-    @NotNull @Pattern(regexp = "asc|desc") private String direction = "asc";
+    @NotNull @Pattern(regexp = "deadline|category|ownershipStartedAt|submittedAt") private String sort = "submittedAt";
+    @NotNull @Pattern(regexp = "asc|desc") private String direction = "desc";
 
     @AssertTrue(message = "日历查询范围须为 1 至 42 天，结束日期不包含在内")
     public boolean isValidRange() {

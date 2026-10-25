@@ -42,7 +42,7 @@ describe('global inbox layout mode', () => {
     expect(lead).toContain('detailContent')
     expect(lead).toContain('filters={')
     expect(lead).toContain('batchActions={')
-    expect(lead).toContain('AdvancedFilterToolbar scene="lead" pageKey="lead_management"')
+    expect(lead).toContain("AdvancedFilterToolbar scene=\"lead\" pageKey={salesUserId === undefined ? 'lead_management' : 'subordinate_sales_leads'}")
     expectSourceToContainTokens(detail, "if (tab === 'follow-ups')")
     expectSourceToContainTokens(detail, "if (tab === 'appeals')")
     expectSourceToContainTokens(detail, "if (tab === 'complaints')")

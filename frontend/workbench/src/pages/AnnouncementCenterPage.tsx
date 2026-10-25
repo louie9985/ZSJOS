@@ -97,7 +97,7 @@ export default function AnnouncementCenterPage({ permissions }: { permissions: s
 function MyAnnouncements() {
   const screens = Grid.useBreakpoint()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { refresh: refreshSummary } = useAnnouncements()
+  const { refresh: refreshSummary, confirmRead } = useAnnouncements()
   const [items, setItems] = useState<Announcement[]>([])
   const [tablePage, setTablePage] = useState(1)
   const [tablePageSize, setTablePageSize] = useState(CURSOR_LIMIT)
@@ -152,10 +152,11 @@ function MyAnnouncements() {
     } finally { if (request === detailGeneration.current) setDetailLoading(false) }
   }, [])
   const onRead = useCallback((id: number) => {
+    confirmRead(id)
     setSelected(current => current?.id === id ? { ...current, read: true } : current)
     setItems(current => current.map(item => item.id === id ? { ...item, read: true } : item))
     void refreshSummary()
-  }, [refreshSummary])
+  }, [confirmRead, refreshSummary])
   useEffect(() => () => { detailGeneration.current++; listGeneration.current++ }, [])
 
   // URL changes select only the detail; they must not reset the cursor or list scroll.

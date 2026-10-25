@@ -39,6 +39,12 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class DeliveryClassServiceImplTest {
+    @org.junit.jupiter.api.BeforeEach
+    void denyUnconfiguredFeaturePermissions() {
+        org.mockito.Mockito.lenient().when(permissionApi.hasAnyPermissions(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(false);
+    }
+
     @InjectMocks private DeliveryClassServiceImpl service;
     @Mock private DeliveryClassMapper classMapper;
     @Mock private ServiceRelationMapper relationMapper;
@@ -54,6 +60,35 @@ class DeliveryClassServiceImplTest {
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private DeliveryClassNotifyPublisher notifyPublisher;
     @Mock private DeliveryClassNumberService numberService;
+    @Mock private DeliveryClassObjectPermissionProvider objectPermissions;
+
+    @Test void classQueryAllExpandsManagedPageButNotPersonalPageOrWrites() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
+        when(permissionApi.hasAnyPermissions(9L, DeliveryClassService.PERMISSION_QUERY_ALL)).thenReturn(true);
+        when(classMapper.selectDeliveryClassPage(request, java.util.Set.of(), null, true, true))
+                .thenReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty());
+        assertEquals(0L, service.getManagedPage(9L, request).getTotal());
+        when(classMapper.selectDeliveryClassPage(request, java.util.Set.of(), 9L, false, false))
+                .thenReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty());
+        assertEquals(0L, service.getMyPage(9L, request).getTotal());
+        var row = new DeliveryClassDO().setId(1L).setDeptId(80L).setStatus("SERVING").setSystemClass(false);
+        assertEquals(java.util.List.of(), service.availableActions(row, 9L));
+        verifyNoInteractions(scopeService, objectPermissions);
+    }
+
+    @Test void rowActionsRequireFeatureObjectSameDepartmentAndLifecycle() {
+        var row = new DeliveryClassDO().setId(1L).setDeptId(80L).setStatus("SERVING").setSystemClass(false);
+        when(permissionApi.hasAnyPermissions(9L, "zsjos:delivery-class:update")).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(9L, "zsjos:delivery-class:complete")).thenReturn(true);
+        assertEquals(java.util.List.of(), service.availableActions(row, 9L));
+        when(objectPermissions.commandScope(eq(9L),any())).thenReturn(new DeliveryClassScopeService.Scope(false,java.util.Set.of(80L)));
+        when(adminUserApi.getUser(9L)).thenReturn(new AdminUserRespDTO().setId(9L).setDeptId(80L));
+        assertEquals(java.util.List.of("UPDATE", "MOVE_GROUP", "COMPLETE"), service.availableActions(row, 9L));
+        row.setStatus("COMPLETED");
+        assertEquals(java.util.List.of("MOVE_GROUP"), service.availableActions(row, 9L));
+        row.setSystemClass(true);
+        assertEquals(java.util.List.of(), service.availableActions(row, 9L));
+    }
 
     @Test void administratorReadScopesDoNotReuseCommandDepartmentScope() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
@@ -129,12 +164,15 @@ class DeliveryClassServiceImplTest {
         }
     }
 
-    @Test
-    void pendingTransferSucceedsAcrossProductCategoriesAndPreservesServiceState() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"false,false","true,false","false,true","true,true"})
+    void pendingTransferSucceedsAcrossProductCategoriesAndPreservesServiceState(boolean unscheduledSource, boolean unscheduledTarget) {
         plannerRole(20L);
         ServiceRelationDO relation = relation(10L, 100L, 3);
         DeliveryClassDO pending = deliveryClass(100L, true, null, null);
-        DeliveryClassDO target = deliveryClass(200L, false, 8L, 20L);
+        DeliveryClassDO target = deliveryClass(200L, unscheduledTarget, 8L, 20L);
+        if (unscheduledSource) pending.setClassKind("UNSCHEDULED").setHomeroomUserId(11L).setDeptId(80L);
+        if (unscheduledTarget) target.setClassKind("UNSCHEDULED").setDeptId(80L);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
         when(classMapper.selectByIdForUpdate(200L, 1L)).thenReturn(target);
         when(classMapper.selectById(100L)).thenReturn(pending);
@@ -224,7 +262,7 @@ class DeliveryClassServiceImplTest {
 
 
 
-    @Test void createsNamedClassWithoutProductAndRequiresExplicitNameAndExam() {
+    @Test void createsNamedClassWithoutProductAndRequiresExplicitName() {
         plannerRole(20L);
         var schedule = new ExamScheduleDO().setId(70L).setScheduleName("自由考期").setRecordStatus("PUBLISHED")
                 .setScheduleType("EXACT").setExactDate(java.time.LocalDate.now().plusDays(10));
@@ -244,7 +282,7 @@ class DeliveryClassServiceImplTest {
         try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
             req.setClassName("  "); req.setExamScheduleId(null);
             var fields = factory.getValidator().validate(req).stream().map(v -> v.getPropertyPath().toString()).toList();
-            org.junit.jupiter.api.Assertions.assertTrue(fields.containsAll(java.util.List.of("className", "examDateValid")));
+            assertEquals(java.util.List.of("className"), fields);
         }
     }
 
@@ -283,6 +321,39 @@ class DeliveryClassServiceImplTest {
         assertEquals("多日考试 · " + today.minusDays(2) + "~" + today,options.getFirst().displayName());
         assertEquals(today.minusDays(2), options.getFirst().startDate());
         assertEquals(today, options.getFirst().endDate());
+    }
+
+    @Test void createsWithoutDatesThenFillsAndClearsDatesThroughEditor() {
+        plannerRole(20L);
+        when(adminUserApi.getUser(9L)).thenReturn(enabledUser(9L).setDeptId(80L));
+        when(adminUserApi.getUser(20L)).thenReturn(enabledUser(20L).setDeptId(80L));
+        when(numberService.next()).thenReturn("BJOPTIONAL");
+        var req = new DeliveryClassSaveReqVO(); req.setClassName("待补考期班"); req.setHomeroomUserId(20L);
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            org.junit.jupiter.api.Assertions.assertTrue(factory.getValidator().validate(req).isEmpty());
+        }
+        service.create(req, 9L);
+        var saved = org.mockito.ArgumentCaptor.forClass(DeliveryClassDO.class);
+        verify(classMapper).insert(saved.capture());
+        var current = saved.getValue().setId(100L);
+        current.setTenantId(1L);
+        org.junit.jupiter.api.Assertions.assertNull(current.getExamScheduleSnapshot());
+        org.junit.jupiter.api.Assertions.assertNull(current.getExamScheduleId());
+        org.junit.jupiter.api.Assertions.assertFalse(current.getSystemClass());
+        when(classMapper.selectByIdForUpdate(100L, 1L)).thenReturn(current);
+        when(classMapper.update(eq(current), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenAnswer(call -> {
+            var wrapper = (com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<DeliveryClassDO>) call.getArgument(1);
+            org.junit.jupiter.api.Assertions.assertTrue(wrapper.getSqlSet().contains("exam_schedule_snapshot="));
+            org.junit.jupiter.api.Assertions.assertTrue(wrapper.getParamNameValuePairs().containsValue(current.getExamScheduleSnapshot()));
+            return 1;
+        });
+        req.setVersion(0); req.setStartDate(java.time.LocalDate.of(2026, 12, 5));
+        service.update(100L, req, 9L);
+        assertEquals("2026-12-05", current.getExamScheduleSnapshot());
+        req.setVersion(1); req.setStartDate(null);
+        service.update(100L, req, 9L);
+        org.junit.jupiter.api.Assertions.assertNull(current.getExamScheduleSnapshot());
+        verifyNoInteractions(scheduleMapper, relationMapper);
     }
 
     @Test void manualDatesCreateWithoutCalendarAndOverrideReferenceId() {
@@ -364,4 +435,34 @@ class DeliveryClassServiceImplTest {
         req.setTargetClassId(targetId); req.setVersion(version); req.setReason("业务调班");
         return req;
     }
+    @Test void directTransferCandidatesUseCommandScopeEvenWithReadAllAndExplicitAll() {
+        var request=new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
+        request.setCommandTargetsOnly(true);request.setReadScope("ALL");
+        when(permissionApi.hasAnyPermissions(9L,"zsjos:delivery-class:direct-transfer")).thenReturn(true);
+        when(scopeService.resolve(9L)).thenReturn(new DeliveryClassScopeService.Scope(false,java.util.Set.of(80L)));
+        when(classMapper.classQuery(eq(request),eq(java.util.Set.of(80L)),isNull(),eq(false),eq(false))).thenCallRealMethod();
+        var query=service.scopedQuery(9L,request,true);query.getSqlSegment();
+        org.junit.jupiter.api.Assertions.assertTrue(query.getParamNameValuePairs().containsValue(80L));
+        verifyNoInteractions(readScopeService);
+        verify(permissionApi,never()).hasTenantReadAllAccess(anyLong());
+        when(permissionApi.hasAnyPermissions(9L,"zsjos:delivery-class:direct-transfer")).thenReturn(false);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,() -> service.scopedQuery(9L,request,true));
+    }
+
+    @Test void actionProjectionLoadsActorAndCommandScopeOnceForManyRows() {
+        var rows=java.util.stream.LongStream.rangeClosed(1,30).mapToObj(id -> {
+            var row=new DeliveryClassDO().setId(id).setDeptId(id==30?90L:80L).setStatus("SERVING").setSystemClass(false);
+            row.setTenantId(1L);return row;
+        }).toList();
+        when(permissionApi.hasAnyPermissions(9L,"zsjos:delivery-class:update")).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(9L,"zsjos:delivery-class:complete")).thenReturn(true);
+        var user=new AdminUserRespDTO().setId(9L).setDeptId(80L);when(adminUserApi.getUser(9L)).thenReturn(user);
+        when(objectPermissions.commandScope(9L,user)).thenReturn(new DeliveryClassScopeService.Scope(false,java.util.Set.of(80L)));
+        var result=service.toPageResult(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(rows,30L),9L);
+        assertEquals(java.util.List.of("UPDATE","MOVE_GROUP","COMPLETE"),result.getList().getFirst().getAvailableActions());
+        assertEquals(java.util.List.of(),result.getList().getLast().getAvailableActions());
+        verify(adminUserApi,times(1)).getUser(9L);verify(objectPermissions,times(1)).commandScope(9L,user);
+        verify(permissionApi,times(1)).hasAnyPermissions(9L,"zsjos:delivery-class:update");
+    }
+
 }

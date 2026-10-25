@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.bpm.content.provider;
 
+import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountStageTiming;
 import cn.iocoder.yudao.module.bpm.api.approvalcontent.vo.BpmApprovalBriefVO;
 import cn.iocoder.yudao.module.bpm.api.approvalcontent.vo.BpmApprovalDetailVO;
 import cn.iocoder.yudao.module.bpm.api.approvalcontent.vo.BpmApprovalFieldVO;
@@ -71,8 +72,8 @@ public class ContentReviewContentProvider implements BpmApprovalContentProvider 
                 BpmApprovalFieldVO.of("状态", statusText(batch.getStatus())),
                 BpmApprovalFieldVO.of("内容条数", contentCount(batch) + " 条"),
                 BpmApprovalFieldVO.of("编导", batch.getDirectorName())));
-        // 内容审核页当前不接收 query 参数，只能定位到页面、无法高亮具体批次。
         brief.setRoute("/zsjos/material-library/content-review");
+        brief.setQuery(java.util.Map.of("batchId", Long.valueOf(businessId)));
         return brief;
     }
 
@@ -89,8 +90,8 @@ public class ContentReviewContentProvider implements BpmApprovalContentProvider 
         card.setBizType(bizType());
         card.setTitle(batch.getBatchNo());
         card.setStatusText(statusText(batch.getStatus()));
-        // 内容审核页当前不接收 query 参数，只能定位到页面、无法高亮具体批次。
         card.setRoute("/zsjos/material-library/content-review");
+        card.setQuery(java.util.Map.of("batchId", Long.valueOf(businessId)));
 
         card.getGroups().add(group("批次信息", List.of(
                 BpmApprovalFieldVO.of("批次号", batch.getBatchNo()),
@@ -106,6 +107,8 @@ public class ContentReviewContentProvider implements BpmApprovalContentProvider 
                 BpmApprovalFieldVO.of("终审完成", BpmApprovalFormat.dateTime(batch.getFinalCompletedAt())),
                 BpmApprovalFieldVO.of("定稿时间", BpmApprovalFormat.dateTime(batch.getFinalizedAt())))));
 
+        addAccountTiming(card, batch);
+
         // 逐条内容的附件：终审要看的就是这些，只有批次级信息无法判断。
         addItemAttachments(card, batch);
 
@@ -114,6 +117,32 @@ public class ContentReviewContentProvider implements BpmApprovalContentProvider 
                     BpmApprovalFieldVO.of("修订自批次", String.valueOf(batch.getRevisionOfBatchId())))));
         }
         return card;
+    }
+
+    private void addAccountTiming(BpmApprovalDetailVO card, ContentReviewBatchRespVO batch) {
+        if (batch.getContextSnapshot() == null) return;
+        Object raw = batch.getContextSnapshot().get("accountSnapshots");
+        List<?> snapshots = raw instanceof List<?> list && !list.isEmpty() ? list
+                : batch.getContextSnapshot().get("account") instanceof java.util.Map<?, ?> primary ? List.of(primary) : List.of();
+        for (Object row : snapshots) {
+            if (!(row instanceof java.util.Map<?, ?> snapshot)) continue;
+            String duration = "阶段时长未记录";
+            if (snapshot.get("sStageDurationDays") instanceof Number days && days.longValue() >= 0
+                    && snapshot.get("sStageEnteredAt") instanceof Number start
+                    && snapshot.get("sStageDurationAsOf") instanceof Number end && start.longValue() <= end.longValue()
+                    && ("RECORDED".equals(snapshot.get("sStageTimingSource")) || "HISTORY_RECONSTRUCTED".equals(snapshot.get("sStageTimingSource")))) {
+                var cutoff = java.time.LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(end.longValue()),
+                        MediaAccountStageTiming.ZONE);
+                duration = "已维持 " + days.longValue() + " 天（截至本轮提交时：" + BpmApprovalFormat.dateTime(cutoff)
+                        + "，北京时间）" + ("HISTORY_RECONSTRUCTED".equals(snapshot.get("sStageTimingSource")) ? "；根据诊断历史恢复" : "");
+            }
+            Object stage = snapshot.get("sStageLabel");
+            if (stage == null) stage = snapshot.get("stageLabelSnapshot");
+            card.getGroups().add(group("账号资料", List.of(
+                    BpmApprovalFieldVO.of("账号名称", snapshot.get("nickname") instanceof String name ? name : "未记录"),
+                    BpmApprovalFieldVO.of("当前期段", stage instanceof String label ? label : "未记录"),
+                    BpmApprovalFieldVO.of("阶段时长", duration))));
+        }
     }
 
     /**

@@ -17,4 +17,5 @@ public class DeliveryClassStudentRespVO {
     private String ownerUserName;
     private LocalDateTime activatedAt;
     private Integer version;
+    private java.util.List<String> availableActions = java.util.List.of();
 }

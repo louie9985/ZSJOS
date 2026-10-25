@@ -1,3 +1,8 @@
+import TeachingServiceLifecyclePanel from '../components/TeachingServiceLifecyclePanel'
+import { StudentArchiveEditGuard, useStudentArchiveNavigationGuard } from '../components/StudentArchiveEditGuard'
+import { useWorkbenchPageGuard } from '../components/WorkbenchPageNavigation'
+import TaskIndicator, { leadTaskReminderText as taskReminderText } from '../components/LeadTaskIndicator'
+import { MENU_TASK_INVALIDATED_EVENT } from '../services/menuTaskRefresh'
 import { studentContactSchedule } from '../services/studentContactSchedule';
 import StudentServiceFilters, { type StudentQuickFilters } from '../components/StudentServiceFilters'
 import StudentServiceCard from '../components/StudentServiceCard'
@@ -76,7 +81,7 @@ const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : "请求失败，请重试";
 const key = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const serviceStatusLabel = (status: string) =>
-  ({ active: "服务中", completed: "已完成", cancelled: "已取消" })[status] ||
+  ({ active: "服务中", paused: "已暂停", completed: "已结业", closed: "已关闭", cancelled: "已取消" })[status] ||
   "未知状态";
 const studentContactTypeLabel = (type?: string) =>
   ({ student_first_contact: "首联", student_study_plan: "制定学习计划", student_contact: "普通跟进", student_delivery_stage: "交付记录" })[type || ""] || type || "联系记录";
@@ -486,7 +491,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         {classesDirty && <Alert type="info" showIcon title="分班选择尚未保存，保存后将流转至学生交付中心" />}
         <div className="registration-checklist">
           {selected.assignmentMode === "class_per_item" ? selected.classAssignments?.map(assignment => {
-            const options = classOptions.map(row => ({ value: row.id, disabled: false, label: row.systemClass ? "待分班" : `${row.className} · ${row.homeroomUserName || "未配置班主任"}` }));
+            const options = classOptions.map(row => ({ value: row.id, disabled: false, label: row.classKind === "PENDING" || (row.systemClass && !row.classKind) ? "待分班" : `${row.className} · ${row.homeroomUserName || "未配置班主任"}` }));
             if (assignment.classId && !options.some(row => row.value === assignment.classId)) {
               options.push({ value: assignment.classId, label: assignment.className || "已选班级", disabled: true });
             }
@@ -757,13 +762,24 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
 
 import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope';
 
-export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { permissions?: string[]; tenantReadAll?: boolean }) {
+export function MyStudentsPage(props: { permissions?: string[]; tenantReadAll?: boolean }) {
+  return <StudentArchiveEditGuard><MyStudentsPageContent {...props} /></StudentArchiveEditGuard>
+}
+
+function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { permissions?: string[]; tenantReadAll?: boolean }) {
+  const canQuery = hasPermission(permissions, 'zsjos:student:query-my');
+  // The linked detail endpoint explicitly accepts student:query-my and enforces object read scope.
+  const canQueryLead = canQuery || hasPermission(permissions, 'zsjos:lead:query');
+  const canQueryClasses = ['zsjos:delivery-class:query', 'zsjos:delivery-class:query-managed', 'zsjos:delivery-class:query-my'].some(permission => hasPermission(permissions, permission));
   const asServiceStudent = (value: import("../services/api").StudentServiceSubject): ServiceStudent => ({ ...value, services: [value.service] });
   const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' });
   const readOnly = readScope.readScope !== 'SELF';
   const { useTableLayout, isDesktop } = useInboxTableLayout();
   const avatarRail = useInboxAvatarRail('zsjos.my-students.list-collapsed');
   const location = useLocation();
+  const archiveGuard = useStudentArchiveNavigationGuard();
+  const canLeaveArchive = useCallback(() => archiveGuard?.confirmLeave() ?? true, [archiveGuard]);
+  useWorkbenchPageGuard(location.pathname, async () => canLeaveArchive());
   const taskTarget = location.state as { personId?: number; serviceRelationId?: number; classId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
   const requestedPersonId = Number(taskTarget?.personId) || undefined;
   const requestedServiceId = Number(taskTarget?.serviceRelationId) || undefined;
@@ -773,6 +789,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [studentSort, setStudentSort] = useState<BusinessSort>({});
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
+  useEffect(() => { if (!canQueryLead) setLeadDetail(undefined); }, [canQueryLead]);
   const [selectedServiceId, setSelectedServiceId] = useState<number>();
   const [repurchaseOpen, setRepurchaseOpen] = useState(false);
   const [studentContactContext, setStudentContactContext] = useState<import("../services/api").StudentContactContext>();
@@ -782,7 +799,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   const [categoryError, setCategoryError] = useState(false);
   const [channelError, setChannelError] = useState(false);
   const [keyword, setKeyword] = useState("");
-  const [serviceStatus, setServiceStatus] = useState<'active' | 'paused' | 'completed'>();
+  const [serviceStatus, setServiceStatus] = useState<'active' | 'paused' | 'completed' | 'closed'>();
   const [quickFilters, setQuickFilters] = useState<StudentQuickFilters>({});
   const [listUnauthorized, setListUnauthorized] = useState(false);
   const [classId, setClassId] = useState<number | undefined>(requestedClassId);
@@ -803,12 +820,16 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   const dictionaryGeneration = useRef(0);
   const inflightLists = useRef(new Set<string>());
   const resetSelection = () => {
+    if (!canLeaveArchive()) return false;
     detailGeneration.current += 1;
     setRows([]); setSelected(undefined); setSelectedServiceId(undefined); setLeadDetail(undefined);
     setStudentContactContext(undefined); setStudentContactRecords([]); setDetailError("");
+    return true;
   };
-  const loadStudent = useCallback(async (relationId: number) => {
+  const loadStudent = useCallback(async (relationId: number, checkLeave = true) => {
+    if (checkLeave && !canLeaveArchive()) return;
     const generation = ++detailGeneration.current;
+    if (!canQuery) { setSelected(undefined); setDetailLoading(false); return; }
     setSelectedServiceId(relationId);
     setDetailLoading(true);
     setDetailError("");
@@ -820,7 +841,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       setSelectedServiceId(service?.serviceRelationId);
       const leadId = service?.leadId;
       const [leadResult, context, records] = await Promise.all([
-        leadId ? api.managedLead(leadId).catch(() => undefined) : Promise.resolve(undefined),
+        leadId && canQueryLead ? api.managedLead(leadId).catch(() => undefined) : Promise.resolve(undefined),
         service ? api.studentContactContext(service.serviceRelationId) : Promise.resolve(undefined),
         service ? api.studentContactRecords(service.serviceRelationId, 1, 100) : Promise.resolve({ list: [], total: 0 }),
       ]);
@@ -838,7 +859,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     } finally {
       if (generation === detailGeneration.current) setDetailLoading(false);
     }
-  }, []);
+  }, [canQuery, canQueryLead, canLeaveArchive]);
   const targetNavigationKey = location.key;
   useEffect(() => {
     setClassId(requestedClassId);
@@ -847,6 +868,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   }, [loadStudent, requestedClassId, requestedPersonId, requestedServiceId, targetNavigationKey]);
   const loadDictionaries = useCallback(async () => {
     const generation = ++dictionaryGeneration.current;
+    if (!canQuery) return;
     const [categoryResult, channelResult] = await Promise.allSettled([
       api.dictDataByType(DICT_TYPE.LEAD_CATEGORY),
       api.dictDataByType(DICT_TYPE.LEAD_SOURCE_CHANNEL),
@@ -856,13 +878,15 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     else setCategoryError(true);
     if (channelResult.status === "fulfilled") { setChannels(channelResult.value); setChannelError(false); }
     else setChannelError(true);
-  }, []);
+  }, [canQuery]);
   useEffect(() => { void loadDictionaries(); }, [loadDictionaries]);
   const loadClassOptions = useCallback(async (search?: string) => {
     const generation = ++classOptionsGeneration.current;
+    if (!canQuery || !canQueryClasses) { setClassOptions([]); setClassOptionsError(''); setClassOptionsLoading(false); return; }
     if (readScope.readScope === 'USER' && !readScope.targetUserId) { setClassOptions([]); setClassOptionsLoading(false); return; }
     setClassOptionsLoading(true); setClassOptionsError('');
-    const manage = hasPermission(permissions, 'zsjos:delivery-class:query-managed');
+    const manage = hasPermission(permissions, 'zsjos:delivery-class:query-managed')
+      || hasPermission(permissions, 'zsjos:delivery-class:query-all') && hasPermission(permissions, 'zsjos:delivery-class:query');
     try {
       const [serving, completed] = await Promise.all([
         api.deliveryClasses.page({ ...(tenantReadAll ? readScope : {}), pageNo: 1, pageSize: 50, status: 'SERVING', keyword: search || undefined }, manage),
@@ -872,10 +896,12 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     } catch (requestError) {
       if (generation === classOptionsGeneration.current) { setClassOptions([]); setClassOptionsError(errorMessage(requestError)); }
     } finally { if (generation === classOptionsGeneration.current) setClassOptionsLoading(false); }
-  }, [permissions, tenantReadAll, readScope]);
+  }, [permissions, tenantReadAll, readScope, canQuery, canQueryClasses]);
   useEffect(() => { void loadClassOptions(); }, [loadClassOptions]);
   const load = useCallback(
     async (targetPage = pageNo, options: { force?: boolean; reloadDetail?: boolean } = {}) => {
+      if (options.reloadDetail !== false && !canLeaveArchive()) return;
+      if (!canQuery) { setRows([]); setTotal(0); setSelected(undefined); setListUnauthorized(true); setLoading(false); return; }
       if (readScope.readScope === 'USER' && !readScope.targetUserId) { setRows([]); setTotal(0); setSelected(undefined); return; }
       const baseRequestKey = JSON.stringify(quickFilters) + ":" + `${JSON.stringify(studentSort)}:${JSON.stringify(readScope)}:${targetPage}:${keyword}:${serviceStatus || ''}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
       if (!options.force && inflightLists.current.has(baseRequestKey)) return;
@@ -890,6 +916,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       setError("");
       try {
         const page = await api.myStudentServices({
+          pendingTasksFirst: true,
           ...quickFilters,
           personId: requestedPersonId,
           ...studentSort,
@@ -909,7 +936,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
           const target = selected && page.list.some((item) => item.serviceRelationId === selected.serviceRelationId)
             ? selected.serviceRelationId
             : (requestedPersonId && page.total !== 1 ? undefined : page.list[0]?.serviceRelationId);
-          if (target) await loadStudent(target);
+          if (target) await loadStudent(target, false);
           else setSelected(undefined);
         }
       } catch (requestError) {
@@ -923,22 +950,37 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus, readScope, tenantReadAll, studentSort, quickFilters],
+    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus, readScope, tenantReadAll, studentSort, quickFilters, canQuery, canLeaveArchive],
   );
   useEffect(() => {
     void load(1);
-  }, [advancedFilter, classId, keyword, serviceStatus, readScope, studentSort, quickFilters]);
+  }, [advancedFilter, classId, keyword, serviceStatus, readScope, studentSort, quickFilters, canQuery]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
+  // Reload only the list when obligations change; the active editor keeps its draft.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') void load(pageNo, { force: true, reloadDetail: false }); };
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener(MENU_TASK_INVALIDATED_EVENT, refresh);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(MENU_TASK_INVALIDATED_EVENT, refresh);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [load, pageNo]);
   const refreshCurrentStudent = useCallback(async () => {
+    if (!canLeaveArchive()) return;
     if (!selected) {
       await load(pageNo, { force: true });
       return;
     }
     await Promise.all([
       load(pageNo, { force: true, reloadDetail: false }),
-      loadStudent(selected.serviceRelationId),
+      loadStudent(selected.serviceRelationId, false),
     ]);
-  }, [load, loadStudent, pageNo, selected, selectedService?.serviceRelationId]);
+  }, [load, loadStudent, pageNo, selected, selectedService?.serviceRelationId, canLeaveArchive]);
   const canStudentRepurchase = Boolean(selectedService && hasPermission(permissions, 'zsjos:sales-order:student-repurchase')
     && selectedService.owner && selectedService.acceptanceStatus === 'accepted'
     && ['active', 'paused', 'completed'].includes(selectedService.status));
@@ -954,6 +996,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
     />
   ) : selected && selectedService && studentContactContext ? (
     <StudentPlannerOperations
+      teachingLifecycle
       key={selectedService.serviceRelationId}
       student={selected}
       service={selectedService}
@@ -963,14 +1006,14 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
       openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
       onRefresh={refreshCurrentStudent}
       onTransferred={async () => {
-        resetSelection(); setDrawerOpen(false); setPageNo(1);
+        if (!resetSelection()) return; setDrawerOpen(false); setPageNo(1);
         await Promise.all([load(1, { force: true, reloadDetail: false }), loadClassOptions()]);
       }}
     >
       {(studentToolbarActions) => <StudentDetail
       student={selected}
       service={selectedService}
-      contactContext={studentContactContext}
+      contactContext={{ ...studentContactContext, visibleTabs: studentContactContext.visibleTabs.filter(tab => tab !== 'student-info' || hasPermission(permissions, 'zsjos:student-archive:read')) }}
       contactRecords={studentContactRecords}
       toolbar={<OverflowToolbar actions={studentToolbarActions} />}
       overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords, onRefresh: refreshCurrentStudent }} slots={{ sidebarAfterStatus: <StudentServiceCard service={selectedService} /> }} />}
@@ -1032,27 +1075,45 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
   );
   const studentTableColumnSource = studentServiceColumnDefinitions();
   const studentTableColumns = studentServiceColumns(studentSort);
-  const changeStudentSort = (sort: BusinessSort) => { ++listGeneration.current; resetSelection(); setPageNo(1); setRows([]); setStudentSort(sort); };
+  const changeStudentSort = (sort: BusinessSort) => { if (!resetSelection()) return; ++listGeneration.current; setPageNo(1); setRows([]); setStudentSort(sort); };
   const studentSortMenu = <BusinessSortMenu label="学员" value={studentSort} fields={sortChoices(studentTableColumnSource.filter(column => column.sorter))} onChange={changeStudentSort} />;
+  const classFilterOptions = classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }));
+  const studentFilterControls = <div className="student-filter-controls">
+    <StudentServiceFilters value={quickFilters} onChange={value => { if (!resetSelection()) return; setPageNo(1); setQuickFilters(value); }} />
+    {canQueryClasses && <Select aria-label="全部班级" allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级"
+      popupMatchSelectWidth={false} virtual={false}
+      classNames={{ popup: { root: 'student-class-filter-popup' } }}
+      styles={{ popup: { root: { width: 'min(480px, calc(100vw - 24px))' } } }}
+      title={classFilterOptions.find(item => item.value === classId)?.label}
+      onChange={value => { if (!resetSelection()) return; setPageNo(1); setClassId(value); }}
+      options={classFilterOptions}
+      notFoundContent={classOptionsLoading ? <Spin size="small" /> : '暂无可选班级'} />}
+    <Select aria-label="全部服务状态" allowClear value={serviceStatus} placeholder="全部服务状态"
+      onChange={value => { if (!resetSelection()) return; setPageNo(1); setServiceStatus(value); }}
+      options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }, { value: 'closed', label: '已关闭' }]} />
+  </div>;
+  const studentSearchToolbar = <AdvancedFilterToolbar scene="student_service" pageKey="student_my" placeholder="搜索姓名、学员编号、手机号、微信号或客资编号" keyword={keyword} value={advancedFilter}
+    onKeyword={value => { if (!resetSelection()) return; setPageNo(1); setKeyword(value); }}
+    onChange={value => { if (!resetSelection()) return false; setPageNo(1); setAdvancedFilter(value); }} />;
+  if (!canQuery) return <Alert type="warning" showIcon message="暂无学员查询权限" />;
   return (
     <section className="workspace-page registration-page">
       <header className="registration-filter-shell">
         <div>
           <Typography.Title level={4}>学员管理</Typography.Title>
-          {tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setReadScope(value); setSelected(undefined); setDrawerOpen(false); }} />}
+          {tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { if (!resetSelection()) return; setReadScope(value); setDrawerOpen(false); }} />}
           <Typography.Text type="secondary">
-            查看当前负责的学员及课程权益
+            查看有权限的学员及课程权益
           </Typography.Text>
         </div>
         <Button icon={<ReloadOutlined />} onClick={() => { void refreshCurrentStudent(); void loadDictionaries(); }}>刷新</Button>
       </header>
       {classOptionsError && <Alert type="error" showIcon message="班级筛选加载失败" description={classOptionsError} action={<Button size="small" onClick={() => void loadClassOptions()}>重试</Button>} />}
-      <StudentServiceFilters value={quickFilters} onChange={value => { resetSelection(); setPageNo(1); setQuickFilters(value); }} />
       {useTableLayout ? <BusinessTable<ServiceStudent> tableKey="registration-pages-1" widthPersistenceKey="crm-student-management-table-widths" unauthorized={listUnauthorized} error={error} onReload={() => { void load(1, { force: true }); void loadDictionaries() }}
         className="lead-management-table"
         rowKey="serviceRelationId"
 
-        filters={<>{[<Space key="student-filters" wrap>{studentSortMenu}<Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: 220 }} onChange={value => { resetSelection(); setPageNo(1); setClassId(value) }} options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}/><Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: 160 }} onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value) }} options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/><AdvancedFilterToolbar scene="student_service" pageKey="student_my" placeholder="搜索姓名、学员编号、手机号、微信号或客资编号" keyword={keyword} value={advancedFilter} onKeyword={value => { resetSelection(); setPageNo(1); setKeyword(value) }} onChange={value => { resetSelection(); setPageNo(1); setAdvancedFilter(value) }}/></Space>]}</>}
+        filters={<div className="student-filter-toolbar" role="group" aria-label="学员筛选">{studentSortMenu}{studentFilterControls}{studentSearchToolbar}</div>}
 
         columnsState={{ defaultValue: studentColumnDefaults, persistenceKey: "crm-student-management-table-columns", persistenceType: "localStorage" }}
         loading={loading}
@@ -1060,39 +1121,15 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: value => void load(value) }}
         scroll={{ x: "max-content" }}
         locale={{ emptyText: error ? "学员列表加载失败" : "当前筛选下暂无学员" }}
-        onRow={row => ({ onClick: () => { void loadStudent(row.serviceRelationId); setDrawerOpen(true); } })}
+        onRow={row => ({ onClick: () => { if (!canLeaveArchive()) return; void loadStudent(row.serviceRelationId, false); setDrawerOpen(true); } })}
         columns={studentTableColumns}
         onChange={(_, __, sorter, extra) => { if (extra.action === "sort") changeStudentSort(readTableSort(sorter)); }}
       /> : <div className={`lead-inbox-layout inbox-avatar-layout student-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
         <aside className="lead-inbox-list-pane">
-          <div className="inbox-avatar-toolbar">{studentSortMenu}<InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || serviceStatus || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
+          <div className="inbox-avatar-toolbar">{studentSortMenu}<InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || serviceStatus || Object.values(quickFilters).some(value => value !== undefined) || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
           <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
-            <AdvancedFilterToolbar
-              scene="student_service"
-              pageKey="student_my"
-              placeholder="搜索姓名、学员编号、手机号、微信号或客资编号"
-              keyword={keyword}
-              value={advancedFilter}
-              onKeyword={(value) => {
-                resetSelection();
-                setPageNo(1);
-                setKeyword(value);
-              }}
-              onChange={(value) => {
-                resetSelection();
-                setPageNo(1);
-                setAdvancedFilter(value);
-              }}
-            />
-            <div className="inbox-avatar-secondary-filters">
-            <Select allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} optionFilterProp="label" value={classId} loading={classOptionsLoading} placeholder="全部班级" style={{ width: '100%' }}
-              onChange={value => { resetSelection(); setPageNo(1); setClassId(value); }}
-              options={classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }))}
-              notFoundContent={classOptionsLoading ? <Spin size="small" /> : '暂无可选班级'} />
-            <Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: '100%' }}
-              onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value); }}
-              options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/>
-            </div>
+            {studentSearchToolbar}
+            <div className="inbox-avatar-secondary-filters">{studentFilterControls}</div>
           </div>
           </div></div>
           {error && (avatarRail.collapsed ? <InboxAvatarError message={error} expand={() => avatarRail.change(false)} retry={() => void load(pageNo)} /> : <LoadState error={error} retry={() => void load(pageNo)} />)}
@@ -1107,13 +1144,14 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
               avatarRail.collapsed ? <span className="inbox-avatar-empty" role="status">暂无学员</span> : <Empty description="当前筛选下暂无学员" />
             ) : (
               rows.map((row) => (
-                <Tooltip key={row.serviceRelationId} title={avatarRail.collapsed ? `${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}` : undefined} trigger={['hover', 'focus']}><button
+                <Tooltip key={row.serviceRelationId} title={avatarRail.collapsed ? `${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}${row.pendingTasks?.length ? ` · 待处理：${taskReminderText(row)}` : ''}` : undefined} trigger={['hover', 'focus']}><button
                   type="button"
-                  aria-label={`${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}`}
+                  aria-label={`${row.name || '未填写姓名'} · ${row.personNo || '暂无学员编号'}${row.pendingTasks?.length ? ` · 待处理：${taskReminderText(row)}` : ''}`}
                   aria-current={selected?.serviceRelationId === row.serviceRelationId ? 'true' : undefined}
-                  className={`lead-inbox-item${selected?.serviceRelationId === row.serviceRelationId ? " active" : ""}`}
-                  onClick={() => { void loadStudent(row.serviceRelationId); if (!isDesktop) setDrawerOpen(true); }}
+                  className={`lead-inbox-item${selected?.serviceRelationId === row.serviceRelationId ? " active" : ""}${row.pendingTasks?.length ? ' has-pending-tasks' : ''}`}
+                  onClick={() => { if (!canLeaveArchive()) return; void loadStudent(row.serviceRelationId, false); if (!isDesktop) setDrawerOpen(true); }}
                 >
+                  {Boolean(row.pendingTasks?.length) && <span className="lead-task-border" aria-hidden="true" />}
                   <div className="lead-inbox-item-main">
                     <NameAvatar name={row.name || "学员"} seed={row.personNo} size={36} subjectType="student" />
                     <div className="lead-inbox-item-copy">
@@ -1132,6 +1170,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
                       </span>
                     </div>
                   </div>
+                  {!avatarRail.collapsed && <TaskIndicator lead={row} />}
                 </button></Tooltip>
               ))
             )}
@@ -1149,7 +1188,7 @@ export function MyStudentsPage({ permissions = [], tenantReadAll = false }: { pe
         </aside>
         <main className="lead-inbox-detail-pane">{detailContent}</main>
       </div>}
-      {(useTableLayout || !isDesktop) && <ResizableDetailDrawer desktopResizable open={drawerOpen} onClose={() => setDrawerOpen(false)} title="学员详情" placement="right" width="860px">{detailContent}</ResizableDetailDrawer>}
+      {(useTableLayout || !isDesktop) && <ResizableDetailDrawer desktopResizable open={drawerOpen} onClose={() => { if (canLeaveArchive()) { setDrawerOpen(false); setSelected(undefined); setSelectedServiceId(undefined); } }} title="学员详情" placement="right" width="860px">{detailContent}</ResizableDetailDrawer>}
       {repurchaseOpen && selected && <SalesOrderEntryModal
         lead={{ id: selected.personId, submittedName: selected.name || '', submittedMobile: selected.mobile, submittedWechatId: selected.wechatId,
           provinceCode: leadDetail?.provinceCode, provinceName: leadDetail?.provinceName, cityCode: leadDetail?.cityCode, cityName: leadDetail?.cityName }}
@@ -1170,7 +1209,7 @@ export function StudentContactForm({
   const [submitting, setSubmitting] = useState(false);
   const [attachmentUploads, setAttachmentUploads] = useState<Array<{ uid: string; name: string; status: "uploading" | "done" | "error"; url?: string; fileId?: number }>>([]);
   const [extensionReasons, setExtensionReasons] = useState<DictData[]>([]);
-  const taskType = context.currentTask?.type || 'student_contact';
+  const taskType = context.currentTask?.type || context.manualTaskType || 'student_contact';
   const successfulValue = Form.useWatch('successful', form);
   const planCompletedValue = Form.useWatch('studyPlanCompletedAtFirstContact', form);
   const schedule = studentContactSchedule(taskType, successfulValue === true, planCompletedValue === true,
@@ -1186,7 +1225,7 @@ export function StudentContactForm({
       .then(rows => setFieldDicts(Object.fromEntries(rows)))
       .catch(() => setFieldDicts({}));
   }, [context.formFields]);
-  if (!context.currentTask && !context.availableActions.includes("FOLLOW_UP")) return <Alert type="info" showIcon title="当前不可录入跟进" />;
+  if (!context.currentTask && !context.manualTaskType && !context.availableActions.includes("FOLLOW_UP")) return <Alert type="info" showIcon title="当前不可录入跟进" />;
   const submit = async (values: Record<string, unknown>) => {
     if (attachmentUploads.some(item => item.status !== "done" || item.fileId == null)) {
       message.warning("请等待附件上传完成，或移除上传失败的附件");
@@ -1240,7 +1279,8 @@ export function StudentContactForm({
   </Form>;
 }
 
-export function StudentPlannerOperations({ student, service, context, permissions, openTaskId, openTaskType, onRefresh, onTransferred, children }: {
+export function StudentPlannerOperations({ student, service, context, permissions, openTaskId, openTaskType, onRefresh, onTransferred, children, teachingLifecycle = false }: {
+  teachingLifecycle?: boolean;
   student: MyStudent;
   service: MyStudent["services"][number];
   context: import("../services/api").StudentContactContext;
@@ -1276,8 +1316,14 @@ export function StudentPlannerOperations({ student, service, context, permission
   const [transferTargetId, setTransferTargetId] = useState<number>();
   const [transferReason, setTransferReason] = useState("");
   const deliveryIdempotencyKey = useRef<string | undefined>(undefined);
-  const available = context.availableActions || [];
-  const stageAction = available.find(action => ["FIRST_CONTACT", "STUDY_PLAN", "FOLLOW_UP"].includes(action));
+  const available = teachingLifecycle && context.teachingClosed ? [] : context.availableActions || [];
+  const canAction = (action: import('../services/api').StudentContactAction, permission: string) => available.includes(action) && hasPermission(permissions, permission);
+  const canDirectTransfer = canAction('DIRECT_TRANSFER', 'zsjos:delivery-class:direct-transfer');
+  const canRequestTransfer = canAction('REQUEST_TRANSFER', 'zsjos:class-transfer:create');
+  const canAssignCollaborator = hasPermission(permissions, 'zsjos:student-collaborator:assign') || hasPermission(permissions, 'zsjos:student-collaborator:correct');
+  const stageAction = canAction('FIRST_CONTACT', 'zsjos:student-contact:first-submit') ? 'FIRST_CONTACT'
+    : canAction('STUDY_PLAN', 'zsjos:student-contact:study-plan-submit') ? 'STUDY_PLAN'
+    : canAction('FOLLOW_UP', 'zsjos:student-contact:submit') ? 'FOLLOW_UP' : undefined;
   const stageLabel = stageAction === "FIRST_CONTACT" ? "首联" : stageAction === "STUDY_PLAN" ? "制定学习计划" : "普通跟进";
   const taskOpened = useRef(false);
   useEffect(() => {
@@ -1371,16 +1417,17 @@ export function StudentPlannerOperations({ student, service, context, permission
     finally { setExamDateSaving(false); }
   };
   const openTransfer = async () => {
+    if (!canDirectTransfer && !canRequestTransfer) return;
     setTransferOpen(true); setTransferReason(""); setTransferTargetId(undefined);
     setTransferTargets([]); setTransferTargetsError(""); setTransferTargetsLoading(true);
     try {
-      if (hasPermission(permissions, "zsjos:delivery-class:direct-transfer")
+      if (canDirectTransfer
           && hasPermission(permissions, "zsjos:delivery-class:query-managed")) {
         const targets: DeliveryClassOption[] = [];
         let pageNo = 1;
         for (;;) {
-          const page = await api.deliveryClasses.page({ pageNo, pageSize: 50, status: 'SERVING', excludeSystemClass: true }, true);
-          targets.push(...page.list.filter(row => row.id !== service.classId));
+          const page = await api.deliveryClasses.page({ pageNo, pageSize: 50, status: 'SERVING', assignableOnly: true, commandTargetsOnly: true }, true);
+          targets.push(...page.list.filter(row => row.id !== service.classId).map(row => ({ ...row, homeroomUserName: row.homeroomUserNameSnapshot })));
           if (pageNo * 50 >= page.total || !page.list.length) break;
           pageNo++;
         }
@@ -1392,15 +1439,16 @@ export function StudentPlannerOperations({ student, service, context, permission
     finally { setTransferTargetsLoading(false); }
   };
   const submitTransfer = async () => {
+    if (!canDirectTransfer && !canRequestTransfer) return;
     if (!transferTargetId || !transferReason.trim()) { message.warning("请选择目标班级并填写调班原因"); return; }
     setTransferSaving(true);
     try {
       const payload = { targetClassId: transferTargetId, version: service.version || context.version, reason: transferReason.trim() };
-      if (hasPermission(permissions, "zsjos:delivery-class:direct-transfer")) await api.deliveryClasses.directTransfer(service.serviceRelationId, payload);
+      if (canDirectTransfer) await api.deliveryClasses.directTransfer(service.serviceRelationId, payload);
       else await api.deliveryClasses.requestTransfer(service.serviceRelationId, payload);
-      message.success(hasPermission(permissions, "zsjos:delivery-class:direct-transfer") ? "已完成调班" : "调班申请已提交");
+      message.success(canDirectTransfer ? "已完成调班" : "调班申请已提交");
       setTransferOpen(false);
-      if (hasPermission(permissions, "zsjos:delivery-class:direct-transfer") && onTransferred) await onTransferred();
+      if (canDirectTransfer && onTransferred) await onTransferred();
       else await onRefresh();
     } catch (error) { message.error(errorMessage(error)); }
     finally { setTransferSaving(false); }
@@ -1437,17 +1485,17 @@ export function StudentPlannerOperations({ student, service, context, permission
   };
 
   const toolbarActions: ToolbarAction[] = [
-    available.includes("ACCEPT") && { key: "student-accept", icon: <CheckOutlined />, label: "接收", onClick: accept },
+    canAction('ACCEPT', 'zsjos:student:accept') && { key: "student-accept", icon: <CheckOutlined />, label: "接收", onClick: accept },
     stageAction && { key: `student-${stageAction.toLowerCase()}`, icon: <PhoneOutlined />, label: stageLabel, onClick: () => setContactOpen(true) },
-    available.includes("EDIT_BASIC_INFO") && { key: "student-edit-basic-info", icon: <EditOutlined />, label: "修改信息", onClick: openBasicInfo },
-    available.includes("ASSIGN_CONTENT_DIRECTOR") && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
-    available.includes("ASSIGN_CAREER_PLANNER") && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
-    available.includes("UPDATE_EXAM_DATE") && { key: "student-exam-date", icon: <EditOutlined />, label: "修改考试时间", onClick: () => { examDateForm.setFieldsValue({ examDate: context.examDate ? dayjs(context.examDate) : undefined }); setExamDateOpen(true); } },
-    (hasPermission(permissions, "zsjos:delivery-class:direct-transfer") || hasPermission(permissions, "zsjos:class-transfer:create"))
+    canAction('EDIT_BASIC_INFO', 'zsjos:student:update-basic-info') && { key: "student-edit-basic-info", icon: <EditOutlined />, label: "修改信息", onClick: openBasicInfo },
+    available.includes("ASSIGN_CONTENT_DIRECTOR") && canAssignCollaborator && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
+    available.includes("ASSIGN_CAREER_PLANNER") && canAssignCollaborator && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
+    canAction('UPDATE_EXAM_DATE', 'zsjos:student:exam-date-update') && { key: "student-exam-date", icon: <EditOutlined />, label: "修改考试时间", onClick: () => { examDateForm.setFieldsValue({ examDate: context.examDate ? dayjs(context.examDate) : undefined }); setExamDateOpen(true); } },
+    !context.teachingClosed && (canDirectTransfer || canRequestTransfer)
       && { key: "student-class-transfer", icon: <EditOutlined />, label: "调班", onClick: () => void openTransfer() },
-    available.includes("EXAM_NOTICE_DONE") && { key: "student-exam-notice-done", icon: <CheckOutlined />, label: "已考前通知", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
-    available.includes("POST_EXAM_DONE") && { key: "student-post-exam-done", icon: <CheckOutlined />, label: "已考后回访", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
-    (available.includes("COMPLETE_STAGE") || available.includes("END_SERVICE")) && currentDeliveryStage
+    canAction('EXAM_NOTICE_DONE', 'zsjos:student-contact:delivery-stage-submit') && { key: "student-exam-notice-done", icon: <CheckOutlined />, label: "已考前通知", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
+    canAction('POST_EXAM_DONE', 'zsjos:student-contact:delivery-stage-submit') && { key: "student-post-exam-done", icon: <CheckOutlined />, label: "已考后回访", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
+    (canAction('COMPLETE_STAGE', 'zsjos:student-contact:delivery-stage-submit') || canAction('END_SERVICE', 'zsjos:student-contact:delivery-stage-submit')) && currentDeliveryStage
       && !["first_contact", "study_plan", "supervision"].includes(currentDeliveryStage.code)
       && { key: "student-delivery-stage", icon: <CheckOutlined />, label: currentDeliveryStage.label, onClick: () => {
         const templates: Record<string, Record<string, unknown>> = {
@@ -1463,7 +1511,9 @@ export function StudentPlannerOperations({ student, service, context, permission
   ].filter(Boolean) as ToolbarAction[];
 
   return <>
-    {children(toolbarActions)}
+    {teachingLifecycle ? <TeachingServiceLifecyclePanel relationId={service.serviceRelationId} version={context.version} permissions={permissions} onChanged={onRefresh}>
+      {lifecycleActions => children([...toolbarActions, ...lifecycleActions])}
+    </TeachingServiceLifecyclePanel> : children(toolbarActions)}
     <Modal title={stageLabel} open={contactOpen} footer={null} destroyOnHidden onCancel={() => setContactOpen(false)}>
       <StudentContactForm relationId={service.serviceRelationId} context={context} onDone={async () => { setContactOpen(false); await onRefresh(); }} />
     </Modal>
@@ -1481,9 +1531,9 @@ export function StudentPlannerOperations({ student, service, context, permission
         <Form.Item name="examDate" label="考试时间" rules={[{ required: true, message: "请选择考试日期" }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
       </Form>
     </Modal>
-    <Modal title="调班" open={transferOpen} confirmLoading={transferSaving} okButtonProps={{ disabled: transferTargetsLoading || !!transferTargetsError }} okText={hasPermission(permissions, "zsjos:delivery-class:direct-transfer") ? "确认调班" : "提交申请"} onCancel={() => setTransferOpen(false)} onOk={() => void submitTransfer()} destroyOnHidden>
+    <Modal title="调班" open={transferOpen} confirmLoading={transferSaving} okButtonProps={{ disabled: transferTargetsLoading || !!transferTargetsError }} okText={canDirectTransfer ? "确认调班" : "提交申请"} onCancel={() => setTransferOpen(false)} onOk={() => void submitTransfer()} destroyOnHidden>
       {transferTargetsError && <Alert type="error" showIcon message={transferTargetsError} action={<Button onClick={() => void openTransfer()}>重试</Button>} />}
-      <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch loading={transferTargetsLoading} disabled={transferTargetsLoading || !!transferTargetsError} notFoundContent={transferTargetsLoading ? '加载中…' : '暂无可调入的班级'} optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: row.className || row.classNo }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
+      <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch loading={transferTargetsLoading} disabled={transferTargetsLoading || !!transferTargetsError} notFoundContent={transferTargetsLoading ? '加载中…' : '暂无可调入的班级'} optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: row.classKind === "UNSCHEDULED" ? `${row.className} · ${row.homeroomUserName || "班主任姓名未记录"}` : row.className || row.classNo }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
     </Modal>
     <Modal title={assignmentType === "content_director" ? "分配编导" : "分配职业规划师"} open={Boolean(assignmentType)} confirmLoading={assignmentSaving} okText="确认分配" onCancel={() => setAssignmentType(undefined)} onOk={() => void assign()} destroyOnHidden>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>

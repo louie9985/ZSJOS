@@ -152,3 +152,7 @@ Infra 持有文件对象和预签名上传校验。素材字段中的字典选�
 ## Sales performance ownership
 
 ZSJOS owns sales targets, revisions, explicit sales organization associations and event-time performance attribution. It consumes System organization/post/user/permission APIs; it does not duplicate CRM statistics or workflow state. Both new pages are Workbench-only by explicit user decision. See [sales performance](../api/sales-performance.md).
+
+## Bounded positioning file uploads
+
+ZSJOS retains positioning attachment authorization, relation scope, MIME policy and aggregate budget. Infra owns the additive trusted-local-file `FileApi.createFileInfoFromPath` boundary, metadata and storage-provider streaming. The caller owns and cleans its staged source; Infra compensates only its newly generated storage path if upload or metadata persistence fails. Existing byte-array APIs remain compatible, and no filesystem path is accepted from a frontend request.

@@ -18,6 +18,17 @@ public class ContentReviewStudentDraftCreateReqVO {
     /** Optimistic version for saving an existing draft; absent only for legacy clients. */
     private Integer expectedVersion;
 
+    @Valid
+    private ContentReviewDraftReviewerSelectionVO draftReviewerSelection;
+
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private boolean draftReviewerSelectionProvided;
+
+    public void setDraftReviewerSelection(ContentReviewDraftReviewerSelectionVO selection) {
+        this.draftReviewerSelection = selection;
+        this.draftReviewerSelectionProvided = true;
+    }
+
     @NotNull(message = "请选择学员")
     private Long studentPersonId;
 

@@ -37,7 +37,7 @@ public class StudentInfoFields {
             f.setSort((i+1)*10); f.setNote("");
             f.setType(Set.of(2,4,7,8,12).contains(i) ? "dict" : i==5 ? "area" : i==18 ? "textarea" : i>=19 ? "images" : "text");
             f.setGroup(i<9 ? "basic" : i<15 ? "education" : i<19 ? "career" : "materials");
-            if (i>=19) { f.setMaxImages(9); f.setMaxSizeMb(10); }
+            if (i>=19) { f.setMaxImages(9); f.setMaxSizeMb(ATTACHMENT_MAX_SIZE_MB); }
             if (i==2) f.setDictType("system_user_sex");
             if (i==4) f.setDictType("zsjos_student_info_ethnicity");
             if (i==7) f.setDictType("zsjos_student_info_retraining");
@@ -68,7 +68,7 @@ public class StudentInfoFields {
         for (Field preset : presets()) {
             var existing = result.stream().filter(f -> f.getKey().equals(preset.getKey())).findFirst();
             if (existing.isEmpty()) result.add(preset);
-            else if ("images".equals(existing.get().getType())) existing.get().setAllowedExtensions(preset.getAllowedExtensions());
+            else if ("images".equals(existing.get().getType())) { existing.get().setAllowedExtensions(preset.getAllowedExtensions()); existing.get().setMaxSizeMb(ATTACHMENT_MAX_SIZE_MB); }
         }
         return result.stream().sorted(Comparator.comparing(Field::getSort).thenComparing(Field::getKey)).toList();
     }
@@ -76,7 +76,11 @@ public class StudentInfoFields {
     public List<Field> parse(String json) { return JsonUtils.parseArray(json, Field.class); }
 
     public List<Field> withAttachmentPolicy(List<Field> input) {
-        for (Field field : input) if ("images".equals(field.getType())) field.setAllowedExtensions(extensions(field.getKey()));
+        for (Field field : input) if ("images".equals(field.getType())) {
+            field.setAllowedExtensions(extensions(field.getKey()));
+            // The current upload policy applies to pending forms without rewriting issued snapshots.
+            field.setMaxSizeMb(ATTACHMENT_MAX_SIZE_MB);
+        }
         return input;
     }
 
@@ -94,7 +98,8 @@ public class StudentInfoFields {
                     || f.getSort()<0 || f.getSort()>10000 || f.getNote()!=null && f.getNote().length()>500)
                 throw exception(CONFIG_INVALID);
             if ("images".equals(f.getType()) && (f.getMaxImages()==null || f.getMaxImages()<2 || f.getMaxImages()>9
-                    || f.getMaxSizeMb()==null || f.getMaxSizeMb()<1 || f.getMaxSizeMb()>10)) throw exception(CONFIG_INVALID);
+                    || f.getMaxSizeMb()==null || f.getMaxSizeMb()<1 || f.getMaxSizeMb()>ATTACHMENT_MAX_SIZE_MB)) throw exception(CONFIG_INVALID);
+            if ("images".equals(f.getType())) f.setMaxSizeMb(ATTACHMENT_MAX_SIZE_MB);
             if (!"dict".equals(f.getType())) f.setDictType(null);
             f.setAllowedExtensions(p.getAllowedExtensions());
             if ("gender".equals(f.getKey()) && !"system_user_sex".equals(f.getDictType())) throw exception(CONFIG_INVALID);

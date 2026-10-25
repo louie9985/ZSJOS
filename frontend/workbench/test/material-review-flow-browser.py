@@ -14,7 +14,7 @@ with sync_playwright() as p:
 
     # 1. 带 bpm:process-instance:query：在途版本的抽屉里出现流程轨迹。
     page.goto(URL + '?view=mine&bpm=1')
-    page.get_by_role('button', name='修订审核中', exact=False).click()
+    page.get_by_role('button', name='修订审核中', exact=True).click()
     expect(page.locator('.material-layout-summary')).to_be_visible()
     panel = page.locator('.bpm-process-panel')
     expect(panel).to_be_visible()
@@ -32,7 +32,7 @@ with sync_playwright() as p:
 
     # 2. 缺权限：不渲染面板，抽屉其余部分与撤回入口不受影响。
     page.goto(URL + '?view=mine')
-    page.get_by_role('button', name='修订审核中', exact=False).click()
+    page.get_by_role('button', name='修订审核中', exact=True).click()
     expect(page.locator('.material-layout-summary')).to_be_visible()
     assert page.locator('.bpm-process-panel').count() == 0, '缺权限时不应渲染流程面板'
     expect(page.get_by_role('button', name='撤回审批', exact=True)).to_be_visible()

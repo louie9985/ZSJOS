@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
+import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
@@ -295,7 +296,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         replay = commandService.beginBatch("batch-" + action, managerUserId, reqVO.getIdempotencyKey(), fingerprint);
         if (replay != null) return replay;
         SubordinateBatchResultVO result = executeBatch(reqVO.getLeadIds(), leadId -> {
-            String itemKey = reqVO.getIdempotencyKey() + ":" + leadId;
+            String itemKey = batchItemKey(reqVO.getIdempotencyKey(), leadId);
             switch (action) {
                 case "transfer" -> commandService.transferOne(
                         leadId, reqVO.getTargetUserId(), managerUserId, reason, itemKey);
@@ -310,6 +311,12 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         });
         commandService.completeBatch(managerUserId, reqVO.getIdempotencyKey(), result);
         return result;
+    }
+
+    private static String batchItemKey(String batchKey, Long leadId) {
+        String key = batchKey + ":" + leadId;
+        // Keep historical valid keys replayable; oversized keys must fit the command table's VARCHAR(40).
+        return key.length() <= 40 ? key : DigestUtil.sha256Hex(key).substring(0, 40);
     }
 
     private List<SubordinateSalesRespVO> buildRows(List<AdminUserRespDTO> users) {

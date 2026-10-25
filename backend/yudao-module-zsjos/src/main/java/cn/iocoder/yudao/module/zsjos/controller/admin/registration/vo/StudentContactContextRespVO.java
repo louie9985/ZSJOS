@@ -14,6 +14,8 @@ public class StudentContactContextRespVO {
     private String acceptanceStatus;
     private LocalDateTime acceptedAt;
     private Integer version;
+    private Boolean teachingClosed;
+    private String manualTaskType;
     private CurrentTaskVO currentTask;
     private List<ChecklistItemVO> firstContactChecklist;
     private List<String> quickNotes;
@@ -86,6 +88,8 @@ public class StudentContactContextRespVO {
     }
     @Data public static class DirectorFormVO {
         private Integer version;
+    private Boolean teachingClosed;
+    private String manualTaskType;
         private String state;
         private Long configId;
         private Integer configVersion;

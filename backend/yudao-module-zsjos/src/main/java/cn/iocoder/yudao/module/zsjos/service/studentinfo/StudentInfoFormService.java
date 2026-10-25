@@ -175,18 +175,55 @@ public class StudentInfoFormService {
             result.setConfigVersion(configs.selectById(form.getConfigVersionId()).getVersionNo()); result.setFields(definitions(form));
             Map<String,List<Option>> options=new LinkedHashMap<>();
             for (var f:result.getFields()) if ("dict".equals(f.getType())) options.put(f.getKey(),fields.options(f));
-            result.setOptions(options); result.setImages(images.list(form.getId())); return result;
+            var draft = draft(form);
+            // A restored selection displays its saved label, including after dictionary renaming.
+            for (var selection : draft.getSelections().entrySet()) if (options.containsKey(selection.getKey())) {
+                var entries = new ArrayList<>(options.get(selection.getKey())); var saved = selection.getValue();
+                int index = java.util.stream.IntStream.range(0,entries.size()).filter(i -> saved.getCode().equals(entries.get(i).getValue())).findFirst().orElse(-1);
+                if (index < 0) entries.add(new Option(saved.getCode(),saved.getLabel()));
+                else entries.set(index,new Option(saved.getCode(),saved.getLabel()));
+                options.put(selection.getKey(), entries);
+            }
+            result.setDraft(draft); result.setOptions(options); result.setImages(images.list(form.getId())); return result;
         });
+    }
+    @Transactional(rollbackFor=Exception.class)
+    public Draft saveDraft(String token, DraftWrite request) {
+        return withLockedToken(token,form -> {
+            if (!"DRAFT".equals(effectiveState(form))) throw exception(LINK_EXPIRED);
+            var previous = draft(form);
+            // A timed-out response can hide a successful write; identical retries are safe.
+            if (request.getRevision() != null && previous.getRevision() == request.getRevision()+1
+                    && Objects.equals(request.getValues(),previous.getValues())) return previous;
+            if (!Objects.equals(request.getRevision(),previous.getRevision())) throw exception(DRAFT_CONFLICT);
+            var saved = StudentInfoDraftPolicy.build(definitions(form),previous,request.getValues(),fields::options);
+            saved.setRevision(previous.getRevision()+1); saved.setSavedAt(LocalDateTime.now());
+            var update = new StudentInfoFormDO(); update.setId(form.getId());
+            update.setDraftSnapshot(JsonUtils.toJsonString(saved)); update.setDraftRevision(saved.getRevision()); update.setDraftSavedAt(saved.getSavedAt());
+            forms.updateById(update); return saved;
+        });
+    }
+    private Draft draft(StudentInfoFormDO form) {
+        var saved = form.getDraftSnapshot() == null ? new Draft() : JsonUtils.parseObject(form.getDraftSnapshot(),Draft.class);
+        saved.setRevision(form.getDraftRevision() == null ? 0 : form.getDraftRevision()); saved.setSavedAt(form.getDraftSavedAt()); return saved;
     }
     @Transactional(rollbackFor=Exception.class)
     public void submit(String token,Submit request) {
         withLockedToken(token,form->{
             if ("SUBMITTED".equals(form.getStatus())) return null;
             if (!"DRAFT".equals(effectiveState(form))) throw exception(LINK_EXPIRED);
+            if (!Objects.equals(request.getRevision(), form.getDraftRevision() == null ? 0L : form.getDraftRevision())) throw exception(DRAFT_CONFLICT);
             var definitions=definitions(form); images.validateSubmission(form,definitions,request.getValues());
-            for (var answer:fields.validateCollectionValues(definitions,request.getValues())) { answer.setFormId(form.getId()); answer.setTenantId(form.getTenantId()); values.insert(answer); }
+            var draft = draft(form);
+            for (var answer:fields.validateCollectionValues(definitions,request.getValues())) {
+                var saved = draft.getSelections().get(answer.getFieldKey());
+                if (saved != null && Objects.equals(saved.getCode(),answer.getValueCode()) && Objects.equals(saved.getDictType(),answer.getDictType()))
+                    answer.setValueLabelSnapshot(saved.getLabel());
+                answer.setFormId(form.getId()); answer.setTenantId(form.getTenantId()); values.insert(answer);
+            }
             forms.update(null,new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,form.getId()).eq(StudentInfoFormDO::getStatus,"DRAFT")
-                    .set(StudentInfoFormDO::getStatus,"SUBMITTED").set(StudentInfoFormDO::getSubmittedAt,LocalDateTime.now()).set(StudentInfoFormDO::getSubmitSource,"public")); return null;
+                    .set(StudentInfoFormDO::getStatus,"SUBMITTED").set(StudentInfoFormDO::getSubmittedAt,LocalDateTime.now()).set(StudentInfoFormDO::getSubmitSource,"public")
+                    .set(StudentInfoFormDO::getDraftSnapshot,null).set(StudentInfoFormDO::getDraftSavedAt,null)); return null;
         });
     }
     public <T> T withLockedToken(String token,java.util.function.Function<StudentInfoFormDO,T> action) {

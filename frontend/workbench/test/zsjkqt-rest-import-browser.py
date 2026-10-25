@@ -1,0 +1,37 @@
+# -*- coding: utf-8 -*-
+from playwright.sync_api import sync_playwright, expect
+with sync_playwright() as p:
+    browser = p.chromium.launch(channel='chrome', headless=True)
+    for width in [1440,390]:
+        page = browser.new_page(viewport={'width':width,'height':900})
+        page.goto('http://127.0.0.1:5174/test/zsjkqt-rest-import.html')
+        page.set_default_timeout(10000)
+        button = page.get_by_role('button',name='从首页导入休息日')
+        expect(page.locator('.home-rest-import-select')).to_contain_text('普通休息日')
+        page.evaluate("restImportFixture.setMode('error')")
+        button.click()
+        expect(page.locator('p[role=status]')).to_contain_text('读取失败')
+        expect(page.locator('output')).to_have_text('{"restDays":[2],"paidRestDays":[3]}')
+        page.evaluate("restImportFixture.setMode('success')")
+        page.get_by_role('combobox').click()
+        expect(page.locator('.ant-select-item-option').filter(has_text='带薪休息日')).to_be_visible()
+        page.wait_for_timeout(350) # Let the Select opening animation settle for visual inspection.
+        page.screenshot(path=f'C:/Users/EDY/AppData/Local/Temp/zsjkqt-rest-import-open-{width}.png')
+        page.locator('.ant-select-item-option').filter(has_text='带薪休息日').click()
+        button.click()
+        expect(page.locator('output')).to_have_text('{"restDays":[2],"paidRestDays":[3,4,6]}')
+        page.get_by_role('combobox').click()
+        page.locator('.ant-select-item-option').filter(has_text='普通休息日').click()
+        button.click()
+        expect(page.locator('output')).to_have_text('{"restDays":[2],"paidRestDays":[3,4,6]}')
+        page.evaluate("restImportFixture.setMode('empty')")
+        button.click()
+        expect(page.locator('p[role=status]')).to_contain_text('没有标记')
+        page.screenshot(path=f'C:/Users/EDY/AppData/Local/Temp/zsjkqt-rest-import-{width}.png')
+        page.goto('http://127.0.0.1:5174/test/zsjkqt-rest-import.html?denied')
+        expect(page.get_by_role('button',name='从首页导入休息日')).to_be_disabled()
+        expect(page.locator('p[role=status]')).to_contain_text('权限')
+        page.close()
+    browser.close()
+print('rest import browser passed: desktop/mobile, paid/default, preserve/repeat, error/retry/empty/denied')
+

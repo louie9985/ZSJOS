@@ -13,7 +13,7 @@ public class MediaAccountDiagnosisTaskSceneProvider implements BusinessTaskScene
     public Map<Long, BusinessTaskDisplay> getDisplayMap(List<BusinessTaskDO> tasks) {
         Map<Long, BusinessTaskDisplay> result = new HashMap<>();
         for (BusinessTaskDO task : tasks) if (TYPES.contains(task.getTaskType()))
-            result.put(task.getId(), new BusinessTaskDisplay(task.getTitleSnapshot(), task.getSummarySnapshot(), "MEDIA_ACCOUNT_DIAGNOSIS"));
+            result.put(task.getId(), new BusinessTaskDisplay("周期综合诊断", "按固定截止节点填写7天及本节点适用的14/28天诊断，各部分在表内标明起止时间", "MEDIA_ACCOUNT_DIAGNOSIS"));
         return result;
     }
 }

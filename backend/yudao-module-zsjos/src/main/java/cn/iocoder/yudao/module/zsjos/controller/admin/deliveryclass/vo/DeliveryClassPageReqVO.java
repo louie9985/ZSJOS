@@ -22,6 +22,9 @@ public class DeliveryClassPageReqVO extends PageParam {
     @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
     private java.time.LocalDate examDateEnd;
     private Boolean excludeSystemClass;
+    private Boolean assignableOnly;
+    /** Direct-transfer target scope; read-all grants do not expand this command projection. */
+    private Boolean commandTargetsOnly;
 
     @jakarta.validation.constraints.AssertTrue(message = "结束日期不能早于开始日期")
     public boolean isExamDateRangeValid() {

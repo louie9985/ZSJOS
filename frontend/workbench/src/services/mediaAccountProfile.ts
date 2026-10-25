@@ -99,7 +99,48 @@ export type DiagnosisTodo = {taskId: number; accountId: number; studentPersonId:
   templateType: DiagnosisRequest['templateType']; cycle: number; dueAt: Timestamp;
   payload: {requirementSnapshot?: Record<string, unknown>; source?: AccountProfile['diagnosisContext']}};
 const diagnosisBase = '/zsjos/media-account/diagnosis';
+export type DiagnosisMetric = {
+  state: 'OPEN' | 'SETTLED' | 'UNAVAILABLE'; reason?: string; asOf: Timestamp; settledAt?: Timestamp;
+  publishedCount?: number; missingPublishTimeCount?: number; validLeads?: number; deals?: number;
+  conversionRate?: number; highestLikes?: number; likesCoverage?: number;
+  publicationExplanation: string; conversionExplanation: string;
+};
+export type WeeklyDiagnosisPart = { templateType: DiagnosisRequest['templateType']; cycle: number; days: number;
+  from: Timestamp; to: Timestamp; taskId: number; metric: DiagnosisMetric };
+export type WeeklyDiagnosisNode = { key: string; roundKey: string; week: number; dueAt: Timestamp;
+  parts: WeeklyDiagnosisPart[]; taskIds: number[] };
+export type DiagnosisOverview = {
+  tasks: DiagnosisTodo[];
+  nodes: Array<Omit<WeeklyDiagnosisNode, 'parts'> & {
+    parts: Array<Omit<WeeklyDiagnosisPart, 'metric'> & { metric?: DiagnosisMetric | null }>;
+  }>;
+};
+export type WeeklyDiagnosisPreview = {node: WeeklyDiagnosisNode; metricToken: string};
+export type WeeklyDiagnosisSubmit = {nodeKey: string; common: DiagnosisRequest; highestLikes?: number;
+  changeDirection: string; trafficNormal: string; directionSummary: string; metricToken: string};
+export type DiagnosisBatchCandidate = {
+  accountId: number; accountNo?: string; accountName?: string; platformLabel?: string;
+  version: number; configVersionId: number; currentStage?: string; accountStatus?: string;
+  nodeKey?: string; eligible: boolean; reason?: string;
+};
+export type DiagnosisBatchItem = {accountId: number; initial?: DiagnosisRequest; weekly?: WeeklyDiagnosisSubmit};
+export type DiagnosisBatchSubmit = {
+  accountId: number; templateType: 'diagnosis_initial' | 'weekly'; nodeKey?: string;
+  idempotencyKey: string; accounts: DiagnosisBatchItem[];
+};
+export const diagnosisBatchApi = {
+  candidates: async (accountId: number, templateType: DiagnosisBatchSubmit['templateType'], nodeKey?: string) =>
+    unwrap<DiagnosisBatchCandidate[]>(await http.get(`${diagnosisBase}/batch-candidates`, {params: {accountId, templateType, nodeKey}})),
+  submit: async (data: DiagnosisBatchSubmit) => unwrap<Array<{accountId: number; version: number}>>(await http.post(`${diagnosisBase}/batch`, data)),
+};
+export const weeklyDiagnosisApi = {
+  nodes: async (accountId: number) => unwrap<WeeklyDiagnosisNode[]>(await http.get(`${diagnosisBase}/nodes`, {params:{accountId}})),
+  preview: async (accountId: number, nodeKey: string, highestLikes?: number) => unwrap<WeeklyDiagnosisPreview>(await http.get(`${diagnosisBase}/preview`, {params:{accountId,nodeKey,highestLikes}})),
+  history: async (accountId: number, entryId: number, highestLikes?: number) => unwrap<WeeklyDiagnosisPreview>(await http.get(`${diagnosisBase}/entry-metrics`, {params:{accountId,entryId,highestLikes}})),
+  submit: async (accountId: number, data: WeeklyDiagnosisSubmit) => unwrap<number>(await http.post(`${diagnosisBase}/weekly`,data,{params:{accountId}})),
+};
 export const diagnosisApi = {
+  overview: async (accountId: number) => unwrap<DiagnosisOverview>(await http.get(`${diagnosisBase}/overview`, { params: { accountId } })),
   reminders: async () => unwrap<DiagnosisTodo[]>(await http.get(`${diagnosisBase}/reminders`)),
   tasks: async (accountId:number) => unwrap<DiagnosisTodo[]>(await http.get(`${diagnosisBase}/tasks`, {params:{accountId}})),
   acknowledge: async (taskIds:number[]) => unwrap<boolean>(await http.post(`${diagnosisBase}/acknowledge`, {taskIds})),

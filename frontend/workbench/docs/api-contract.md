@@ -236,3 +236,5 @@ Workbench 使用 `GET /admin-api/zsjos/media-students/{personId}/partner-context
 ### 客资来源关系文案（2026-10-11）
 
 客资概览与订单的客资投影将 sourceLabel/sourceUserName 显示为业务来源/来源人员。providerIdentityLabel 的“新媒体提供方”表示历史来源关系，不表示当前岗位；字段名称、类型及身份遮蔽保持不变。不能用 sourceUserId 冒充销售代录的实际操作人；旧响应没有身份标签时继续显示身份待核实。
+
+- 定位访谈稿与共用定位卡附件选择器按一组附件合计限制 1GB（1,073,741,824 字节），包含已上传和待保存文件；多选累计校验，移除后释放额度。定位访谈后端在上传及保存时校验；定位卡按附件字段在草稿保存时校验总量。

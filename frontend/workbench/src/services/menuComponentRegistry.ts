@@ -1,4 +1,5 @@
 export const WORKBENCH_COMPONENT = {
+  STUDENT_ENTRY: 'studentEntry',
   LEAD_FOLLOW_UP_CALENDAR: 'leadFollowUpCalendar',
   DELIVERY_PERFORMANCE: 'deliveryPerformance',
   DELIVERY_PERFORMANCE_TARGET: 'deliveryPerformanceTarget',
@@ -21,6 +22,7 @@ export const WORKBENCH_COMPONENT = {
 export type WorkbenchComponent = typeof WORKBENCH_COMPONENT[keyof typeof WORKBENCH_COMPONENT]
 
 const COMPONENT_REGISTRY: Record<string, WorkbenchComponent> = {
+  'zsjos/studentEntry/index': WORKBENCH_COMPONENT.STUDENT_ENTRY,
   'zsjos/leadFollowUpCalendar/index': WORKBENCH_COMPONENT.LEAD_FOLLOW_UP_CALENDAR,
   'zsjos/deliveryPerformance/index': WORKBENCH_COMPONENT.DELIVERY_PERFORMANCE,
   'zsjos/deliveryPerformanceTarget/index': WORKBENCH_COMPONENT.DELIVERY_PERFORMANCE_TARGET,

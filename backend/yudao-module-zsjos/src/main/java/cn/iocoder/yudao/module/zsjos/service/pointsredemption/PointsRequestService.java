@@ -140,7 +140,8 @@ public class PointsRequestService {
     }
     public List<PointsPackageRespVO> packages(boolean management) {
         return packages.selectList(new LambdaQueryWrapperX<PointsPackageDO>()
-                .eqIfPresent(PointsPackageDO::getEnabled, management ? null : true).orderByDesc(PointsPackageDO::getId))
+                .eqIfPresent(PointsPackageDO::getEnabled, management ? null : true)
+                .orderByAsc(PointsPackageDO::getCreditsAmount).orderByAsc(PointsPackageDO::getId))
                 .stream().map(p -> BeanUtils.toBean(p, PointsPackageRespVO.class)).toList();
     }
     @Transactional(rollbackFor=Exception.class)

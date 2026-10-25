@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { expectSourceToContainTokens } from '../test/sourceGuard'
 import detailSource from '../components/LeadDetail.tsx?raw'
 import pageSource from './SubordinateSalesPage.tsx?raw'
+import managementSource from './LeadManagementPage.tsx?raw'
 import apiSource from '../services/api.ts?raw'
 
 describe('subordinate Lead supervisor actions', () => {
@@ -17,22 +18,24 @@ describe('subordinate Lead supervisor actions', () => {
   })
 
   it('shows batch commands only from their server permission identifiers', () => {
-    expect(pageSource).toContain('zsjos:subordinate-sales:lead-transfer')
-    expect(pageSource).toContain('zsjos:subordinate-sales:lead-restore')
-    expect(pageSource).toContain('zsjos:subordinate-sales:lead-recycle')
-    expect(pageSource).toContain('zsjos:subordinate-sales:lead-release-claim-pool')
-    expect(pageSource).toContain('zsjos:subordinate-sales:lead-release-public-sea')
+    expect(managementSource).toContain('zsjos:subordinate-sales:lead-transfer')
+    expect(managementSource).toContain('zsjos:subordinate-sales:lead-restore')
+    expect(managementSource).toContain('zsjos:subordinate-sales:lead-recycle')
+    expect(managementSource).toContain('zsjos:subordinate-sales:lead-release-claim-pool')
+    expect(managementSource).toContain('zsjos:subordinate-sales:lead-release-public-sea')
   })
 
   it('shows assignment state and blocks an inapplicable mixed selection as a whole', () => {
-    expect(pageSource).toContain('title: "客资状态"')
-    expect(pageSource).toContain('title: "分配状态"')
-    expect(pageSource).toContain('subordinateAssignmentStatusLabel')
-    expect(pageSource).toContain('supervisorLeadSelectionEligibility')
-    expect(pageSource).toContain('subordinateBatchTransferCandidates(selected.map(Number))')
-    expect(pageSource).toContain('回收待处理')
-    expect(pageSource).toContain('selection.message')
-    expect(pageSource).toContain('preserveSelectedRowKeys: true')
+    expect(pageSource).toContain('<LeadManagementPage')
+    expect(pageSource).toContain('salesUserId={sales.userId}')
+    expect(managementSource).toContain('supervisorLeadSelectionEligibility')
+    expect(managementSource).toContain('api.subordinateBatchTransferCandidates(selectedRowKeys.map(Number))')
+    expect(managementSource).toContain('api.subordinateSalesLeads(salesUserId, params)')
+    expect(managementSource).toContain('mode={audience}')
+    expect(managementSource).toContain('preserveSelectedRowKeys: true')
+    expect(managementSource).toContain('salesUserId !== undefined')
+    expect(managementSource).toContain('filterProfile.groups.map')
+    expect(managementSource).toContain('section.options.map')
   })
 
   it('declares all server-projected supervisor detail actions in the API type', () => {

@@ -61,7 +61,7 @@ public class PositioningCardController {
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
     public CommonResult<PositioningCardService.CardFile> uploadAttachment(@PathVariable Long id,
             @RequestParam String fieldKey, @RequestParam org.springframework.web.multipart.MultipartFile file) throws java.io.IOException {
-        return success(service.uploadAttachment(id, fieldKey, file.getBytes(), file.getOriginalFilename(), file.getContentType(), getLoginUserId()));
+        return success(service.uploadAttachmentFile(id, fieldKey, file, getLoginUserId()));
     }
     @GetMapping("/{id}/attachments/{fileId}")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:query')")

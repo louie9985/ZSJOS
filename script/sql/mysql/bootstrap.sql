@@ -12,6 +12,7 @@
 
 -- Core baseline: schema, System seed, ZSJOS seed and dictionaries.
 SOURCE script/sql/mysql/00-bootstrap-schema.sql;
+SOURCE script/sql/mysql/bootstrap-compatibility.sql;
 SOURCE script/sql/mysql/01-bootstrap-system-seed.sql;
 SOURCE script/sql/mysql/02-bootstrap-zsjos-seed.sql;
 SOURCE script/sql/mysql/03-bootstrap-dictionary-types.sql;

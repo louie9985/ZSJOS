@@ -8,8 +8,9 @@
       <van-button v-if="error && !runtime" block @click="load">重新加载</van-button>
       <van-empty v-if="runtime && runtime.status !== 'DRAFT'" :description="statusText" />
       <form v-else-if="runtime" novalidate @submit.prevent="submit">
-        <details v-for="group in visibleGroups" :key="group.key" :open="openGroups[group.key]" class="collection-group norem" :data-group="group.key" @toggle="openGroups[group.key]=($event.target as HTMLDetailsElement).open">
-          <summary class="norem" @click.prevent="openGroups[group.key]=!openGroups[group.key]"><span class="collection-group-icon norem"><van-icon :name="group.icon" /></span><span class="collection-group-title norem"><strong>{{ group.label }}</strong><small>{{ group.note }}</small></span><van-icon name="arrow-down" /></summary>
+        <div class="collection-draft norem" role="status" aria-live="polite"><span>{{ draftError || (draftBusy ? '草稿保存中…' : draftChanged ? '有修改待保存' : draftSaved ? '草稿已保存，可稍后继续填写' : '填写后自动保存草稿') }}</span><button v-if="draftConflict" type="button" :disabled="draftBusy || saving" @click="reloadConflictedDraft">重新加载最新草稿</button><button v-else-if="draftError" type="button" :disabled="draftBusy" @click="saveDraftNow">重试保存</button></div>
+        <details v-for="group in visibleGroups" :key="group.key" :open="openGroups[group.key] !== false" class="collection-group norem" :data-group="group.key" @toggle="openGroups[group.key]=($event.target as HTMLDetailsElement).open">
+          <summary class="norem" @click.prevent="openGroups[group.key]=openGroups[group.key] === false"><span class="collection-group-icon norem"><svg class="collection-group-svg norem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path :d="group.iconPath" /></svg></span><span class="collection-group-title norem"><strong>{{ group.label }}</strong><small>{{ group.note }}</small></span><van-icon name="arrow-down" /></summary>
           <div class="collection-grid norem">
         <div v-for="field in group.fields" :key="field.key" class="collection-field norem" :class="{ 'collection-field-wide': field.type==='images' || field.type==='textarea' }">
           <label :for="field.key"><span :class="{ 'h5-required-label': field.required }">{{ field.label }}</span></label>
@@ -33,7 +34,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { useRoute, onBeforeRouteLeave } from 'vue-router'
+import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { showConfirmDialog } from 'vant'
 import { collectionApi, CollectionError, type CollectionArea, type CollectionRuntime, type CollectionImage } from '@/api/studentInfo'
 import CollectionImages from './CollectionImages.vue'
@@ -51,21 +52,81 @@ const areaLabel = ref('')
 const areaError = ref('')
 const loading = ref(false)
 const saving = ref(false)
+const draftRevision = ref(0)
+const draftSaved = ref(false)
+const draftBusy = ref(false)
+const draftError = ref('')
+const draftConflict = ref(false)
+const savedDraftText = ref('{}')
+let draftTimer: ReturnType<typeof setTimeout> | undefined
+let draftRequest: Promise<boolean> | undefined
+let draftRequestSequence = 0
+const draftValues = computed(() => Object.fromEntries((runtime.value?.fields || [])
+  .filter(f => ['text','textarea','dict'].includes(f.type) && !['gender','age','household_area'].includes(f.key))
+  .map(f => [f.key, answers.value[f.key] || ''])))
+const draftText = computed(() => JSON.stringify(draftValues.value))
+const draftChanged = computed(() => runtime.value?.status === 'DRAFT' && draftText.value !== savedDraftText.value)
+async function saveDraftNow(): Promise<boolean> {
+  clearTimeout(draftTimer)
+  if (saving.value) return false
+  if (draftConflict.value) return false
+  if (draftRequest) {
+    const pendingSequence = draftRequestSequence
+    if (!await draftRequest && pendingSequence === loadSequence) return false
+    return saveDraftNow()
+  }
+  if (!draftChanged.value || runtime.value?.status !== 'DRAFT') return true
+  const requestToken = token.value, sequence = loadSequence, text = draftText.value
+  draftRequestSequence = sequence
+  draftBusy.value = true; draftError.value = ''
+  draftRequest = (async () => {
+    try {
+      const saved = await collectionApi.saveDraft(requestToken, draftRevision.value, JSON.parse(text))
+      if (sequence !== loadSequence || requestToken !== token.value) return false
+      if (draftConflict.value) error.value = ''
+      draftRevision.value = saved.revision; savedDraftText.value = text; draftSaved.value = true; draftConflict.value = false
+      return true
+    } catch (e) {
+      if (sequence === loadSequence && requestToken === token.value) {
+        draftError.value = e instanceof Error ? e.message : '草稿保存失败，请重试'
+        draftConflict.value = e instanceof CollectionError && e.code === 1900090011
+      }
+      return false
+    } finally {
+      draftRequest = undefined
+      if (sequence === loadSequence) draftBusy.value = false
+    }
+  })()
+  return draftRequest
+}
+watch(draftText, () => {
+  clearTimeout(draftTimer)
+  if (!loading.value && draftChanged.value && !saving.value) draftTimer = setTimeout(() => { void saveDraftNow() }, 700)
+})
 const error = ref('')
-const openGroups = ref<Record<string,boolean>>({basic:true})
+const openGroups = ref<Record<string,boolean>>({})
 const uploadBusy = ref<Record<string,boolean>>({})
 const uploadFailed = ref<Record<string,boolean>>({})
 const hasUploads = computed(()=>Object.values(uploadBusy.value).some(Boolean))
 const hasUploadErrors = computed(()=>Object.values(uploadFailed.value).some(Boolean))
 const genderLabel = computed(() => runtime.value?.options.gender?.find(option => option.value === answers.value.gender)?.label || '')
-const groupDefinitions = [{key:'basic',label:'基本信息',icon:'user-o',note:'请与本人证件信息保持一致'},{key:'education',label:'学历与报考',icon:'graduation-cap',note:'填写学历信息与本次报名意向'},{key:'career',label:'职业与学习目的',icon:'manager-o',note:'帮助老师了解您的学习需求'},{key:'materials',label:'证明材料',icon:'photo-o',note:'请按各字段要求上传清晰材料'}]
+const groupDefinitions = [
+  {key:'basic',label:'基本信息',iconPath:'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2Z',note:'请与本人证件信息保持一致'},
+  {key:'education',label:'学历与报考',iconPath:'m2 9 10-5 10 5-10 5L2 9Zm4 2v6c4 3 8 3 12 0v-6m4-2v7',note:'填写学历信息与本次报名意向'},
+  {key:'career',label:'职业与学习目的',iconPath:'M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 7h18v14H3V7Zm0 6c6 3 12 3 18 0m-9 0v4',note:'帮助老师了解您的学习需求'},
+  {key:'materials',label:'证明材料',iconPath:'M14 3H5v18h14V8l-5-5Zm0 0v5h5M8 12h8m-8 4h6',note:'请按各字段要求上传清晰材料'}
+]
 const visibleGroups = computed(()=>groupDefinitions.map(g=>({...g,fields:runtime.value?.fields.filter(f=>f.group===g.key)||[]})).filter(g=>g.fields.length))
 const updateImages = (key:string,list:CollectionImage[])=>{if(runtime.value)runtime.value.images=[...(runtime.value.images||[]).filter(i=>i.fieldKey!==key),...list]}
-const dirty = computed(()=>runtime.value?.status==='DRAFT' && (Object.values(answers.value).some(Boolean)||areaPath.value.length>0||!!runtime.value.images?.length||hasUploads.value))
+const dirty = computed(()=>runtime.value?.status==='DRAFT' && (draftChanged.value || draftBusy.value || hasUploads.value || hasUploadErrors.value))
 const beforeUnload = (e:BeforeUnloadEvent)=>{if(dirty.value){e.preventDefault();e.returnValue=''}}
+const saveWhenHidden = ()=>{if(document.visibilityState === 'hidden' && draftChanged.value)void saveDraftNow()}
 window.addEventListener('beforeunload',beforeUnload)
-onBeforeUnmount(()=>{loadSequence++;window.removeEventListener('beforeunload',beforeUnload)})
-onBeforeRouteLeave(async()=>{if(!dirty.value)return true;try{await showConfirmDialog({title:'离开填写页？',message:'未提交的文字内容不会保存。'});return true}catch{return false}})
+document.addEventListener('visibilitychange',saveWhenHidden)
+onBeforeUnmount(()=>{loadSequence++;clearTimeout(draftTimer);window.removeEventListener('beforeunload',beforeUnload);document.removeEventListener('visibilitychange',saveWhenHidden)})
+const confirmLeave = async()=>{if(!dirty.value)return true;if(!hasUploads.value && !hasUploadErrors.value && await saveDraftNow())return true;try{await showConfirmDialog({title:'离开填写页？',message:'仍有内容未保存，离开后这些修改可能丢失。'});return true}catch{return false}}
+onBeforeRouteLeave(confirmLeave)
+onBeforeRouteUpdate((to,from)=>to.hash===from.hash ? true : confirmLeave())
 watch([() => answers.value.id_card, areas], () => {
   if (/身份证|户籍所在地/.test(error.value)) error.value = ''
   const identity = deriveCollectionIdentity(answers.value.id_card || '')
@@ -79,6 +140,7 @@ watch([() => answers.value.id_card, areas], () => {
 const statusText = computed(() => ({ SUBMITTED: '信息已提交，不可修改', EXPIRED: '链接已失效', REVOKED: '链接已撤销' }[runtime.value?.status || ''] || '链接不可用'))
 const load = async () => {
   const sequence = ++loadSequence
+  draftBusy.value = false; draftConflict.value = false
   loading.value = true; error.value = ''; runtime.value = undefined
   try {
     if (!token.value) throw new Error('信息收集链接不完整')
@@ -96,11 +158,28 @@ const load = async () => {
       for (const f of data.fields) if (!(f.key in answers.value)) answers.value[f.key] = ''
     }
     runtime.value = data
+    if (data.status === 'DRAFT') {
+      Object.assign(answers.value, data.draft?.values || {})
+      draftRevision.value = data.draft?.revision || 0
+      draftSaved.value = !!data.draft?.savedAt
+      savedDraftText.value = JSON.stringify(draftValues.value)
+      draftError.value = ''
+    }
   } catch (e) { if (sequence === loadSequence) error.value = e instanceof Error ? e.message : '加载失败' }
   finally { if (sequence === loadSequence) loading.value = false }
 }
+const reloadConflictedDraft = async () => {
+  if (draftBusy.value || saving.value) return
+  try {
+    await showConfirmDialog({ title: '重新加载最新草稿', message: '当前未保存内容不会覆盖其他页面的草稿。请先另行保留需要的内容，确认后将读取最新草稿。' })
+  } catch { return }
+  clearTimeout(draftTimer)
+  answers.value = {}; areaPath.value = []; areaLabel.value = ''
+  await load()
+}
 const submit = async () => {
   if (!runtime.value || saving.value || hasUploads.value || hasUploadErrors.value) return
+  if (draftConflict.value) { error.value = draftError.value; return }
   error.value = ''
   if (answers.value.id_card && !validCollectionIdentity(answers.value.id_card)) { error.value = '请检查身份证号码'; return }
   if (runtime.value.fields.some(f => f.key === 'household_area') && areaError.value) { error.value = areaError.value; return }
@@ -110,28 +189,39 @@ const submit = async () => {
   const requestToken = token.value
   try { await showConfirmDialog({ title: '确认提交', message: '提交后信息将锁定，不能再次修改。' }) } catch { return }
   if (requestToken !== token.value || runtime.value?.status !== 'DRAFT') return
+  clearTimeout(draftTimer)
+  if (!await saveDraftNow()) { error.value = draftError.value; return }
+  clearTimeout(draftTimer)
+  if (requestToken !== token.value || runtime.value?.status !== 'DRAFT') return
+  if (draftConflict.value) { error.value = draftError.value; return }
   saving.value = true
   try {
     const values: Record<string,string | number[]> = {}
     for (const f of runtime.value.fields) values[f.key] = f.type==='images' ? (runtime.value.images||[]).filter(i=>i.fieldKey===f.key).map(i=>i.id) : f.type === 'area' ? areaPath.value : (answers.value[f.key] || '')
-    await collectionApi.submit(requestToken, values)
+    await collectionApi.submit(requestToken, values, draftRevision.value)
     if (requestToken !== token.value) return
     runtime.value = { ...runtime.value, status: 'SUBMITTED', fields: [], options: {}, images: [] }
     answers.value = {}; areaPath.value = []; areaLabel.value = ''
   } catch (e) {
     if (requestToken !== token.value) return
+    if (e instanceof CollectionError && e.code === 1900090011) { draftConflict.value = true; draftError.value = e.message }
     if (e instanceof CollectionError && [1900090006, 1900090007].includes(e.code)) await load()
     else error.value = e instanceof Error ? e.message : '提交失败，请重试'
   }
   finally { saving.value = false }
 }
 watch(token, () => {
+  clearTimeout(draftTimer); draftRevision.value = 0; draftSaved.value = false; draftBusy.value = false; draftError.value = ''; draftConflict.value = false; savedDraftText.value = '{}'
+  openGroups.value = {}
   answers.value = {}; uploadBusy.value = {}; uploadFailed.value = {}; areaPath.value = []; areaLabel.value = ''; areaError.value = ''; areas.value = []
   void load()
 }, { immediate: true })
 </script>
 
 <style scoped>
+.collection-draft.norem { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 4px 12px; font-size: 12px; color: var(--h5-text-secondary); }
+.collection-draft.norem button { border: 0; background: transparent; color: var(--h5-primary); font: inherit; cursor: pointer; }
+.collection-group-svg.norem { display: block; width: 22px; height: 22px; }
 .student-collection.norem { max-width: 940px; margin: 0 auto; padding: 0 20px 40px; background: var(--h5-app-background); color: var(--h5-text-primary); min-height: 100vh; box-sizing: border-box; }
 :global(#app:has(.student-collection.norem)){max-width:none}
 .collection-hero.norem{padding:24px 4px}.collection-hero p,.collection-submit p{font-size:12px;color:var(--h5-text-secondary);margin:6px 0}.collection-chip.norem{display:inline-block;padding:4px 10px;margin-top:10px;border-radius:999px;background:var(--h5-primary-opacity);color:var(--h5-primary);font-size:12px}

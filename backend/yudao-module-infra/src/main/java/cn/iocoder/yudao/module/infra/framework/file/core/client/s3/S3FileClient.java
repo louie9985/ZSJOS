@@ -107,6 +107,14 @@ public class S3FileClient extends AbstractFileClient<S3FileClientConfig> {
     }
 
     @Override
+    public String uploadFile(java.nio.file.Path source, String path, String type) throws java.io.IOException {
+        var request = PutObjectRequest.builder().bucket(config.getBucket()).key(path)
+                .contentType(type).contentLength(java.nio.file.Files.size(source)).build();
+        client.putObject(request, RequestBody.fromFile(source));
+        return presignGetUrl(path, null);
+    }
+
+    @Override
     public void delete(String path) {
         DeleteObjectRequest deleteRequest = DeleteObjectRequest.builder()
                 .bucket(config.getBucket())

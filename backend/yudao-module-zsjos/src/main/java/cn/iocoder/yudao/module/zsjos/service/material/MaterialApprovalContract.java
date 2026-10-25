@@ -18,6 +18,10 @@ final class MaterialApprovalContract {
         return code != null && VIRAL_PROCESSES.containsKey(code);
     }
 
+    static boolean isViralProcess(String processKey) {
+        return processKey != null && VIRAL_PROCESSES.containsValue(processKey);
+    }
+
     static String processKey(MaterialTypeDO type) {
         if (type == null) return null;
         return isViral(type.getCode()) ? VIRAL_PROCESSES.get(type.getCode()) : type.getBpmProcessDefinitionKey();

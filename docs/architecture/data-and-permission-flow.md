@@ -689,6 +689,7 @@ otherwise
   the complete employee identity. Frontends must not broaden either authorization.
 - `query-all` is an explicit permission-based bypass for the current tenant; it is
   never inferred from a role, post, department, or display name.
+- 客资列表及详情的员工提供方 `providerOwnerNameSnapshot` 复用 `LeadIdentityMaskingService.snapshotName`，按提供方员工 ID 和当前查看关系投影，与来源人员使用同一脱敏策略；指定分配及完整身份查看权限沿用现有例外。展示使用持久化姓名快照，不以当前员工昵称替换，也不回写原始快照。Workbench 与 Vue Admin 均消费后端投影值。
 - Team visibility is resolved from current System department leader relationships, not
   from the `sales_manager` role name or its generic role data scope. The lead-management
   user filters use `GET /zsjos/lead/visible-users`: `query-all` users receive all enabled
@@ -884,7 +885,8 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 - V188 后新报名固定使用 `class_per_item`，按每个订单商品保存班级选择；正式班班主任成为该课程
   服务的 owner，明确选择租户待分班时 owner 为空。旧 `legacy_planner` 路线只为历史报名兼容，
   不再成为新报名完成条件。存量服务关系只补充真实租户待分班 `classId`，原 owner 保留。
-- 班级管理统一页面按权限调用管理范围或本人班级列表：`query-managed` 累积部门 DataPermission，本人范围只按当前班主任关系。页面卡片点击进入学员管理时，`classId` 仅作为原有学员可见范围内的查询条件，不扩大对象权限。
+- 班级管理统一页面按权限调用管理范围或本人班级列表：`query-managed` 累积部门 DataPermission，独立 `zsjos:delivery-class:query-all` 可扩大当前租户管理读取；本人范围只按当前班主任关系。学员管理独立使用 `zsjos:student:query-all` 扩大教学服务读取，两项权限不互相授予。显式 SELF/USER 保留指定人员约束。页面卡片点击进入学员管理时，`classId` 仅作为学员可见范围内的查询条件，不扩大对象权限。
+  全读与写操作分离，两端按功能权限及服务端对象动作渲染按钮并加载相关请求；班级和服务调班的 `availableActions` 不取代后端命令校验。V348 只定义菜单按钮元数据，角色授权仍由管理员配置。
   单班读取、更新、结课继续经过 `delivery-class` 对象权限。待分班是主管可读的租户系统对象，
   不可编辑或结课；其 active/paused/completed 课程服务向持有 `query-managed` 的主管开放读取，不要求已有 owner；列表、详情和详情子资源一致，其他无 owner 的记录不因此开放。待分班与正式班使用同一卡片网格并参与服务端分页与筛选。主管直调另需 `direct-transfer`，不能由查询权限隐式获得。
 - 班主任变化、主管直调和 BPM 调班共用服务归属迁移边界：原子更新课程服务 owner 与未完成业务
@@ -1080,3 +1082,12 @@ The subordinate-sales API again restricts every employee read (including tenant-
 ## Media relationships without teaching delivery (2026-10-20)
 
 `ServiceRelation.teachingDelivery` is an explicit, default-enabled business participation flag. Existing records retain true. Direct media generation requires a user-confirmed yes/no value; there is no page switch or generic update endpoint. Media services retain their existing relationship IDs, permissions and workflows without requiring teaching class/order/owner data. Teaching service lists/search/counts/details, legacy student projections, class membership/statistics and teaching-only commands enforce participation independently from permissions. A media relation does not become teaching data merely because its creator is a director or operator. Shared student/student-service read authorization remains usable by existing media context and Partner binding; it cannot bypass delivery projection filters. Both Vue Admin and React Workbench consume the same unchanged delivery APIs. See [student detail scope](../api/student-detail-scope.md).
+
+## Teaching service close and restore
+
+Teaching closure is service-scoped and independent of the shared media relationship lifecycle. Close requires configured `zsjos:student-service:close` plus current ownership; restore requires `zsjos:student-service:restore` plus source and target management scope. EXCEPTION classes are per planner and do not inherit the tenant PENDING-class read exception. Both frontends consume the same operation metadata; role assignment remains administrator-owned. See [the lifecycle contract](../api/teaching-service-close-restore.md).
+
+
+## 学员档案独立授权（2026-10-25）
+
+学员管理下配置 `zsjos:student-archive:read`、`update`、`sensitive-read`、`export`。档案敏感字段、报名材料附件和敏感修订使用档案 sensitive-read，档案导出使用档案 export；普通导出仍脱敏。报名履约公共池及报名信息表继续使用自己的 `zsjos:registration:*` / `zsjos:student-info-form:*`，两条授权链不互相回退，避免勾选档案按钮时把公共池父菜单及查询权限带给学习规划师。两端均消费服务端能力标记；后端累计检查功能权限及原服务关系对象范围。V350 仅新增菜单元数据，不迁移或新增角色授权。升级授权窗口详见[信息表与档案契约](../api/student-information-collection.md)。

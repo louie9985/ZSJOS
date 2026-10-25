@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.contentreview;
 
+import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountStageTiming;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -445,8 +446,14 @@ public class ContentReviewBatchService {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("studentPersonId", request.getStudentPersonId());
         context.put("accountIds", accountIds);
-        context.put("accountSnapshots", accounts.stream().map(account -> reviewAccountSnapshot(account, sourceContext,
-                request.getAccountSnapshots() == null ? null : request.getAccountSnapshots().get(String.valueOf(account.getId())))).toList());
+        // A draft choice is not an assignee and grants no access; submit() validates it afresh.
+        if (request.getDraftReviewerSelection() != null)
+            context.put("draftReviewerSelection", request.getDraftReviewerSelection());
+        else if (!request.isDraftReviewerSelectionProvided() && editing != null && sourceContext != null
+                && sourceContext.get("draftReviewerSelection") != null)
+            context.put("draftReviewerSelection", sourceContext.get("draftReviewerSelection"));
+        LocalDateTime draftAt = LocalDateTime.now(MediaAccountStageTiming.ZONE);
+        context.put("accountSnapshots", accounts.stream().map(account -> draftAccountSnapshotAt(account, draftAt)).toList());
         batch.setContextSnapshotJson(JsonUtils.toJsonString(context));
         batchMapper.updateById(batch);
         return batchId;
@@ -498,17 +505,17 @@ public class ContentReviewBatchService {
                 throw field(CONTENT_ACCOUNT_SCOPE_CHANGED, "accountIds");
             accounts.add(account);
         }
-        return accounts.stream().map(account -> JsonUtils.parseObject(JsonUtils.toJsonString(draftAccountSnapshot(account, null)),
+        LocalDateTime previewAt = LocalDateTime.now(MediaAccountStageTiming.ZONE);
+        return accounts.stream().map(account -> JsonUtils.parseObject(JsonUtils.toJsonString(draftAccountSnapshotAt(account, previewAt)),
                 cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewAccountProfileRespVO.class)).toList();
     }
 
-    private Map<String, Object> reviewAccountSnapshot(MediaAccountDO account, Map<String, Object> sourceContext,
-                                                       Map<String, Object> overrides) {
-        return draftAccountSnapshot(account, null);
+    private Map<String, Object> draftAccountSnapshot(MediaAccountDO account, Map<String, Object> ignored) {
+        return draftAccountSnapshotAt(account, LocalDateTime.now(MediaAccountStageTiming.ZONE));
     }
 
-    private Map<String, Object> draftAccountSnapshot(MediaAccountDO account, Map<String, Object> ignored) {
-        Map<String, Object> snapshot = ContentReviewAccountProfile.snapshot(account);
+    private Map<String, Object> draftAccountSnapshotAt(MediaAccountDO account, LocalDateTime asOf) {
+        Map<String, Object> snapshot = ContentReviewAccountProfile.snapshot(account, asOf);
         Set<Long> ids = java.util.stream.Stream.of(account.getOwnerOperatorUserId(), account.getDirectorUserId())
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, AdminUserRespDTO> users = ids.isEmpty() ? Map.of() : adminUserApi.getUserMap(ids);
@@ -580,6 +587,7 @@ public class ContentReviewBatchService {
         reviewerSnapshot.put("roleIds", selection.getRoleIds());
         reviewerSnapshot.put("processDefinitionId", definition.getId());
         String relationSnapshotJson = JsonUtils.toJsonString(reviewerSnapshot);
+        LocalDateTime now = LocalDateTime.now(MediaAccountStageTiming.ZONE).withNano(0);
         Map<String, Object> frozenContext = contextSnapshot(config, subjects.account(), materialSchema);
         frozenContext.put("directorTaskKey", taskKeys.director());
         frozenContext.put("finalTaskKey", taskKeys.finalReview());
@@ -593,15 +601,14 @@ public class ContentReviewBatchService {
         if (draftContext.containsKey("accountIds")) frozenContext.put("accountIds", draftContext.get("accountIds"));
         // Each new round freezes the current profile; existing rounds remain immutable.
         frozenContext.put("accountSnapshots", submitAccounts.stream()
-                .map(account -> draftAccountSnapshot(account, null)).toList());
+                .map(account -> draftAccountSnapshotAt(account, now)).toList());
         submitAccounts.stream().filter(account -> Objects.equals(account.getId(), batch.getAccountId()))
                 .findFirst().ifPresent(account -> {
                     Map<String, Object> primary = new LinkedHashMap<>((Map<String, Object>) frozenContext.get("account"));
-                    primary.putAll(draftAccountSnapshot(account, null));
+                    primary.putAll(draftAccountSnapshotAt(account, now));
                     frozenContext.put("account", primary);
                 });
         String contextSnapshotJson = JsonUtils.toJsonString(frozenContext);
-        LocalDateTime now = LocalDateTime.now();
         Map<Long, ContentVersionDO> lockedVersionMap = versions.stream()
                 .collect(Collectors.toMap(ContentVersionDO::getId, Function.identity()));
         for (ContentReviewBatchItemDO item : items) {
@@ -1256,6 +1263,11 @@ public class ContentReviewBatchService {
                                                  String studentName) {
         ContentReviewBatchRespVO response = BeanUtils.toBean(batch, ContentReviewBatchRespVO.class);
         response.setStudentName(studentName);
+        if (BATCH_DRAFT.equals(batch.getStatus())) {
+            Object selection = parseMap(batch.getContextSnapshotJson()).get("draftReviewerSelection");
+            if (selection != null) response.setDraftReviewerSelection(JsonUtils.parseObject(JsonUtils.toJsonString(selection),
+                    cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.vo.ContentReviewDraftReviewerSelectionVO.class));
+        }
         response.setRelationSnapshot(parseMap(batch.getRelationSnapshotJson()));
         response.setCanReadStudentForReview(ContentReviewSelectionService.SOURCE.equals(response.getRelationSnapshot().get("source"))
                 && Objects.equals(batch.getDirectorUserId(), userId)

@@ -1,5 +1,6 @@
 <template>
-  <ContentWrap>
+  <el-alert v-if="!canQuery" title="暂无学员查询权限" type="warning" :closable="false" />
+  <ContentWrap v-if="canQuery">
     <BusinessReadScope v-if="userStore.dataAccess.tenantReadAll" v-model="readScope" />
     <el-form :model="query" inline @submit.prevent>
       <el-form-item label="学员搜索">
@@ -11,6 +12,9 @@
           @keyup.enter="handleQuery"
         />
       </el-form-item>
+      <el-form-item label="服务状态"><el-select v-model="query.serviceStatus" clearable placeholder="默认排除已关闭" class="!w-180px" @change="handleQuery">
+        <el-option label="服务中" value="active" /><el-option label="已暂停" value="paused" /><el-option label="已结业" value="completed" /><el-option label="已关闭" value="closed" />
+      </el-select></el-form-item>
       <el-form-item>
         <el-button type="primary" :loading="loading" @click="handleQuery">
           <Icon icon="ep:search" class="mr-5px" />查询
@@ -26,6 +30,7 @@
   </ContentWrap>
 
   <ZsjosAdvancedFilter
+    v-if="canQuery"
     scene="student_service"
     placeholder="姓名 / 手机号 / 客资编号"
     :keyword="query.keyword"
@@ -44,7 +49,7 @@
     "
   />
 
-  <ContentWrap>
+  <ContentWrap v-if="canQuery">
     <el-table v-loading="loading" :data="list" row-key="serviceRelationId" stripe>
       <el-table-column label="学员姓名" prop="name" min-width="130" fixed="left">
         <template #default="{ row }">{{ row.name || '学员姓名未补全' }}</template>
@@ -63,6 +68,7 @@
       </el-table-column>
       <el-table-column label="班级" prop="service.className" min-width="150" />
       <el-table-column label="负责人" prop="service.ownerUserName" min-width="120" />
+      <el-table-column label="服务状态" width="110"><template #default="{ row }">{{ serviceStatusLabel(row.service.status) }}</template></el-table-column>
       <el-table-column label="服务激活时间" prop="activatedAt" min-width="170" />
       <el-table-column label="订单审核" min-width="120"
         ><template #default="{ row }">{{
@@ -99,6 +105,7 @@
         >
       </el-alert>
       <template v-else-if="detail">
+        <TeachingServiceLifecyclePanel :key="detail.serviceRelationId" :relation-id="detail.serviceRelationId" :version="detail.service.version || 0" @changed="refreshService" />
         <el-tabs>
           <el-tab-pane label="概览">
             <el-descriptions :column="2" border>
@@ -162,6 +169,7 @@
 </template>
 
 <script lang="ts" setup>
+import TeachingServiceLifecyclePanel from './components/TeachingServiceLifecyclePanel.vue'
 import ProductSpecs from './components/ProductSpecs.vue'
 import StudentArchivePanel from './components/StudentArchivePanel.vue'
 import BusinessReadScope from '@/components/BusinessReadScope/index.vue'
@@ -177,13 +185,14 @@ defineOptions({ name: 'ZsjosMyStudents' })
 const loading = ref(false)
 const route = useRoute()
 const userStore = useUserStore()
+const canQuery = computed(() => checkPermi(['zsjos:student:query-my']))
 const readScope = ref<{ readScope: 'SELF' | 'ALL' | 'USER'; targetUserId?: number }>({
   readScope: 'SELF'
 })
 const error = ref('')
 const list = ref<RegistrationApi.StudentServiceSubject[]>([])
 const total = ref(0)
-const query = reactive({ pageNo: 1, pageSize: 10, keyword: '', advancedFilter: undefined as any })
+const query = reactive({ pageNo: 1, pageSize: 10, keyword: '', serviceStatus: undefined as string | undefined, advancedFilter: undefined as any })
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
@@ -198,10 +207,11 @@ const serviceCourseName = (service: RegistrationApi.StudentService) =>
 const serviceCategoryPath = (service: RegistrationApi.StudentService) =>
   service.categoryPath?.length ? service.categoryPath.join(' / ') : '课程分类暂未记录'
 const serviceStatusLabel = (status: string) =>
-  ({ active: '服务中', completed: '已完成', cancelled: '已取消' })[status] || '未知状态'
+  ({ active: '服务中', paused: '已暂停', completed: '已结业', closed: '已关闭', cancelled: '已取消' })[status] || '未知状态'
 let listRequest = 0
 const load = async () => {
   const run = ++listRequest
+  if (!canQuery.value) { list.value = []; total.value = 0; loading.value = false; return }
   list.value = []
   total.value = 0
   loading.value = true
@@ -232,12 +242,13 @@ const handleQuery = () => {
 }
 const resetQuery = () => {
   query.pageNo = 1
-  query.keyword = ''
+  query.keyword = ''; query.serviceStatus = undefined
   query.advancedFilter = undefined
   void load()
 }
 const openDetail = async (relationId: number) => {
   const run = ++detailRequest
+  if (!canQuery.value) { detail.value = undefined; detailOpen.value = false; return }
   detail.value = undefined
   detailServiceId.value = relationId
   detailOpen.value = true
@@ -254,6 +265,7 @@ const openDetail = async (relationId: number) => {
     if (run === detailRequest) detailLoading.value = false
   }
 }
+const refreshService = async () => { await Promise.all([load(), detailServiceId.value ? openDetail(detailServiceId.value) : Promise.resolve()]) }
 const reloadDetail = () => detailServiceId.value && openDetail(detailServiceId.value)
 watch(
   readScope,

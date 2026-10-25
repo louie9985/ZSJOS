@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, App, Button, Empty, Form, Select, Space, Spin } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
@@ -116,12 +117,12 @@ export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, 
             size="small" allowClear placeholder="跟进方式" value={filterMethod} onChange={setFilterMethod}
             options={methods.map(item => ({ value: item.value, label: item.label }))}
             style={{ minWidth: 90 }}
-          />
+           {...filterSelectDisplayProps}/>
           <Select
             size="small" allowClear placeholder="跟进结果" value={filterResult} onChange={setFilterResult}
             options={results.map(item => ({ value: item.value, label: item.label }))}
             style={{ minWidth: 90 }}
-          />
+           {...filterSelectDisplayProps}/>
           {onOpen && !open && <Button size="small" type="primary" icon={<PlusOutlined/>} onClick={onOpen}>新增跟进</Button>}
         </div>
 

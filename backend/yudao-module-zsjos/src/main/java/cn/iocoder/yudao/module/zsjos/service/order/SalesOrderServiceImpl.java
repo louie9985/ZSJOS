@@ -138,6 +138,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private OrderPaymentAllocationMapper orderPaymentAllocationMapper;
     @Resource private GiftConfigMapper giftConfigMapper;
     @Resource private GiftPurchaseMapper giftPurchaseMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.giftpurchase.GiftPurchaseService giftPurchaseService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -1170,7 +1171,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         p.setOrderId(order.getId()); p.setOrderNo(order.getOrderNo()); p.setStudentName(order.getStudentName());
         p.setStudentMobile(order.getStudentMobile()); p.setStudentWechatId(order.getStudentWechatId());
         p.setGiftItemsJson(order.getGiftItems()); p.setShippingAddress(order.getGiftShippingAddress()); p.setGeneratedAt(now);
-        try { giftPurchaseMapper.insert(p); } catch (DuplicateKeyException ignored) { }
+        try { giftPurchaseMapper.insert(p); } catch (DuplicateKeyException ignored) { return; }
+        giftPurchaseService.recordGenerated(p.getId());
     }
 
     private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,

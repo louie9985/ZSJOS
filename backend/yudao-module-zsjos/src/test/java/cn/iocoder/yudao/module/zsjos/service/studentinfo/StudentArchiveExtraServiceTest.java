@@ -34,6 +34,16 @@ class StudentArchiveExtraServiceTest {
     @AfterEach void clearTenant() { TenantContextHolder.clear(); }
     Value value(String text) { var v=new Value(); v.setText(text); return v; }
     Save request(String field,Value v) { var r=new Save(); r.setRevision(0); r.setIdempotencyKey("test"); r.setReason("synthetic correction"); r.setChanges(Map.of(field,v)); return r; }
+    @Test void extraAttachmentsAndShippingUseArchivePermissionOnly() {
+        when(permissions.hasAnyPermissions(any(),eq("zsjos:student-info-form:sensitive-read"))).thenReturn(true);
+        assertFalse(service.detail(5L).getCanReadAttachments());
+        assertThrows(ServiceException.class,()->service.download(5L,7L));
+        assertThrows(ServiceException.class,()->service.save(5L,request("certificate_shipping_address",value("synthetic address"))));
+        verifyNoInteractions(attachments);
+        when(permissions.hasAnyPermissions(any(),eq("zsjos:student-archive:sensitive-read"))).thenReturn(true);
+        assertTrue(service.detail(5L).getCanReadAttachments());
+        assertEquals(1,service.save(5L,request("certificate_shipping_address",value("synthetic address"))));
+    }
     @Test void maintainBeforeAnyCollectionExists() {
         assertEquals(1,service.save(5L,request("channel",value("test channel"))));
         var captured=ArgumentCaptor.forClass(StudentArchiveExtraRevisionDO.class);verify(revisions).insert(captured.capture());
@@ -42,6 +52,23 @@ class StudentArchiveExtraServiceTest {
     @Test void emptyArchiveExposesIndependentMaintenance() {
         when(permissions.hasAnyPermissions(any(),any())).thenReturn(true);
         var detail=service.detail(5L);assertTrue(detail.getCanMaintain());assertEquals(11,detail.getFields().size());assertTrue(detail.getValues().isEmpty());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullAndEmptySource
+    @org.junit.jupiter.params.provider.ValueSource(strings={"synthetic correction"})
+    void optionalReasonPreservesRevisionAndOriginalRequestFingerprint(String reason) {
+        var request=request("channel",value("test channel"));request.setReason(reason);
+        String fingerprint=cn.hutool.crypto.digest.DigestUtil.sha256Hex(JsonUtils.toJsonString(request));
+
+        assertEquals(1,service.save(5L,request));
+
+        var capture=ArgumentCaptor.forClass(StudentArchiveExtraRevisionDO.class);verify(revisions).insert(capture.capture());
+        assertEquals(Objects.requireNonNullElse(reason,""),capture.getValue().getReason());
+        assertEquals(fingerprint,capture.getValue().getRequestHash());
+        assertEquals(reason,request.getReason());
+        when(revisions.byKey(request.getIdempotencyKey())).thenReturn(capture.getValue());
+        assertEquals(1,service.save(5L,request));
+        verify(revisions,times(1)).insert(any(StudentArchiveExtraRevisionDO.class));
     }
     @Test void fieldVisibilityFiltersOnlyClosedFieldsForNonExamReaders() {
         var configRow = new StudentArchiveExtraConfigDO(); configRow.setRevision(3);

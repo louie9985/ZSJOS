@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import { useEffect, useState } from 'react'
 import { Alert, Button, Checkbox, DatePicker, Empty, Input, Select, Skeleton, Tag } from 'antd'
 import { FilterOutlined } from '@ant-design/icons'
@@ -47,9 +48,9 @@ export default function ContentReviewInbox({ rows, selectedId, loading, error, k
       {(keyword || count > 0) && <Button size="small" type="link" onClick={() => { setSearch(''); onReset() }}>重置搜索与筛选</Button>}
       {expanded && <div className="content-review-inbox-filters">
         {optionsError && <Alert type="error" title={optionsError} action={<Button onClick={() => setRetry(value => value + 1)}>重试</Button>} />}
-        <label>责任运营<Select aria-label="责任运营筛选" showSearch optionFilterProp="label" allowClear placeholder="全部运营" loading={optionsLoading} disabled={Boolean(optionsError)} value={filters.operatorUserId} options={users.map(user => ({ value: user.id, label: user.nickname }))} onChange={value => onFilters({ ...filters, operatorUserId: value })} /></label>
-        <label>责任编导<Select aria-label="责任编导筛选" showSearch optionFilterProp="label" allowClear placeholder="全部编导" loading={optionsLoading} disabled={Boolean(optionsError)} value={filters.directorUserId} options={users.map(user => ({ value: user.id, label: user.nickname }))} onChange={value => onFilters({ ...filters, directorUserId: value })} /></label>
-        <label>平台<Select aria-label="平台筛选" allowClear placeholder="全部平台" loading={optionsLoading} disabled={Boolean(optionsError)} value={filters.platformValue} options={platforms.map(item => ({ value: item.value, label: item.label }))} onChange={value => onFilters({ ...filters, platformValue: value })} /></label>
+        <label>责任运营<Select aria-label="责任运营筛选" showSearch optionFilterProp="label" allowClear placeholder="全部运营" loading={optionsLoading} disabled={Boolean(optionsError)} value={filters.operatorUserId} options={users.map(user => ({ value: user.id, label: user.nickname }))} onChange={value => onFilters({ ...filters, operatorUserId: value })}  {...filterSelectDisplayProps}/></label>
+        <label>责任编导<Select aria-label="责任编导筛选" showSearch optionFilterProp="label" allowClear placeholder="全部编导" loading={optionsLoading} disabled={Boolean(optionsError)} value={filters.directorUserId} options={users.map(user => ({ value: user.id, label: user.nickname }))} onChange={value => onFilters({ ...filters, directorUserId: value })}  {...filterSelectDisplayProps}/></label>
+        <label>平台<Select aria-label="平台筛选" allowClear placeholder="全部平台" loading={optionsLoading} disabled={Boolean(optionsError)} value={filters.platformValue} options={platforms.map(item => ({ value: item.value, label: item.label }))} onChange={value => onFilters({ ...filters, platformValue: value })}  {...filterSelectDisplayProps}/></label>
         {category === 'PENDING' && <label>审批阶段<Select allowClear placeholder="全部阶段" value={filters.stage} options={[{ value: 'DIRECTOR_REVIEW', label: '编导审核' }, { value: 'FINAL_REVIEW', label: '终审' }]} onChange={value => onFilters({ ...filters, stage: value })} /></label>}
         <label className="content-review-filter-dates">提交时间<DatePicker.RangePicker value={filters.submittedFrom && filters.submittedTo ? [dayjs(filters.submittedFrom), dayjs(filters.submittedTo)] : null} onChange={(_, values) => onFilters({ ...filters, submittedFrom: values[0] || undefined, submittedTo: values[1] || undefined })} /></label>
         {canSeeAll && <Checkbox checked={mine} onChange={event => onMine(event.target.checked)}>我是批次运营</Checkbox>}

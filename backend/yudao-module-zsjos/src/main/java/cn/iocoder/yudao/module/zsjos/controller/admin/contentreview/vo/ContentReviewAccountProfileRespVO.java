@@ -14,6 +14,10 @@ public class ContentReviewAccountProfileRespVO {
     private String platformLabel;
     private String sStage;
     private String sStageLabel;
+    private Long sStageEnteredAt;
+    private Long sStageDurationAsOf;
+    private Long sStageDurationDays;
+    private String sStageTimingSource;
     private String currentStatusValue;
     private String currentStatusLabel;
     private String operatorName;

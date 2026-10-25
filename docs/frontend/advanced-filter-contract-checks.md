@@ -14,6 +14,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File script/verify-advanced-filte
 
 ## 七项检查与边界
 
+Workbench 统一筛选组件的“应用筛选”和标签删除共享提交规范化：递归移除空子组及未完成条件，保留剩余 AND/OR 关系；全空提交 `undefined`。取消不提交，“清空全部”只移除高级筛选、不改关键词。后端仍拒绝空子组，不以放宽校验兼容非法前端结构。
+
+此行为由 `frontend/workbench/src/components/AdvancedFilter.test.ts` 验证。`python frontend/workbench/test/subordinate-lead-search-browser.py` 通过隔离 HTTP 适配器验证真实下属销售页面，并回归真实客资管理、媒体学员页面的应用、取消、标签删除及清空；不访问真实账号或修改业务数据。聚焦测试与该浏览器检查不替代上面的完整字段/权限盘点。
+
 | 要求 | 自动验证 | 证据位置 |
 |---|---|---|
 | 页面目录非空 | 人工维护的16个pageKey与后端元数据双向对齐；前端解析React/Vue所有统一筛选入口，新增、遗漏或错场景均失败 | AdvancedFilterCompletenessTest；AdvancedFilterContract.test.ts |

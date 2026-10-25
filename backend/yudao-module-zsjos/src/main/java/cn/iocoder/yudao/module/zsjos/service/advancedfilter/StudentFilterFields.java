@@ -20,7 +20,7 @@ final class StudentFilterFields {
         add(result, selectSource(Sensitivity.PERSONAL, "service.contentDirectorUserId", PEOPLE, "编导", "visible-users", bind(scene, "sr.content_director_user_id", null)));
         add(result, selectSource(Sensitivity.PERSONAL, "service.careerPlannerUserId", PEOPLE, "职业规划师", "visible-users", bind(scene, "sr.career_planner_user_id", null)));
         add(result, selectSource(Sensitivity.PERSONAL, "service.operatorUserId", PEOPLE, "运营负责人", "visible-users", bind(scene, "sr.operator_user_id", null)));
-        add(result, select(Sensitivity.STANDARD, "service.status", STATUS, "服务状态", options("active", "服务中", "paused", "已暂停", "completed", "已完成", "terminated", "已终止"), bind("student", "sr.status", serviceFromStudent)));
+        add(result, select(Sensitivity.STANDARD, "service.status", STATUS, "服务状态", options("active", "服务中", "paused", "已暂停", "completed", "已完成", "terminated", "已终止", "closed", "已关闭"), bind("student", cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.STATUS_SQL, serviceFromStudent)));
         add(result, selectSource(Sensitivity.PERSONAL, "service.ownerUserId", PEOPLE, "服务负责人", "visible-users", bind("student", "sr.owner_user_id", serviceFromStudent)));
         add(result, date(Sensitivity.STANDARD, "service.activatedAt", TIME, "服务激活时间", bind("student", "sr.activated_at", serviceFromStudent)));
         add(result, date(Sensitivity.STANDARD, "service.pausedAt", TIME, "服务暂停时间", bind("student", "sr.paused_at", serviceFromStudent)));

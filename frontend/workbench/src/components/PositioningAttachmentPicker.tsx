@@ -1,6 +1,6 @@
 import { DeleteOutlined, DownloadOutlined, FileOutlined, PlusOutlined } from '@ant-design/icons'
 import { Alert, Button, Image, Modal, Spin, Typography, Upload, type UploadProps } from 'antd'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { attachmentKind, AttachmentTypeIcon } from './AttachmentCard'
 
 /** One uploaded file, without the signed URL that only the owning service can issue. */
@@ -11,7 +11,12 @@ export type PendingAttachment = { uid: string; file: File }
 export type AttachmentItem = { key: string; name: string; type?: string; size?: number; uploaded?: UploadedAttachment; pending?: PendingAttachment }
 
 export const MAX_ATTACHMENT_COUNT = 20
-export const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024
+export const MAX_ATTACHMENT_SIZE = 1024 * 1024 * 1024
+
+export function attachmentBudgetError(sizes: number[]): string | undefined {
+  if (sizes.some(size => !Number.isFinite(size) || size <= 0)) return '附件不能为空，且须有有效的文件大小'
+  if (sizes.reduce((total, size) => total + size, 0) > MAX_ATTACHMENT_SIZE) return '附件总大小不能超过 1GB，请移除部分文件后重试'
+}
 
 /** Positioning attachments accept documents, images, audio and video in one field. */
 export const POSITIONING_ATTACHMENT_ACCEPT = [
@@ -64,6 +69,9 @@ export default function PositioningAttachmentPicker({ items, onChange, accept = 
     if (remaining.length !== queued.length) setQueued(remaining)
   }, [items, queued])
   const shown = [...items, ...queued]
+  // Reserve synchronously so every file in one multi-selection sees earlier accepted files.
+  const selection = useRef(shown)
+  selection.current = shown
 
   const open = async (item: AttachmentItem) => {
     setError('')
@@ -97,16 +105,20 @@ export default function PositioningAttachmentPicker({ items, onChange, accept = 
   }
   const remove = (item: AttachmentItem) => {
     if (!item.pending) { onRemove?.(item); onChange(items.filter(current => current.key !== item.key)); return }
+    selection.current = selection.current.filter(entry => entry.key !== item.key)
     setQueued(current => current.filter(entry => entry.key !== item.key))
+    onChange(items.filter(entry => entry.key !== item.key))
   }
   const beforeUpload: UploadProps['beforeUpload'] = file => {
     setError('')
-    if (!file.size || file.size > MAX_ATTACHMENT_SIZE) { setError(`${file.name} 大小须为 1 字节至 100 MB`); return Upload.LIST_IGNORE }
+    const budgetError = attachmentBudgetError([...selection.current.map(item => item.size ?? item.pending?.file.size ?? 0), file.size])
+    if (budgetError) { setError(budgetError); return Upload.LIST_IGNORE }
     if (!isAllowed(file)) { setError(`${file.name} 不是支持的格式，请上传文档、图片、音频或视频`); return Upload.LIST_IGNORE }
-    if (shown.length >= maxCount) { setError(`最多上传 ${maxCount} 个附件`); return Upload.LIST_IGNORE }
+    if (selection.current.length >= maxCount) { setError(`最多上传 ${maxCount} 个附件`); return Upload.LIST_IGNORE }
     const next: AttachmentItem = { key: `pending-${file.uid}`, name: file.name, type: file.type, size: file.size, pending: { uid: file.uid, file } }
+    selection.current = [...selection.current, next]
     if (onUpload) { setQueued(current => [...current, next]); onUpload([file]) }
-    else onChange([...items, next])
+    else onChange(selection.current)
     return false
   }
   const kind = preview ? caption(preview.item) : 'file'

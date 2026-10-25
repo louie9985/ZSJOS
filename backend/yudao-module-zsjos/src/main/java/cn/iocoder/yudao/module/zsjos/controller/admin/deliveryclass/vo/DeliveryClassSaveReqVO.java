@@ -19,10 +19,10 @@ public class DeliveryClassSaveReqVO {
     /** Existing clients omit this field; the new editor sets it when only metadata changes. */
     private Boolean preserveExamDate;
 
-    @jakarta.validation.constraints.AssertTrue(message = "请选择考期日期，结束日期不能早于开始日期")
+    @jakarta.validation.constraints.AssertTrue(message = "结束日期必须有开始日期，且不能早于开始日期")
     @com.fasterxml.jackson.annotation.JsonIgnore
     public boolean isExamDateValid() {
-        if (startDate == null) return endDate == null && examScheduleId != null;
+        if (startDate == null) return endDate == null;
         return endDate == null || !endDate.isBefore(startDate);
     }
     @NotNull private Long homeroomUserId;

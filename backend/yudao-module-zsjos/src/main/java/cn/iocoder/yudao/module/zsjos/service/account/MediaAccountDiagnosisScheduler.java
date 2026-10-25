@@ -22,7 +22,6 @@ public class MediaAccountDiagnosisScheduler {
     @Resource private MediaAccountMapper accounts;
     @Resource private BusinessTaskCommandService tasks;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper taskMapper;
-    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryPlanMapper plans;
     @Resource private cn.iocoder.yudao.module.zsjos.service.delivery.DeliveryPositioningSyncService sync;
     public static Map<String, Object> context(MediaAccountDO account) {
         var values = DeliveryPositioningSource.parse(account.getDetailValuesJson());
@@ -44,16 +43,12 @@ public class MediaAccountDiagnosisScheduler {
             sync.syncAccount(account.getId());
             account = accounts.selectById(account.getId());
             var ctx = context(account);
-            var latestPlan = plans.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryPlanDO>()
-                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryPlanDO::getAccountId, account.getId())
-                    .orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryPlanDO::getId).last("LIMIT 1"));
-            boolean closed = latestPlan != null && "REPOSITIONING".equals(latestPlan.getStatus());
             for (var pending : taskMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO>()
                     .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getBizType, "media_account_diagnosis")
                     .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getBizId, account.getId())
                     .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getStatus, "pending"))) {
                 var payload = DeliveryPositioningSource.parse(pending.getPayload());
-                if (closed || !Objects.equals(String.valueOf(payload.get("roundKey")), String.valueOf(ctx.get("roundKey"))) || payload.get("roundKey") == null) {
+                if (!Objects.equals(String.valueOf(payload.get("roundKey")), String.valueOf(ctx.get("roundKey"))) || payload.get("roundKey") == null) {
                     taskMapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO>()
                             .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getId, pending.getId())
                             .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getStatus, "pending")
@@ -62,7 +57,7 @@ public class MediaAccountDiagnosisScheduler {
                             .set(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getCancelReason, "诊断计时规则更新或轮次结束"));
                 }
             }
-            if (closed || ctx.get("anchorAt") == null) continue;
+            if (ctx.get("anchorAt") == null) continue;
             LocalDateTime anchor = LocalDateTime.parse(String.valueOf(ctx.get("anchorAt")));
             tasks.reassignPending(List.of(TASK_TYPE_ACCOUNT_DIAGNOSIS_7D, TASK_TYPE_ACCOUNT_DIAGNOSIS_14D, TASK_TYPE_ACCOUNT_DIAGNOSIS_28D), account.getId(), account.getDirectorUserId());
             long day = java.time.temporal.ChronoUnit.DAYS.between(anchor.toLocalDate(), today);

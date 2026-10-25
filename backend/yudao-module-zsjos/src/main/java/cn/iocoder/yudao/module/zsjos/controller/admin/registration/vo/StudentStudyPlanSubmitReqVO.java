@@ -12,7 +12,7 @@ import java.util.Map;
 
 @Data
 public class StudentStudyPlanSubmitReqVO {
-    @NotNull private Long taskId;
+    private Long taskId;
     @NotNull private Boolean successful;
     private String unsuccessfulReasonValue;
     @NotBlank @Size(max = 2000) private String remark;

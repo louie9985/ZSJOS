@@ -39,7 +39,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class MediaStudentServiceTest {
     @Test
-    void sortingScansAuthorizedPagesAndKeepsFiltersBeforeReturningRequestedPage() {
+    void keywordSortingCollectsAuthorizedMatchesOnceAndKeepsFiltersBeforeReturningRequestedPage() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
         request.setSortField("name"); request.setSortOrder("ascend"); request.setPageNo(2); request.setPageSize(1);
         request.setKeyword("测试"); request.setInServicePeriod(true); request.setOperatorUserId(20L);
@@ -48,13 +48,13 @@ class MediaStudentServiceTest {
         request.setAdvancedFilter(filter);
         when(myStudentService.getMediaPage(eq(10L), any())).thenAnswer(invocation -> {
             var batch = invocation.getArgument(1, cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO.class);
-            assertEquals(200, batch.getPageSize());
+            assertEquals(-1, batch.getPageSize());
             org.junit.jupiter.api.Assertions.assertNull(batch.getSortField());
             org.junit.jupiter.api.Assertions.assertNull(batch.getSortOrder());
             assertEquals(request.getKeyword(), batch.getKeyword());
             assertEquals(true, batch.getInServicePeriod()); assertEquals(20L, batch.getOperatorUserId());
             assertEquals("SELF", batch.getReadScope()); assertEquals(filter, batch.getAdvancedFilter());
-            var rows = java.util.stream.LongStream.rangeClosed(batch.getPageNo() == 1 ? 1 : 201, batch.getPageNo() == 1 ? 200 : 201)
+            var rows = java.util.stream.LongStream.rangeClosed(1, 201)
                     .mapToObj(id -> { var row = new MyStudentRespVO(); row.setPersonId(id); row.setName(id == 201 ? "陈" : "张"); return row; }).toList();
             return new cn.iocoder.yudao.framework.common.pojo.PageResult<>(rows, 201L);
         });
@@ -63,7 +63,7 @@ class MediaStudentServiceTest {
         var result = service.getPage(10L, request);
         assertEquals(201L, result.getTotal());
         assertEquals(200L, result.getList().getFirst().getPersonId());
-        verify(myStudentService, times(2)).getMediaPage(eq(10L), any());
+        verify(myStudentService, times(1)).getMediaPage(eq(10L), any());
         assertEquals("name", request.getSortField()); assertEquals(1, request.getPageSize());
     }
 
@@ -123,6 +123,51 @@ class MediaStudentServiceTest {
             org.junit.jupiter.api.Assertions.assertNull(MediaStudentService.accountHomepageUrl(new MediaAccountDO().setDetailValuesJson(json)));
         }
         org.junit.jupiter.api.Assertions.assertNull(MediaStudentService.accountHomepageUrl(new MediaAccountDO()));
+    }
+
+    @Test
+    void pageHidesCompletedDeletionsButKeepsPendingAccountsAndStudentsWithoutAccounts() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
+        var first = new MyStudentRespVO(); first.setPersonId(1L);
+        var second = new MyStudentRespVO(); second.setPersonId(2L);
+        when(myStudentService.getMediaPage(10L, request)).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(first, second), 12L));
+        var active = new MediaAccountDO().setId(20L).setStudentPersonId(1L).setRunStatus("active");
+        var pending = new MediaAccountDO().setId(21L).setStudentPersonId(1L).setRunStatus("delete_pending");
+        var legacy = new MediaAccountDO().setId(22L).setStudentPersonId(1L);
+        var deleted = new MediaAccountDO().setId(23L).setStudentPersonId(2L).setRunStatus("deleted");
+        var accounts = List.of(active, pending, legacy, deleted);
+        when(accountMapper.selectByStudents(List.of(1L, 2L))).thenReturn(accounts);
+        when(accountPermissionProvider.filterReadable(accounts, 10L)).thenReturn(accounts);
+
+        var result = service.getPage(10L, request);
+
+        assertEquals(12L, result.getTotal());
+        assertEquals(List.of(1L, 2L), result.getList().stream().map(MyStudentRespVO::getPersonId).toList());
+        assertEquals(List.of(20L, 21L, 22L), result.getList().getFirst().getAccounts().stream()
+                .map(cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentListRespVO.AccountVO::getId).toList());
+        assertTrue(result.getList().getLast().getAccounts().isEmpty());
+        assertEquals("deleted", deleted.getRunStatus());
+        verifyNoInteractions(accountService, positioningMapper, contentMapper, ticketMapper);
+    }
+
+    @Test
+    void accountSortingIgnoresDeletedAccountNamesBeforePagination() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO();
+        request.setSortField("accounts"); request.setSortOrder("ascend"); request.setPageSize(1);
+        var first = new MyStudentRespVO(); first.setPersonId(1L);
+        var second = new MyStudentRespVO(); second.setPersonId(2L);
+        when(myStudentService.getMediaPage(eq(10L), any())).thenReturn(
+                new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(first, second), 2L));
+        var deleted = new MediaAccountDO().setId(20L).setStudentPersonId(1L).setNickname("A").setRunStatus("deleted");
+        var active = new MediaAccountDO().setId(21L).setStudentPersonId(2L).setNickname("B").setRunStatus("active");
+        when(accountMapper.selectByStudents(List.of(1L, 2L))).thenReturn(List.of(deleted, active));
+        when(accountPermissionProvider.filterReadable(List.of(deleted, active), 10L)).thenReturn(List.of(deleted, active));
+
+        var result = service.getPage(10L, request);
+
+        assertEquals(2L, result.getTotal());
+        assertEquals(List.of(2L), result.getList().stream().map(MyStudentRespVO::getPersonId).toList());
     }
 
     @Test
@@ -215,6 +260,55 @@ class MediaStudentServiceTest {
         verify(contentMapper).selectByAccountIds(List.of(3L));
         verify(ticketMapper).selectByAccountIds(List.of(3L));
         verify(accountService, never()).projectStudentReadOnly(foreign);
+    }
+
+    @Test
+    void detailHidesCompletedDeletionBeforeLoadingItsBusinessDataButKeepsPendingAccount() {
+        var student = new MyStudentRespVO(); student.setPersonId(2L); student.setServices(List.of());
+        var deleted = new MediaAccountDO().setId(3L).setAccountNo("MA-3").setRunStatus("deleted");
+        var pending = new MediaAccountDO().setId(4L).setAccountNo("MA-4").setRunStatus("delete_pending");
+        deleted.setUpdateTime(java.time.LocalDateTime.now());
+        pending.setUpdateTime(java.time.LocalDateTime.now());
+        when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
+        when(accountMapper.selectByStudent(2L)).thenReturn(List.of(deleted, pending));
+        when(accountPermissionProvider.hasPermission(4L, "read", 1L)).thenReturn(true);
+        when(accountService.projectStudentReadOnly(pending)).thenReturn(new MediaAccountRespVO());
+
+        var result = service.getDetail(1L, 2L);
+
+        assertEquals(List.of(4L), result.getAccounts().stream().map(MediaStudentDetailRespVO.AccountVO::getId).toList());
+        assertEquals("delete_pending", result.getAccounts().getFirst().getRunStatus());
+        assertEquals(List.of("account-4"), result.getOperationTimeline().stream()
+                .map(MediaStudentDetailRespVO.OperationVO::getKey).toList());
+        verify(positioningMapper).selectByStudentAndAccountIds(2L, List.of(4L));
+        verify(positioningSubmissionMapper).selectByStudentAndAccountIds(2L, List.of(4L));
+        verify(contentMapper).selectByAccountIds(List.of(4L));
+        verify(contentMapper).selectRecentByAccountIds(List.of(4L));
+        verify(ticketMapper).selectByAccountIds(List.of(4L));
+        verify(ticketMapper).selectRecentByAccountIds(List.of(4L));
+        verify(accountService, never()).projectStudentReadOnly(deleted);
+        verify(accountService, never()).get(3L, 1L);
+        verify(accountPermissionProvider, never()).hasPermission(3L, "read", 1L);
+    }
+
+    @Test
+    void detailKeepsStudentAndReturnsEmptyAccountsAfterLastAccountDeletion() {
+        var student = new MyStudentRespVO(); student.setPersonId(2L); student.setServices(List.of());
+        var deleted = new MediaAccountDO().setId(3L).setRunStatus("deleted");
+        when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
+        when(accountMapper.selectByStudent(2L)).thenReturn(List.of(deleted));
+
+        var result = service.getDetail(1L, 2L);
+
+        assertEquals(2L, result.getStudent().getPersonId());
+        assertTrue(result.getAccounts().isEmpty());
+        assertTrue(result.getOperationTimeline().isEmpty());
+        assertEquals(0, result.getPendingStats().getAccountCount());
+        verify(positioningMapper).selectByStudentAndAccountIds(2L, List.of());
+        verify(positioningSubmissionMapper).selectByStudentAndAccountIds(2L, List.of());
+        verify(contentMapper).selectByAccountIds(List.of());
+        verify(ticketMapper).selectByAccountIds(List.of());
+        verifyNoInteractions(accountService, accountPermissionProvider);
     }
 
     @Test

@@ -61,6 +61,7 @@ export const STORAGE_KEYS = {
 } as const
 
 export const APP_ROUTES = {
+  ZSJKQT: "/hrm/zsjkqt",
   USER_PROFILE: '/user/profile',
   WECOM_CLICK: '/zsjos/wecom-click',
   LEAD_SUBMISSION: '/zsjos/leads/submit',
@@ -83,6 +84,7 @@ export const APP_ROUTES = {
   REGISTRATION_CHECKLIST_CONFIG: '/zsjos/registration-checklist-config',
   MY_STUDENTS: '/zsjos/my-students',
   CLASS_MANAGEMENT: '/zsjos/class-management',
+  STUDENT_ENTRY: '/zsjos/student-entry',
   MY_CLASSES: '/zsjos/my-classes',
   POSITIONING_INTERVIEW_TEMPLATE: '/zsjos/director-config/interview-template',
   STUDENT_CONTACT_CONFIG: '/zsjos/student-contact-config',
@@ -172,6 +174,7 @@ export const AUTH_STORAGE_KEYS = {
 } as const
 
 export const RENDERABLE_APP_ROUTES = new Set([
+  APP_ROUTES.ZSJKQT,
   APP_ROUTES.LEAD_SUBMISSION,
   APP_ROUTES.LEAD_MANAGEMENT,
   APP_ROUTES.LEAD_SELF_SOURCED,
@@ -192,6 +195,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG,
   APP_ROUTES.MY_STUDENTS,
   APP_ROUTES.CLASS_MANAGEMENT,
+  APP_ROUTES.STUDENT_ENTRY,
   APP_ROUTES.MY_CLASSES,
   APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE,
   APP_ROUTES.STUDENT_CONTACT_CONFIG,

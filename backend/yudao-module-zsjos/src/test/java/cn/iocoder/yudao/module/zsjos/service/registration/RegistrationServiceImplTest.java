@@ -105,6 +105,7 @@ class RegistrationServiceImplTest {
     @Mock private RegistrationClassAssignmentMapper classAssignmentMapper;
     @Mock private DeliveryClassMapper deliveryClassMapper;
     @Mock private DeliveryClassService deliveryClassService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.deliveryclass.UnscheduledDeliveryClassService unscheduledClasses;
     @Mock private ZsjosProductCategoryMapper productCategoryMapper;
     @Mock private ZsjosProductMapper productMapper;
     @Mock private SalesOrderItemMapper orderItemMapper;
@@ -385,7 +386,7 @@ class RegistrationServiceImplTest {
         when(userRelationMapper.selectListBySourceUserIds(any(), any())).thenReturn(List.of(assignment));
         when(adminUserApi.getUserList(any())).thenReturn(List.of(planner));
         when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(first, second));
-        when(deliveryClassMapper.selectPending()).thenReturn(deliveryClass(299L, true, null, null));
+        when(unscheduledClasses.ensure(30L)).thenReturn(deliveryClass(299L, true, null, 30L).setClassKind("UNSCHEDULED"));
         when(personMapper.selectByIdForUpdate(501L, 1L)).thenReturn(person);
         RegistrationVersionReqVO request = new RegistrationVersionReqVO();
         request.setVersion(0); request.setIdempotencyKey("complete-student");
@@ -402,13 +403,14 @@ class RegistrationServiceImplTest {
         captured.getAllValues().forEach(relation -> {
             assertEquals("创建时学员姓名", relation.getStudentNameSnapshot());
             assertEquals("order_creation", relation.getStudentNameSource());
+            assertEquals(299L, relation.getClassId()); assertEquals(30L, relation.getOwnerUserId());
         });
         verify(registrationNotifyPublisher, times(2)).publishPlannerAssigned(registrationCase, order, null, 30L, 501L, null);
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void classModeCompletesEachOrderItemIntoItsSelectedClass(boolean singleItemTask) {
+    @org.junit.jupiter.params.provider.CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    void classModeCompletesEachOrderItemIntoItsSelectedClass(boolean singleItemTask, boolean unscheduled) {
         RegistrationCaseDO registrationCase = editableCase();
         registrationCase.setAssignmentMode("class_per_item");
         if (singleItemTask) registrationCase.setOrderItemId(301L);
@@ -422,7 +424,8 @@ class RegistrationServiceImplTest {
         pendingItem.setId(302L); pendingItem.setProductId(402L); pendingItem.setProductSnapshot("待分班商品");
         RegistrationClassAssignmentDO formalAssignment = assignment(301L, 202L);
         RegistrationClassAssignmentDO pendingAssignment = assignment(302L, 201L);
-        DeliveryClassDO formalClass = deliveryClass(202L, false, 81L, 31L);
+        DeliveryClassDO formalClass = deliveryClass(202L, unscheduled, 81L, 31L);
+        if (unscheduled) formalClass.setClassKind("UNSCHEDULED");
         DeliveryClassDO pendingClass = deliveryClass(201L, true, null, null);
         PersonDO person = new PersonDO(); person.setId(501L); person.setVersion(0); person.setPersonNo("XY202609080001");
         org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);

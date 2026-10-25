@@ -55,4 +55,13 @@ public class PublicStudentInfoFormController {
         response.setHeader("Cache-Control","no-store");
         service.submit(token,request); return success(true);
     }
+    @PutMapping("/draft")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Draft> draft(
+            @RequestHeader("X-Student-Info-Token") String token,
+            @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.DraftWrite request,
+            HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store");
+        return success(service.saveDraft(token,request));
+    }
 }

@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaServiceReadiness;
+
 import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
 
 import cn.hutool.crypto.digest.DigestUtil;
@@ -104,6 +106,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         ServiceRelationDO relation = requireReadable(relationId, userId);
         StudentContactContextRespVO result = new StudentContactContextRespVO();
         result.setServiceRelationId(relationId); result.setAcceptanceStatus(relation.getAcceptanceStatus());
+        result.setTeachingClosed(relation.getTeachingClosed());
         result.setAcceptedAt(relation.getAcceptedAt()); result.setVersion(relation.getVersion());
         BusinessTaskDO task = currentTask(relationId);
         StudentContactConfigVersionDO config = task == null ? configService.requirePublished() : configFromTask(task);
@@ -136,6 +139,7 @@ public class StudentContactServiceImpl implements StudentContactService {
             }
         }
         List<String> availableActions = new ArrayList<>();
+        availableActions.addAll(serviceReadPermission.transferActions(relation.getId(), userId));
         boolean accepted = "accepted".equals(relation.getAcceptanceStatus());
         if (operational && owner && !accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_ACCEPT)) {
             availableActions.add(CONTEXT_ACTION_ACCEPT);
@@ -184,33 +188,33 @@ public class StudentContactServiceImpl implements StudentContactService {
                         .orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.positioninginterview.PositioningInterviewDO::getId).last("LIMIT 1"));
         if (positioningInterview != null) directorStage = "completed".equals(positioningInterview.getStatus())
                 ? "positioning_interview_completed" : "positioning_interview";
-        if (operational && accepted && director && "precheck".equals(directorStage)
+        if (operational && MediaServiceReadiness.ready(relation) && director && "precheck".equals(directorStage)
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_PRECHECK)) {
             availableActions.add(CONTEXT_ACTION_DIRECTOR_PRECHECK);
         }
-        if (operational && accepted && director && Set.of("positioning_interview", "interview", "positioning_ready").contains(directorStage)
+        if (operational && MediaServiceReadiness.ready(relation) && director && Set.of("positioning_interview", "interview", "positioning_ready").contains(directorStage)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:student:positioning-interview")) {
             boolean hasDraft = positioningInterview != null;
             availableActions.add(hasDraft ? CONTEXT_ACTION_CONTINUE_POSITIONING_INTERVIEW
                     : CONTEXT_ACTION_START_POSITIONING_INTERVIEW);
         }
-        if ((operational && accepted && director && "positioning_interview_completed".equals(directorStage)
+        if ((operational && MediaServiceReadiness.ready(relation) && director && "positioning_interview_completed".equals(directorStage)
                 || positioningInterview != null && cn.iocoder.yudao.module.zsjos.service.registration.MediaStudentReadScope.canReadAll(permissionApi, userId))
                 && permissionApi.hasAnyPermissions(userId, "zsjos:student:positioning-interview-query")) {
             availableActions.add(CONTEXT_ACTION_VIEW_POSITIONING_INTERVIEW);
         }
-        if (operational && accepted && director
+        if (operational && MediaServiceReadiness.ready(relation) && director
                 && Set.of("positioning_interview_completed", "positioning_ready").contains(directorStage)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:create")) {
             availableActions.add("CREATE_POSITIONING_CARD");
         }
-        if (operational && accepted && (director || Objects.equals(relation.getOperatorUserId(), userId))
+        if (operational && MediaServiceReadiness.ready(relation) && (director || Objects.equals(relation.getOperatorUserId(), userId))
                 && relation.getContentDirectorUserId() != null
                 && Set.of("positioning_interview_completed", "positioning_ready").contains(directorStage)
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_MEDIA_ACCOUNT_CREATE)) {
             availableActions.add(CONTEXT_ACTION_CREATE_MEDIA_ACCOUNT);
         }
-        if (operational && accepted && director
+        if (operational && MediaServiceReadiness.ready(relation) && director
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)) {
             availableActions.add(CONTEXT_ACTION_ASSIGN_OPERATOR);
         }
@@ -254,7 +258,7 @@ public class StudentContactServiceImpl implements StudentContactService {
                 : formFields(config, stage, task));
         result.setDirectorForms(directorForms(relation, config));
         boolean operatorConflict = relation.getPersonId() != null
-                && relationMapper.selectActiveByPersonIds(List.of(relation.getPersonId())).stream()
+                && relationMapper.selectMediaActiveByPersonIds(List.of(relation.getPersonId())).stream()
                 .map(ServiceRelationDO::getOperatorUserId).filter(Objects::nonNull).distinct().limit(2).count() > 1;
         result.setOperatorAssignmentConflict(operatorConflict);
         if (operational && owner && accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_EXAM_DATE)
@@ -273,6 +277,22 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         if (operational && accepted && owner && progress != null && !Boolean.TRUE.equals(progress.getHistoryIncomplete())
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_CHECKLIST_UPDATE)) availableActions.add(ACTION_CHECKLIST_UPDATE);
+        if (Boolean.TRUE.equals(relation.getTeachingRestored()) && task == null && owner && accepted
+                && operational && !cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation)) {
+            String manualType = STAGE_FIRST_CONTACT.equals(stage) ? TYPE_FIRST_CONTACT : STAGE_STUDY_PLAN.equals(stage) ? TYPE_STUDY_PLAN : null;
+            if (manualType != null && permissionApi.hasAnyPermissions(userId, TYPE_FIRST_CONTACT.equals(manualType) ? PERMISSION_FIRST_CONTACT_SUBMIT : PERMISSION_STUDY_PLAN_SUBMIT)) {
+                result.setManualTaskType(manualType);
+                result.setFormFields(formFields(config,manualType,null));
+                availableActions.add(TYPE_FIRST_CONTACT.equals(manualType) ? CONTEXT_ACTION_FIRST_CONTACT : CONTEXT_ACTION_STUDY_PLAN);
+            }
+        }
+        if (cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation)) {
+            availableActions.removeAll(List.of(CONTEXT_ACTION_ACCEPT,CONTEXT_ACTION_FIRST_CONTACT,CONTEXT_ACTION_STUDY_PLAN,CONTEXT_ACTION_FOLLOW_UP,
+                CONTEXT_ACTION_EDIT_BASIC_INFO,CONTEXT_ACTION_UPDATE_EXAM_DATE,CONTEXT_ACTION_COMPLETE_STAGE,
+                CONTEXT_ACTION_EXAM_NOTICE_DONE,CONTEXT_ACTION_POST_EXAM_DONE,CONTEXT_ACTION_END_SERVICE,ACTION_CHECKLIST_UPDATE));
+            result.setCurrentTask(null);
+            result.setDeliveryStages(deliveryStages(stage,false));
+        }
         result.setAvailableActions(availableActions);
         return result;
     }
@@ -305,6 +325,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "accept")
     public void accept(Long relationId, StudentServiceAcceptReqVO request, Long userId) {
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         if ("accepted".equals(relation.getAcceptanceStatus())) return;
         StudentContactConfigVersionDO config = configService.requirePublished();
         LocalDateTime now = LocalDateTime.now();
@@ -320,6 +341,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "update-basic-info")
     public void updateBasicInfo(Long relationId, StudentBasicInfoUpdateReqVO request, Long userId) {
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         String mobile = StrUtil.trimToNull(request.getMobile());
         String wechatId = StrUtil.trimToNull(request.getWechatId());
@@ -382,6 +404,7 @@ public class StudentContactServiceImpl implements StudentContactService {
             throw exception(STUDENT_PERMISSION_DENIED);
         }
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         String fingerprint = deliveryFingerprint(relationId, request);
         StudentContactRecordDO replay = recordMapper.selectByIdempotencyKey(request.getIdempotencyKey());
@@ -431,6 +454,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "update-exam-date")
     public void updateExamDate(Long relationId, StudentExamDateUpdateReqVO request, Long userId) {
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId, TenantContextHolder.getRequiredTenantId());
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         if (!Objects.equals(relation.getOwnerUserId(), userId)
                 && !permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_EXAM_DATE)) throw exception(STUDENT_PERMISSION_DENIED);
@@ -451,6 +475,7 @@ public class StudentContactServiceImpl implements StudentContactService {
                           String extensionReason, String extensionDescription, List<Long> extensionAttachments,
                           Map<String, Object> data, String idempotencyKey, Long userId) {
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         String requestFingerprint = contactFingerprint(expectedType, successful, unsuccessfulReason, remark,
                 attachments, checklistKeys, planCompleted, nextAt, extensionReason, extensionDescription, extensionAttachments, data);
         if (taskId == null) requestFingerprint = DigestUtil.sha256Hex("taskless:" + requestFingerprint);
@@ -461,7 +486,13 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         BusinessTaskDO task;
-        if (TYPE_CONTACT.equals(expectedType) && taskId == null) {
+        if (taskId == null && !TYPE_CONTACT.equals(expectedType)) {
+            String stage = relation.getDeliveryStage() == null ? STAGE_FIRST_CONTACT : relation.getDeliveryStage();
+            if (!Boolean.TRUE.equals(relation.getTeachingRestored()) || currentTask(relationId) != null
+                || !(TYPE_FIRST_CONTACT.equals(expectedType) && STAGE_FIRST_CONTACT.equals(stage)
+                    || TYPE_STUDY_PLAN.equals(expectedType) && STAGE_STUDY_PLAN.equals(stage))) throw exception(STUDENT_CONTACT_TASK_INVALID);
+            task = null;
+        } else if (TYPE_CONTACT.equals(expectedType) && taskId == null) {
             if (!canContactWithoutTask(relation)) throw exception(STUDENT_CONTACT_TASK_INVALID);
             task = currentTask(relationId);
             if (task != null) {
@@ -557,7 +588,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         boolean directorCanAssignOperator = operatorAssignment && director
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN);
         if (((!owner || !assign) && !directorCanAssignOperator) && !correction) throw exception(STUDENT_PERMISSION_DENIED);
-        if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
+        if (!(operatorAssignment ? MediaServiceReadiness.ready(relation) : "accepted".equals(relation.getAcceptanceStatus()))) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         String scene = scene(type);
         if (scene == null) throw exception(STUDENT_COLLABORATOR_INVALID);
         Set<Long> ids = new LinkedHashSet<>();
@@ -586,7 +617,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         boolean directorCanAssignOperator = operatorAssignment && director
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN);
         if ((!ownerCanAssign && !directorCanAssignOperator && !correction)
-                || !"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_PERMISSION_DENIED);
+                || !(operatorAssignment ? MediaServiceReadiness.ready(relation) : "accepted".equals(relation.getAcceptanceStatus()))) throw exception(STUDENT_PERMISSION_DENIED);
         StudentCollaboratorAssignmentLogDO replay = assignmentLogMapper.selectByIdempotencyKey(request.getIdempotencyKey());
         if (replay != null) {
             if (!Objects.equals(replay.getServiceRelationId(), relationId)
@@ -612,7 +643,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (previous != null && (request.getCorrectionReason() == null || request.getCorrectionReason().isBlank())) {
             throw exception(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED);
         }
-        if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) relation.setContentDirectorUserId(request.getUserId());
+        if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) { relation.setContentDirectorUserId(request.getUserId()); relation.setMediaReady(true); }
         else if (COLLABORATOR_CAREER.equals(request.getCollaboratorType())) relation.setCareerPlannerUserId(request.getUserId());
         else relation.setOperatorUserId(request.getUserId());
         relation.setVersion(relation.getVersion() + 1); relationMapper.updateById(relation);
@@ -642,6 +673,9 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Override @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-contact-extension", bizId = "#extensionId", action = "withdraw")
     public void withdrawExtension(Long extensionId, Integer version, String reason, String idempotencyKey, Long userId) {
+        var candidate = extensionMapper.selectById(extensionId);
+        if (candidate == null) throw exception(STUDENT_CONTACT_EXTENSION_NOT_EXISTS);
+        relationMapper.selectByIdForUpdate(candidate.getServiceRelationId(),TenantContextHolder.getRequiredTenantId());
         StudentContactExtensionDO extension = extensionMapper.selectByIdForUpdate(
                 extensionId, TenantContextHolder.getRequiredTenantId());
         if (extension != null && "withdrawn".equals(extension.getStatus())
@@ -668,11 +702,16 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Transactional(rollbackFor = Exception.class)
     public void handleExtensionResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
+        var candidate = extensionMapper.selectOne(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<StudentContactExtensionDO>()
+                .eq(StudentContactExtensionDO::getProcessInstanceId,processInstanceId));
+        if (candidate == null) return;
+        var relation = relationMapper.selectByIdForUpdate(candidate.getServiceRelationId(),TenantContextHolder.getRequiredTenantId());
         StudentContactExtensionDO extension = extensionMapper.selectByProcessIdForUpdate(
                 processInstanceId, TenantContextHolder.getRequiredTenantId());
         if (extension == null || !"pending".equals(extension.getStatus())) return;
         String status;
-        if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)
+        if (!cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation)
+                && BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)
                 && taskMapper.updatePendingDueAt(extension.getTaskId(), extension.getRequestedDueAt()) == 1) status = "approved";
         else status = BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus) ? "rejected" : "cancelled";
         if (extensionMapper.transitionPending(extension.getId(), extension.getVersion(), status, reason, null,
@@ -706,6 +745,10 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-assistance", bizId = "#taskId", action = "complete")
     public void completeAssistance(Long taskId, String remark, Long userId) {
+        var candidate = taskMapper.selectById(taskId);
+        if (candidate == null) throw exception(STUDENT_CONTACT_TASK_INVALID);
+        var relation = relationMapper.selectByIdForUpdate(candidate.getBizId(),TenantContextHolder.getRequiredTenantId());
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
         if (task == null || !TYPE_ASSISTANCE.equals(task.getTaskType()) || !userId.equals(task.getAssigneeId())) {
             throw exception(STUDENT_CONTACT_TASK_INVALID);
@@ -870,6 +913,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     public void updateFirstContactChecklist(Long relationId, StudentFirstContactChecklistUpdateReqVO request, Long userId) {
         if (!permissionApi.hasAnyPermissions(userId, PERMISSION_CHECKLIST_UPDATE)) throw exception(STUDENT_PERMISSION_DENIED);
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         String commandKey = "student-checklist:" + relationId + ":" + request.getIdempotencyKey();
         String fingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(request));
@@ -931,11 +975,13 @@ public class StudentContactServiceImpl implements StudentContactService {
     private ServiceRelationDO requireOwned(Long id, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(id);
         if (!cn.iocoder.yudao.module.zsjos.service.registration.StudentDeliveryParticipation.includes(relation) || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         if (!Objects.equals(relation.getOwnerUserId(), userId)) throw exception(STUDENT_PERMISSION_DENIED); return relation;
     }
     private ServiceRelationDO requireOwnedForUpdate(Long id, Long userId) {
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
         if (!cn.iocoder.yudao.module.zsjos.service.registration.StudentDeliveryParticipation.includes(relation) || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         if (!Objects.equals(relation.getOwnerUserId(), userId)) throw exception(STUDENT_PERMISSION_DENIED); return relation;
     }
     private ServiceRelationDO requireReadable(Long id, Long userId) {
@@ -1098,7 +1144,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId,
                 TenantContextHolder.getRequiredTenantId());
         if (relation == null || !"active".equals(relation.getStatus())
-                || !"accepted".equals(relation.getAcceptanceStatus())
+                || !MediaServiceReadiness.ready(relation)
                 || !Objects.equals(relation.getContentDirectorUserId(), userId)) {
             throw exception(STUDENT_PERMISSION_DENIED);
         }

@@ -67,6 +67,15 @@ public class SftpFileClient extends AbstractFileClient<SftpFileClientConfig> {
     }
 
     @Override
+    public String uploadFile(java.nio.file.Path source, String path, String type) {
+        String filePath = getFilePath(path);
+        reconnectIfTimeout();
+        sftp.mkDirs(StrUtil.removeSuffix(filePath, FileUtil.getName(filePath)));
+        if (!sftp.upload(filePath, source.toFile())) throw new JschRuntimeException("流式文件上传失败");
+        return super.formatFileUrl(config.getDomain(), path);
+    }
+
+    @Override
     public void delete(String path) {
         String filePath = getFilePath(path);
         reconnectIfTimeout();

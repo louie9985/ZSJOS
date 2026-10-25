@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management;
 
 import lombok.Data;
+import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.LeadTaskReminderRespVO;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -8,6 +9,9 @@ import java.util.List;
 
 @Data
 public class LeadManagementRespVO {
+
+    /** Current viewer's pending tasks, using the same eligibility as the menu reminder. */
+    private List<LeadTaskReminderRespVO> pendingTasks;
 
     private AppealSummaryVO appealSummary;
 

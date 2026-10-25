@@ -62,6 +62,9 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
                 .orderByDesc(BusinessTaskDO::getId).last("LIMIT 1"));
     }
 
+    @org.apache.ibatis.annotations.Update("UPDATE zsjos_business_task SET status='cancelled', cancelled_at=#{now}, cancel_reason=#{reason}, version=version+1 WHERE tenant_id=#{tenantId} AND deleted=0 AND status='pending' AND biz_type='student_service' AND biz_id=#{relationId} AND task_type IN ('student_first_contact','student_study_plan','student_contact','student_delivery_stage','student_first_contact_assistance')")
+    int cancelTeachingService(@Param("relationId") Long relationId,@Param("tenantId") Long tenantId,@Param("now") LocalDateTime now,@Param("reason") String reason);
+
     default int updatePendingDueAt(Long id, LocalDateTime dueAt) {
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getId, id).eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
@@ -137,8 +140,17 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
                 .orderByAsc(BusinessTaskDO::getId));
     }
 
+    default List<BusinessTaskDO> selectMyPendingByBusiness(Long assigneeId, String bizType, Long bizId) {
+        java.util.Objects.requireNonNull(bizType);
+        return selectList(buildMyQuery(assigneeId, TASK_STATUS_PENDING, null, LocalDateTime.now())
+                .eq(BusinessTaskDO::getBizType, bizType)
+                .eqIfPresent(BusinessTaskDO::getBizId, bizId)
+                .orderByAsc(BusinessTaskDO::getDueAt)
+                .orderByAsc(BusinessTaskDO::getId));
+    }
+
     default long selectMyPendingCount(Long assigneeId, String bucket, LocalDateTime now) {
-        return selectCount(buildMyQuery(assigneeId, TASK_STATUS_PENDING, bucket, now));
+        return selectCount(weeklyNodes(buildMyQuery(assigneeId, TASK_STATUS_PENDING, bucket, now), now));
     }
 
     default PageResult<BusinessTaskDO> selectMyPage(Long assigneeId, BusinessTaskPageReqVO reqVO,
@@ -151,6 +163,7 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
                                                      LocalDateTime now) {
         LambdaQueryWrapperX<BusinessTaskDO> query = buildReadQuery(
                 assigneeId, reqVO.getStatus(), reqVO.getBucket(), now);
+        if (TASK_STATUS_PENDING.equals(reqVO.getStatus())) weeklyNodes(query, now);
         if (TASK_STATUS_PENDING.equals(reqVO.getStatus())) {
             query.orderByAsc(BusinessTaskDO::getDueAt).orderByAsc(BusinessTaskDO::getId);
         } else {
@@ -168,7 +181,19 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
     }
 
     default long selectReadPendingCount(Long assigneeId, String bucket, LocalDateTime now) {
-        return selectCount(buildReadQuery(assigneeId, TASK_STATUS_PENDING, bucket, now));
+        return selectCount(weeklyNodes(buildReadQuery(assigneeId, TASK_STATUS_PENDING, bucket, now), now));
+    }
+
+    /** Only public pending projections collapse rows; internal task commands still see every template. */
+    private static LambdaQueryWrapperX<BusinessTaskDO> weeklyNodes(LambdaQueryWrapperX<BusinessTaskDO> query, LocalDateTime now) {
+        query.apply("(zsjos_business_task.biz_type <> 'media_account_diagnosis' OR (zsjos_business_task.due_at <= {0} AND NOT EXISTS ("
+                + "SELECT 1 FROM zsjos_business_task sibling WHERE sibling.tenant_id=zsjos_business_task.tenant_id AND sibling.deleted=0 "
+                + "AND sibling.biz_type=zsjos_business_task.biz_type AND sibling.biz_id=zsjos_business_task.biz_id "
+                + "AND sibling.assignee_id=zsjos_business_task.assignee_id AND sibling.due_at=zsjos_business_task.due_at "
+                + "AND sibling.status='pending' AND sibling.id < zsjos_business_task.id "
+                + "AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(sibling.payload)=1 THEN sibling.payload ELSE '{}' END,'$.roundKey')),'') "
+                + "= COALESCE(JSON_UNQUOTE(JSON_EXTRACT(CASE WHEN JSON_VALID(zsjos_business_task.payload)=1 THEN zsjos_business_task.payload ELSE '{}' END,'$.roundKey')),''))))", now.plusDays(7));
+        return query;
     }
 
     private static LambdaQueryWrapperX<BusinessTaskDO> buildReadQuery(Long assigneeId, String status,

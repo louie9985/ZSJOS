@@ -140,3 +140,5 @@ trails the current code baseline.
 non-deleted rows to one BCrypt hash of `--password` (default `Test@123456`). The hash uses the
 `$2a$` prefix and cost 10, matching Spring Security's `BCryptPasswordEncoder`. Tokens in
 `system_oauth2_*` are not cleared, so an already-issued token stays valid until it expires.
+
+2026-10-22 审查修复补齐 V345/V346 的 canonical/fresh 空结构，并加强 V344/V345/V347 的现存对象后置检查。开发库校验值不自动重写；受控恢复测试与发布兼容性判断分别记录在 `handoff/local-complete-review-fixes-20261022-01a16363.md`。

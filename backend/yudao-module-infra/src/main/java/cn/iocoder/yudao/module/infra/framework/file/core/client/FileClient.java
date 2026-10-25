@@ -22,6 +22,11 @@ public interface FileClient {
      * @return 完整路径，即 HTTP 访问地址
      * @throws Exception 上传文件时，抛出 Exception 异常
      */
+    /** Repeatable file source; implementations must stream instead of reading all bytes. */
+    default String uploadFile(java.nio.file.Path source, String path, String type) throws Exception {
+        throw new UnsupportedOperationException("当前文件存储器未实现流式上传");
+    }
+
     String upload(byte[] content, String path, String type) throws Exception;
 
     /**

@@ -45,6 +45,15 @@ public class MediaStudentService {
             Long userId, MyStudentPageReqVO request) {
         var sorting = cn.iocoder.yudao.module.zsjos.service.sorting.MediaStudentListSort.create();
         if (sorting.requested(request.getSortField(), request.getSortOrder())) {
+            if (cn.hutool.core.util.StrUtil.isNotBlank(request.getKeyword())) {
+                var batch = BeanUtils.toBean(request, MyStudentPageReqVO.class);
+                batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(1);
+                batch.setPageSize(cn.iocoder.yudao.framework.common.pojo.PageParam.PAGE_SIZE_NONE);
+                var matches = new java.util.ArrayList<>(getPage(userId, batch).getList());
+                matches.sort(sorting.comparator(request.getSortField(), request.getSortOrder()));
+                int start = (int) Math.min(((long)request.getPageNo()-1)*request.getPageSize(), matches.size());
+                return new PageResult<>(matches.subList(start, Math.min(start+request.getPageSize(), matches.size())), (long)matches.size());
+            }
             return sorting.page(request.getSortField(), request.getSortOrder(), request.getPageNo(), request.getPageSize(), (pageNo, pageSize) -> {
                 var batch = BeanUtils.toBean(request, MyStudentPageReqVO.class);
                 batch.setSortField(null); batch.setSortOrder(null); batch.setPageNo(pageNo); batch.setPageSize(pageSize);
@@ -54,7 +63,8 @@ public class MediaStudentService {
         var page = myStudentService.getMediaPage(userId, request);
         var personIds = page.getList().stream().map(MyStudentRespVO::getPersonId).toList();
         var accounts = personIds.isEmpty() ? List.<MediaAccountDO>of()
-                : accountPermissionProvider.filterReadable(accountMapper.selectByStudents(personIds), userId);
+                : accountPermissionProvider.filterReadable(accountMapper.selectByStudents(personIds), userId).stream()
+                        .filter(MediaStudentService::isDisplayedAccount).toList();
         var grouped = accounts.stream().collect(java.util.stream.Collectors.groupingBy(MediaAccountDO::getStudentPersonId));
         var rows = page.getList().stream().map(student -> {
             var row = BeanUtils.toBean(student, MediaStudentListRespVO.class);
@@ -67,6 +77,11 @@ public class MediaStudentService {
             return row;
         }).toList();
         return new PageResult<>(rows, page.getTotal());
+    }
+
+    private static boolean isDisplayedAccount(MediaAccountDO account) {
+        // Completed deletions remain in storage for audit; pending deletions still need a visible status.
+        return !"deleted".equals(account.getRunStatus());
     }
 
     /** Only project the saved homepage, never synthesize a URL from an account identifier. */
@@ -101,6 +116,7 @@ public class MediaStudentService {
         result.setCanUpdateServicePeriod(servicePeriodService.canUpdate(userId, personId));
         // Student visibility does not authorize all accounts under that person.
         List<MediaAccountDO> accounts = accountMapper.selectByStudent(personId).stream()
+                .filter(MediaStudentService::isDisplayedAccount)
                 .filter(account -> accountPermissionProvider.hasPermission(account.getId(), "read", userId)).toList();
         List<Long> accountIds = accounts.stream().map(MediaAccountDO::getId).toList();
         Map<Long, MediaAccountDO> accountById = accounts.stream()

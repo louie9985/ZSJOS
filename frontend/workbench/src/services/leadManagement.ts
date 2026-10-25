@@ -33,10 +33,13 @@ export function pinLeadFirst<T extends { id: number }>(items: T[], lead: T): T[]
   return [lead, ...items.filter(item => item.id !== lead.id)]
 }
 
-export function prioritizeLeads<T extends { id: number }>(items: T[], priorityIds: number[]): T[] {
-  if (!priorityIds.length) return items
+export function prioritizeLeads<T extends { id: number; pendingTasks?: readonly unknown[] }>(items: T[], priorityIds: number[], pendingFirst = true): T[] {
   const priority = new Map(priorityIds.map((id, index) => [id, index]))
   return [...items].sort((left, right) => {
+    const leftPending = Boolean(left.pendingTasks?.length)
+    const rightPending = Boolean(right.pendingTasks?.length)
+    if (pendingFirst && leftPending !== rightPending) return leftPending ? -1 : 1
+    if (pendingFirst && leftPending) return 0
     const leftIndex = priority.get(left.id)
     const rightIndex = priority.get(right.id)
     if (leftIndex === undefined && rightIndex === undefined) return 0
@@ -159,4 +162,10 @@ export function leadPendingTaskAlert(
 
 export function applyInvalidRemarkTemplate(_currentRemark: string, templateLabel: string): string {
   return templateLabel
+}
+
+// Reminder and unread indicators must not reorder the default submission timeline.
+export function sortLeadsBySubmission<T extends { id: number; submittedAt?: Timestamp }>(items: T[]): T[] {
+  const time = (value: Timestamp | undefined) => value == null ? Number.NEGATIVE_INFINITY : value
+  return [...items].sort((a, b) => (time(b.submittedAt) - time(a.submittedAt)) || b.id - a.id)
 }

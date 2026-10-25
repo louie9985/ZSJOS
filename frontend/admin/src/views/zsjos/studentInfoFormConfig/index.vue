@@ -27,7 +27,7 @@
     </div>
   </ContentWrap>
   <ContentWrap v-loading="loading">
-    <el-alert title="新增字段和材料格式保存并发布后对新生成的表单生效，已发送表单保持原样。" type="info" :closable="false" />
+    <el-alert title="字段配置保存并发布后对新表单生效；未提交表单的附件限制按当前上传规则执行。" type="info" :closable="false" />
     <el-form label-position="top">
       <el-form-item label="学历提升分类（包含所有下级分类）"
         ><el-tree-select
@@ -86,12 +86,7 @@
               :max="9"
               :disabled="!editable || busy"
             />
-            个；<el-input-number
-              v-model="row.maxSizeMb"
-              :min="1"
-              :max="10"
-              :disabled="!editable || busy"
-            />
+            个；{{ row.maxSizeMb }}
             MB/个</template
           ><span v-else>—</span></template
         ></el-table-column

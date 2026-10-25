@@ -2,26 +2,25 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const source = readFileSync('src/pages/DeliveryClassPage.tsx', 'utf8')
+const grouped = readFileSync('src/pages/DeliveryClassGroups.tsx', 'utf8')
 
 describe('delivery class review fixes', () => {
-  it('enters student management with the selected class filter', () => {
-    expect(source).toContain("navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })")
-    expect(source).toContain('delivery-class-grid')
+  it('delegates class listing and navigation to the grouped list', () => {
+    expect(source).toContain('<DeliveryClassGroups')
+    expect(grouped).toContain("navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: r.id } })")
   })
-
-  it('loads pending and formal classes in the same server-paginated grid', () => {
-    expect(source).toContain('IntersectionObserver')
-    expect(source).not.toContain('excludeSystemClass: true')
-    expect(source).toContain('delivery-class-grid">{rows.map(row => <Card')
-    expect(source).toContain('className="delivery-class-card"')
-    expect(source).toContain('setHasMore(targetPage * CLASS_PAGE_SIZE < page.total)')
+  it('keeps root and child pagination separate in the grouped card and table views', () => {
+    expect(grouped).toContain('IntersectionObserver')
+    expect(grouped).toContain('classGroups.page(')
+    expect(grouped).toContain('classGroups.children(')
+    expect(grouped).toContain('delivery-class-grid')
+    expect(grouped).toContain('pagination={{ current: page')
   })
-
-  it('uses the same class navigation without system-class maintenance actions', () => {
-    expect(source).toContain('hoverable onClick={() => navigate(APP_ROUTES.MY_STUDENTS, { state: { classId: row.id } })}')
-    expect(source).not.toContain('delivery-class-pending-entry')
-    expect(source).toContain('无固定班主任')
-    expect(source).toContain('manage && !row.systemClass')
+  it('requires server-authorized object actions for class maintenance', () => {
+    expect(grouped).toContain("r.availableActions?.includes('UPDATE')")
+    expect(grouped).toContain("r.availableActions?.includes('MOVE_GROUP')")
+    expect(grouped).toContain("r.availableActions?.includes('COMPLETE')")
+    expect(grouped).not.toContain('delivery-class-pending-entry')
   })
 
   it('accepts definite multi-day schedules without an uncertain-date warning', () => {

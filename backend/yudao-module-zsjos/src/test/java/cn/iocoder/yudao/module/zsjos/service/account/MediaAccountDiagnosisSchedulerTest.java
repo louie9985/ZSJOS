@@ -42,4 +42,23 @@ class MediaAccountDiagnosisSchedulerTest {
  @Test void repeatedSchedulingUsesSameKey(){context("2026-09-01T12:00:00",1);scheduler.generateTenant(LocalDate.of(2026,9,8));scheduler.generateTenant(LocalDate.of(2026,9,8));
   verify(tasks,times(2)).create(argThat(c->c.idempotencyKey().equals("media-diagnosis-v2:10:1:media_account_diagnosis_7d:1")));}
  @Test void restartedRoundCannotReuseOldTaskKey(){context("2026-09-01T12:00:00",2);scheduler.generateTenant(LocalDate.of(2026,9,8));assertNotEquals(MediaAccountDiagnosisScheduler.key(10L,1,"type",1),MediaAccountDiagnosisScheduler.key(10L,2,"type",1));}
+ @Test void revisionIntentDoesNotCloseCurrentDiagnosisRound(){
+  context("2026-09-01T12:00:00",1);
+  scheduler.generateTenant(LocalDate.of(2026,9,1));
+  verify(tasks,times(3)).create(any());verifyNoInteractions(plans);
+ }
+ @Test void newRoundCancelsOnlyOldPendingTasksAndKeepsCurrentRound(){
+  com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""), cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO.class);
+  context("2026-09-01T12:00:00",2);
+  var old=new cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO();old.setId(1L);old.setPayload("{\"roundKey\":1}");
+  var current=new cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO();current.setId(2L);current.setPayload("{\"roundKey\":2}");
+  when(taskMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(old,current));
+  scheduler.generateTenant(LocalDate.of(2026,9,1));
+  var updates=ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper.class);
+  verify(taskMapper,times(1)).update(isNull(),updates.capture());
+  assertTrue(updates.getValue().getSqlSegment().contains("status"));
+  assertTrue(updates.getValue().getParamNameValuePairs().containsValue("pending"));
+  assertTrue(updates.getValue().getParamNameValuePairs().containsValue(1L));
+  verify(tasks,times(3)).create(any());
+ }
 }

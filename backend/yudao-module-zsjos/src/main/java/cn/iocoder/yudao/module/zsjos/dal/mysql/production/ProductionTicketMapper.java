@@ -13,8 +13,29 @@ import java.util.stream.Collectors;
 
 @Mapper
 public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> {
-    @org.apache.ibatis.annotations.Update("UPDATE zsjos_production_ticket SET account_ids_json=JSON_REMOVE(account_ids_json, JSON_UNQUOTE(JSON_SEARCH(account_ids_json,'one',CAST(#{accountId} AS CHAR)))), status=IF(JSON_LENGTH(account_ids_json)<=1,'cancelled',status), version=version+1 WHERE tenant_id=(SELECT tenant_id FROM zsjos_media_account WHERE id=#{accountId}) AND deleted=b'0' AND JSON_CONTAINS(account_ids_json,JSON_ARRAY(#{accountId})) AND status NOT IN ('completed','cancelled')")
-    int excludeDeletedAccount(@org.apache.ibatis.annotations.Param("accountId") Long accountId);
+    // JSON_TABLE subqueries in UPDATE functions are not supported by the tenant SQL parser.
+    // Lock only affected active rows, then retain tenant and version checks on ordinary updates.
+    default int excludeDeletedAccount(Long accountId) {
+        var rows = selectList(new LambdaQueryWrapperX<ProductionTicketDO>()
+                .select(ProductionTicketDO::getId, ProductionTicketDO::getAccountIdsJson, ProductionTicketDO::getVersion)
+                .notIn(ProductionTicketDO::getStatus, "completed", "cancelled")
+                .apply("JSON_CONTAINS(account_ids_json, JSON_ARRAY({0}))", accountId).last("FOR UPDATE"));
+        int changed = 0;
+        for (var row : rows) {
+            var values = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseArray(row.getAccountIdsJson(), Object.class);
+            var remaining = values.stream().filter(value -> !(value instanceof Number
+                    && value.toString().equals(accountId.toString()))).toList();
+            var update = new LambdaUpdateWrapper<ProductionTicketDO>().eq(ProductionTicketDO::getId, row.getId())
+                    .eq(ProductionTicketDO::getVersion, row.getVersion())
+                    .set(ProductionTicketDO::getAccountIdsJson, cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(remaining))
+                    .set(ProductionTicketDO::getVersion, row.getVersion() + 1);
+            if (remaining.isEmpty()) update.set(ProductionTicketDO::getStatus, "cancelled");
+            if (update(null, update) != 1) throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PRODUCTION_TICKET_VERSION_CONFLICT);
+            changed++;
+        }
+        return changed;
+    }
     default List<ProductionTicketDO> selectByAccountIds(Collection<Long> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<ProductionTicketDO>()

@@ -5597,6 +5597,10 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `student_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员服务姓名快照',
   `student_name_source` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员姓名快照来源',
   `teaching_delivery` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否纳入教学交付',
+  `teaching_closed` bit(1) NOT NULL DEFAULT b'0' COMMENT '教学服务是否已关闭',
+  `teaching_previous_class_id` bigint DEFAULT NULL COMMENT '关闭前班级',
+  `teaching_closed_at` datetime DEFAULT NULL COMMENT '最近教学关闭时间',
+  `teaching_restored` bit(1) NOT NULL DEFAULT b'0' COMMENT '曾恢复教学服务',
   `order_id` bigint DEFAULT NULL COMMENT '来源有效订单编号',
   `order_item_id` bigint DEFAULT NULL COMMENT '来源订单项编号',
   `registration_case_id` bigint DEFAULT NULL COMMENT '激活报名服务单编号',
@@ -5640,6 +5644,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `director_precheck_draft_version` int NOT NULL DEFAULT '0' COMMENT '编导资料预审草稿版本',
   `director_interview_draft_version` int NOT NULL DEFAULT '0' COMMENT '编导学员采访草稿版本',
   `first_contact_progress_json` JSON NULL COMMENT '首联清单当前进度',
+  `media_ready` bit(1) DEFAULT NULL COMMENT '媒体业务就绪，空值沿用历史接收规则',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_order_item` (`tenant_id`,`order_item_id`),
   KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`),
@@ -5651,15 +5656,38 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   KEY `idx_service_class` (`tenant_id`,`class_id`,`status`,`deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 学生服务关系';
 
+CREATE TABLE IF NOT EXISTS zsjos_delivery_class_group (
+  id bigint NOT NULL AUTO_INCREMENT,name varchar(100) NOT NULL,
+  dept_id bigint NOT NULL,dept_name_snapshot varchar(100) DEFAULT NULL,reference_date date DEFAULT NULL,
+  version int NOT NULL DEFAULT 0,
+  creator varchar(64) DEFAULT '',create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '',update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',tenant_id bigint NOT NULL,
+  PRIMARY KEY(id),KEY idx_delivery_group_scope(tenant_id,dept_id,deleted,id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='交付班级组';
+
+ CREATE TABLE IF NOT EXISTS zsjos_delivery_class_membership_event (
+  id bigint NOT NULL AUTO_INCREMENT,class_id bigint NOT NULL,
+  source_group_id bigint DEFAULT NULL,target_group_id bigint DEFAULT NULL,operator_user_id bigint NOT NULL,
+  creator varchar(64) DEFAULT '',create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '',update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',tenant_id bigint NOT NULL,
+  PRIMARY KEY(id),KEY idx_delivery_membership_class(tenant_id,class_id,id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='班级归组历史';
+
 CREATE TABLE IF NOT EXISTS `zsjos_delivery_class` (
   `id` bigint NOT NULL AUTO_INCREMENT, `class_no` varchar(40) NOT NULL, `class_name` varchar(100) NOT NULL,
+  `group_id` bigint DEFAULT NULL COMMENT '普通班级所属父级',
   `system_class` bit(1) NOT NULL DEFAULT b'0',
+  `class_kind` varchar(24) NOT NULL DEFAULT 'NORMAL' COMMENT 'NORMAL/PENDING/UNSCHEDULED/EXCEPTION',
+  `unscheduled_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`class_kind`='UNSCHEDULED' AND `deleted`=b'0') THEN `homeroom_user_id` ELSE NULL END) STORED,
+  `exception_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`class_kind`='EXCEPTION' AND `deleted`=b'0') THEN `homeroom_user_id` ELSE NULL END) STORED,
   `product_id` bigint DEFAULT NULL COMMENT '班级产品编号',
   `product_name_snapshot` varchar(255) DEFAULT NULL COMMENT '班级产品名称快照',
   `selected_attrs_json` json DEFAULT NULL COMMENT '班级规格条件快照',
   `selected_specs_json` json DEFAULT NULL COMMENT '班级规格标签快照',
   `selected_skus_json` json DEFAULT NULL COMMENT '班级适用 SKU 快照',
-  `pending_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`system_class`=b'1' AND `deleted`=b'0') THEN `tenant_id` ELSE NULL END) STORED,
+  `pending_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`class_kind`='PENDING' AND `deleted`=b'0') THEN `tenant_id` ELSE NULL END) STORED,
   `category_id` bigint DEFAULT NULL, `category_name_snapshot` varchar(255) DEFAULT NULL,
   `category_path_snapshot` json DEFAULT NULL, `exam_schedule_id` bigint DEFAULT NULL,
   `exam_schedule_snapshot` varchar(255) DEFAULT NULL, `homeroom_user_id` bigint DEFAULT NULL,
@@ -5671,6 +5699,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_delivery_class` (
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
   PRIMARY KEY (`id`), UNIQUE KEY `uk_delivery_class_no` (`tenant_id`,`class_no`,`deleted`),
   UNIQUE KEY `uk_delivery_pending_guard` (`pending_guard`),
+  UNIQUE KEY `uk_delivery_unscheduled_guard` (`tenant_id`,`unscheduled_guard`),
+  UNIQUE KEY `uk_delivery_exception_guard` (`tenant_id`,`exception_guard`),
+  KEY `idx_delivery_class_group` (`tenant_id`,`group_id`,`deleted`,`id`),
   KEY `idx_delivery_class_scope` (`tenant_id`,`dept_id`,`status`,`homeroom_user_id`,`deleted`),
   KEY `idx_delivery_class_category` (`tenant_id`,`category_id`,`exam_schedule_id`,`status`,`deleted`),
   CONSTRAINT `chk_delivery_class_status` CHECK (`status` IN ('SERVING','COMPLETED'))
@@ -7183,7 +7214,10 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_form (
  PRIMARY KEY(id), UNIQUE KEY uk_student_info_token(token_hash),
  UNIQUE KEY uk_student_info_active(tenant_id,active_lead_id),
  UNIQUE KEY uk_student_info_case(tenant_id,registration_case_id,deleted),
- KEY idx_student_info_lead(tenant_id,lead_id,id), KEY idx_student_info_expiry(tenant_id,status,expires_at)
+ KEY idx_student_info_lead(tenant_id,lead_id,id), KEY idx_student_info_expiry(tenant_id,status,expires_at),
+  draft_snapshot MEDIUMTEXT NULL COMMENT '加密的未提交草稿',
+  draft_revision BIGINT NOT NULL DEFAULT 0 COMMENT '草稿乐观版本',
+  draft_saved_at DATETIME NULL COMMENT '草稿保存时间'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员信息收集表';
 
 CREATE TABLE IF NOT EXISTS zsjos_student_info_form_value (
@@ -8187,7 +8221,7 @@ CREATE TABLE IF NOT EXISTS zsjos_calendar_rest_day (
 CREATE TABLE IF NOT EXISTS zsjos_student_info_image (
   id BIGINT NOT NULL AUTO_INCREMENT, tenant_id BIGINT NOT NULL,
   form_id BIGINT NOT NULL, field_key VARCHAR(64) NOT NULL, side VARCHAR(8) NOT NULL DEFAULT '',
-  infra_file_id BIGINT NOT NULL, content_type VARCHAR(32) NOT NULL, file_size BIGINT NOT NULL,
+  infra_file_id BIGINT NOT NULL, content_type VARCHAR(128) NOT NULL, file_size BIGINT NOT NULL,
   creator VARCHAR(64) DEFAULT '', create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updater VARCHAR(64) DEFAULT '', update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted BIT(1) NOT NULL DEFAULT b'0',
@@ -8254,3 +8288,87 @@ CREATE TABLE IF NOT EXISTS zsjos_student_archive_extra_config (
   deleted BIT(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY (id), UNIQUE KEY uk_tenant (tenant_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员考试字段可见性配置';
+
+CREATE TABLE IF NOT EXISTS zsjos_teaching_service_event (
+ id bigint NOT NULL AUTO_INCREMENT, service_relation_id bigint NOT NULL,
+ action varchar(16) NOT NULL, reason varchar(500) NOT NULL,
+ operator_user_id bigint NOT NULL, operator_name varchar(100) DEFAULT NULL,
+ from_class_id bigint DEFAULT NULL, target_class_id bigint NOT NULL, target_owner_user_id bigint NOT NULL,
+ target_class_name varchar(100) DEFAULT NULL, target_owner_name varchar(100) DEFAULT NULL,
+ idempotency_key varchar(100) NOT NULL, fingerprint varchar(64) NOT NULL, occurred_at datetime NOT NULL,
+ creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL,
+ PRIMARY KEY(id), UNIQUE KEY uk_teaching_event_key(tenant_id,idempotency_key,deleted),
+ KEY idx_teaching_event_service(tenant_id,service_relation_id,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教学服务关闭恢复历史';
+
+
+-- V340 target structure; operation history has no business cascade deletion.
+CREATE TABLE IF NOT EXISTS zsjos_gift_purchase_operation (
+  id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL,
+  purchase_id bigint NOT NULL, action varchar(24) NOT NULL,
+  operator_user_id bigint DEFAULT NULL, operator_name varchar(100) DEFAULT NULL,
+  occurred_at datetime NOT NULL,
+  creator varchar(64) DEFAULT '',create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '',update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',PRIMARY KEY(id),KEY idx_purchase_operation(tenant_id,purchase_id,id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='礼品采购操作记录';
+
+-- 中世健考勤通 (V347)
+CREATE TABLE IF NOT EXISTS zsjkqt_draft (
+ id bigint NOT NULL AUTO_INCREMENT,
+ client_id varchar(64) NOT NULL,
+ name varchar(120) NOT NULL,
+ year int NOT NULL, month int NOT NULL,
+ source_file_name varchar(255) NOT NULL DEFAULT '', source_file_hash varchar(64) NOT NULL DEFAULT '',
+ employee_count int NOT NULL DEFAULT 0, confirmed_count int NOT NULL DEFAULT 0,
+ snapshot_json longtext NOT NULL, version int NOT NULL DEFAULT 0,
+ updater_name varchar(200) NOT NULL DEFAULT '',
+ creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 1,
+ PRIMARY KEY(id), UNIQUE KEY uk_zsjkqt_client(tenant_id,client_id),
+ KEY idx_zsjkqt_month(tenant_id,deleted,year,month,update_time,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='中世健考勤通共享草稿';
+CREATE TABLE IF NOT EXISTS zsjkqt_config (
+ id bigint NOT NULL AUTO_INCREMENT, config_key varchar(32) NOT NULL, value_json longtext NOT NULL,
+ version int NOT NULL DEFAULT 0,
+ creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 1,
+ PRIMARY KEY(id), UNIQUE KEY uk_zsjkqt_config(tenant_id,config_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='中世健考勤通独立配置';
+
+-- Empty V345/V346 structures; business rows and permission assignments are not seeded.
+CREATE TABLE IF NOT EXISTS zsjos_student_entry_command (
+  id bigint NOT NULL AUTO_INCREMENT,operator_user_id bigint NOT NULL,command_key varchar(64) NOT NULL,
+  request_hash varchar(64) NOT NULL,person_id bigint DEFAULT NULL,service_relation_id bigint DEFAULT NULL,
+  creator varchar(64) DEFAULT '',create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '',update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',tenant_id bigint NOT NULL,
+  PRIMARY KEY(id),UNIQUE KEY uk_student_entry_command(tenant_id,operator_user_id,command_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员独立录入幂等命令';
+
+-- Empty V345/V346 structures; business rows and permission assignments are not seeded.
+CREATE TABLE IF NOT EXISTS zsjos_account_diagnosis_metric (
+  id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  account_id bigint NOT NULL, node_key varchar(128) NOT NULL, round_key varchar(64) NOT NULL,
+  interval_days int NOT NULL, interval_cycle int NOT NULL,
+  period_from datetime NOT NULL, period_to datetime NOT NULL,
+  partner_id bigint NULL, partner_link_id bigint NULL,
+  state varchar(24) NOT NULL, metric_json longtext NOT NULL, submission_snapshot_json longtext NOT NULL,
+  failure_reason varchar(500) NULL, settled_at datetime NULL,
+  creator varchar(64) NOT NULL DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) NOT NULL DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 1,
+  UNIQUE KEY uk_diagnosis_metric(tenant_id,account_id,node_key,interval_days),
+  KEY idx_diagnosis_settlement(tenant_id,state,period_to)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账号周期诊断统计结算';
+
+-- Empty V345/V346 structures; business rows and permission assignments are not seeded.
+CREATE TABLE IF NOT EXISTS zsjos_account_diagnosis_member (
+  id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY, metric_id bigint NOT NULL, lead_id bigint NOT NULL,
+  tenant_id bigint NOT NULL DEFAULT 1,
+  UNIQUE KEY uk_diagnosis_member(tenant_id,metric_id,lead_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='周期截止有效客资固定集合';

@@ -1,10 +1,12 @@
 package cn.iocoder.yudao.module.zsjos.service.account;
 
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaServiceReadiness;
+
 import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceStatusEvent;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
 import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
-import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
@@ -20,6 +22,9 @@ import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,40 +37,85 @@ public class MediaAccountDeleteService {
     @Resource private MediaAccountMapper mapper;
     @Resource private BpmProcessInstanceApi bpm;
     @Resource private AdminUserApi users;
-    @Resource private DeptApi depts;
+    @Resource private ServiceRelationMapper relations;
     @Resource private PermissionApi permissions;
     @Resource private MediaWorkflowEventService events;
     @Resource private MediaAccountDeleteRequestMapper requestMapper;
     @Resource private BusinessTaskMapper taskMapper;
     @Resource private ProductionTicketMapper tickets;
     @Resource private ContentReviewBatchMapper reviewBatches;
+    @Resource private PlatformTransactionManager transactionManager;
 
-    @ZsjosPermission(bizType=BIZ_TYPE_MEDIA_ACCOUNT, bizId="#id", action="delete")
+    @ZsjosPermission(bizType=BIZ_TYPE_MEDIA_ACCOUNT, bizId="#id", action="delete-request")
     @Transactional(rollbackFor=Exception.class)
     public String submit(Long id, String reason, Long userId) {
         MediaAccountDO a=mapper.selectByIdForUpdate(id,cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
-        if(a==null || (!Objects.equals(a.getOwnerOperatorUserId(),userId)&&!Objects.equals(a.getDirectorUserId(),userId))) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
-        if("pending".equals(a.getDeleteStatus())||"deleted".equals(a.getRunStatus())) throw exception(MEDIA_ACCOUNT_STATE_INVALID);
-        Long reviewer=supervisor(userId); BpmProcessInstanceCreateReqDTO req=new BpmProcessInstanceCreateReqDTO(); req.setProcessDefinitionKey(PROCESS_KEY_DELETE);
+        requireDeletable(a);
+        var owners = owners(a);
+        if (!Objects.equals(owners.operator(), userId) || Objects.equals(owners.director(), userId)) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
+        Long reviewer = owners.director();
+        var reviewerUser = reviewer == null ? null : users.getUser(reviewer);
+        if (reviewerUser == null || !CommonStatusEnum.ENABLE.getStatus().equals(reviewerUser.getStatus())
+                || !permissions.hasAnyPermissions(reviewer, "zsjos:media-account:delete-approve")) throw exception(MEDIA_ACCOUNT_DELETE_REVIEWER_INVALID);
+        BpmProcessInstanceCreateReqDTO req=new BpmProcessInstanceCreateReqDTO(); req.setProcessDefinitionKey(PROCESS_KEY_DELETE);
         req.setBusinessKey("media-account-delete:"+id+":"+System.nanoTime()); req.setVariables(new java.util.HashMap<>(Map.of("accountId",id,"assignee",reviewer,"coll_userList",List.of(reviewer))));
+        req.setStartUserSelectAssignees(Map.of("review", List.of(reviewer)));
         String process=bpm.createProcessInstance(userId,req);
         if(mapper.claimDelete(id,a.getVersion(),process,userId,reviewer,reason.trim())==0) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+        // Empty newly created accounts still need a reproducible deletion snapshot.
+        Map<String, Object> snapshot = new java.util.LinkedHashMap<>();
+        snapshot.put("accountNo", a.getAccountNo()); snapshot.put("nickname", a.getNickname()); snapshot.put("platform", a.getPlatformLabelSnapshot());
+        var requester = users.getUser(userId);
+        snapshot.put("requestedByName", requester == null ? null : requester.getNickname());
+        snapshot.put("reviewerName", reviewerUser.getNickname());
         requestMapper.insert(new MediaAccountDeleteRequestDO().setAccountId(id).setProcessInstanceId(process)
-                .setAccountSnapshotJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(Map.of("accountNo",a.getAccountNo(),"nickname",a.getNickname(),"platform",a.getPlatformLabelSnapshot())))
+                .setAccountSnapshotJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(snapshot))
                 .setReason(reason.trim()).setRequestedByUserId(userId).setReviewerUserId(reviewer).setStatus("pending").setAttemptCount(0).setVersion(0));
         events.transition(BIZ_TYPE_MEDIA_ACCOUNT,id,userId,a.getRunStatus(),"delete_pending",reason,"media-account-delete-submit:"+id+":"+process); return process;
     }
-    @ZsjosPermission(bizType=BIZ_TYPE_MEDIA_ACCOUNT, bizId="#id", action="delete")
+    @ZsjosPermission(bizType=BIZ_TYPE_MEDIA_ACCOUNT, bizId="#id", action="delete-direct")
+    @Transactional(rollbackFor=Exception.class)
+    public void deleteDirectly(Long id, String reason, Long userId) {
+        MediaAccountDO account = mapper.selectByIdForUpdate(id,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        requireDeletable(account);
+        if (!Objects.equals(owners(account).director(), userId)) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
+        if (mapper.deleteDirectly(id, account.getVersion(), userId, reason.trim()) == 0) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+        // Linked exclusions and direct deletion must commit together, so failed cleanup remains retryable.
+        terminateInFlight(id);
+        events.transition(BIZ_TYPE_MEDIA_ACCOUNT, id, userId, account.getRunStatus(), "deleted", reason.trim(),
+                "media-account-delete-direct:" + id + ":" + account.getVersion());
+    }
+
+    @ZsjosPermission(bizType=BIZ_TYPE_MEDIA_ACCOUNT, bizId="#id", action="withdraw-delete")
     @Transactional(rollbackFor=Exception.class)
     public void withdraw(Long id,Long userId){ MediaAccountDO a=mapper.selectByIdForUpdate(id,cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()); if(a==null||!Objects.equals(a.getDeleteRequestedByUserId(),userId)||!"pending".equals(a.getDeleteStatus())) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED); bpm.cancelProcessInstanceByStartUser(userId,a.getDeleteProcessInstanceId(),"申请人撤回"); mapper.finishDelete(id,a.getVersion(),a.getDeleteProcessInstanceId(),"withdrawn","申请人撤回"); }
     @Transactional(rollbackFor=Exception.class)
     public void onResult(BpmProcessInstanceStatusEvent e){
         MediaAccountDO a=mapper.selectByDeleteProcessInstanceId(e.getId()); if(a==null||!"pending".equals(a.getDeleteStatus())) return;
+        a = mapper.selectByIdForUpdate(a.getId(), cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        if (a == null || !"pending".equals(a.getDeleteStatus()) || !Objects.equals(a.getDeleteProcessInstanceId(), e.getId())) return;
         MediaAccountDeleteRequestDO request=requestMapper.byProcess(e.getId());
         if(!BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(e.getStatus())) { mapper.finishDelete(a.getId(),a.getVersion(),e.getId(),"rejected",e.getReason()); if(request!=null) requestMapper.result(request.getId(),request.getVersion(),"rejected",e.getReason(),null); return; }
         boolean completed = false;
-        try { terminateInFlight(a.getId()); mapper.finishDelete(a.getId(),a.getVersion(),e.getId(),"approved",e.getReason()); if(request!=null) requestMapper.result(request.getId(),request.getVersion(),"completed",e.getReason(),null); completed = true; }
-        catch(Exception ex) { if(request!=null) requestMapper.result(request.getId(),request.getVersion(),"approved_pending",e.getReason(),ex.getMessage()); }
+        try {
+            var account = a;
+            var cleanup = new TransactionTemplate(transactionManager);
+            cleanup.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
+            // A cleanup failure must undo earlier linked updates while allowing BPM approval and retry state to commit.
+            cleanup.executeWithoutResult(status -> {
+                terminateInFlight(account.getId());
+                if (mapper.finishDelete(account.getId(),account.getVersion(),e.getId(),"approved",e.getReason()) != 1)
+                    throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+                if(request!=null && requestMapper.result(request.getId(),request.getVersion(),"completed",e.getReason(),null) != 1)
+                    throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+            });
+            completed = true;
+        } catch(Exception ex) {
+            // Driver/parser messages may contain SQL and exceed last_error; persist only a bounded non-sensitive summary.
+            if(request!=null) requestMapper.result(request.getId(),request.getVersion(),"approved_pending",e.getReason(),
+                    "关联业务处理失败（" + ex.getClass().getSimpleName() + "），请重试删除处理");
+        }
         events.transition(BIZ_TYPE_MEDIA_ACCOUNT,a.getId(),a.getDeleteReviewerUserId(),"delete_pending", completed ? "deleted":"delete_pending",e.getReason(),"media-account-delete-result:"+a.getId()+":"+e.getId());
     }
     public void retry(Long requestId){ MediaAccountDeleteRequestDO r=requestMapper.selectById(requestId); if(r==null||!"approved_pending".equals(r.getStatus())) return; MediaAccountDO a=mapper.selectById(r.getAccountId()); if(a==null)return; terminateInFlight(a.getId()); mapper.finishDelete(a.getId(),a.getVersion(),r.getProcessInstanceId(),"approved",r.getResultReason()); requestMapper.result(r.getId(),r.getVersion(),"completed",r.getResultReason(),null); }
@@ -76,5 +126,23 @@ public class MediaAccountDeleteService {
         tickets.excludeDeletedAccount(accountId);
         reviewBatches.excludeDeletedAccount(accountId);
     }
-    private Long supervisor(Long userId){ var u=users.getUser(userId); Long d=u==null?null:u.getDeptId(); for(int i=0;i<20&&d!=null;i++){var dept=depts.getDept(d); Long l=dept==null?null:dept.getLeaderUserId(); var x=l==null?null:users.getUser(l); if(x!=null&&!userId.equals(l)&&CommonStatusEnum.ENABLE.getStatus().equals(x.getStatus())&&permissions.hasAnyPermissions(l,"zsjos:media-account:delete-approve")) return l; d=dept==null?null:dept.getParentId();} throw exception(MEDIA_REBIND_REVIEWER_INVALID);}
+    private void requireDeletable(MediaAccountDO account) {
+        if (account == null) throw exception(MEDIA_ACCOUNT_NOT_EXISTS);
+        if ("pending".equals(account.getRebindStatus()) || "starting".equals(account.getRebindStatus()))
+            throw exception(MEDIA_ACCOUNT_STATE_INVALID);
+        if ("pending".equals(account.getDeleteStatus()) || "delete_pending".equals(account.getRunStatus())
+                || "deleted".equals(account.getRunStatus())) throw exception(MEDIA_ACCOUNT_STATE_INVALID);
+    }
+
+    private Owners owners(MediaAccountDO account) {
+        if (account.getCreateServiceRelationId() == null) return new Owners(account.getOwnerOperatorUserId(), account.getDirectorUserId());
+        var source = relations.selectByIdForUpdate(account.getCreateServiceRelationId(),
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        if (source == null || !Objects.equals(source.getTenantId(), account.getTenantId())
+                || !Objects.equals(source.getPersonId(), account.getStudentPersonId())
+                || !"active".equals(source.getStatus()) || !MediaServiceReadiness.ready(source)) throw exception(MEDIA_ACCOUNT_PERMISSION_DENIED);
+        return new Owners(source.getOperatorUserId(), source.getContentDirectorUserId());
+    }
+
+    private record Owners(Long operator, Long director) {}
 }

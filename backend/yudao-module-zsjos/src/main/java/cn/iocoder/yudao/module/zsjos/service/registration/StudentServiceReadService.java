@@ -30,6 +30,7 @@ public class StudentServiceReadService {
     @Resource private BusinessReadScopeService readScope;
     @Resource private AdvancedFilterService filters;
     @Resource private StudentServiceSummaryReader summaryReader;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService taskReminders;
 
     @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public PageResult<StudentServiceRespVO> page(Long actor, StudentServicePageReqVO req) {
@@ -37,9 +38,11 @@ public class StudentServiceReadService {
         long count = pageMapper.count(query);
         if (count == 0) return PageResult.empty();
         var relations = pageMapper.page(query);
+        var reminders = taskReminders.getMyStudentReminders(actor, relations.stream().map(ServiceRelationDO::getId).toList());
         var summaries = summaryReader.read(actor, relations, (java.time.LocalDateTime) query.getParameters().get("now"));
         return new PageResult<>(relations.stream().map(r -> {
-            var row = convert(actor, r); row.setSummary(summaries.get(r.getId())); return row;
+            var row = convert(actor, r); row.setSummary(summaries.get(r.getId()));
+            row.setPendingTasks(reminders.getOrDefault(r.getId(), List.of())); return row;
         }).toList(), count);
     }
 
@@ -48,12 +51,14 @@ public class StudentServiceReadService {
         var relation = relationMapper.selectById(relationId);
         if (!StudentDeliveryParticipation.includes(relation)) throw exception(STUDENT_NOT_EXISTS);
         var req = new StudentServicePageReqVO();
+        req.setServiceStatus(TeachingServiceLifecycle.status(relation));
         if (permissionApi.hasTenantReadAllAccess(actor)) req.setReadScope("ALL");
         var scoped = query(actor, req);
         scoped.getParameters().put("relationId", relationId);
         if (pageMapper.count(new AdvancedFilterQuery(scoped.getWhereSql()
                 + " AND sr.id=#{query.parameters.relationId}", scoped.getParameters())) == 0) throw exception(STUDENT_NOT_EXISTS);
         var result = convert(actor, relation);
+        result.setPendingTasks(taskReminders.getMyStudentReminders(actor, List.of(relationId)).getOrDefault(relationId, List.of()));
         result.setSummary(summaryReader.read(actor, List.of(relation), java.time.LocalDateTime.now()).get(relationId));
         return result;
     }
@@ -63,6 +68,8 @@ public class StudentServiceReadService {
         var result = BeanUtils.toBean(person, StudentServiceRespVO.class);
         result.setServiceRelationId(relation.getId());
         result.setService(person.getServices().getFirst());
+        result.getService().setStatus(TeachingServiceLifecycle.status(relation));
+        result.getService().setTeachingClosed(relation.getTeachingClosed());
         result.setLeadId(result.getService().getLeadId());
         result.setLeadNo(result.getService().getLeadNo());
         return result;
@@ -82,6 +89,8 @@ public class StudentServiceReadService {
         if (req.getReadScope() != null || req.getTargetUserId() != null) {
             subject = readScope.resolve(req.getReadScope(), req.getTargetUserId(), actor);
             all = subject == null;
+        } else if (StudentReadScope.canReadAll(permissionApi, actor)) {
+            all = true;
         } else if (permissionApi.hasAnyPermissions(actor, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)) {
             var scope = classScope.resolveRead(actor); all = scope.allDepartments();
             owners = new LinkedHashSet<>(); owners.add(actor);
@@ -107,8 +116,9 @@ public class StudentServiceReadService {
             params.put("subject", subject);
             clauses.add("(sr.owner_user_id=#{query.parameters.subject} OR ((sr.content_director_user_id=#{query.parameters.subject} OR sr.career_planner_user_id=#{query.parameters.subject}) AND sr.acceptance_status='accepted' AND sr.status='active'))");
         }
-        if (req.getServiceStatus() != null) add(clauses,params,"sr.status","status",req.getServiceStatus());
-        else if (!all || !permissionApi.hasTenantReadAllAccess(actor)) clauses.add("sr.status IN ('active','paused','completed')");
+        if (req.getServiceStatus() != null) add(clauses,params,TeachingServiceLifecycle.STATUS_SQL,"status",req.getServiceStatus());
+        else if (req.getClassId() == null && !TeachingServiceLifecycle.hasExplicitStatus(req.getAdvancedFilter())) clauses.add("sr.teaching_closed=0");
+        if (!all || !permissionApi.hasTenantReadAllAccess(actor)) clauses.add("sr.status IN ('active','paused','completed')");
         add(clauses,params,"sr.class_id","classId",req.getClassId());
         add(clauses,params,"sr.owner_user_id","ownerUserId",req.getOwnerUserId());
         add(clauses,params,"sr.acceptance_status","acceptanceStatus",req.getAcceptanceStatus());
@@ -121,6 +131,11 @@ public class StudentServiceReadService {
             clauses.add("(sr.student_name_snapshot LIKE #{query.parameters.keyword} OR p.mobile LIKE #{query.parameters.keyword} OR p.wechat_id LIKE #{query.parameters.keyword} OR p.person_no LIKE #{query.parameters.keyword} OR rl.lead_no LIKE #{query.parameters.keyword})");
         }
         params.put("sortField",req.getSortField()); params.put("sortOrder",req.getSortOrder());
+        if (Boolean.TRUE.equals(req.getPendingTasksFirst())) {
+            var ids = taskReminders.getMyStudentReminderIds(actor);
+            params.put("priorityRelationCount", ids.size());
+            for (int i = 0; i < ids.size(); i++) params.put("priorityRelation" + i, ids.get(i));
+        }
         params.put("limit",req.getPageSize()); params.put("offset",(long)(req.getPageNo()-1)*req.getPageSize());
         if (usesOrderHandoff(req.getAdvancedFilter())) {
             var readable = summaryReader.readableOrders(pageMapper.matchingOrders(new AdvancedFilterQuery(String.join(" AND ", clauses), params)), actor);

@@ -74,6 +74,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "xls", "application/vnd.ms-excel",
             "xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    @Resource private cn.iocoder.yudao.module.zsjos.service.deliveryclass.UnscheduledDeliveryClassService unscheduledClasses;
     @Resource private RegistrationCaseMapper caseMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper informationForms;
     @Resource private RegistrationCaseChecklistItemMapper caseItemMapper;
@@ -663,7 +664,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                 throw exception(REGISTRATION_ROUTE_ASSIGNEE_INVALID);
             }
             plannerId = selectedRoutes.get(0).getAssigneeUserId();
-            pendingClass = deliveryClassMapper.selectPending();
+            pendingClass = unscheduledClasses.ensure(plannerId);
             if (pendingClass == null) throw exception(REGISTRATION_ROUTE_INVALID);
         }
         LocalDateTime now = LocalDateTime.now();
@@ -788,9 +789,11 @@ public class RegistrationServiceImpl implements RegistrationService {
             throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         }
         CategorySnapshot category = categorySnapshot(productCategoryId);
-        if (Boolean.TRUE.equals(deliveryClass.getSystemClass())) {
+        if (cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassKind.exception(deliveryClass)) throw exception(DELIVERY_CLASS_NOT_EXISTS);
+        if (cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassKind.pending(deliveryClass)) {
             return new AssignmentSnapshot(deliveryClass, productCategoryId, category.name(), category.path(), null);
         }
+        if (!cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassKind.assignable(deliveryClass)) throw exception(REGISTRATION_CLASS_ASSIGNMENT_INVALID);
         AdminUserRespDTO homeroom = null;
         if (deliveryClass.getHomeroomUserId() != null) {
             try {
@@ -968,6 +971,7 @@ public class RegistrationServiceImpl implements RegistrationService {
                         row.setHomeroomUserName(assignment.getHomeroomUserNameSnapshot());
                         DeliveryClassDO currentClass = deliveryClassMapper.selectById(assignment.getClassId());
                         row.setSystemClass(currentClass != null && Boolean.TRUE.equals(currentClass.getSystemClass()));
+                        row.setClassKind(currentClass == null ? null : currentClass.getClassKind());
                         try { validateClassAssignment(orderItem, assignment.getClassId(), false); }
                         catch (RuntimeException invalid) {
                             row.setErrorCode("class_unavailable"); row.setErrorReason("所选班级已不可用，请重新选择");

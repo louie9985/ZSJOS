@@ -1,3 +1,4 @@
+import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import BusinessTable from './BusinessTable'
 import PositioningDialog from './PositioningDialog'
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
@@ -79,7 +80,7 @@ export default function PositioningCardMaterialPicker({ field, value = EMPTY_SEL
         {filterDefinitions.map(f => <Select key={f.key} aria-label={f.title} placeholder={f.title} allowClear showSearch optionFilterProp="label" style={{ width: 170, maxWidth: '100%' }}
           disabled={field.filterAdjustable === false && (f.key === 'platform' || f.key === 'accountStage')} value={filters[f.key]}
           options={(dicts[f.dict] || []).map(item => ({ value: item.value, label: item.label }))}
-          onChange={next => { setFilters(current => ({ ...current, [f.key]: next })); setPage(1) }} />)}
+          onChange={next => { setFilters(current => ({ ...current, [f.key]: next })); setPage(1) }}  {...filterSelectDisplayProps}/>)}
       </Space>
       {error ? <Alert type="error" showIcon message={error} action={<Button icon={<ReloadOutlined />} onClick={() => setRetry(n => n + 1)}>重试</Button>} /> : <BusinessTable<Material> tableKey="positioning-card-material-picker-1" columnMode="native" mode="compact"
         rowKey={row => row.currentEffectiveVersionId!} size="small" loading={busy} dataSource={rows.filter(row => row.currentEffectiveVersionId)}

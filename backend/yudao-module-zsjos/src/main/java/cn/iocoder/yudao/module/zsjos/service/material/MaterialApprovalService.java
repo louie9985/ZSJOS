@@ -27,6 +27,7 @@ public class MaterialApprovalService {
     @Resource private MaterialTypeMapper typeMapper;
     @Resource private MaterialApprovalRoundMapper roundMapper;
     @Resource private MaterialService materialService;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissions;
 
     public List<MaterialApprovalTypeRespVO> types() {
         return typeMapper.selectList().stream().filter(t -> MaterialApprovalContract.isViral(t.getCode()))
@@ -76,6 +77,32 @@ public class MaterialApprovalService {
     @ZsjosPermission(bizType = "material-approval", bizId = "#versionId", action = "decide")
     @Transactional(rollbackFor = Exception.class)
     public void decide(Long versionId, String taskId, String reason, boolean approve, Long userId) {
+        requireDecisionPermission(userId, approve);
+        validateCurrentDecision(versionId, taskId, userId);
+        BpmTaskDecisionReqDTO command = new BpmTaskDecisionReqDTO().setTaskId(taskId).setReason(reason);
+        if (approve) taskApi.approveTask(userId, command); else taskApi.rejectTask(userId, command);
+    }
+
+    private void requireDecisionPermission(Long userId, boolean approve) {
+        if (userId == null || !permissions.hasAnyPermissions(userId, "zsjos:material-approval:query")
+                || !permissions.hasAnyPermissions(userId, approve ? "zsjos:material-approval:approve" : "zsjos:material-approval:reject"))
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MATERIAL_PERMISSION_DENIED);
+    }
+
+    /** Generic BPM and business commands enforce the same permission and exact current approval round. */
+    public void validateTaskAction(BpmTaskActionContext context) {
+        boolean approve = cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_APPROVE.equals(context.getAction());
+        boolean reject = cn.iocoder.yudao.module.bpm.api.task.BpmTaskActionValidator.ACTION_REJECT.equals(context.getAction());
+        if (!approve && !reject) return;
+        requireDecisionPermission(context.getUserId(), approve);
+        Long versionId = versionId(new BpmTaskRespDTO().setBusinessKey(context.getBusinessKey()));
+        if (versionId == null) throw exception(INVALID_TASK);
+        BpmTaskRespDTO task = validateCurrentDecision(versionId, context.getTaskId(), context.getUserId());
+        if (!Objects.equals(task.getProcessInstanceId(), context.getProcessInstanceId())
+                || !Objects.equals(task.getProcessDefinitionKey(), context.getProcessDefinitionKey())) throw exception(INVALID_TASK);
+    }
+
+    private BpmTaskRespDTO validateCurrentDecision(Long versionId, String taskId, Long userId) {
         MaterialVersionDO source = versionMapper.selectById(versionId);
         if (source == null) throw exception(INVALID_TASK);
         // Match submit/result callback lock order: material first, then version.
@@ -85,8 +112,7 @@ public class MaterialApprovalService {
         if (material == null || version == null || !VERSION_IN_APPROVAL.equals(version.getStatus())
                 || !Objects.equals(material.getCurrentDraftVersionId(), versionId)
                 || !Objects.equals(version.getProcessInstanceId(), task.getProcessInstanceId())) throw exception(TASK_CHANGED);
-        BpmTaskDecisionReqDTO command = new BpmTaskDecisionReqDTO().setTaskId(taskId).setReason(reason);
-        if (approve) taskApi.approveTask(userId, command); else taskApi.rejectTask(userId, command);
+        return task;
     }
 
     public BpmTaskRespDTO requireTask(Long versionId, String taskId, boolean done, Long userId) {

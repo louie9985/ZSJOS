@@ -94,11 +94,11 @@ public class StudentArchiveExtraService {
         var visible = definitions().stream().filter(field -> examReader || state.values().getOrDefault(field.key(), true)).toList();
         var result = new Detail();
         result.setFields(canConfigure ? definitions() : visible);
-        result.setCanMaintain(permitted(ARCHIVE_UPDATE));
+        result.setCanMaintain(permitted(ARCHIVE_UPDATE) && !cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation));
         result.setCanConfigureVisibility(canConfigure);
         result.setVisibilityRevision(state.revision());
         result.setEducationVisibility(canConfigure ? state.values() : visible.stream().collect(java.util.stream.Collectors.toMap(Field::key, field -> true, (a,b) -> a, LinkedHashMap::new)));
-        boolean sensitive = permitted(SENSITIVE); result.setCanReadAttachments(sensitive);
+        boolean sensitive = permitted(ARCHIVE_SENSITIVE); result.setCanReadAttachments(sensitive);
         result.setRevision(latest == null ? 0 : latest.getRevision());
         var content = values(latest);
         // A collected address is a fallback until an internal override is explicitly saved.
@@ -168,7 +168,7 @@ public class StudentArchiveExtraService {
     @ZsjosPermission(bizType="student-archive",bizId="#relationId",action="update")
     @Transactional(rollbackFor=Exception.class)
     public Integer save(Long relationId, Save request) {
-        relation(relationId,true);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation(relationId,true));
         String fingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(request));
         var prior = revisions.byKey(request.getIdempotencyKey());
         if (prior != null) {
@@ -182,15 +182,15 @@ public class StudentArchiveExtraService {
             var f = field(change.getKey()); var value = change.getValue(); validate(f,value);
             if (!examReader() && !visibilityState().values().getOrDefault(f.key(), true))
                 throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
-            if ("certificate_shipping_address".equals(f.key()) && !permitted(SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+            if ("certificate_shipping_address".equals(f.key()) && !permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
             var old = merged.get(f.key());
             var oldIds = old == null ? List.<Long>of() : old.getAttachmentIds();
-            if (!permitted(SENSITIVE) && !oldIds.equals(value.getAttachmentIds())) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+            if (!permitted(ARCHIVE_SENSITIVE) && !oldIds.equals(value.getAttachmentIds())) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
             for (Long id : value.getAttachmentIds()) requireAttachment(relationId,id,f.key());
             value.setText(value.getText().trim()); merged.put(f.key(),value);
         }
         var row = new StudentArchiveExtraRevisionDO(); row.setServiceRelationId(relationId); row.setRevision(current+1);
-        row.setOperatorUserId(getLoginUserId()); row.setReason(request.getReason()); row.setIdempotencyKey(request.getIdempotencyKey());
+        row.setOperatorUserId(getLoginUserId()); row.setReason(Objects.requireNonNullElse(request.getReason(), "")); row.setIdempotencyKey(request.getIdempotencyKey());
         row.setRequestHash(fingerprint); row.setValuesJson(JsonUtils.toJsonString(merged)); revisions.insert(row); return row.getRevision();
     }
     private StudentArchiveAttachmentDO requireAttachment(Long relationId,Long id,String key) {
@@ -206,10 +206,10 @@ public class StudentArchiveExtraService {
     @ZsjosPermission(bizType="student-archive",bizId="#relationId",action="update")
     @Transactional(rollbackFor=Exception.class)
     public StudentInfoVO.Image upload(Long relationId,String key,MultipartFile upload) {
-        relation(relationId,true);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation(relationId,true));
         if (!examReader() && !visibilityState().values().getOrDefault(key, true))
             throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
-        if (!permitted(SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        if (!permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         var f = field(key);
         if (f.allowedExtensions().isEmpty() || upload.isEmpty() || upload.getSize()>10*1024*1024L) throw exception(FIELD_INVALID,"附件格式或大小");
         try {
@@ -229,7 +229,7 @@ public class StudentArchiveExtraService {
     @ZsjosPermission(bizType="student-archive",bizId="#relationId",action="read")
     public byte[] download(Long relationId,Long id) {
         relation(relationId,false);
-        if (!permitted(SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        if (!permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         try {
             var row = requireAttachment(relationId,id,null);
             if (!examReader() && !visibilityState().values().getOrDefault(row.getFieldKey(), true))

@@ -54,6 +54,11 @@ public class FileApiImpl implements FileApi {
     }
 
     @Override
+    public FileInfoRespDTO createFileInfoFromPath(java.nio.file.Path source, String name, String directory, String type) {
+        return BeanUtils.toBean(fileService.createFileInfoFromPath(source, name, directory, type), FileInfoRespDTO.class);
+    }
+
+    @Override
     public FileInfoRespDTO createFileInfo(byte[] content, String name, String directory, String type) {
         return BeanUtils.toBean(fileService.createFileInfo(content, name, directory, type), FileInfoRespDTO.class);
     }

@@ -32,6 +32,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
+import cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadSubmitterAssistRequestMapper;
@@ -104,6 +105,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private BusinessTaskMapper businessTaskMapper;
     @Resource private LeadRemarkHistoryService remarkHistoryService;
     @Resource private LeadAppealSummaryService appealSummaryService;
+    @Resource private MenuTaskSummaryService menuTaskSummaryService;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -116,7 +118,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                         reqVO.getInboxGroup(), reqVO.getInboxSectionOptions());
         LeadVisibilityScope visibility = resolveVisibilityScope(relationScope, userId);
         List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
-        PageResult<LeadDO> page = leadMapper.selectManagementPageByScope(reqVO,
+        PageResult<LeadDO> page = Boolean.TRUE.equals(reqVO.getPendingTasksFirst())
+                ? leadMapper.selectManagementPageByScope(reqVO,
+                        visibility.sourceUserIds(), visibility.ownerUserIds(), visibility.queryAll(),
+                        inboxQuery, matchedLeadIds, menuTaskSummaryService.getMyLeadReminderIds(userId))
+                : leadMapper.selectManagementPageByScope(reqVO,
                 visibility.sourceUserIds(), visibility.ownerUserIds(), visibility.queryAll(),
                 inboxQuery, matchedLeadIds);
         if (page.getList().isEmpty()) {
@@ -162,10 +168,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     @Override
     public CursorPageResult<LeadManagementRespVO> getLeadCursor(LeadManagementPageReqVO reqVO, Long userId) {
+        // Submission order is stable across follow-ups; cursor requests never apply task priority.
+        reqVO.setPendingTasksFirst(false);
         reqVO.setSortField(null);
         reqVO.setSortOrder(null);
         LeadCursor cursor = decodeCursor(reqVO.getCursor(), reqVO, userId);
-        reqVO.setCursorActivityAt(cursor == null ? null : cursor.time());
+        reqVO.setCursorSubmittedAt(cursor == null ? null : cursor.time());
         reqVO.setCursorId(cursor == null ? null : cursor.id());
         int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
         reqVO.setPageNo(1);
@@ -178,7 +186,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private String encodeCursor(LeadManagementRespVO item, LeadManagementPageReqVO reqVO, Long userId) {
-        String raw = item.getLastActivityAt() + "|" + item.getId() + "|" + userId + "|"
+        String raw = item.getSubmittedAt() + "|" + item.getId() + "|" + userId + "|"
                 + cursorContext(reqVO);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
@@ -201,8 +209,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 reqVO.getInboxGroup(), reqVO.getInboxStage(), reqVO.getSimpleStatus(),
                 reqVO.getKeyword(), reqVO.getStatus(), reqVO.getAssignmentStatus(), reqVO.getSourceChannel(),
                 reqVO.getLeadCategory(), reqVO.getSourceUserId(), reqVO.getOwnerUserId(), reqVO.getAdvancedFilter()));
-        return reqVO.getPartnerSubmitterId() == null ? context
-                : context + ":partner:" + reqVO.getPartnerSubmitterId();
+        return reqVO.getPartnerSubmitterId() == null ? "submitted-v1:" + context
+                : "submitted-v1:" + context + ":partner:" + reqVO.getPartnerSubmitterId();
     }
 
     private record LeadCursor(LocalDateTime time, Long id) {}
@@ -214,14 +222,21 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 && !leadObjectPermissionService.getManagedUserIds(managerUserId).contains(ownerUserId)) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
+        // The embedded management page uses the published management profile; legacy callers omit it.
+        LeadInboxFilterQuery inboxQuery = reqVO.getAudience() == null ? null
+                : inboxFilterConfigService.resolveQuery(
+                        inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_MANAGEMENT),
+                        reqVO.getInboxGroup(), reqVO.getInboxSectionOptions());
         reqVO.setAudience(INBOX_AUDIENCE_OWNER);
         reqVO.setRelationScope("owned");
-        boolean recycled = Boolean.TRUE.equals(reqVO.getRecycledOnly());
+        boolean recycled = Boolean.TRUE.equals(reqVO.getRecycledOnly())
+                || (inboxQuery != null && inboxQuery.values(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS)
+                        .equals(Set.of(ASSIGNMENT_RECYCLE_PENDING)));
         reqVO.setOwnerUserId(recycled ? null : ownerUserId);
         reqVO.setRecycleSourceOwnerUserId(recycled ? ownerUserId : null);
         if (recycled) reqVO.setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING);
         PageResult<LeadDO> page = leadMapper.selectManagementPage(reqVO, recycled ? null : ownerUserId,
-                List.of(), null, advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
+                List.of(), inboxQuery, advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
         if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
         Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
@@ -252,6 +267,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(id);
         var result = convert(lead, userId, users, products, attachments, resolveAttachmentUrls(attachments), true);
         appealSummaryService.populate(List.of(result), userId, true);
+        populatePendingTasks(List.of(result), userId);
         return result;
     }
 
@@ -380,6 +396,10 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())) {
             result.setProviderOwnerNameSnapshot(leadIdentityMaskingService.partnerName(
                     identityContext, lead.getProviderOwnerNameSnapshot()));
+        } else if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())) {
+            result.setProviderOwnerNameSnapshot(leadIdentityMaskingService.snapshotName(
+                    identityContext, lead.getProviderOwnerNameSnapshot(), lead.getProviderOwnerId(),
+                    LeadIdentityRole.SOURCE));
         }
         boolean selfSourcedWithoutProvider = cn.iocoder.yudao.module.zsjos.enums.LeadConstants.isSelfSourced(lead.getSourceType())
                 && Boolean.TRUE.equals(lead.getSourceProviderRecorded())
@@ -469,6 +489,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     private void populatePageTimestamps(List<LeadDO> leads, List<LeadManagementRespVO> rows, Long userId) {
         appealSummaryService.populate(rows, userId, false);
+        populatePendingTasks(rows, userId);
         // Match detail projection and its follow-up visibility; stale Lead.nextFollowUpAt
         // must not resurrect a completed or cancelled reminder in the table.
         List<Long> followUpLeadIds = leads.stream()
@@ -486,6 +507,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             SalesOrderDO order = orders.get(row.getId());
             row.setSalesOrderSubmittedAt(order == null ? null : order.getSubmittedAt());
         });
+    }
+
+    private void populatePendingTasks(List<LeadManagementRespVO> rows, Long userId) {
+        var tasks = menuTaskSummaryService.getMyLeadReminders(userId, rows.stream().map(LeadManagementRespVO::getId).toList());
+        rows.forEach(row -> row.setPendingTasks(tasks.getOrDefault(row.getId(), List.of())));
     }
 
     private String resolveRelationScope(LeadManagementPageReqVO reqVO) {

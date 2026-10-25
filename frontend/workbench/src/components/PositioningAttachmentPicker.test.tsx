@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
-import PositioningAttachmentPicker, { POSITIONING_ATTACHMENT_ACCEPT, type AttachmentItem } from './PositioningAttachmentPicker'
+import PositioningAttachmentPicker, { POSITIONING_ATTACHMENT_ACCEPT, attachmentBudgetError, MAX_ATTACHMENT_SIZE, type AttachmentItem } from './PositioningAttachmentPicker'
 
 const download = async () => ({ url: 'https://files.test/a' })
 
 describe('positioning attachment picker', () => {
+  it('accepts a group exactly at 1GiB including files above the previous 100MiB limit', () => {
+    expect(attachmentBudgetError([700 * 1024 * 1024, 324 * 1024 * 1024])).toBeUndefined()
+    expect(attachmentBudgetError([MAX_ATTACHMENT_SIZE])).toBeUndefined()
+  })
+  it('rejects a cumulative excess even when every individual file fits', () => {
+    expect(attachmentBudgetError([700 * 1024 * 1024, 324 * 1024 * 1024, 1])).toContain('总大小')
+    expect(attachmentBudgetError([MAX_ATTACHMENT_SIZE + 1])).toContain('1GB')
+    expect(attachmentBudgetError([0])).toContain('不能为空')
+  })
+
   it('accepts documents, images, audio and video in one control', () => {
     const accept = POSITIONING_ATTACHMENT_ACCEPT.split(',')
     for (const extension of ['.pdf', '.docx', '.txt', '.png', '.mp3', '.wav', '.mp4', '.mov']) {

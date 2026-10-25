@@ -366,3 +366,10 @@
 .ant-drawer-body:has(> .bpm-unified-detail) { overflow: hidden; }
 .bpm-unified-detail.is-narrow .bpm-unified-action-dock:has(.bpm-unified-result) { display: block; position: static; max-height: none; }
 .bpm-unified-detail .bpm-unified-action-dock:empty { display: none; }
+
+/* Business task views share their original detail UI without a second inbox. */
+.bpm-business-approval { min-width: 0; height: 100%; }
+.bpm-business-approval > .workspace-page { padding: 0; }
+.bpm-business-approval .content-review-layout { grid-template-columns: minmax(0, 1fr); }
+.bpm-business-approval .content-review-detail-pane { display: block; width: 100%; }
+.bpm-business-approval .material-approval-page { min-width: 0; }

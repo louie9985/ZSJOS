@@ -2,9 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { TableColumnsType } from 'antd'
 import BusinessTable from './index'
-import { columnKey, fromNativeColumns, parseColumnWidths } from './columns'
+import { clampColumnWidth, columnKey, fromNativeColumns, parseColumnWidths } from './columns'
 
 describe('BusinessTable compatibility and states', () => {
+  it('protects multi-line column minimums without widening ordinary saved columns', () => {
+    expect(clampColumnWidth(32, 280)).toBe(280)
+    expect(clampColumnWidth(390, 280)).toBe(390)
+    expect(clampColumnWidth(80)).toBe(80)
+    expect(clampColumnWidth(10, 12)).toBe(32)
+  })
   it('rejects malformed storage and clamps valid widths without coercing strings', () => {
     for (const value of ['null', '[]', 'broken', '123']) expect(parseColumnWidths(value)).toEqual({})
     expect(parseColumnWidths('{"name":12,"amount":240.5,"text":"200","bad":null,"compact":48,"minimum":32,"existing":80}')).toEqual({ name: 32, amount: 241, compact: 48, minimum: 32, existing: 80 })

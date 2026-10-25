@@ -25,6 +25,9 @@
 
 .advanced-filter-tags .ant-tag {
   margin: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .advanced-filter-template-panel {

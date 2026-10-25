@@ -1,9 +1,10 @@
+import StudentEntryDialog from '../components/StudentEntryDialog'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import BusinessSortMenu from '../components/BusinessSortMenu'
 import type { BusinessSort } from '../services/businessListSort'
 import type { AdvancedFilterGroup } from '../services/api'
 import { locateContentError, contentSaveError, contentResultUncertain, type ContentSavePhase, approvalHasStarted } from '../services/contentReviewErrors'
-import { useContentReviewSubmit } from '../components/ContentReviewReviewerSelect'
+import { requireContentReviewReviewer, submitWithFormReviewer } from '../services/contentReviewReviewer'
 import ContentReviewStudentDetail from '../components/ContentReviewStudentDetail'
 import { isWorkOrderLinkField, serializeWorkOrderDynamicValues } from '../services/workOrderForm'
 import StudentContentDraftPicker from '../components/StudentContentDraftPicker'
@@ -22,6 +23,7 @@ import type { InputRef } from 'antd'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useWorkbenchPageGuard, useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
+import { useRetainedPageActive } from '../layouts/RetainedReviewRoutes'
 import { APP_ROUTES } from '../constants'
 import dayjs from 'dayjs'
 import DetailFieldGrid from '../components/DetailFieldGrid'
@@ -198,9 +200,13 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
 }
 
 function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }) {
-  const submitContentReview = useContentReviewSubmit()
+  const [entryOpen, setEntryOpen] = useState(false)
   // The student inbox deliberately remains master-detail for every global inbox layout setting.
   const location = useLocation()
+  const pageActive = useRetainedPageActive()
+  const pageActiveRef = useRef(pageActive)
+  pageActiveRef.current = pageActive
+  const removedAccountRoute = useRef<{ previous: string; next: URLSearchParams } | undefined>(undefined)
   const workspaceNavigation = useWorkbenchPageNavigation()
   const initialLocationKey = useRef(location.key)
   const acceptedLocationSearch = useRef(location.search)
@@ -392,7 +398,8 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
       if (run !== detailRun.current) return
       if (value.student.personId !== personId) throw new Error('学员详情身份不一致，请重新加载')
       const requestedAccountId = preferredAccountId || Number(detailParams.get('accountId')) || accountIdFromTab(detailParams.get('tab'))
-      if (requestedAccountId && !value.accounts.some(account => account.id === requestedAccountId)) {
+      const accountRemoved = !!requestedAccountId && !value.accounts.some(account => account.id === requestedAccountId)
+      if (accountRemoved && !background) {
         throw new Error('该账号已失效、不属于此学员或你无权查看；请返回审批核对账号。')
       }
       const service = value.student.services.find(item => item.serviceRelationId === preferredServiceId) || value.student.services[0]
@@ -412,6 +419,19 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
         setRows(current => current.map(row => row.personId === personId ? { ...row, inServicePeriod: value.student.inServicePeriod, accounts: value.accounts } : row))
         setDetail(value); setSelectedServiceId(service?.serviceRelationId); setSelectedAccountId(accountId); setDirectorContext(context)
         setTab(accountId ? mediaAccountTabKey(accountId) : 'overview')
+        if (accountRemoved) {
+          // A successful account action can remove its tab; stale route hints must not reopen it.
+          const next = new URLSearchParams(detailParams)
+          for (const key of ['accountId', 'contentId', 'positioningCardId', 'diagnosisTaskId']) next.delete(key)
+          next.set('personId', String(personId)); next.set('tab', 'overview')
+          setMaintenanceEditorAccountId(undefined)
+          if (pageActiveRef.current) {
+            acceptedLocationSearch.current = `?${next}`
+            setParams(next, { replace: true })
+          } else {
+            removedAccountRoute.current = { previous: detailParams.toString(), next }
+          }
+        }
       }
       if (service && context?.availableActions.some(action => action.includes('POSITIONING_INTERVIEW'))) {
         try { const summary = await positioningInterviewApi.context(service.serviceRelationId); if (run === detailRun.current) setInterviewSummary(summary) }
@@ -420,7 +440,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
     }
     catch (cause) { if (run === detailRun.current) { setDetail(undefined); setDetailError(cause instanceof ApiError && cause.code === 403 ? '无权查看该学员' : errorText(cause)) } }
     finally { if (run === detailRun.current) setDetailLoading(false) }
-  }, [params])
+  }, [params, setParams])
   const loadPage = useCallback(async (targetPage: number, preferred?: number, append = false, keepDetail = false, initialLink = false) => {
     if (append && listBusy.current) return
     listBusy.current = true
@@ -552,6 +572,14 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
   }, [keyword, servicePeriodTab, advancedFilter, operatorFilter, studentSort])
   useEffect(() => () => { ++listRun.current; ++detailRun.current }, [])
   useEffect(() => {
+    if (!pageActive) return
+    const removedRoute = removedAccountRoute.current
+    removedAccountRoute.current = undefined
+    if (removedRoute && params.toString() === removedRoute.previous) {
+      acceptedLocationSearch.current = `?${removedRoute.next}`
+      setParams(removedRoute.next, { replace: true })
+      return
+    }
     if (location.key === initialLocationKey.current) return
     initialLocationKey.current = location.key
     if (location.search === acceptedLocationSearch.current) { listSelectionNavigation.current = false; return }
@@ -567,7 +595,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
       if (linkedId) void loadDetail(linkedId, Number(params.get('serviceRelationId')) || undefined, Number(params.get('accountId')) || undefined)
     })()
     return () => { disposed = true }
-  }, [location.key, params, selectedId, loadDetail])
+  }, [pageActive, location.key, params, selectedId, loadDetail])
   useEffect(() => {
     if (loading || error || moreError || !rows.length || !hasMore) return
     const target = loadMoreRef.current
@@ -876,6 +904,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
     contentDraft.current = { id: batch.id, fingerprint: '', version: batch.version }; setContentError(''); setContentUncertain(false)
     const snapshots = Array.isArray(batch.contextSnapshot.accountSnapshots) ? batch.contextSnapshot.accountSnapshots : []
     form.setFieldsValue({ accountIds: batch.accountIds?.length ? batch.accountIds : [batch.accountId],
+      draftReviewerSelection: batch.draftReviewerSelection,
       accountSnapshots: Object.fromEntries(snapshots.map((row: Record<string, unknown>) => [String(row.id), row])),
       works: restoreDraftWorks(batch) })
   }
@@ -904,6 +933,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
     try {
       if (dialog === 'positioning') { await savePositioning(true); return }
       const validated = await form.validateFields()
+      const reviewer = dialog === 'content' && submitContent ? requireContentReviewReviewer(form) : undefined
       const values = dialog === 'content' ? form.getFieldsValue(true) : validated
       setSaving(true)
       if (dialog === 'content') {
@@ -922,6 +952,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
           formatLabelSnapshot: work.formatLabelSnapshot || contentFormats.find(item => item.value === work.formatValue)?.label || '',
         }))
         const draftRequest = {
+          draftReviewerSelection: values.draftReviewerSelection || null,
           studentPersonId: detail.student.personId,
           accountIds: Array.isArray(values.accountIds) ? (values.accountIds as unknown[]).map(Number).filter(Number.isFinite) : [],
           accountSnapshots: values.accountSnapshots as Record<string, Record<string, unknown>> | undefined,
@@ -948,7 +979,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
         contentSaved = true
         if (submitContent) {
           contentPhase = 'submit'
-          if (!await submitContentReview(contentDraft.current!.id, contentDraft.current!.version!)) { message.info('草稿已保存，尚未提交审批'); return }
+          await submitWithFormReviewer(form, contentDraft.current!.id, contentDraft.current!.version!, reviewer!)
         } else {
           message.success('草稿已保存，可继续填写；下次从发起内容审批入口选择此草稿')
           return
@@ -1090,7 +1121,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
       label: '新增账号',
       onClick: () => Modal.confirm({
         title: '确认新增账号？',
-        content: '账号新增后无法直接删除，请确认已核对当前学员和服务信息。',
+        content: '请确认已核对当前学员和服务信息。新增后，运营可申请由所属编导审批删除，所属编导可直接删除。',
         okText: '确认新增',
         cancelText: '取消',
         onOk: createEmptyAccount,
@@ -1211,6 +1242,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
   </div>
 
   return <section className="workspace-page media-students-page">
+    <StudentEntryDialog open={entryOpen} type="media" onClose={() => setEntryOpen(false)} onSaved={() => { void loadPage(1, selectedId) }} />
     <header className="media-students-filter-shell"><Tabs className="media-students-service-period-tabs" activeKey={servicePeriodTab}
       onChange={key => void changeServicePeriodTab(key)} items={[
         { key: 'in', label: '服务期', disabled: servicePeriodSaving },
@@ -1227,7 +1259,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
           <AdvancedFilterToolbar scene="media_student" pageKey="media_students" placeholder="搜索姓名或手机号"
             keyword={keyword} value={advancedFilter} onKeyword={value => void searchStudents(value)} onChange={changeAdvancedFilter}
             collapsed={listCollapsed} disabled={servicePeriodSaving} inputRef={searchRef}
-            leading={<Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip>} />
+            leading={<Space>{hasPermission(permissions, 'zsjos:student:create') && <Button icon={<PlusOutlined />} onClick={() => setEntryOpen(true)}>添加学员</Button>}<Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip></Space>} />
         </div>
         {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
         {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}

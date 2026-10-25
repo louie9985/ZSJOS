@@ -27,7 +27,7 @@ final class DeliveryClassProjects {
     }
     static Map<Long, List<DeliveryClassProjectRespVO>> load(DeliveryClassMapper mapper, List<DeliveryClassDO> rows) {
         Map<Long, Map<Long, DeliveryClassProjectRespVO>> projects = new HashMap<>();
-        Map<Long, List<DeliveryClassDO>> tenants = rows.stream().filter(row -> !Boolean.TRUE.equals(row.getSystemClass()))
+        Map<Long, List<DeliveryClassDO>> tenants = rows.stream().filter(row -> !DeliveryClassKind.pending(row))
                 .collect(Collectors.groupingBy(DeliveryClassDO::getTenantId));
         tenants.forEach((tenant, classes) -> {
             // Bound each IN list without truncating the candidate population to a page.

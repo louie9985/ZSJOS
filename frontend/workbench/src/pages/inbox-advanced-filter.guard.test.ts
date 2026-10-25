@@ -16,8 +16,8 @@ const targetSurfaces = [
   ['pages/LeadAppealPage.tsx', 'lead_appeal', 'lead_appeal'],
   ['pages/LeadDuplicateReviewPage.tsx', 'duplicate_review', 'lead_duplicate_review'],
   ['pages/RegistrationPages.tsx', 'registration', 'registration_pool'],
-  ['pages/RegistrationPages.tsx', 'student', 'student_my'],
-  ['pages/SubordinateSalesPage.tsx', 'lead', 'subordinate_sales_leads'],
+  ['pages/RegistrationPages.tsx', 'student_service', 'student_my'],
+  ['pages/LeadManagementPage.tsx', 'lead', 'subordinate_sales_leads'],
   ['pages/SubordinateSalesPage.tsx', 'subordinate_sales', 'subordinate_sales']
 ] as const
 

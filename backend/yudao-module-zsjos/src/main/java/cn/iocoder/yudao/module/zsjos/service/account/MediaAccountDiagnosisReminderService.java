@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.zsjos.service.account;
 
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.service.delivery.DeliveryPositioningSource;
@@ -22,26 +24,34 @@ public class MediaAccountDiagnosisReminderService {
     @Resource private MediaAccountObjectPermissionProvider objects;
     @Resource private BusinessEventMapper events;
     @Resource private MediaWorkflowEventService eventService;
-    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.delivery.StudentDeliveryPlanMapper plans;
 
     public List<DiagnosisTodo> pending(Long userId) {
+        return project(tasks.selectMyPendingByBusiness(userId, "media_account_diagnosis", null), userId);
+    }
+
+    private List<DiagnosisTodo> project(List<BusinessTaskDO> pending, Long userId) {
         var result = new ArrayList<DiagnosisTodo>();
-        for (var task : tasks.selectMyPending(userId)) {
+        // Multiple templates share one account; validate its current ownership and positioning once per read.
+        Map<Long, Optional<MediaAccountDO>> readable = new HashMap<>();
+        for (var task : pending) {
             if (!"media_account_diagnosis".equals(task.getBizType()) || task.getDueAt() == null) continue;
-            var account = accounts.selectById(task.getBizId());
-            if (account == null || !Objects.equals(account.getDirectorUserId(), userId) || !objects.hasPermission(account.getId(),"edit",userId)) continue;
+            var account = readable.computeIfAbsent(task.getBizId(), id -> eligibleAccount(id, userId)).orElse(null);
+            if (account == null) continue;
             var payload = DeliveryPositioningSource.parse(task.getPayload());
             var ctx = MediaAccountDiagnosisScheduler.context(account);
-            var latest = plans.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryPlanDO>()
-                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryPlanDO::getAccountId, account.getId())
-                    .orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.delivery.StudentDeliveryPlanDO::getId).last("LIMIT 1"));
-            if (latest != null && "REPOSITIONING".equals(latest.getStatus())) continue;
             if (payload.get("roundKey") == null || !Objects.equals(String.valueOf(payload.get("roundKey")), String.valueOf(ctx.get("roundKey")))) continue;
             result.add(new DiagnosisTodo(task.getId(),account.getId(),account.getStudentPersonId(),account.getNickname(),
                     task.getTitleSnapshot(),String.valueOf(payload.get("templateType")),((Number)payload.get("cycle")).intValue(),task.getDueAt(),payload));
         }
         result.sort(Comparator.comparing(DiagnosisTodo::dueAt).thenComparing(DiagnosisTodo::taskId));
         return result;
+    }
+
+    private Optional<MediaAccountDO> eligibleAccount(Long accountId, Long userId) {
+        var account = accounts.selectById(accountId);
+        if (account == null || !Objects.equals(account.getDirectorUserId(), userId)
+                || !objects.hasPermission(accountId, "edit", userId)) return Optional.empty();
+        return Optional.of(account);
     }
     public List<DiagnosisTodo> reminders(Long userId) {
         // Start daily reminders 24 hours before the deadline; completed tasks are excluded by pending().
@@ -51,7 +61,7 @@ public class MediaAccountDiagnosisReminderService {
     }
     @ZsjosPermission(bizType="media-account",bizId="#accountId",action="edit")
     public List<DiagnosisTodo> accountTasks(Long accountId,Long userId) {
-        return pending(userId).stream().filter(t -> t.accountId().equals(accountId)).toList();
+        return project(tasks.selectMyPendingByBusiness(userId, "media_account_diagnosis", accountId), userId);
     }
     private String key(Long taskId,Long userId) { return "diagnosis-seen:"+taskId+":"+userId+":"+LocalDate.now(ZoneId.of("Asia/Shanghai")); }
     @Transactional(rollbackFor=Exception.class)

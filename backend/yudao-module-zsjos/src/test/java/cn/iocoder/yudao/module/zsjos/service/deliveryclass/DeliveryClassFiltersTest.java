@@ -18,6 +18,17 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class DeliveryClassFiltersTest {
+    @Test void classQueryAllExpandsFilterCandidatesWithoutCommandScope() {
+        var mapper = mock(DeliveryClassMapper.class); var permissions = mock(PermissionApi.class);
+        when(permissions.hasAnyPermissions(7L, DeliveryClassService.PERMISSION_QUERY_ALL)).thenReturn(true);
+        var query = new LambdaQueryWrapperX<DeliveryClassDO>();
+        when(mapper.classQuery(any(), eq(Set.of()), isNull(), eq(true), eq(true))).thenReturn(query);
+        when(mapper.selectList(query)).thenReturn(List.of());
+        var service = new DeliveryClassServiceImpl();
+        ReflectionTestUtils.setField(service, "mapper", mapper); ReflectionTestUtils.setField(service, "permissionApi", permissions);
+        assertTrue(service.filterContext(7L, new DeliveryClassPageReqVO(), true).projects().isEmpty());
+        verify(mapper).classQuery(any(), eq(Set.of()), isNull(), eq(true), eq(true));
+    }
     @Test void projectsUseOnlyRecordedCategoriesAndPaths() {
         assertNull(DeliveryClassProjects.parse(null));
         assertNull(DeliveryClassProjects.parse("{}"));

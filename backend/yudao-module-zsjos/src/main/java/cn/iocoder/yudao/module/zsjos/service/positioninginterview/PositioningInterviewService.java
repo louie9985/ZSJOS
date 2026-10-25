@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.positioninginterview;
 
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaServiceReadiness;
+
 import static cn.iocoder.yudao.module.zsjos.enums.MediaNotificationScenes.*;
 
 import cn.hutool.crypto.digest.DigestUtil;
@@ -18,6 +20,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
 import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningAttachmentTypes;
+import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningAttachmentLimits;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
@@ -76,7 +79,7 @@ public class PositioningInterviewService {
  }
  private ServiceRelationDO validateAuthorization(ServiceRelationDO relation,Long userId) {
   if(relation==null || !Objects.equals(relation.getTenantId(),TenantContextHolder.getRequiredTenantId())
-    || !"active".equals(relation.getStatus()) || !"accepted".equals(relation.getAcceptanceStatus())
+    || !"active".equals(relation.getStatus()) || !MediaServiceReadiness.ready(relation)
     || !Objects.equals(relation.getContentDirectorUserId(),userId)) throw exception(STUDENT_PERMISSION_DENIED);
   return relation;
  }
@@ -114,10 +117,20 @@ public class PositioningInterviewService {
     .orderByAsc(PositioningInterviewItemDO::getSort)).stream().map(i->{Item x=new Item();x.setFieldKey(i.getFieldKey());x.setStatus(i.getConfirmationStatus());x.setRemark(i.getRemark());x.setValue(i.getFieldValue());return x;}).toList());
    c.setAttachments(attachmentMapper.selectList(new LambdaQueryWrapper<PositioningInterviewAttachmentDO>().eq(PositioningInterviewAttachmentDO::getInterviewId,row.getId())).stream().map(this::attachment).toList());
   }
+  if (row == null || !"completed".equals(row.getStatus())) {
+  var visibleAttachments = new java.util.LinkedHashMap<Long, Attachment>();
+  c.getAttachments().forEach(a -> visibleAttachments.put(a.getFileId(), a));
+  attachmentMapper.selectList(new LambdaQueryWrapper<PositioningInterviewAttachmentDO>()
+      .eq(PositioningInterviewAttachmentDO::getStudentPersonId, relation.getPersonId())
+      .eq(PositioningInterviewAttachmentDO::getDirectory, directory(relation.getId(), relation.getPersonId(), userId))
+      .isNull(PositioningInterviewAttachmentDO::getInterviewId))
+      .forEach(a -> visibleAttachments.putIfAbsent(a.getFileId(), attachment(a)));
+  c.setAttachments(new java.util.ArrayList<>(visibleAttachments.values()));
+  }
   List<String> actions=new ArrayList<>();
   if(row!=null) actions.add("VIEW_POSITIONING_INTERVIEW");
   if((row==null||!"completed".equals(row.getStatus())) && ready(relation)
-    && "active".equals(relation.getStatus()) && "accepted".equals(relation.getAcceptanceStatus())
+    && "active".equals(relation.getStatus()) && MediaServiceReadiness.ready(relation)
     && Objects.equals(relation.getContentDirectorUserId(),userId)) {
    if(permissionApi.hasAnyPermissions(userId,EDIT))actions.add(row==null?"START_POSITIONING_INTERVIEW":"CONTINUE_POSITIONING_INTERVIEW");
    if(permissionApi.hasAnyPermissions(userId,COMPLETE))actions.add("COMPLETE_POSITIONING_INTERVIEW");
@@ -222,7 +235,9 @@ public class PositioningInterviewService {
    FileInfoRespDTO info=fileApi.getFileInfo(id);
    if(info==null||!Objects.equals(info.getCreator(),String.valueOf(user))||info.getPath()==null||!info.getPath().startsWith(row.getDirectory()+"/"))throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
    result.add(row);
-  }return result;
+  }
+  PositioningAttachmentLimits.requireWithinBudget(result.stream().map(PositioningInterviewAttachmentDO::getFileSize).toList());
+  return result;
  }
  @Transactional(rollbackFor=Exception.class)
  @ZsjosPermission(bizType="student-service",bizId="#relationId",action="director-interview")
@@ -231,15 +246,23 @@ public class PositioningInterviewService {
   mapper.lockStudent(relation.getPersonId(),TenantContextHolder.getRequiredTenantId());
   relation=validateAuthorization(relationMapper.selectByIdForUpdate(relationId,TenantContextHolder.getRequiredTenantId()),userId);
   var existing=current(relation.getId(),relation.getPersonId());if(!ready(relation)||existing!=null&&"completed".equals(existing.getStatus()))throw exception(POSITIONING_INTERVIEW_STATE);
-  String name=file==null?null:file.getOriginalFilename();
-  byte[] content=file==null||file.isEmpty()?null:file.getBytes();
-  // 允许文档、图片、音频、视频；以探测结果为准，避免客户端伪造 Content-Type。
-  String detected=PositioningAttachmentTypes.detectAllowed(name,content);
-  if(file==null||file.isEmpty()||file.getSize()>100L*1024*1024||detected==null)throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
+  if(file==null||file.isEmpty())throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
   String directory=directory(relationId,relation.getPersonId(),userId);
-  var info=fileApi.createFileInfo(content,name,directory,detected);
-  var row=new PositioningInterviewAttachmentDO();row.setStudentPersonId(relation.getPersonId());row.setFileId(info.getId());row.setFileName(name);row.setFileSize(file.getSize());
-  row.setMimeType(detected);row.setUploadedBy(userId);row.setDirectory(directory);attachmentMapper.insert(row);return attachment(row);
+  // The student/relation locks above serialize uploads and removals of this budget.
+  var retained=attachmentMapper.selectList(new LambdaQueryWrapper<PositioningInterviewAttachmentDO>()
+   .eq(PositioningInterviewAttachmentDO::getStudentPersonId,relation.getPersonId())
+   .and(q->{q.eq(PositioningInterviewAttachmentDO::getDirectory,directory);
+    if(existing!=null)q.or().eq(PositioningInterviewAttachmentDO::getInterviewId,existing.getId());}));
+  List<Long> sizes=new ArrayList<>(retained.stream().map(PositioningInterviewAttachmentDO::getFileSize).toList());
+  sizes.add(file.getSize());PositioningAttachmentLimits.requireWithinBudget(sizes);
+  String name=file.getOriginalFilename();
+  try (var input=file.getInputStream(); var source=cn.iocoder.yudao.module.zsjos.service.positioning.PositioningUploadSource.stage(input,file.getSize())) {
+   String detected=PositioningAttachmentTypes.detectAllowed(name,source.path());
+   if(detected==null)throw exception(POSITIONING_INTERVIEW_ATTACHMENT);
+   var info=fileApi.createFileInfoFromPath(source.path(),name,directory,detected);
+   var row=new PositioningInterviewAttachmentDO();row.setStudentPersonId(relation.getPersonId());row.setFileId(info.getId());row.setFileName(name);row.setFileSize(file.getSize());
+   row.setMimeType(detected);row.setUploadedBy(userId);row.setDirectory(directory);attachmentMapper.insert(row);return attachment(row);
+  }
  }
  private Attachment attachment(PositioningInterviewAttachmentDO row){Attachment a=new Attachment();a.setFileId(row.getFileId());a.setFileName(row.getFileName());a.setMimeType(row.getMimeType());a.setFileSize(row.getFileSize());return a;}
  @ZsjosPermission(bizType="student-service",bizId="#relationId",action="positioning-interview-read")

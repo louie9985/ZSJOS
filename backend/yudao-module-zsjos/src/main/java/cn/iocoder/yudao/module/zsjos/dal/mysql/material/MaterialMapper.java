@@ -60,6 +60,13 @@ public interface MaterialMapper extends BaseMapperX<MaterialDO> {
                                 + "mv.id=zsjos_material.current_effective_version_id AND mv.tenant_id=zsjos_material.tenant_id "
                                 + "AND mv.deleted=b'0' AND (mv.title LIKE CONCAT('%',{0},'%') "
                                 + "OR mv.summary LIKE CONCAT('%',{0},'%') OR mv.search_text LIKE CONCAT('%',{0},'%')))", req.getKeyword()));
+            } else if (Boolean.TRUE.equals(req.getMine()) && !Boolean.TRUE.equals(req.getRecommendation())) {
+                String keywordVersion = "COALESCE(zsjos_material.current_draft_version_id,zsjos_material.current_effective_version_id)";
+                query.and(item -> item.like(MaterialDO::getMaterialNo, req.getKeyword())
+                        .or().apply("EXISTS (SELECT 1 FROM zsjos_material_version mv WHERE "
+                                + "mv.id=" + keywordVersion + " AND mv.material_id=zsjos_material.id AND mv.tenant_id=zsjos_material.tenant_id "
+                                + "AND mv.deleted=b'0' AND (mv.title LIKE CONCAT('%',{0},'%') OR mv.summary LIKE CONCAT('%',{0},'%') "
+                                + "OR mv.search_text LIKE CONCAT('%',{0},'%')))", req.getKeyword()));
             } else {
                 query.and(item -> item.like(MaterialDO::getMaterialNo, req.getKeyword())
                         .or().like(MaterialDO::getTitle, req.getKeyword())

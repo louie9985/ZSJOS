@@ -44,7 +44,7 @@ public class BpmApprovalContentServiceImpl implements BpmApprovalContentService 
         }
         Resolved target = resolved.get();
         try {
-            return target.provider().brief(target.businessId(), viewerId);
+            return target.provider().brief(target.businessId(), viewerId, target.processInstanceId());
         } catch (Exception ex) {
             // 单个业务域解析失败不应影响其他任务，也不应把异常信息暴露给前端。
             log.debug("[getBrief][任务({}) 业务内容解析失败：{}]", taskId, ex.toString());
@@ -78,7 +78,7 @@ public class BpmApprovalContentServiceImpl implements BpmApprovalContentService 
         }
         Resolved target = resolved.get();
         try {
-            return target.provider().detail(target.businessId(), viewerId);
+            return target.provider().detail(target.businessId(), viewerId, target.processInstanceId());
         } catch (Exception ex) {
             log.debug("[getDetail][任务({}) 业务详情解析失败：{}]", taskId, ex.toString());
             return null;
@@ -105,10 +105,10 @@ public class BpmApprovalContentServiceImpl implements BpmApprovalContentService 
                     String businessId = provider.parseBusinessId(task.getBusinessKey());
                     return businessId == null
                             ? Optional.<Resolved>empty()
-                            : Optional.of(new Resolved(provider, businessId));
+                            : Optional.of(new Resolved(provider, businessId, task.getProcessInstanceId()));
                 });
     }
 
-    private record Resolved(BpmApprovalContentProvider provider, String businessId) {
+    private record Resolved(BpmApprovalContentProvider provider, String businessId, String processInstanceId) {
     }
 }

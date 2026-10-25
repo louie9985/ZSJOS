@@ -16,11 +16,18 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryC
 
 @Mapper
 public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
+    // Apply before pagination: exception archives must not displace ordinary teaching classes.
+    String DEFAULT_ORDER = "ORDER BY CASE class_kind WHEN 'PENDING' THEN 0 WHEN 'UNSCHEDULED' THEN 1 WHEN 'EXCEPTION' THEN 3 ELSE 2 END ASC, "
+            + "system_class DESC, create_time DESC, id DESC";
     default DeliveryClassDO selectPending() {
-        return selectOne(new LambdaQueryWrapperX<DeliveryClassDO>().eq(DeliveryClassDO::getSystemClass, true));
+        return selectOne(new LambdaQueryWrapperX<DeliveryClassDO>().eq(DeliveryClassDO::getClassKind, "PENDING"));
     }
     @Select("SELECT * FROM zsjos_delivery_class WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     DeliveryClassDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+    @Select("SELECT * FROM zsjos_delivery_class WHERE class_kind=#{kind} AND homeroom_user_id=#{owner} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
+    DeliveryClassDO selectPlannerDefaultForUpdate(@Param("kind") String kind, @Param("owner") Long owner,
+                                                @Param("tenantId") Long tenantId);
 
     default PageResult<DeliveryClassDO> selectDeliveryClassPage(DeliveryClassPageReqVO req, Set<Long> deptIds,
                                                     Long homeroomUserId, boolean allDepartments,
@@ -38,6 +45,7 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
         if (req.getProjectCategoryId() != null) query.apply(DeliveryClassFilterSql.PROJECT_EXISTS, req.getProjectCategoryId());
         if (req.getExamDateStart() != null) query.apply(DeliveryClassFilterSql.DATE_END + " >= {0}", req.getExamDateStart().toString());
         if (req.getExamDateEnd() != null) query.apply(DeliveryClassFilterSql.DATE_START + " <= {0}", req.getExamDateEnd().toString());
+        if (Boolean.TRUE.equals(req.getAssignableOnly())) query.in(DeliveryClassDO::getClassKind, List.of("NORMAL", "UNSCHEDULED"));
         if (Boolean.TRUE.equals(req.getExcludeSystemClass())) query.eq(DeliveryClassDO::getSystemClass, false);
         query.and(req.getKeyword() != null && !req.getKeyword().isBlank(), q -> q
                 .like(DeliveryClassDO::getClassName, req.getKeyword().trim())
@@ -48,12 +56,11 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
                 scope.apply("1 = 0");
                 if (homeroomUserId != null) scope.or().eq(DeliveryClassDO::getHomeroomUserId, homeroomUserId);
                 if (deptIds != null && !deptIds.isEmpty()) scope.or().in(DeliveryClassDO::getDeptId, deptIds);
-                if (includeSystem) scope.or().eq(DeliveryClassDO::getSystemClass, true);
+                if (includeSystem) scope.or().eq(DeliveryClassDO::getClassKind, "PENDING");
             });
         }
-        if (!includeSystem) query.eq(DeliveryClassDO::getSystemClass, false);
-        return query.orderByDesc(DeliveryClassDO::getSystemClass)
-                .orderByDesc(DeliveryClassDO::getCreateTime).orderByDesc(DeliveryClassDO::getId);
+        if (!includeSystem) query.ne(DeliveryClassDO::getClassKind, "PENDING");
+        return query.last(DEFAULT_ORDER);
     }
 
     @Select({"<script>", "SELECT DISTINCT sr.class_id AS classId, oi.product_snapshot AS snapshot",
@@ -79,7 +86,6 @@ public interface DeliveryClassMapper extends BaseMapperX<DeliveryClassDO> {
         LambdaQueryWrapperX<DeliveryClassDO> query = new LambdaQueryWrapperX<>();
         query.eqIfPresent(DeliveryClassDO::getStatus, status);
         if (!includeSystem) query.eq(DeliveryClassDO::getHomeroomUserId, homeroomUserId);
-        return selectList(query.orderByDesc(DeliveryClassDO::getSystemClass)
-                .orderByDesc(DeliveryClassDO::getCreateTime).orderByDesc(DeliveryClassDO::getId));
+        return selectList(query.last(DEFAULT_ORDER));
     }
 }

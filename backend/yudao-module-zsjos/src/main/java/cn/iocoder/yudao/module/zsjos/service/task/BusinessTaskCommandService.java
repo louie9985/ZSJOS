@@ -64,6 +64,10 @@ public class BusinessTaskCommandService {
         return taskMapper.completePendingByKey(idempotencyKey, completedAt) > 0;
     }
 
+    public int cancelTeachingService(Long relationId, LocalDateTime now, String reason) {
+        return taskMapper.cancelTeachingService(relationId,TenantContextHolder.getRequiredTenantId(),now,reason);
+    }
+
     public int cancel(String taskType, Long bizId, Long assigneeId, LocalDateTime cancelledAt, String reason) {
         return taskMapper.cancelPending(taskType, bizId, assigneeId, cancelledAt, reason);
     }

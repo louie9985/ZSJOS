@@ -62,7 +62,7 @@ class CalendarSearchMySqlTest {
                         : field.getPropertyType() == java.math.BigDecimal.class ? "DECIMAL(20,4)" : "BIGINT");
             jdbc.execute(ddl.append(") CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci").toString());
         }
-        jdbc.execute("CREATE TABLE zsjos_lead(id BIGINT PRIMARY KEY, tenant_id BIGINT, deleted INT, owner_user_id BIGINT, lead_category VARCHAR(50), lead_no VARCHAR(100), submitted_name VARCHAR(100), submitted_mobile VARCHAR(100), submitted_wechat_id VARCHAR(100)) CHARACTER SET utf8mb4");
+        jdbc.execute("CREATE TABLE zsjos_lead(id BIGINT PRIMARY KEY, tenant_id BIGINT, deleted INT, owner_user_id BIGINT, lead_category VARCHAR(50), lead_no VARCHAR(100), submitted_name VARCHAR(100), submitted_mobile VARCHAR(100), submitted_wechat_id VARCHAR(100), submitted_at DATETIME) CHARACTER SET utf8mb4");
         jdbc.execute("CREATE TABLE zsjos_business_task(id BIGINT PRIMARY KEY, tenant_id BIGINT, deleted INT, biz_id BIGINT, assignee_type VARCHAR(50), assignee_id BIGINT, biz_type VARCHAR(50), status VARCHAR(50), task_type VARCHAR(100), due_at DATETIME) CHARACTER SET utf8mb4");
     }
     @BeforeEach void tenant() { TenantContextHolder.setTenantId(901L); }
@@ -148,7 +148,7 @@ class CalendarSearchMySqlTest {
 
     @Test void leadAggregatesEarliestBeforeDateFilterAndExcludesTransferredCompletedForeignTasks() {
         for(int id=1;id<=7;id++) {
-            jdbc.update("INSERT INTO zsjos_lead VALUES(?,?,?,?,?,?,?,?,?)",id,id==4?902:901,0,id==3?8:7,"A","L-"+id,"姓名"+id,"13000000000","微信%_");
+            jdbc.update("INSERT INTO zsjos_lead(id,tenant_id,deleted,owner_user_id,lead_category,lead_no,submitted_name,submitted_mobile,submitted_wechat_id) VALUES(?,?,?,?,?,?,?,?,?)",id,id==4?902:901,0,id==3?8:7,"A","L-"+id,"姓名"+id,"13000000000","微信%_");
             jdbc.update("INSERT INTO zsjos_business_task VALUES(?,?,?,?,?,?,?,?,?,?)",id,id==4?902:901,0,id,"user",id==5?8:7,"lead",id==6?"completed":"pending",id==7?"other":"lead_first_follow_up",LocalDateTime.of(2026,10,1,9,0));
         }
         jdbc.update("INSERT INTO zsjos_business_task VALUES(20,901,0,1,'user',7,'lead','pending','lead_follow_up_reminder','2026-11-01 09:00:00')");

@@ -33,6 +33,15 @@ const profileValues: Record<string, string> = { nickname: '测试账号', avatar
 const newer = { ...card, submissionId: 2, submissionNo: 2, valuesSnapshot: { ...values, pc_join_goal: '新版目标：建立长期内容计划' } }
 http.defaults.adapter = async config => {
   const url = config.url || ''; let data: unknown
+  if (url.endsWith('/diagnosis/overview')) {
+    if (location.search.includes('task-error') && !taskFailed) {taskFailed=true;throw new Error('测试任务加载失败')}
+    const tasks=earlyDiagnosis&&!location.search.includes('empty-tasks') ? fixtureTasks.filter(task=>!completedTasks.has(task.taskId)) : [];
+    return {config,status:200,statusText:'OK',headers:{},data:{code:0,data:{tasks,nodes:tasks.map(task=>({
+      key:`${task.accountId}:fixture:${task.taskId}`,roundKey:'fixture',week:1,dueAt:task.dueAt,taskIds:[task.taskId],
+      parts:[{templateType:task.templateType,cycle:task.cycle,days:Number(task.templateType.match(/\d+/)?.[0]),
+        taskId:task.taskId,from:task.dueAt-7*86400000,to:task.dueAt,metric:null}]
+    }))}}};
+  }
   if (earlyDiagnosis && url.endsWith('/diagnosis/tasks')) {
     if (location.search.includes('task-error') && !taskFailed) {taskFailed=true;throw new Error('测试任务加载失败')}
     return {config,status:200,statusText:'OK',headers:{},data:{code:0,data:location.search.includes('empty-tasks') ? [] : fixtureTasks.filter(task=>!completedTasks.has(task.taskId))}}

@@ -17,6 +17,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class StudentServiceReadServiceTest {
+    @org.junit.jupiter.api.BeforeEach
+    void denyUnconfiguredFeaturePermissions() {
+        org.mockito.Mockito.lenient().when(permissionApi.hasAnyPermissions(
+                org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(false);
+    }
+
     @InjectMocks StudentServiceReadService service;
     @Mock StudentServicePageMapper pageMapper;
     @Mock ServiceRelationMapper relationMapper;
@@ -27,8 +33,28 @@ class StudentServiceReadServiceTest {
     @Mock BusinessReadScopeService readScope;
     @Mock AdvancedFilterService filters;
     @Mock StudentServiceSummaryReader summaryReader;
+    @Mock cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService taskReminders;
     @BeforeEach void before(){TenantContextHolder.setTenantId(1L);}
     @AfterEach void after(){TenantContextHolder.clear();}
+    @Test void queryAllRemovesOwnerScopeBeforePaginationButKeepsTeachingAndTenantBoundaries() {
+        when(permissionApi.hasAnyPermissions(7L, StudentReadScope.QUERY_ALL)).thenReturn(true);
+        var req = new StudentServicePageReqVO(); req.setPageNo(2); req.setPageSize(10);
+        var query = service.query(7L, req);
+        assertFalse(query.getParameters().containsKey("subject"));
+        assertFalse(query.getWhereSql().contains("sr.owner_user_id"));
+        assertTrue(query.getWhereSql().contains("sr.teaching_delivery=1"));
+        assertTrue(query.getWhereSql().contains("sr.status IN ('active','paused','completed')"));
+        assertEquals(1L, query.getParameters().get("tenantId"));
+        assertEquals(10L, query.getParameters().get("offset"));
+        verifyNoInteractions(classScope, userApi);
+        req.setReadScope("SELF"); when(readScope.resolve("SELF", null, 7L)).thenReturn(7L);
+        assertEquals(7L, service.query(7L, req).getParameters().get("subject"));
+    }
+
+    @Test void classQueryAllDoesNotGrantStudentQueryAll() {
+        org.mockito.Mockito.lenient().when(permissionApi.hasAnyPermissions(7L, DeliveryClassService.PERMISSION_QUERY_ALL)).thenReturn(true);
+        assertEquals(7L, service.query(7L, new StudentServicePageReqVO()).getParameters().get("subject"));
+    }
     @Test void nameKeywordAndSortUseServiceSnapshot() {
         var req = new StudentServicePageReqVO(); req.setKeyword("订单姓名"); req.setSortField("name"); req.setSortOrder("ascend");
         var q = service.query(7L, req);
@@ -40,6 +66,8 @@ class StudentServiceReadServiceTest {
     @Test void twoCoursesOfSamePersonRemainTwoRowsAndDatabaseTotal(){
         var a=new ServiceRelationDO();a.setId(11L);a.setPersonId(9L);
         var b=new ServiceRelationDO();b.setId(12L);b.setPersonId(9L);
+        var reminder = new cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.StudentTaskReminderRespVO(1L,"student_contact","学员跟进",null,false);
+        when(taskReminders.getMyStudentReminders(7L,List.of(11L,12L))).thenReturn(Map.of(12L,List.of(reminder)));
         when(pageMapper.count(any())).thenReturn(2L);when(pageMapper.page(any())).thenReturn(List.of(a,b));
         for(var r:List.of(a,b)){var p=new MyStudentRespVO();p.setPersonId(9L);
             var v=new MyStudentRespVO.ServiceVO();v.setServiceRelationId(r.getId());p.setServices(List.of(v));
@@ -47,6 +75,38 @@ class StudentServiceReadServiceTest {
         var result=service.page(7L,new StudentServicePageReqVO());
         assertEquals(2,result.getTotal());assertEquals(List.of(11L,12L),result.getList().stream().map(StudentServiceRespVO::getServiceRelationId).toList());
         assertTrue(result.getList().stream().allMatch(r->r.getPersonId()==9L));
+        assertTrue(result.getList().getFirst().getPendingTasks().isEmpty());
+        assertEquals(List.of(reminder),result.getList().getLast().getPendingTasks());
+    }
+    @Test void personalPriorityIsOptInBoundAndDoesNotChangeVisibilityClause(){
+        var req = new StudentServicePageReqVO();
+        var before = service.query(7L,req);
+        req.setPendingTasksFirst(true);
+        when(taskReminders.getMyStudentReminderIds(7L)).thenReturn(List.of(12L));
+        var q = service.query(7L,req);
+        assertEquals(before.getWhereSql(),q.getWhereSql());
+        assertEquals(12L,q.getParameters().get("priorityRelation0"));
+        String sql = StudentServicePageSql.page(Map.of("query",q));
+        assertTrue(sql.contains("ORDER BY CASE WHEN sr.id IN (#{query.parameters.priorityRelation0}) THEN 0 ELSE 1 END ASC,sr.update_time"));
+        assertFalse(sql.contains("IN (12)"));
+    }
+
+    @Test void realPriorityQueryPinsAcrossPagesAndKeepsTenantDeletionOwnershipAndTeachingScope() throws Exception {
+        try(var db=java.sql.DriverManager.getConnection("jdbc:h2:mem:student_priority"+System.nanoTime()+";MODE=MySQL","sa","")) {
+            db.createStatement().execute("CREATE TABLE zsjos_service_relation(id BIGINT,student_name_snapshot VARCHAR,tenant_id BIGINT,deleted INT,teaching_delivery INT,owner_user_id BIGINT,person_id BIGINT,order_id BIGINT,order_item_id BIGINT,class_id BIGINT)");
+            db.createStatement().execute("CREATE TABLE zsjos_person(id BIGINT,tenant_id BIGINT,deleted INT)");
+            db.createStatement().execute("INSERT INTO zsjos_person VALUES(9,1,0),(9,2,0)");
+            for(String table:List.of("zsjos_order","zsjos_order_item","zsjos_lead","zsjos_delivery_class"))
+                db.createStatement().execute("CREATE TABLE "+table+"(id BIGINT,tenant_id BIGINT,deleted INT,lead_id BIGINT,order_id BIGINT)");
+            for(int i=1;i<=24;i++) db.createStatement().execute("INSERT INTO zsjos_service_relation VALUES("+i+",'N"+String.format("%02d",i)+"',"+(i==21?2:1)+","+(i==22?1:0)+","+(i==24?0:1)+","+(i==23?8:7)+",9,NULL,NULL,NULL)");
+            var params=new LinkedHashMap<String,Object>();params.put("tenantId",1L);params.put("actor",7L);params.put("sortField","name");params.put("sortOrder","ascend");params.put("limit",2);params.put("offset",0);
+            params.put("priorityRelationCount",5);
+            var ids=List.of(18L,19L,21L,23L,24L);for(int i=0;i<ids.size();i++)params.put("priorityRelation"+i,ids.get(i));
+            var q=new AdvancedFilterQuery("sr.owner_user_id=#{query.parameters.actor}",params);
+            assertEquals(List.of(18L,19L),new ArrayList<>(mysqlIds(db,"",q)));
+            params.put("offset",2);assertEquals(List.of(1L,2L),new ArrayList<>(mysqlIds(db,"",q)));
+            params.put("offset",0);params.put("priorityRelationCount",0);assertEquals(List.of(1L,2L),new ArrayList<>(mysqlIds(db,"",q)));
+        }
     }
     @Test void currentServicePredicatesAreBoundBeforePagination(){
         var req=new StudentServicePageReqVO();req.setClassId(31L);req.setPersonId(9L);req.setPageNo(2);req.setPageSize(10);

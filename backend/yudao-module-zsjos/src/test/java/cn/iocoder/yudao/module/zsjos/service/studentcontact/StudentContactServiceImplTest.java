@@ -90,6 +90,63 @@ class StudentContactServiceImplTest {
     @Mock private DirectorConfigService directorConfigService;
     @Mock private DirectorFormTemplateService directorFormTemplateService;
 
+    @Test void restoredManualFormUsesOriginalTaskTypeConfigurationEvenForPlannerAndDirector() {
+        prepareContext("no-pending-task");
+        var relation=relation("accepted");relation.setTeachingRestored(true);relation.setDeliveryStage(STAGE_STUDY_PLAN);relation.setContentDirectorUserId(7L);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        var config=config();config.setFormsJson("{\"student_study_plan\":[{\"key\":\"manual_key\",\"title\":\"计划要求\",\"type\":\"text\",\"required\":true}]}");
+        when(configService.requirePublished()).thenReturn(config);
+        lenient().when(permissionApi.hasAnyPermissions(7L,PERMISSION_STUDY_PLAN_SUBMIT)).thenReturn(true);
+        var result=service.getContext(10L,7L);
+        assertEquals(TYPE_STUDY_PLAN,result.getManualTaskType());assertEquals("manual_key",result.getFormFields().getFirst().getKey());
+        org.junit.jupiter.api.Assertions.assertNull(result.getCurrentTask());
+        verifyNoInteractions(taskCommandService);
+    }
+
+    @Test void lateExtensionApprovalCannotChangeClosedServiceTask() {
+        TenantContextHolder.setTenantId(1L);
+        var relation=relation("accepted");relation.setTeachingClosed(true);
+        var extension=new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO();
+        extension.setId(44L);extension.setServiceRelationId(10L);extension.setVersion(0);extension.setStatus("pending");extension.setTaskId(20L);
+        when(extensionMapper.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(extension);
+        when(relationMapper.selectByIdForUpdate(10L,1L)).thenReturn(relation);
+        when(extensionMapper.selectByProcessIdForUpdate("process",1L)).thenReturn(extension);
+        when(extensionMapper.transitionPending(eq(44L),eq(0),eq("cancelled"),any(),isNull(),any())).thenReturn(1);
+        service.handleExtensionResult("process",cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum.APPROVE.getStatus(),"late approval");
+        verify(taskMapper,never()).updatePendingDueAt(anyLong(),any());
+    }
+
+    @Test void restoredEarlyStageCanBeSubmittedWithoutResurrectingOldTask() {
+        TenantContextHolder.setTenantId(1L);
+        var relation=relation("accepted"); relation.setTeachingRestored(true);relation.setDeliveryStage(STAGE_STUDY_PLAN);
+        when(relationMapper.selectByIdForUpdate(10L,1L)).thenReturn(relation);
+        when(configService.requirePublished()).thenReturn(config());
+        when(relationMapper.advanceDeliveryStage(10L,7L,STAGE_STUDY_PLAN,STAGE_SUPERVISION,null,2)).thenReturn(1);
+        doAnswer(call -> { StudentContactRecordDO r=call.getArgument(0);r.setId(100L);return 1; }).when(recordMapper).insert(any(StudentContactRecordDO.class));
+        var req=new StudentStudyPlanSubmitReqVO();req.setSuccessful(true);req.setRemark("恢复后主动补办");req.setIdempotencyKey("manual-stage");
+        assertEquals(100L,service.submitStudyPlan(10L,req,7L));
+        verify(taskCommandService,never()).create(any());verify(taskCommandService,never()).completeByKey(anyString(),any());
+        verify(recordMapper).insert(argThat((StudentContactRecordDO r) -> r.getTaskId()==null && TYPE_STUDY_PLAN.equals(r.getContactType())));
+    }
+    @Test void unRestoredOrWrongStageCannotUseTasklessEarlyForm() {
+        TenantContextHolder.setTenantId(1L);
+        var relation=relation("accepted");relation.setDeliveryStage(STAGE_STUDY_PLAN);
+        when(relationMapper.selectByIdForUpdate(10L,1L)).thenReturn(relation);
+        var req=new StudentStudyPlanSubmitReqVO();req.setSuccessful(true);req.setRemark("不能越过原任务");req.setIdempotencyKey("manual-invalid");
+        assertThrows(ServiceException.class,() -> service.submitStudyPlan(10L,req,7L));
+        relation.setTeachingRestored(true);relation.setDeliveryStage(STAGE_FIRST_CONTACT);
+        assertThrows(ServiceException.class,() -> service.submitStudyPlan(10L,req,7L));
+        verify(recordMapper,never()).insert(any(StudentContactRecordDO.class));
+    }
+    @Test void closedTeachingCannotSubmitEvenWithAnOldTaskIdentifier() {
+        TenantContextHolder.setTenantId(1L);
+        var relation=relation("accepted");relation.setTeachingClosed(true);
+        when(relationMapper.selectByIdForUpdate(10L,1L)).thenReturn(relation);
+        var req=new StudentStudyPlanSubmitReqVO();req.setTaskId(99L);
+        assertThrows(ServiceException.class,() -> service.submitStudyPlan(10L,req,7L));
+        verifyNoInteractions(taskCommandService);
+    }
+
     @Test void administratorReadsExtensionHistoryWithoutAssumingReviewerIdentity() {
         var page = new cn.iocoder.yudao.framework.common.pojo.PageParam();
         when(permissionApi.hasTenantReadAllAccess(9L)).thenReturn(true);

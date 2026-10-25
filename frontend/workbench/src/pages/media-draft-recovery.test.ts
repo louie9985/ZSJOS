@@ -11,8 +11,10 @@ describe('draft recovery entry wiring', () => {
   })
   it('retains a created batch identity before submission and uses saved draft revisions', () => {
     expect(page).toContain('contentDraft.current = { id, fingerprint }')
-    expect(page).toContain('contentReviewApi.saveStudentDraft(contentDraft.current.id, draftRequest)')
-    expect(page.indexOf('contentDraft.current = { id, fingerprint }')).toBeLessThan(page.indexOf('await contentReviewApi.submit(batch.id, batch.version)'))
+    expect(page).toContain('contentReviewApi.saveStudentDraft(contentDraft.current.id, { ...draftRequest, expectedVersion: contentDraft.current.version })')
+    const submission = 'await submitWithFormReviewer(form, contentDraft.current!.id, contentDraft.current!.version!, reviewer!)'
+    expect(page).toContain(submission)
+    expect(page.indexOf('contentDraft.current = { id, fingerprint }')).toBeLessThan(page.indexOf(submission))
     expect(page).toContain('StudentContentDraftPicker')
   })
 })

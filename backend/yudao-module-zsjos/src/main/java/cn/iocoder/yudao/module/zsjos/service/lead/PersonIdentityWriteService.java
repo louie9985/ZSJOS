@@ -63,10 +63,23 @@ public class PersonIdentityWriteService {
         return person;
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public PersonDO createReserved(String name, String mobile, String wechatId, String identityStatus, String key) {
+        Reservation reservation = reserve(mobile, wechatId, key);
+        if (!reservation.personIds().isEmpty()) throw exception(LEAD_CONTACT_CONFLICT);
+        PersonDO person = newPerson(name, mobile, wechatId, identityStatus);
+        personMapper.insert(person);
+        claimMapper.bindReservations(tenantId(), key, person.getId());
+        return person;
+    }
+
     private Reservation reserve(String mobile, String wechatId) {
+        return reserve(mobile, wechatId, UUID.randomUUID().toString());
+    }
+
+    private Reservation reserve(String mobile, String wechatId, String key) {
         List<String> values = java.util.stream.Stream.of(normalize(mobile), normalize(wechatId))
                 .filter(Objects::nonNull).distinct().sorted().toList();
-        String key = UUID.randomUUID().toString();
         Set<Long> personIds = new LinkedHashSet<>();
         for (String value : values) {
             claimMapper.reserve(tenantId(), value, key);

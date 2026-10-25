@@ -23,8 +23,8 @@ describe('lead ProTable sorting and column resizing', () => {
   })
 
   it('delegates resizing while retaining both legacy preference keys', () => {
-    expect(page).toContain('widthPersistenceKey="crm-lead-management-table-column-widths"')
-    expect(page).toContain("persistenceKey: 'crm-lead-management-table-columns'")
+    expect(page).toContain("salesUserId === undefined ? 'crm-lead-management-table-column-widths' : 'crm-subordinate-sales-leads-column-widths'")
+    expect(page).toContain("persistenceKey: salesUserId === undefined ? 'crm-lead-management-table-columns' : 'crm-subordinate-sales-leads-columns'")
     expect(page).toContain('BusinessTable<ManagedLead>')
     expect(page).not.toContain('startLeadTableColumnResize')
     expect(styles).not.toContain('.lead-table-resizable-header')

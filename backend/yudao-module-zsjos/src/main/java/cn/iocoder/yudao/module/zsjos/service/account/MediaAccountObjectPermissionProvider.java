@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.account;
 
+import cn.iocoder.yudao.module.zsjos.service.registration.MediaServiceReadiness;
+
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +55,10 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
     private boolean hasPermission(MediaAccountDO account, String action, Long userId, boolean readAll,
             boolean queryAll, Function<Long,
             ServiceRelationDO> relationLookup) {
+        if ("withdraw-delete".equals(action)) {
+            return "pending".equals(account.getDeleteStatus())
+                    && Objects.equals(userId, account.getDeleteRequestedByUserId());
+        }
         if (("delete_pending".equals(account.getRunStatus()) || "deleted".equals(account.getRunStatus())) && !"read".equals(action)) return false;
         if ("read".equals(action) && readAll) {
             if (account.getCreateServiceRelationId() == null) return true;
@@ -66,18 +72,23 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
                 && queryAll) return true;
         boolean related;
         boolean operator;
+        boolean director;
         if (account.getCreateServiceRelationId() != null) {
             var relation = relationLookup.apply(account.getCreateServiceRelationId());
             if (relation == null || !Objects.equals(relation.getPersonId(), account.getStudentPersonId())
                     || !Objects.equals(relation.getTenantId(), account.getTenantId())
-                    || !"active".equals(relation.getStatus()) || !"accepted".equals(relation.getAcceptanceStatus())) return false;
+                    || !"active".equals(relation.getStatus()) || !MediaServiceReadiness.ready(relation)) return false;
             operator = userId.equals(relation.getOperatorUserId());
-            related = operator || userId.equals(relation.getContentDirectorUserId());
+            director = userId.equals(relation.getContentDirectorUserId());
+            related = operator || director;
         } else {
             // Legacy accounts have no proven group; only their explicit stored owners retain access.
             operator = userId.equals(account.getOwnerOperatorUserId());
-            related = operator || userId.equals(account.getDirectorUserId());
+            director = userId.equals(account.getDirectorUserId());
+            related = operator || director;
         }
+        if ("delete-direct".equals(action)) return director;
+        if ("delete-request".equals(action)) return operator && !director;
         if ("production-ticket-create".equals(action)) {
             return operator;
         }

@@ -8,6 +8,8 @@ type AnnouncementContextValue = AnnouncementUnreadSummary & {
   hasLoaded: boolean
   refresh: () => Promise<boolean>
   markRead: (announcement: Announcement) => Promise<void>
+  confirmedReadIds: ReadonlySet<number>
+  confirmRead: (id: number) => void
 }
 
 const AnnouncementContext = createContext<AnnouncementContextValue | null>(null)
@@ -18,6 +20,12 @@ export function AnnouncementProvider({ enabled, children }: PropsWithChildren<{ 
   const [error, setError] = useState('')
   const [hasLoaded, setHasLoaded] = useState(false)
   const requestVersion = useRef(0)
+  const [confirmedReadIds, setConfirmedReadIds] = useState<ReadonlySet<number>>(() => new Set())
+  // Only successful server acknowledgements belong here; list responses may predate them.
+  const confirmRead = useCallback((id: number) => {
+    if (enabled) setConfirmedReadIds(current => current.has(id) ? current : new Set([...current, id]))
+  }, [enabled])
+  useEffect(() => { if (!enabled) setConfirmedReadIds(new Set()) }, [enabled])
 
   const refresh = useCallback(async () => {
     const request = ++requestVersion.current
@@ -41,14 +49,15 @@ export function AnnouncementProvider({ enabled, children }: PropsWithChildren<{ 
 
   const markRead = useCallback(async (announcement: Announcement) => {
     if (!announcement.read) await api.markAnnouncementRead(announcement.id)
+    confirmRead(announcement.id)
     await refresh()
-  }, [refresh])
+  }, [confirmRead, refresh])
 
   useEffect(() => { void refresh(); return () => { requestVersion.current++ } }, [refresh])
   useRealtimeEvent('notice-published', () => { void refresh() })
 
-  const value = useMemo(() => ({ ...summary, loading, error, hasLoaded, refresh, markRead }),
-    [error, hasLoaded, loading, markRead, refresh, summary])
+  const value = useMemo(() => ({ ...summary, loading, error, hasLoaded, refresh, markRead, confirmedReadIds, confirmRead }),
+    [error, hasLoaded, loading, markRead, refresh, summary, confirmedReadIds, confirmRead])
   return <AnnouncementContext.Provider value={value}>{children}</AnnouncementContext.Provider>
 }
 

@@ -892,7 +892,7 @@
     {
       "processKey": "zsjos_media_account_delete",
       "assetVersion": "1.0.0",
-      "recommended": true,
+      "recommended": false,
       "assetFormat": "xml",
       "taskKeys": [
         "review"
@@ -910,6 +910,29 @@
       "minimumMigration": "V271",
       "path": "zsjos_media_account_delete/1.0.0/process.bpmn20.xml",
       "requiresTenantRoleConfiguration": true
+    },
+    {
+      "processKey": "zsjos_media_account_delete",
+      "assetVersion": "1.1.0",
+      "recommended": true,
+      "assetFormat": "bpmn",
+      "taskKeys": [
+        "review"
+      ],
+      "businessVariables": [
+        "accountId"
+      ],
+      "assigneeVariables": [
+        "assignee"
+      ],
+      "runtimeOnlyVariables": [
+        "accountId"
+      ],
+      "businessKeyFormat": "media-account-delete:{accountId}:{round}",
+      "minimumMigration": "V271",
+      "path": "zsjos_media_account_delete/1.1.0/process.bpmn20.xml",
+      "requiresTenantRoleConfiguration": true,
+      "sha256": "e23fe0244552e8625867e601915eec3a11c50fd7a4baf7eb0221ab37de9cf65b"
     },
     {
       "processKey": "zsjos_points_redemption",

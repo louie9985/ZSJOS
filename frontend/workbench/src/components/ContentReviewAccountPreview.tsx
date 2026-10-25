@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Descriptions, Form, Spin } from 'antd'
+import StageDurationTag from './StageDurationTag'
+import { Alert, Button, Card, Descriptions, Form, Space, Spin } from 'antd'
 import { contentReviewApi, type ContentReviewAccountProfile } from '../services/materialApi'
 
 const fields = [
@@ -32,7 +33,7 @@ export default function ContentReviewAccountPreview({ batchId, studentPersonId, 
     <Alert type="info" message="正式提交时再次同步当前账号资料并保存为本轮快照；账号名称请在账号资料中维护。" />
     {state.error ? <Alert type="error" message={state.error} action={<Button onClick={() => setRetry(x => x + 1)}>重试</Button>} />
       : !ready ? <Spin /> : state.rows.map(row => <Descriptions key={row.id} title={row.nickname || '未记录'} column={{ xs: 1, sm: 2 }}
-        items={fields.map(([field, label]) => ({ key: field, label, children: row[field]?.trim() || '未记录' }))} />)}
+        items={fields.map(([field, label]) => ({ key: field, label, children: field === 'sStageLabel' ? <Space wrap size={0}><span>{row[field]?.trim() || '未记录'}</span><StageDurationTag value={row} preview /></Space> : row[field]?.trim() || '未记录' }))} />)}
     <Button size="small" onClick={() => { form.setFieldValue('accountProfileReady', false); setRetry(x => x + 1) }}>刷新账号资料</Button>
   </Card>
 }

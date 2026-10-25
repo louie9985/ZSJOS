@@ -21,6 +21,16 @@ const lead = (id: number, name: string): ManagedLead => ({
   relationTypes: ['owner']
 })
 
+it('pins pending tasks before unread Leads and preserves server order inside the pending group', () => {
+  const pending = (id: number) => ({ ...lead(id, '待办'), pendingTasks: [{ id, taskType: 'lead_first_follow_up', title: '首次跟进', overdue: false }] })
+  const items = [lead(1, '普通'), pending(2), lead(3, '未读'), pending(4)]
+  expect(prioritizeLeads(items, [3, 4]).map(item => item.id)).toEqual([2, 4, 3, 1])
+  expect(prioritizeLeads(items, []).map(item => item.id)).toEqual([2, 4, 1, 3])
+  expect(items.map(item => item.id)).toEqual([1, 2, 3, 4])
+  const done = items.map(item => ({ ...item, pendingTasks: [] }))
+  expect(prioritizeLeads(done, []).map(item => item.id)).toEqual([1, 2, 3, 4])
+})
+
 describe('lead management paging helpers', () => {
   it('displays closure even when the legacy qualification projection remains pending', () => {
     const closed = { ...lead(1, '关闭客资'), status: 'closed' }

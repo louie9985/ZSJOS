@@ -2,8 +2,8 @@ import type { ProColumns } from '@ant-design/pro-components'
 import type { TableColumnsType } from 'antd'
 
 export const MIN_COLUMN_WIDTH = 32
-export function clampColumnWidth(width: number) {
-  return Math.max(MIN_COLUMN_WIDTH, Math.round(width))
+export function clampColumnWidth(width: number, minimum = MIN_COLUMN_WIDTH) {
+  return Math.max(MIN_COLUMN_WIDTH, minimum, Math.round(width))
 }
 
 export function parseColumnWidths(stored: string | null): Record<string, number> {

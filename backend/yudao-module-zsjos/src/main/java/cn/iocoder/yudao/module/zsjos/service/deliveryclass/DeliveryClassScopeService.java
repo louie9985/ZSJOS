@@ -39,12 +39,20 @@ public class DeliveryClassScopeService {
 
     /** Retained for existing command boundaries; changing reads must not change transfer eligibility. */
     public Scope resolve(Long userId) {
+        return resolve(userId, () -> adminUserApi.getUser(userId));
+    }
+
+    Scope resolve(Long userId, AdminUserRespDTO currentUser) {
+        return resolve(userId, () -> currentUser);
+    }
+
+    private Scope resolve(Long userId, java.util.function.Supplier<AdminUserRespDTO> currentUser) {
         DeptDataPermissionRespDTO permission = permissionApi.getDeptDataPermission(userId);
         if (permission != null && Boolean.TRUE.equals(permission.getAll())) return new Scope(true, Set.of());
         Set<Long> deptIds = new LinkedHashSet<>();
         if (permission != null && permission.getDeptIds() != null) deptIds.addAll(permission.getDeptIds());
         if (permission != null && Boolean.TRUE.equals(permission.getSelf())) {
-            AdminUserRespDTO current = adminUserApi.getUser(userId);
+            AdminUserRespDTO current = currentUser.get();
             if (current != null && current.getDeptId() != null) deptIds.add(current.getDeptId());
         }
         return new Scope(false, deptIds);

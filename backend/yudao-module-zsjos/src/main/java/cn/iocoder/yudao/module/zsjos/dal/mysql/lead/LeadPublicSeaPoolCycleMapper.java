@@ -63,7 +63,11 @@ public interface LeadPublicSeaPoolCycleMapper extends BaseMapperX<LeadPublicSeaP
             if (matchedLeadIds.isEmpty()) query.eq(LeadPublicSeaPoolCycleDO::getLeadId, -1L);
             else query.in(LeadPublicSeaPoolCycleDO::getLeadId, matchedLeadIds);
         }
-        query.orderByAsc(LeadPublicSeaPoolCycleDO::getEnteredAt).orderByAsc(LeadPublicSeaPoolCycleDO::getId);
+        // Public-sea entry time does not change the Lead's original submission order.
+        query.getExpression().add(com.baomidou.mybatisplus.core.enums.SqlKeyword.ORDER_BY,
+                () -> "(SELECT l.submitted_at FROM zsjos_lead l WHERE l.id = zsjos_lead_public_sea_pool_cycle.lead_id "
+                        + "AND l.tenant_id = zsjos_lead_public_sea_pool_cycle.tenant_id AND l.deleted = b'0') DESC");
+        query.orderByDesc(LeadPublicSeaPoolCycleDO::getLeadId).orderByDesc(LeadPublicSeaPoolCycleDO::getId);
         return selectPage(reqVO, query);
     }
     default long selectCountByStatus(List<Long> scopedOwnerUserIds, Long participantUserId, String status) {

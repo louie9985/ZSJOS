@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.zsjos.service.studentinfo;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.StudentArchiveExtraController;
+import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.StudentArchiveController;
+import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentArchiveVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentArchiveExtraVO.Save;
 import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentArchiveExtraVO.VisibilitySave;
 import org.junit.jupiter.api.Test;
@@ -59,5 +61,48 @@ class StudentArchiveExtraControllerTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.code").value(0)).andExpect(jsonPath("$.data").value(1));
         var capture=org.mockito.ArgumentCaptor.forClass(Save.class);verify(service).save(eq(5L),capture.capture());
         var value=capture.getValue().getChanges().get("theory");assertEquals("85",value.getText());assertEquals(java.util.List.of(7L),value.getAttachmentIds());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"",",\"reason\":null",",\"reason\":\"\"",",\"reason\":\"legacy correction\""})
+    void bothArchiveApisAcceptOptionalAndLegacyReasons(String reasonProperty) throws Exception {
+        var service=mock(StudentArchiveService.class);var controller=new StudentArchiveController();
+        var extraService=mock(StudentArchiveExtraService.class);var extraController=new StudentArchiveExtraController();
+        ReflectionTestUtils.setField(controller,"service",service);
+        ReflectionTestUtils.setField(extraController,"service",extraService);
+        var mvc=MockMvcBuilders.standaloneSetup(controller,extraController).build();
+        when(service.save(eq(5L),any())).thenReturn(1);
+        when(extraService.save(eq(5L),any())).thenReturn(1);
+        String prefix="{\"revision\":0,\"idempotencyKey\":\"fixture\""+reasonProperty+",\"changes\":";
+
+        mvc.perform(post("/zsjos/student/service/5/archive").contentType("application/json")
+                .content(prefix+"{\"job\":\"teacher\"}}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(1));
+        mvc.perform(post("/zsjos/student/service/5/archive/extra").contentType("application/json")
+                .content(prefix+"{\"channel\":{\"text\":\"test channel\"}}}"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data").value(1));
+
+        String expected=reasonProperty.contains("legacy correction")?"legacy correction":reasonProperty.endsWith("\"\"")?"":null;
+        var mainCapture=org.mockito.ArgumentCaptor.forClass(StudentArchiveVO.Save.class);
+        verify(service).save(eq(5L),mainCapture.capture());
+        assertEquals(expected,mainCapture.getValue().getReason());
+        var extraCapture=org.mockito.ArgumentCaptor.forClass(Save.class);
+        verify(extraService).save(eq(5L),extraCapture.capture());
+        assertEquals(expected,extraCapture.getValue().getReason());
+    }
+    @Test void bothArchiveApisKeepReasonLengthLimit() throws Exception {
+        var service=mock(StudentArchiveService.class);var controller=new StudentArchiveController();
+        var extraService=mock(StudentArchiveExtraService.class);var extraController=new StudentArchiveExtraController();
+        ReflectionTestUtils.setField(controller,"service",service);
+        ReflectionTestUtils.setField(extraController,"service",extraService);
+        var mvc=MockMvcBuilders.standaloneSetup(controller,extraController).build();
+        String prefix="{\"revision\":0,\"idempotencyKey\":\"fixture\",\"reason\":\""+"a".repeat(501)+"\",\"changes\":";
+
+        mvc.perform(post("/zsjos/student/service/5/archive").contentType("application/json")
+                .content(prefix+"{\"job\":\"teacher\"}}"))
+            .andExpect(status().isBadRequest());
+        mvc.perform(post("/zsjos/student/service/5/archive/extra").contentType("application/json")
+                .content(prefix+"{\"channel\":{\"text\":\"test channel\"}}}"))
+            .andExpect(status().isBadRequest());
+        verifyNoInteractions(service,extraService);
     }
 }

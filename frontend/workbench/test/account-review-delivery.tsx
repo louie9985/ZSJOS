@@ -19,6 +19,7 @@ const todos=()=>[7,14,28].map(days=>({taskId:days,accountId:900001,studentPerson
 http.defaults.adapter=async config=>{const url=config.url||'';let data:unknown; if(url.includes('dict-data'))data=[['zsjos_media_account_stage','s0','S0'],['zsjos_media_account_current_status','normal','正常'],['zsjos_media_account_primary_problem','content','内容表达'],['zsjos_media_account_cooperation_level','a','配合积极']].map(([dictType,value,label])=>({dictType,value,label,status:0}));
 else if(url.endsWith('/diagnosis/reminders'))data=seen?[]:todos();
 else if(url.endsWith('/diagnosis/acknowledge')){seen=true;data=true}
+else if(url.endsWith('/diagnosis/overview'))data={tasks:todos(),nodes:[{key:'900001:fixture:1789704000000',roundKey:'fixture',week:4,dueAt:1789704000000,taskIds:[7,14,28],parts:todos().map(task=>({templateType:task.templateType,cycle:task.cycle,days:task.taskId,taskId:task.taskId,from:task.dueAt-task.taskId*86400000,to:task.dueAt,metric:null}))}]};
 else if(url.endsWith('/diagnosis/tasks'))data=[7,14,28].map(days=>({taskId:days,accountId:900001,studentPersonId:1,accountName:'交付验收账号',title:`${days}天诊断`,templateType:`diagnosis_${days}d`,cycle:1,dueAt:1789704000000,payload:{requirementSnapshot:{diagnosis_7d:'检查播放和互动数据',diagnosis_14d:'验证咨询转化指标',diagnosis_28d:'连续低于目标时调整选题'},source:{submissionNo:2}}}));
 else if(url.endsWith('/diagnosis')){content=JSON.stringify({...JSON.parse(content),...JSON.parse(config.data)});data=++version}
 else if(url.endsWith('/history'))data={list:config.params?.kind==='PROFILE'?[]:[entry()],total:config.params?.kind==='PROFILE'?0:1};

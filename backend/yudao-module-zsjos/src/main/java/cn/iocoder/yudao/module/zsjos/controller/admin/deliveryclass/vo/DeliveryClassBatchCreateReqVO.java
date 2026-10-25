@@ -12,6 +12,6 @@ import java.util.List;
 @Data
 public class DeliveryClassBatchCreateReqVO {
     @NotBlank @Size(max = 100) private String className;
-    @NotNull private LocalDate startDate;
+    private LocalDate startDate;
     @NotEmpty private List<@NotNull Long> homeroomUserIds;
 }

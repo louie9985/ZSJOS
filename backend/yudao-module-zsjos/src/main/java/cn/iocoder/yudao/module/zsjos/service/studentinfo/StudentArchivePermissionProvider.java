@@ -18,7 +18,7 @@ public class StudentArchivePermissionProvider implements ZsjosObjectPermissionPr
         var user = getLoginUser();
         // Maintenance is an independent configured operation, cumulative with exact-service visibility.
         return user != null && UserTypeEnum.ADMIN.getValue().equals(user.getUserType())
-                && Set.of("read", "update").contains(action) && services.hasPermission(id, "read", userId);
+                && Set.of("read", "update").contains(action) && services.hasPermission(id, "update".equals(action) ? "archive-update" : "read", userId);
     }
     @Override public void check(Long id, String action, Long userId) {
         if (!hasPermission(id, action, userId)) throw exception(LEAD_PERMISSION_DENIED);

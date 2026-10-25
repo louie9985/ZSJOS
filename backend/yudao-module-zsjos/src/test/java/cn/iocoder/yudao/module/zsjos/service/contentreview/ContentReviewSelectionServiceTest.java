@@ -23,9 +23,16 @@ class ContentReviewSelectionServiceTest {
     @Mock BpmDefinitionReadApi definitionApi;
     @Mock AdminUserApi userApi;
     @Mock PermissionApi permissionApi;
+    @Mock cn.iocoder.yudao.module.zsjos.service.registration.MyStudentService myStudentService;
+    @Mock cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper accountMapper;
+    @Mock ContentReviewObjectPermissionProvider reviewPermissionProvider;
+
+    @BeforeEach void tenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L); }
+    @AfterEach void clearTenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
     @Test void candidatesAreRoleMembersWithAllPermissionsExcludingInitiator() {
         var batch=new ContentReviewBatchDO();batch.setOperatorUserId(1L);batch.setStatus("DRAFT");batch.setRevisionOfBatchId(9L);
         var previous=new ContentReviewBatchDO();previous.setDirectorUserId(2L);
+        previous.setTenantId(1L);
         when(batchMapper.selectById(10L)).thenReturn(batch);when(batchMapper.selectById(9L)).thenReturn(previous);
         var config=new ContentReviewConfigDO();when(configService.requireReadyConfig(1L)).thenReturn(config);
         var def=new BpmProcessDefinitionMetadataRespDTO();def.setId("v2");def.setVersion(2);
@@ -48,4 +55,75 @@ class ContentReviewSelectionServiceTest {
         verifyNoInteractions(definitionApi,configService,userApi);
     }
     private AdminUserRespDTO user(Long id) {var u=new AdminUserRespDTO();u.setId(id);u.setStatus(0);u.setNickname("测试编导"+id);return u;}
+
+    @Test void studentPreparationNeedsNoDraftAndDoesNotWriteOrGrantAccess() {
+        when(accountMapper.exists(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(true);
+        readyCandidates();
+        assertEquals(List.of(2L), service.formStudentContext(77L, 1L).getCandidates().stream().map(c -> c.id()).toList());
+        verify(myStudentService).getMediaStudent(1L, 77L);
+        verifyNoInteractions(batchMapper, reviewPermissionProvider);
+    }
+
+    @Test void readVisibilityWithoutOwnedAccountCannotEnumerateCandidates() {
+        assertThrows(RuntimeException.class, () -> service.formStudentContext(77L, 1L));
+        verifyNoInteractions(configService, definitionApi, userApi);
+    }
+
+    @Test void studentReadDenialStopsBeforeCandidateOrAccountQueries() {
+        doThrow(new IllegalStateException("denied")).when(myStudentService).getMediaStudent(1L, 77L);
+        assertThrows(RuntimeException.class, () -> service.formStudentContext(77L, 1L));
+        verifyNoInteractions(accountMapper, configService, definitionApi, userApi);
+    }
+
+    @Test void rejectedRoundReturnsPreviousReviewerButRequiresCurrentObjectPermission() {
+        var batch = new ContentReviewBatchDO().setOperatorUserId(1L).setStatus("REJECTED").setDirectorUserId(2L);
+        batch.setTenantId(1L);
+        when(batchMapper.selectById(10L)).thenReturn(batch);
+        readyCandidates();
+        assertEquals(2L, service.formBatchContext(10L, 1L).getPreviousDirectorUserId());
+        verify(reviewPermissionProvider).check(10L, "submit", 1L);
+    }
+
+    @Test void crossTenantNonOwnerAndSubmittedRoundsCannotPrepare() {
+        var batch = new ContentReviewBatchDO().setOperatorUserId(1L).setStatus("DRAFT");
+        batch.setTenantId(2L);
+        when(batchMapper.selectById(10L)).thenReturn(batch);
+        assertThrows(RuntimeException.class, () -> service.formBatchContext(10L, 1L));
+        batch.setTenantId(1L); batch.setOperatorUserId(3L);
+        assertThrows(RuntimeException.class, () -> service.formBatchContext(10L, 1L));
+        batch.setOperatorUserId(1L); batch.setStatus("DIRECTOR_REVIEW");
+        assertThrows(RuntimeException.class, () -> service.formBatchContext(10L, 1L));
+        verifyNoInteractions(configService, definitionApi, userApi);
+    }
+
+    @Test void savedRevisionDraftDoesNotRefillAnExplicitlyClearedReviewer() {
+        var batch = new ContentReviewBatchDO().setOperatorUserId(1L).setStatus("DRAFT").setRevisionOfBatchId(9L);
+        batch.setTenantId(1L);
+        when(batchMapper.selectById(10L)).thenReturn(batch);
+        readyCandidates();
+        assertNull(service.formBatchContext(10L, 1L).getPreviousDirectorUserId());
+        verify(batchMapper, never()).selectById(9L);
+    }
+
+    @Test void supersededRoundCannotPrepareAndControllerRequiresConfiguredSubmitPermission() throws Exception {
+        doThrow(new IllegalStateException("superseded")).when(reviewPermissionProvider).check(10L, "submit", 1L);
+        assertThrows(RuntimeException.class, () -> service.formBatchContext(10L, 1L));
+        verifyNoInteractions(batchMapper, configService, definitionApi, userApi);
+        var method = cn.iocoder.yudao.module.zsjos.controller.admin.contentreview.ContentReviewController.class
+                .getMethod("formSubmitContext", Long.class, Long.class);
+        assertEquals("@ss.hasPermission('zsjos:content-review:submit')", method
+                .getAnnotation(org.springframework.security.access.prepost.PreAuthorize.class).value());
+    }
+
+    private void readyCandidates() {
+        var config = new ContentReviewConfigDO(); when(configService.requireReadyConfig(1L)).thenReturn(config);
+        var def = new BpmProcessDefinitionMetadataRespDTO(); def.setId("v2"); def.setVersion(2);
+        when(configService.requireCurrentDefinition(config)).thenReturn(def);
+        when(configService.requireReviewTaskKeys(def)).thenReturn(new ContentReviewConfigService.ReviewTaskKeys("opaque", "final"));
+        var scope = new BpmStarterSelectionScopeRespDTO(); scope.setRoleIds(List.of(7L)); scope.setUserIds(List.of(2L));
+        when(definitionApi.getStarterSelectionScope("v2", "opaque")).thenReturn(scope);
+        when(userApi.getUserList(List.of(2L))).thenReturn(List.of(user(2L)));
+        for (String permission : ContentReviewSelectionService.READ_PERMISSIONS)
+            when(permissionApi.hasAnyPermissions(2L, permission)).thenReturn(true);
+    }
 }

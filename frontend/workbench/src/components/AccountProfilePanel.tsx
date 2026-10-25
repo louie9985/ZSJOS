@@ -1,5 +1,7 @@
-import { diagnosisApi, type DiagnosisTodo } from "../services/mediaAccountProfile";
+import { diagnosisApi, weeklyDiagnosisApi, type WeeklyDiagnosisPreview, type WeeklyDiagnosisNode, type DiagnosisOverview, type DiagnosisTodo } from "../services/mediaAccountProfile";
+import { WeeklyDiagnosisHistory } from './WeeklyDiagnosisMetrics';
 import AccountDiagnosisForm from "./AccountDiagnosisForm";
+import AccountDiagnosisBatchForm from './AccountDiagnosisBatchForm';
 import AccountReviewRecord from "./AccountReviewRecord";
 import { useWorkbenchPageGuard } from './WorkbenchPageNavigation';
 import { APP_ROUTES } from '../constants';
@@ -57,6 +59,12 @@ import ResourceLink from './ResourceLink';
 const MemoAccountPositioningCard = memo(AccountPositioningCard);
 
 type Account = Pick<MediaStudentDetail["accounts"][number], 'id' | 'availableActions'> & Partial<MediaStudentDetail["accounts"][number]>;
+type DiagnosisOpenTarget = {
+  type: DiagnosisRequest['templateType'];
+  previous?: ProfileEntry;
+  requestedTaskId?: number;
+  anyTemplate?: boolean;
+};
 const owners = {
   AUTO: "自动生成",
   DIRECTOR: "编导填写",
@@ -94,6 +102,7 @@ export function diagnosisHistoryText(entry: ProfileEntry): string | undefined {
       ['cooperationLevelLabel', '配合等级'], ['cooperationEvidence', '配合等级证据'],
       ['secondaryProblemLabel', '次要瓶颈'], ['secondaryProblemEvidence', '次要瓶颈证据'],
       ['conclusion', '诊断结论'], ['improvementMeasures', '改进措施'], ['observedData', '重点观测数据'],
+      ['changeDirectionLabel','是否需要换内容方向测试'], ['directionSummary','方向一句话概况'], ['trafficNormalLabel','流量是否正常'], ['highestLikes','7天内最高点赞'],
       ['reposition', '是否重新定位']] as const)
       .filter(([key]) => data[key] != null && data[key] !== '' && !(key === 'cycle' && entry.fieldKey === 'diagnosis_initial'))
       .map(([key, label]) => `${label}：${typeof data[key] === 'boolean' ? (data[key] ? '是' : '否') : String(data[key])}`).join('\n');
@@ -131,6 +140,7 @@ export default function AccountProfilePanel({
   const { message, modal } = App.useApp();
   const review = useMediaStudentReview();
   const [deleteOpen, setDeleteOpen] = useState(false), [deleteReason, setDeleteReason] = useState(''), [deleteSaving, setDeleteSaving] = useState(false);
+  const deleteLock = useRef(false);
   const [positioningRefresh, setPositioningRefresh] = useState(0);
   const [positioningStatusTarget, setPositioningStatusTarget] = useState<HTMLDivElement | null>(null);
   const [profile, setProfile] = useState<AccountProfile>(),
@@ -140,14 +150,37 @@ export default function AccountProfilePanel({
     [values, publishValues] = useState<Record<string, unknown>>({}),
     [files, setFiles] = useState<Record<string, ProfileFile>>({});
   const [diagnosisSeed, setDiagnosisSeed] = useState<Record<string, unknown>>({});
+  const [weeklyPreview,setWeeklyPreview]=useState<WeeklyDiagnosisPreview>();
+  const weeklyMetricSequence=useRef(0);
+  const weeklyContent = (entry: ProfileEntry) => {
+    try { const saved=JSON.parse(entry.content || '{}') as {weeklyNode?:WeeklyDiagnosisNode};
+      return saved.weeklyNode ? <WeeklyDiagnosisHistory accountId={account!.id} entryId={entry.id} fieldKey={entry.fieldKey} snapshot={saved.weeklyNode} /> : null;
+    } catch { return null; }
+  };
   const [diagnosisPrevious, setDiagnosisPrevious] = useState<number>();
   const [diagnosisSaving, setDiagnosisSaving] = useState(false);
+  const [diagnosisAccountCount, setDiagnosisAccountCount] = useState(1);
+  const [diagnosisBatchReady, setDiagnosisBatchReady] = useState(true);
+  const diagnosisDirty = useRef(false);
   const diagnosisLock = useRef(false);
   const diagnosisRequest = useRef<{ fingerprint: string; key: string } | undefined>(undefined);
   const [diagnosisTask, setDiagnosisTask] = useState<DiagnosisTodo>();
-  const [diagnosisTasks, setDiagnosisTasks] = useState<DiagnosisTodo[]>([]);
+  const [diagnosisOverview, setDiagnosisOverview] = useState<DiagnosisOverview>();
+  const diagnosisOverviewRequest = useRef<{
+    accountId: number;
+    generation: number;
+    data?: DiagnosisOverview;
+    pending?: Promise<DiagnosisOverview>;
+  } | undefined>(undefined);
+  const diagnosisTasks = diagnosisOverview?.tasks || [];
   const [diagnosisTasksLoading, setDiagnosisTasksLoading] = useState(false);
   const [diagnosisTasksError, setDiagnosisTasksError] = useState('');
+  const [diagnosisOpening, setDiagnosisOpening] = useState(false);
+  const [diagnosisOpenError, setDiagnosisOpenError] = useState('');
+  const [diagnosisOpenNotice, setDiagnosisOpenNotice] = useState('');
+  const diagnosisOpeningLock = useRef(false);
+  const diagnosisOpenSequence = useRef(0);
+  const diagnosisOpenTarget = useRef<DiagnosisOpenTarget | undefined>(undefined);
   const openedDiagnosisTask = useRef<number | undefined>(undefined);
   const startupPromptedTask = useRef<number | undefined>(undefined);
   const [diagnosisOpen, setDiagnosisOpen] = useState(false), [diagnosisType, setDiagnosisType] = useState<DiagnosisRequest["templateType"]>("diagnosis_7d");
@@ -167,13 +200,25 @@ export default function AccountProfilePanel({
   const [record, setRecord] = useState<ProfileField>(),
     [content, setContent] = useState(""),
     [recordFiles, setRecordFiles] = useState<ProfileFile[]>([]);
+  const closeDiagnosis = () => {
+    diagnosisDirty.current = false;
+    diagnosisOpenSequence.current++;
+    weeklyMetricSequence.current++;
+    diagnosisOpeningLock.current = false;
+    diagnosisOpenTarget.current = undefined;
+    setDiagnosisOpen(false);
+    setDiagnosisOpening(false);
+    setDiagnosisOpenError('');
+    setDiagnosisOpenNotice('');
+  };
   useWorkbenchPageGuard(APP_ROUTES.MEDIA_STUDENTS, async destination => {
-    if (!open && !record && !diagnosisOpen) return true;
+    if (deleteLock.current) { message.warning('请先完成或取消账号删除确认'); return false; }
+    if (!open && !record && !diagnosisOpen && !deleteOpen) return true;
     if (destination && Number(new URL(destination, window.location.origin).searchParams.get('accountId')) === account?.id) return true;
     if (saving || uploading || diagnosisSaving) { message.warning('正在保存或上传，请完成后再切换账号'); return false; }
     return new Promise(resolve => modal.confirm({ title: '账号页面有未保存修改',
       content: '可继续填写，或放弃本次编辑后切换。', okText: '放弃并切换', cancelText: '继续填写',
-      onOk: () => { setOpen(false); setRecord(undefined); setDiagnosisOpen(false); onEditingFinished?.(); resolve(true); },
+      onOk: () => { setOpen(false); setRecord(undefined); setDeleteOpen(false); closeDiagnosis(); onEditingFinished?.(); resolve(true); },
       onCancel: () => resolve(false) }));
   });
   const pending = useRef<{ fingerprint: string; key: string } | undefined>(
@@ -213,6 +258,9 @@ export default function AccountProfilePanel({
   const load = async () => {
     if (!account || !canQuery) return;
     const gen = generation.current;
+    // A profile reload follows account writes; pre-write task responses must not restore completed tasks.
+    diagnosisOverviewRequest.current = undefined;
+    setDiagnosisOverview(undefined);
     setLoading(true);
     setError("");
     try {
@@ -222,6 +270,13 @@ export default function AccountProfilePanel({
         setProfile(r);
         setValues(r.values);
         setFiles(r.files);
+        if (r.canSubmitDiagnosis) void loadDiagnosisTasks(true).catch(() => undefined);
+        else {
+          diagnosisOverviewRequest.current = undefined;
+          setDiagnosisOverview(undefined);
+          setDiagnosisTasksLoading(false);
+          setDiagnosisTasksError('');
+        }
       }
     } catch (cause) {
       if (gen === generation.current) setError(errorText(cause));
@@ -229,25 +284,40 @@ export default function AccountProfilePanel({
       if (gen === generation.current) setLoading(false);
     }
   };
-  const loadDiagnosisTasks = useCallback(async () => {
-    if (!account || !profile?.canSubmitDiagnosis) return;
+  const loadDiagnosisTasks = useCallback(async (refresh = false): Promise<DiagnosisOverview | undefined> => {
+    if (!account?.id || !canQuery || review) return;
+    const accountId = account.id;
     const gen = generation.current;
+    const cached = diagnosisOverviewRequest.current;
+    if (cached?.accountId === accountId && cached.generation === gen) {
+      if (cached.pending) return cached.pending;
+      if (!refresh && cached.data) return cached.data;
+    }
+    const request: NonNullable<typeof diagnosisOverviewRequest.current> = { accountId, generation: gen };
+    diagnosisOverviewRequest.current = request;
     setDiagnosisTasksLoading(true);
     setDiagnosisTasksError('');
-    try {
-      const tasks = await diagnosisApi.tasks(account.id);
-      if (gen === generation.current) setDiagnosisTasks(tasks);
-    } catch (cause) {
-      if (gen === generation.current) setDiagnosisTasksError(errorText(cause));
-    } finally {
-      if (gen === generation.current) setDiagnosisTasksLoading(false);
-    }
-  }, [account?.id, profile]);
-  useEffect(() => {
-    setDiagnosisTasks([]);
-    setDiagnosisTasksError('');
-    void loadDiagnosisTasks();
-  }, [loadDiagnosisTasks]);
+    request.pending = diagnosisApi.overview(accountId).then(result => {
+      if (gen === generation.current && diagnosisOverviewRequest.current === request) {
+        request.data = result;
+        setDiagnosisOverview(result);
+      }
+      return result;
+    }).catch(cause => {
+      if (gen === generation.current && diagnosisOverviewRequest.current === request) {
+        request.data = undefined;
+        setDiagnosisOverview(undefined);
+        setDiagnosisTasksError(errorText(cause));
+      }
+      throw cause;
+    }).finally(() => {
+      if (gen === generation.current && diagnosisOverviewRequest.current === request) {
+        request.pending = undefined;
+        setDiagnosisTasksLoading(false);
+      }
+    });
+    return request.pending;
+  }, [account?.id, canQuery, review?.batchId]);
   useEffect(() => {
     // Applying a card changes both the account version and startup eligibility.
     if (positioningRefresh > 0) void load();
@@ -285,7 +355,7 @@ export default function AccountProfilePanel({
             .filter((f) => f.enabled && f.dictType)
             .map((f) => f.dictType!),
         ),
-        "zsjos_media_account_stage", "zsjos_media_account_current_status", "zsjos_media_account_primary_problem", "zsjos_media_account_cooperation_level",
+        "zsjos_media_account_stage", "zsjos_media_account_current_status", "zsjos_media_account_primary_problem", "zsjos_media_account_cooperation_level", "infra_boolean_string",
       ];
       const rows = await Promise.all(
         types.map(
@@ -302,15 +372,25 @@ export default function AccountProfilePanel({
   useEffect(() => {
     generation.current++;
     setProfile(undefined);
+    setDeleteOpen(false);
+    setDeleteReason('');
     setOpen(false);
     setRecord(undefined);
-    setDiagnosisOpen(false);
+    closeDiagnosis();
+    diagnosisOverviewRequest.current = undefined;
+    setDiagnosisOverview(undefined);
+    setDiagnosisTasksLoading(false);
+    setDiagnosisTasksError('');
+    openedDiagnosisTask.current = undefined;
+    startupPromptedTask.current = undefined;
     diagnosisRequest.current = undefined;
     setHistory([]);
     pending.current = undefined;
     void load();
     return () => {
       generation.current++;
+      diagnosisOpenSequence.current++;
+      weeklyMetricSequence.current++;
     };
     // Identity changes invalidate in-flight requests and account-specific drafts.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -491,63 +571,108 @@ export default function AccountProfilePanel({
     ) : (
       <Typography.Text type="secondary">{f.name} · 暂不可预览</Typography.Text>
     );
+  const availableDiagnosisTask = (type?: DiagnosisRequest['templateType']) => diagnosisTasks.find(task =>
+    (!type || task.templateType === type) && diagnosisOverview?.nodes.some(node => node.taskIds.includes(task.taskId)));
   const recordButton = (f: ProfileField) =>
-    editable.includes(f.key) && !f.key.startsWith("delivery_s") && (!["diagnosis_7d","diagnosis_14d","adjustment_28d"].includes(f.key) || profile?.canSubmitDiagnosis) ? (
+    editable.includes(f.key) && !f.key.startsWith("delivery_s") && !["diagnosis_7d","diagnosis_14d","diagnosis_28d","adjustment_28d"].includes(f.key) ? (
       <Button
         size="small"
         disabled={
           saving || uploading || (open && Object.keys(currentChanges()).length > 0)
         }
         onClick={() => {
-          if (["diagnosis_7d", "diagnosis_14d", "adjustment_28d"].includes(f.key)) {
-            openDiagnosis(f.key === "adjustment_28d" ? "diagnosis_28d" : f.key as DiagnosisRequest["templateType"]);
-            return;
-          }
           setRecord(f);
           setContent("");
           setRecordFiles([]);
         }}
       >
-        {["diagnosis_7d","diagnosis_14d","adjustment_28d"].includes(f.key) ? "填写诊断" : "填写记录"}
+        填写记录
       </Button>
       ) : null;
-  const openDiagnosis = async (type: DiagnosisRequest["templateType"], previous?: ProfileEntry, requestedTaskId?: number, anyTemplate = false) => {
-    if (!profile) return;
-    let seed: Record<string, unknown> = {};
-    if (previous?.kind === "DIAGNOSIS" && previous.content) {
-      try { seed = JSON.parse(previous.content) as Record<string, unknown>; } catch { message.error("记录格式无法读取"); return; }
-    }
+  const openDiagnosis = async (type: DiagnosisRequest["templateType"], previous?: ProfileEntry, requestedTaskId?: number, anyTemplate = false, refreshTasks = false) => {
+    if (!profile || !account || profile.account.id !== account.id || diagnosisOpeningLock.current) return;
+    diagnosisOpeningLock.current = true;
+    const sequence = ++diagnosisOpenSequence.current;
+    weeklyMetricSequence.current++;
+    diagnosisOpenTarget.current = { type, previous, requestedTaskId, anyTemplate };
+    setDiagnosisType(type);
+    setDiagnosisTask(undefined);
+    setWeeklyPreview(undefined);
+    setDiagnosisSeed({});
+    setDiagnosisPrevious(previous?.id);
+    setDiagnosisOpenError('');
+    setDiagnosisOpenNotice('');
+    setDiagnosisOpening(true);
+    setDiagnosisOpen(true);
+    setDiagnosisAccountCount(1); setDiagnosisBatchReady(true); diagnosisDirty.current = false;
     const requestGeneration = generation.current;
-    let task: DiagnosisTodo | undefined;
-    if (!previous && type !== 'diagnosis_initial') {
-      const accountId = account!.id;
-      try {
-        const tasks = await diagnosisApi.tasks(accountId);
-        if (requestGeneration !== generation.current) return;
-        setDiagnosisTasks(tasks);
-        task = tasks.find(t => requestedTaskId ? t.taskId === requestedTaskId : anyTemplate || t.templateType === type);
-        if (!task) { message.info('暂无可填写任务：本周期可能已完成或任务尚未生成，请刷新任务查看'); return; }
-        seed.cycle = task.cycle; type = task.templateType;
-      } catch (cause) { message.error(errorText(cause)); return; }
-    }
-    if (requestGeneration !== generation.current) return;
-    setDiagnosisTask(task);
-    setDiagnosisSeed(seed); setDiagnosisPrevious(previous?.id);
-    setDiagnosisType(type); diagnosisRequest.current = undefined; setDiagnosisOpen(true);
+    const active = () => requestGeneration === generation.current && sequence === diagnosisOpenSequence.current;
     void loadDicts(profile);
+    try {
+      let seed: Record<string, unknown> = {};
+      if (previous?.kind === 'DIAGNOSIS' && previous.content) {
+        try { seed = JSON.parse(previous.content) as Record<string, unknown>; }
+        catch { throw new Error('记录格式无法读取，请联系管理员'); }
+      }
+      let task: DiagnosisTodo | undefined;
+      let preview: WeeklyDiagnosisPreview | undefined;
+      if (!previous && type !== 'diagnosis_initial') {
+        let overview = await loadDiagnosisTasks(refreshTasks);
+        if (!active()) return;
+        // A save may invalidate the overview while an opener is awaiting it.
+        if (overview !== diagnosisOverviewRequest.current?.data) overview = await loadDiagnosisTasks();
+        if (!active()) return;
+        const matches = (candidate: DiagnosisTodo) => requestedTaskId
+          ? candidate.taskId === requestedTaskId : anyTemplate || candidate.templateType === type;
+        const hasNode = (candidate: DiagnosisTodo) => overview?.nodes.some(node => node.taskIds.includes(candidate.taskId));
+        task = overview?.tasks.find(candidate => matches(candidate) && hasNode(candidate));
+        if (!task) {
+          setDiagnosisOpenNotice(overview?.tasks.some(matches)
+            ? '该周诊断尚未开放，请在对应周开始后填写'
+            : '暂无可填写任务：本周期可能已完成或任务尚未生成，请刷新任务查看');
+          return;
+        }
+        const node = overview!.nodes.find(candidate => candidate.taskIds.includes(task!.taskId))!;
+        setDiagnosisTask(task);
+        preview = await weeklyDiagnosisApi.preview(account.id, node.key);
+        if (!active()) return;
+        seed.cycle = task.cycle;
+        type = task.templateType;
+      }
+      if (previous && seed.weeklyNode) preview = await weeklyDiagnosisApi.history(account.id, previous.id);
+      if (!active()) return;
+      setDiagnosisTask(task);
+      setWeeklyPreview(preview);
+      setDiagnosisSeed(seed);
+      setDiagnosisType(type);
+      diagnosisRequest.current = undefined;
+    } catch (cause) {
+      if (active()) setDiagnosisOpenError(errorText(cause));
+    } finally {
+      if (active()) {
+        diagnosisOpeningLock.current = false;
+        setDiagnosisOpening(false);
+      }
+    }
+  };
+  const retryDiagnosis = (refreshTasks = false) => {
+    const target = diagnosisOpenTarget.current;
+    if (target) void openDiagnosis(target.type, target.previous, target.requestedTaskId, target.anyTemplate, refreshTasks);
   };
   const diagnosisDeadline = (fieldKey: string) => {
     if (!profile?.canSubmitDiagnosis) return <Typography.Paragraph type="secondary">{profile?.canStartDiagnosis ? '完成启动诊断后可查看周期任务及截止时间' : '周期任务暂不可用，请确认有效定位卡、启动诊断及账号维护权限'}</Typography.Paragraph>;
     if (diagnosisTasksLoading) return <Typography.Paragraph type="secondary">正在加载诊断截止时间…</Typography.Paragraph>;
-    if (diagnosisTasksError) return <Alert type="error" showIcon message={`诊断任务加载失败：${diagnosisTasksError}`} action={<Button size="small" onClick={() => void loadDiagnosisTasks()}>重试</Button>} />;
+    if (diagnosisTasksError) return <Alert type="error" showIcon message={`诊断任务加载失败：${diagnosisTasksError}`} action={<Button size="small" onClick={() => void loadDiagnosisTasks(true).catch(() => undefined)}>重试</Button>} />;
     const task = diagnosisTasks.find(t => t.templateType === (fieldKey === 'adjustment_28d' ? 'diagnosis_28d' : fieldKey));
     return <Typography.Paragraph>
-      {task ? <>第 {task.cycle} 轮 · <Typography.Text strong>截止时间：{formatTimestamp(task.dueAt)}（北京时间）</Typography.Text><br />{task.dueAt < Date.now() ? '已逾期，仍可补填' : '可提前填写，提交后完成本次任务'}</> : '暂无待填写任务，本周期可能已完成；下一周期开始后生成新任务'}
-      {' '}<Button type="link" size="small" onClick={() => void loadDiagnosisTasks()}>刷新任务</Button>
+      {task ? <>第 {task.cycle} 轮 · <Typography.Text strong>截止时间：{formatTimestamp(task.dueAt)}（北京时间）</Typography.Text><br />{diagnosisOverview?.nodes.some(node => node.taskIds.includes(task.taskId))
+        ? task.dueAt < Date.now() ? '已逾期，仍可补填' : '本周已开放，可提前填写，提交后完成本次任务'
+        : '该周诊断尚未开放，请在对应周开始后填写'}</> : '暂无待填写任务，本周期可能已完成；下一周期开始后生成新任务'}
+      {' '}<Button type="link" size="small" onClick={() => void loadDiagnosisTasks(true).catch(() => undefined)}>刷新任务</Button>
     </Typography.Paragraph>;
   };
   useEffect(() => {
-    if (!profile || !diagnosisTaskId || !account || openedDiagnosisTask.current === diagnosisTaskId) return;
+    if (!profile || !diagnosisTaskId || !account || profile.account.id !== account.id || openedDiagnosisTask.current === diagnosisTaskId) return;
     if (!profile.canSubmitDiagnosis) {
       if (startupPromptedTask.current !== diagnosisTaskId) {
         startupPromptedTask.current = diagnosisTaskId;
@@ -560,18 +685,31 @@ export default function AccountProfilePanel({
     void openDiagnosis('diagnosis_7d', undefined, diagnosisTaskId);
   }, [profile, account?.id, diagnosisTaskId]);
   const submitDiagnosis = async (values: Record<string, unknown>) => {
-    if (!profile || !account || diagnosisLock.current) return;
+    if (!profile || !account || diagnosisLock.current || diagnosisOpening || diagnosisOpenError || diagnosisOpenNotice || !diagnosisOpen) return;
     const gen = generation.current;
     diagnosisLock.current = true; setDiagnosisSaving(true);
+    weeklyMetricSequence.current++;
     try {
       const payload = { ...values, version: profile.account.version, configVersionId: profile.config.id,
         previousEntryId: diagnosisPrevious, taskId: diagnosisTask?.taskId, templateType: diagnosisType, cycle: diagnosisType === 'diagnosis_initial' ? 0 : Number(diagnosisPrevious != null ? diagnosisSeed.cycle : diagnosisTask?.cycle) };
       const fingerprint = JSON.stringify(payload);
       if (diagnosisRequest.current?.fingerprint !== fingerprint) diagnosisRequest.current = { fingerprint, key: createIdempotencyKey() };
-      await accountProfileApi.diagnosis(account.id, { ...payload, idempotencyKey: diagnosisRequest.current.key } as DiagnosisRequest);
+      const common={ ...payload, idempotencyKey: diagnosisRequest.current.key } as DiagnosisRequest;
+      if(weeklyPreview){
+        await weeklyDiagnosisApi.submit(account.id,{nodeKey:weeklyPreview.node.key,common,
+          changeDirection:String(values.changeDirection),trafficNormal:String(values.trafficNormal),directionSummary:String(values.directionSummary),
+          highestLikes:values.highestLikes as number,metricToken:weeklyPreview.metricToken});
+      }else await accountProfileApi.diagnosis(account.id,common);
       if (gen !== generation.current) return;
-      message.success("诊断已提交"); setDiagnosisOpen(false); await load(); await loadHistory(); await onSaved();
-    } catch (cause) { message.error(errorText(cause)); }
+      message.success("诊断已提交"); closeDiagnosis(); await load(); await loadHistory(); await onSaved();
+    } catch (cause) {
+      message.error(errorText(cause));
+      if(weeklyPreview){
+        try {const refreshed=diagnosisPrevious ? await weeklyDiagnosisApi.history(account.id,diagnosisPrevious) : await weeklyDiagnosisApi.preview(account.id,weeklyPreview.node.key);
+          if(gen===generation.current){setWeeklyPreview(refreshed);message.info('指标已刷新，填写内容已保留，请核对后再次提交');}}
+        catch(refreshError){message.error(errorText(refreshError));}
+      }
+    }
     finally { diagnosisLock.current = false; setDiagnosisSaving(false); }
   };
   const control = (f: ProfileField) => {
@@ -589,8 +727,9 @@ export default function AccountProfilePanel({
               <br />{profile?.diagnosisContext?.submissionNo ? `来源：第${profile.diagnosisContext.submissionNo}次提交 · 更新 ${profile.diagnosisContext.syncedAt}` : '等待有效定位卡，计时待核实'}
             </Typography.Paragraph></>
           )}
-          <AccountReviewRecord accountId={account!.id} fieldKey={f.key} latest={profile?.latestRecords?.[f.key]} canHistory={!!profile?.canViewHistory}
-          text={diagnosisHistoryText} action={recordButton(f)} onRevise={profile?.canSubmitDiagnosis && ["diagnosis_7d","diagnosis_14d","adjustment_28d"].includes(f.key) ? entry => openDiagnosis(f.key === "adjustment_28d" ? "diagnosis_28d" : f.key as DiagnosisRequest["templateType"], entry) : undefined} />
+          <AccountReviewRecord accountId={account!.id} fieldKey={f.key} title={f.label} latest={profile?.latestRecords?.[f.key]} canHistory={!!profile?.canViewHistory}
+          extra={weeklyContent}
+          action={recordButton(f)} />
         </>
       );
     if (f.type === "materials")
@@ -856,28 +995,68 @@ export default function AccountProfilePanel({
   );
   return (
     <section className="media-students-card account-profile">
-      <Modal title={diagnosisType === "diagnosis_initial" ? "启动诊断" : "周期诊断"} open={diagnosisOpen} onCancel={() => { if (!diagnosisSaving) setDiagnosisOpen(false); }} width={1080} style={{top:16,maxWidth:'calc(100vw - 32px)',paddingBottom:0}}
+      <Modal title={diagnosisType === "diagnosis_initial" ? "启动诊断" : "周期诊断"} open={diagnosisOpen} onCancel={() => {
+        if (diagnosisSaving) return;
+        if (diagnosisDirty.current) modal.confirm({title: '放弃本次诊断填写？', content: '已填写内容尚未提交，关闭后将丢失。', okText: '放弃填写', cancelText: '继续填写', onOk: closeDiagnosis});
+        else closeDiagnosis();
+      }} width={1080} style={{top:16,maxWidth:'calc(100vw - 32px)',paddingBottom:0}}
         styles={{container:{maxHeight:'calc(100dvh - 32px)',display:'flex',flexDirection:'column'},body:{minHeight:0,overflowY:'auto'},footer:{flexShrink:0}}}
-        footer={<Button type="primary" htmlType="submit" form="account-diagnosis-form" loading={diagnosisSaving} disabled={!!dictError || dictLoading}>提交诊断</Button>} destroyOnHidden>
+        footer={<Button type="primary" htmlType="submit" form="account-diagnosis-form" loading={diagnosisSaving} disabled={diagnosisOpening || !!diagnosisOpenError || !!diagnosisOpenNotice || !!dictError || dictLoading || (diagnosisPrevious == null && !diagnosisBatchReady)}>{diagnosisPrevious == null ? `提交诊断（${diagnosisAccountCount} 个账号）` : '提交诊断'}</Button>} destroyOnHidden>
+        {diagnosisOpening ? <div role="status"><Typography.Paragraph>正在加载诊断表单…</Typography.Paragraph><Skeleton active paragraph={{ rows: 4 }} /></div>
+          : diagnosisOpenError ? <Alert type="error" showIcon message={`诊断表单加载失败：${diagnosisOpenError}`} action={<Button onClick={() => retryDiagnosis()}>重试加载</Button>} />
+          : diagnosisOpenNotice ? <Alert type="info" showIcon message={diagnosisOpenNotice} action={<Button onClick={() => retryDiagnosis(true)}>刷新任务</Button>} />
+          : <>
         {dictError && <Alert type="error" message={dictError} action={<Button onClick={() => void loadDicts(profile)}>重试字典</Button>} />}
         {diagnosisTask && <Alert type={diagnosisTask.dueAt < Date.now() ? 'warning' : 'info'} showIcon
           message={`截止时间：${formatTimestamp(diagnosisTask.dueAt)}（北京时间）`}
           description={diagnosisTask.dueAt < Date.now() ? '本次任务已逾期，仍可补填。' : '可以提前填写，提交后即完成本次诊断任务。'} />}
         {diagnosisType !== 'diagnosis_initial' && <Typography.Paragraph style={{whiteSpace:'pre-wrap'}}>
-          本次诊断要求：{String((diagnosisPrevious ? (diagnosisSeed.requirementSnapshot as Record<string,unknown> | undefined) : diagnosisTask?.payload.requirementSnapshot)?.[diagnosisType] ?? '历史版本未留存')}
+          {weeklyPreview ? weeklyPreview.node.parts.map(part=><span key={part.days}>
+            {part.days}天诊断要求：{String((diagnosisPrevious ? (diagnosisSeed.requirementSnapshot as Record<string,unknown> | undefined) : diagnosisTask?.payload.requirementSnapshot)?.[part.templateType] ?? '历史版本未留存')}<br />
+          </span>) : <>本次诊断要求：{String((diagnosisPrevious ? (diagnosisSeed.requirementSnapshot as Record<string,unknown> | undefined) : diagnosisTask?.payload.requirementSnapshot)?.[diagnosisType] ?? '历史版本未留存')}</>}
         </Typography.Paragraph>}
-        <AccountDiagnosisForm key={`${diagnosisType}-${diagnosisPrevious ?? diagnosisTask?.taskId ?? 'new'}`} type={diagnosisType}
+        {diagnosisPrevious == null && profile ? <AccountDiagnosisBatchForm key={`${account?.id}-${diagnosisType}-${diagnosisTask?.taskId ?? 'new'}`}
+          profile={profile} type={diagnosisType} seed={diagnosisSeed} preview={weeklyPreview} dicts={dicts}
+          disabled={diagnosisSaving || dictLoading || !!dictError} onSavingChange={setDiagnosisSaving}
+          onReadyChange={setDiagnosisBatchReady} onCountChange={setDiagnosisAccountCount}
+          onDirtyChange={() => {diagnosisDirty.current = true;}}
+          onSuccess={async () => {closeDiagnosis(); await load(); await loadHistory(); await onSaved();}} />
+        : <AccountDiagnosisForm key={`${diagnosisType}-${diagnosisPrevious ?? diagnosisTask?.taskId ?? 'new'}`} type={diagnosisType}
           seed={diagnosisSeed} revising={diagnosisPrevious != null} disabled={diagnosisSaving || dictLoading || !!dictError}
-          dicts={dicts} onFinish={submitDiagnosis} />
+          dicts={dicts} onFinish={submitDiagnosis} weekly={weeklyPreview?.node} onLikesChange={async value=>{
+            if(!weeklyPreview || !account || diagnosisSaving || !diagnosisOpen)return;
+            const gen=generation.current;
+            const sequence=++weeklyMetricSequence.current;
+            try {const updated=diagnosisPrevious ? await weeklyDiagnosisApi.history(account.id,diagnosisPrevious,value) : await weeklyDiagnosisApi.preview(account.id,weeklyPreview.node.key,value);
+              if(gen===generation.current && sequence===weeklyMetricSequence.current)setWeeklyPreview(updated);}
+            catch(cause){if(gen===generation.current && sequence===weeklyMetricSequence.current)message.error(errorText(cause));}
+          }} />}
+        </>}
       </Modal>
       {/* 主体自然滚动；右侧摘要栏由 CSS sticky 保持在视口内。 */}
-      <Modal title="申请删除账号" open={deleteOpen} confirmLoading={deleteSaving} okText="提交审批" okButtonProps={{ danger: true, disabled: !deleteReason.trim() }} onCancel={() => setDeleteOpen(false)} onOk={async () => {
-        if (!account || !deleteReason.trim()) return;
-        setDeleteSaving(true);
-        try { await api.mediaAccount.requestDelete(account.id, deleteReason.trim()); message.success('已提交删除审批'); setDeleteOpen(false); await load(); await onSaved(); }
-        catch (cause) { message.error(errorText(cause)); } finally { setDeleteSaving(false); }
+      <Modal title={profile?.account.availableActions.includes('DELETE_ACCOUNT_DIRECTLY') ? '确认删除账号' : '申请删除账号'} open={deleteOpen} confirmLoading={deleteSaving} okText={profile?.account.availableActions.includes('DELETE_ACCOUNT_DIRECTLY') ? '确认删除' : '提交审批'} okButtonProps={{ danger: true, disabled: !deleteReason.trim() }} cancelButtonProps={{ disabled: deleteSaving }} closable={!deleteSaving} maskClosable={!deleteSaving} keyboard={!deleteSaving} onCancel={() => { if (!deleteLock.current) setDeleteOpen(false); }} onOk={async () => {
+        if (!account || !deleteReason.trim() || deleteLock.current) return;
+        const gen = generation.current;
+        const reason = deleteReason.trim();
+        deleteLock.current = true;
+        try {
+          const direct = profile?.account.availableActions.includes('DELETE_ACCOUNT_DIRECTLY');
+          if (direct && !await modal.confirm({
+            title: '再次确认删除账号',
+            content: <><Typography.Paragraph>将删除账号：{profile?.account.nickname || '未命名账号'}{profile?.account.accountNo ? `（${profile.account.accountNo}）` : ''}。</Typography.Paragraph><Typography.Paragraph>删除完成后，该账号将从我的学员中移除，相关待办、工单和内容审批将同步处理，历史记录保留。</Typography.Paragraph></>,
+            okText: '仍然删除', cancelText: '取消', okButtonProps: { danger: true }, autoFocusButton: 'cancel',
+          })) return;
+          if (gen !== generation.current) return;
+          setDeleteSaving(true);
+          if (direct) await api.mediaAccount.deleteDirectly(account.id, reason);
+          else await api.mediaAccount.requestDelete(account.id, reason);
+          if (gen !== generation.current) return;
+          message.success(direct ? '账号已删除' : '已提交所属编导审批');
+          setDeleteOpen(false); await load(); if (gen === generation.current) await onSaved();
+        }
+        catch (cause) { message.error(errorText(cause)); } finally { deleteLock.current = false; setDeleteSaving(false); }
       }}>
-        <Alert type="warning" showIcon message="提交后账号将冻结，主管通过后删除账号并保留历史记录。" />
+        <Alert type="warning" showIcon message={profile?.account.availableActions.includes('DELETE_ACCOUNT_DIRECTLY') ? '确认后直接删除账号，并处理关联待办、工单和内容审批，历史记录保留。' : '提交后账号将冻结，由所属编导审批；通过后删除账号并保留历史记录。'} />
         <Input.TextArea aria-label="删除原因" value={deleteReason} onChange={e => setDeleteReason(e.target.value)} maxLength={500} showCount rows={4} placeholder="请说明错误新增或申请删除的原因" style={{ marginTop: 16 }} />
       </Modal>
       <div className="account-profile-grid">
@@ -908,12 +1087,12 @@ export default function AccountProfilePanel({
               {profile.snapshots.find(s => s.key === "current_status")?.displayValue || "待完成启动诊断"}
             </Tag>
             <div className="account-profile-sidebar-actions">
-              {profile.account.availableActions.includes('REQUEST_DELETE_ACCOUNT') && <Button danger onClick={() => { setDeleteReason(''); setDeleteOpen(true); }}>申请删除账号</Button>}
+              {profile.account.availableActions.includes('DELETE_ACCOUNT_DIRECTLY') ? <Button danger onClick={() => { setDeleteReason(''); setDeleteOpen(true); }}>删除账号</Button> : profile.account.availableActions.includes('REQUEST_DELETE_ACCOUNT') && <Button danger onClick={() => { setDeleteReason(''); setDeleteOpen(true); }}>申请删除账号</Button>}
               {editable.length > 0 && <Button icon={<EditOutlined />} onClick={() => openEditor()}>维护账号表</Button>}
               {profile.canStartDiagnosis && <Button onClick={() => openDiagnosis('diagnosis_initial')}>填写启动诊断</Button>}
-              {profile.canSubmitDiagnosis && <Button onClick={() => openDiagnosis('diagnosis_7d', undefined, undefined, true)}>填写周期诊断</Button>}
             </div>
             {profile.account.deleteStatus === 'pending' && <Alert type="warning" showIcon message="删除审批中，账号已冻结" />}
+            {profile.account.deleteStatus === 'approved' && <Alert type="success" showIcon message="账号已删除，历史记录保留" />}
             {reminder}
             {missingList}
             <Progress percent={required ? Math.round(((required - missing.length) / required) * 100) : 100} size="small" />
@@ -927,7 +1106,12 @@ export default function AccountProfilePanel({
               data-profile-section={k}
             >
               <div className="account-profile-section-heading">
-                <Typography.Title level={5}>{name}</Typography.Title>
+                {k === 'REVIEW' ? <Space wrap>
+                  <Typography.Title level={5}>{name}</Typography.Title>
+                  {profile.canSubmitDiagnosis && <Button type="primary" size="small" loading={diagnosisOpening}
+                    disabled={saving || uploading || (open && Object.keys(currentChanges()).length > 0) || Boolean(diagnosisOverview && !diagnosisTasksLoading && !availableDiagnosisTask())}
+                    onClick={() => openDiagnosis('diagnosis_7d', undefined, undefined, true)}>填写诊断表</Button>}
+                </Space> : <Typography.Title level={5}>{name}</Typography.Title>}
                 {fields.some(
                   (f) => profileSection(f) === k && editable.includes(f.key),
                 ) && (

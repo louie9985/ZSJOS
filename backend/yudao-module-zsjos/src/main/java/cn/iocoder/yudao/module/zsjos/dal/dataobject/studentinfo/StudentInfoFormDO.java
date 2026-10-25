@@ -17,5 +17,10 @@ public class StudentInfoFormDO extends TenantBaseDO {
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class)
     @lombok.ToString.Exclude
     private String tokenCiphertext;
+    @com.baomidou.mybatisplus.annotation.TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class)
+    @lombok.ToString.Exclude
+    private String draftSnapshot;
+    private Long draftRevision;
+    private java.time.LocalDateTime draftSavedAt;
     private java.time.LocalDateTime expiresAt, revokedAt, submittedAt;
 }

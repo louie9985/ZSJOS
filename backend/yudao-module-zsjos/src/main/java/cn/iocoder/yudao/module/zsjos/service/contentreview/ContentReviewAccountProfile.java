@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.zsjos.service.contentreview;
 
+import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountStageTiming;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,6 +15,10 @@ final class ContentReviewAccountProfile {
     private ContentReviewAccountProfile() {}
 
     static Map<String, Object> snapshot(MediaAccountDO account) {
+        return snapshot(account, LocalDateTime.now(MediaAccountStageTiming.ZONE));
+    }
+
+    static Map<String, Object> snapshot(MediaAccountDO account, LocalDateTime asOf) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("id", account.getId());
         result.put("accountNo", account.getAccountNo());
@@ -26,6 +32,7 @@ final class ContentReviewAccountProfile {
         result.put("currentStatusLabel", account.getCurrentStatusLabelSnapshot());
         result.put("ownerOperatorUserId", account.getOwnerOperatorUserId());
         result.put("directorUserId", account.getDirectorUserId());
+        result.putAll(MediaAccountStageTiming.snapshot(account, asOf));
         result.putAll(read(account));
         return result;
     }

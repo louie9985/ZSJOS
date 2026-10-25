@@ -1,0 +1,108 @@
+# -*- coding: utf-8 -*-
+"""Production teaching lifecycle UI with isolated HTTP transport, never a live mutation."""
+import os
+import re
+from pathlib import Path
+from tempfile import gettempdir
+from playwright.sync_api import sync_playwright, expect
+
+BASE = os.environ.get('TEACHING_TEST_BASE', 'http://127.0.0.1:5202') + '/test/teaching-service-lifecycle.html'
+OUT = Path(gettempdir()) / 'zsjos-teaching-service-lifecycle'
+OUT.mkdir(exist_ok=True)
+with sync_playwright() as p:
+    browser = p.chromium.launch(channel='chrome', headless=True)
+    page = browser.new_page(viewport={'width': 1440, 'height': 1000})
+    errors = []
+    page.on('pageerror', lambda error: errors.append(str(error)))
+    for width in (1440, 390):
+        page.set_viewport_size({'width': width, 'height': 920})
+        page.goto(BASE)
+        page.get_by_role('button', name=re.compile('关闭服务$')).click()
+        dialog = page.get_by_role('dialog')
+        dialog.get_by_role('button', name=re.compile('确.*认')).click()
+        expect(dialog.get_by_text('请填写原因（最多 500 字）')).to_be_visible()
+        dialog.get_by_label('关闭原因').fill('学员确认暂不继续服务')
+        dialog.get_by_role('button', name=re.compile('确.*认')).click()
+        expect(page.get_by_text('已关闭 · 异常结业', exact=True)).to_be_visible()
+        assert page.evaluate('teachingFixture.requests[0].data.version') == 3
+        page.get_by_role('button', name=re.compile('恢复服务$')).click()
+        dialog = page.get_by_role('dialog')
+        expect(dialog.locator('.ant-select')).to_contain_text('原服务班')
+        dialog.get_by_label('恢复原因').fill('学员确认继续服务')
+        page.wait_for_timeout(400)
+        page.screenshot(path=str(OUT / f'restore-{width}.png'), full_page=True)
+        dialog.get_by_role('button', name=re.compile('确.*认')).click()
+        expect(page.get_by_role('button', name=re.compile('关闭服务$'))).to_be_visible()
+        assert page.evaluate('teachingFixture.requests[1].data.targetClassId') == 10
+        assert page.evaluate('teachingFixture.requests.length') == 2
+        print('PASS close/restore/reasons/original class/no extra task request', width, flush=True)
+    page.goto(BASE + '?fail')
+    page.get_by_role('button', name=re.compile('关闭服务$')).click()
+    dialog = page.get_by_role('dialog')
+    dialog.get_by_label('关闭原因').fill('失败后重试保留原因')
+    dialog.get_by_role('button', name=re.compile('确.*认')).click()
+    expect(page.get_by_text('审批取消失败，请重试')).to_be_visible()
+    expect(dialog.get_by_label('关闭原因')).to_have_value('失败后重试保留原因')
+    dialog.get_by_role('button', name=re.compile('确.*认')).click()
+    expect(dialog).not_to_be_visible()
+    assert page.evaluate('teachingFixture.requests[0].data.idempotencyKey === teachingFixture.requests[1].data.idempotencyKey')
+    page.goto(BASE + '?closed&targetFail')
+    page.get_by_role('button', name=re.compile('恢复服务$')).click()
+    dialog = page.get_by_role('dialog')
+    expect(dialog.get_by_text('恢复班级加载失败')).to_be_visible()
+    expect(dialog.get_by_role('button', name=re.compile('确.*认'))).to_be_disabled()
+    dialog.get_by_role('button', name=re.compile('重\s*试')).click()
+    expect(dialog.locator('.ant-select')).to_contain_text('原服务班')
+    page.goto(BASE + '?closed&empty')
+    page.get_by_role('button', name=re.compile('恢复服务$')).click()
+    expect(page.get_by_role('dialog').get_by_role('button', name=re.compile('确.*认'))).to_be_disabled()
+    page.goto(BASE + '?denied')
+    expect(page.get_by_role('button', name=re.compile('关闭服务$'))).to_have_count(0)
+    print('PASS failure/retry preserves request key, target failure/empty and permissions', flush=True)
+    page.set_viewport_size({'width': 1440, 'height': 1000})
+    page.goto(BASE + '?page')
+    expect(page.locator('tr.ant-table-row')).to_have_count(2)
+    page.locator('tr.ant-table-row').first.click()
+    page.get_by_role('button', name=re.compile('关闭服务$')).filter(visible=True).click()
+    dialog = page.get_by_role('dialog').last
+    dialog.get_by_label('关闭原因').fill('只关闭课程一')
+    dialog.get_by_role('button', name=re.compile('确.*认')).click()
+    expect(page.locator('tr.ant-table-row')).to_have_count(1)
+    expect(page.locator('tr.ant-table-row')).to_contain_text('课程2')
+    expect(page.get_by_role('button', name='普通跟进', exact=True).filter(visible=True)).to_have_count(0)
+    print('PASS actual student page removes only closed course and disables teaching follow-up', flush=True)
+    page.goto(BASE + '?manual')
+    page.get_by_role('radio', name='是', exact=True).check()
+    page.get_by_label('备注').fill('恢复后主动补办学习计划')
+    page.get_by_role('button', name=re.compile('提交')).click()
+    page.wait_for_function('teachingFixture.saved === 1')
+    assert page.evaluate('teachingFixture.requests[0].url') == '/study-plan/1'
+    assert page.evaluate('teachingFixture.requests[0].data.taskId === undefined')
+    page.goto(BASE + '?mediaShared')
+    expect(page.get_by_role('button', name='分配编导', exact=True)).to_be_visible()
+    expect(page.get_by_role('button', name=re.compile('关闭服务$'))).to_have_count(0)
+    assert page.evaluate('teachingFixture.lifecycleReads') == 0
+    page.goto(BASE + '?classes')
+    row = page.locator('tr.ant-table-row').filter(has_text='异常结业')
+    expect(row).to_contain_text('异常结业')
+    expect(row).to_contain_text('规划师')
+    expect(row.get_by_role('button', name='结课', exact=True)).to_have_count(0)
+    page.set_viewport_size({'width': 390, 'height': 920})
+    page.goto(BASE + '?classes&cards')
+    expect(page.get_by_text('异常结业', exact=True).first).to_be_visible()
+    expect(page.get_by_text('班主任：规划师', exact=True).first).to_be_visible()
+    page.set_viewport_size({'width': 1440, 'height': 1000})
+    page.goto(BASE + '?toolbar')
+    toolbar = page.get_by_test_id('unified-toolbar')
+    expect(toolbar.get_by_role('button', name=re.compile('关闭服务$')).filter(visible=True)).to_be_visible()
+    page.goto(BASE + '?toolbar&narrow')
+    toolbar = page.get_by_test_id('unified-toolbar')
+    expect(toolbar.get_by_role('button', name=re.compile('关闭服务$')).filter(visible=True)).to_have_count(0)
+    toolbar.get_by_role('button', name=re.compile('更多')).click()
+    page.get_by_role('menuitem', name=re.compile('关闭服务$')).click()
+    expect(page.get_by_role('dialog').get_by_label('关闭原因')).to_be_visible()
+    page.screenshot(path=str(OUT / 'unified-toolbar-overflow.png'), full_page=True)
+    print('PASS shared toolbar wide action / narrow More menu and original close dialog', flush=True)
+    assert not errors, errors
+    browser.close()
+    print('PASS taskless original-stage form without old task ID or browser errors', flush=True)

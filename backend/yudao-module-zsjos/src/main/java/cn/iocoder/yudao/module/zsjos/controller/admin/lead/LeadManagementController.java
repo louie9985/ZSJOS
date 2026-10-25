@@ -280,7 +280,7 @@ public class LeadManagementController {
 
     @GetMapping("/inbox/management/filter-profile")
     @Operation(summary = "获得统一客资管理的筛选配置")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query')")
     public CommonResult<LeadInboxFilterProfileRespVO> getManagementInboxFilterProfile() {
         return success(leadManagementService.getInboxFilterProfile(getLoginUserId(), INBOX_AUDIENCE_MANAGEMENT));
     }

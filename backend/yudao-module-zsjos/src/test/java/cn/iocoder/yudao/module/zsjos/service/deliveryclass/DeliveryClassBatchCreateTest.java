@@ -115,7 +115,17 @@ class DeliveryClassBatchCreateTest {
         assertEquals(0, count());
     }
 
-    @Test void validatesNameDateAndNonemptyNonNullSelection() {
+    @Test void createsBatchWithoutDates() {
+        var req = request(20L, 21L);
+        req.setStartDate(null);
+        try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            assertTrue(factory.getValidator().validate(req).isEmpty());
+        }
+        assertEquals(2, service.createBatch(req, 9L).size());
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM classes WHERE exam_date IS NULL", Integer.class));
+    }
+
+    @Test void validatesNameAndNonemptyNonNullSelection() {
         try (var factory = jakarta.validation.Validation.buildDefaultValidatorFactory()) {
             var validator = factory.getValidator();
             assertTrue(validator.validate(request(20L)).isEmpty());
@@ -125,7 +135,7 @@ class DeliveryClassBatchCreateTest {
             req = request(20L); req.setHomeroomUserIds(Arrays.asList(20L, null));
             assertFalse(validator.validate(req).isEmpty());
             req = request(20L); req.setClassName(" "); req.setStartDate(null);
-            assertEquals(Set.of("className", "startDate"), validator.validate(req).stream()
+            assertEquals(Set.of("className"), validator.validate(req).stream()
                     .map(v -> v.getPropertyPath().toString()).collect(java.util.stream.Collectors.toSet()));
         }
     }

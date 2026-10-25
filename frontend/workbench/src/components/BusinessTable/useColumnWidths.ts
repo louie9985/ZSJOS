@@ -17,17 +17,17 @@ export function useColumnWidths(storageKey: string) {
   }, [state, storageKey])
   useEffect(() => () => finish.current?.(), [storageKey])
 
-  function setWidth(key: string, width: number) {
+  function setWidth(key: string, width: number, minimum?: number) {
     setState(current => ({ key: storageKey, widths: {
-      ...(current.key === storageKey ? current.widths : readWidths(storageKey)), [key]: clampColumnWidth(width),
+      ...(current.key === storageKey ? current.widths : readWidths(storageKey)), [key]: clampColumnWidth(width, minimum),
     } }))
   }
-  function resize(event: ReactPointerEvent<HTMLElement>, key: string, width: number) {
+  function resize(event: ReactPointerEvent<HTMLElement>, key: string, width: number, minimum?: number) {
     event.preventDefault()
     event.stopPropagation()
     finish.current?.()
     const startX = event.clientX
-    const move = (next: PointerEvent) => setWidth(key, width + next.clientX - startX)
+    const move = (next: PointerEvent) => setWidth(key, width + next.clientX - startX, minimum)
     const end = () => {
       suppressClickUntil.current = Date.now() + 300
       window.removeEventListener('pointermove', move)
@@ -40,13 +40,13 @@ export function useColumnWidths(storageKey: string) {
     window.addEventListener('pointerup', end)
     window.addEventListener('pointercancel', end)
   }
-  function headerProps(key: string, width: number): HTMLAttributes<HTMLElement> {
+  function headerProps(key: string, width: number, minimum?: number): HTMLAttributes<HTMLElement> {
     const edge = (element: HTMLElement, x: number) => element.getBoundingClientRect().right - x <= 12
     return {
       className: 'business-table-resizable-header',
       onPointerMove: event => { event.currentTarget.style.cursor = edge(event.currentTarget, event.clientX) ? 'col-resize' : '' },
       onPointerLeave: event => { event.currentTarget.style.cursor = '' },
-      onPointerDownCapture: event => { if (edge(event.currentTarget, event.clientX)) resize(event, key, width) },
+      onPointerDownCapture: event => { if (edge(event.currentTarget, event.clientX)) resize(event, key, width, minimum) },
       onClickCapture: event => {
         if (Date.now() < suppressClickUntil.current || edge(event.currentTarget, event.clientX)) { event.preventDefault(); event.stopPropagation() }
       },

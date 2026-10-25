@@ -1,5 +1,6 @@
 <template>
-  <ContentWrap>
+  <el-alert v-if="!canQuery" title="暂无班级查询权限" type="warning" :closable="false" />
+  <ContentWrap v-if="canQuery">
     <el-form :model="query" inline @submit.prevent>
       <el-form-item label="状态"
         ><el-select v-model="query.status" class="!w-140px"
@@ -15,7 +16,7 @@
           @keyup.enter="load"
       /></el-form-item>
       <el-form-item
-        ><el-button type="primary" :loading="loading" @click="load"
+        ><el-button v-hasPermi="['zsjos:student:create']" @click="openEntry()">添加学员</el-button><el-button type="primary" :loading="loading" @click="load"
           ><Icon icon="ep:search" class="mr-5px" />查询</el-button
         ><el-button
           v-if="!mine"
@@ -32,7 +33,7 @@
       ></el-alert
     >
   </ContentWrap>
-  <ContentWrap>
+  <ContentWrap v-if="canQuery">
     <el-table v-loading="loading" :data="list" row-key="id" stripe @row-click="openDetail">
       <el-table-column label="班级编号" prop="classNo" min-width="180" /><el-table-column
         label="班级"
@@ -52,21 +53,21 @@
       <el-table-column label="状态" width="100"
         ><template #default="{ row }"
           ><el-tag :type="row.status === 'SERVING' ? 'success' : 'info'">{{
-            row.status === 'SERVING' ? '服务中' : '已结课'
+            row.systemClass ? (row.classKind === 'EXCEPTION' ? '异常结业' : row.classKind === 'UNSCHEDULED' ? '未确定考期' : '待分班') : row.status === 'SERVING' ? '服务中' : '已结课'
           }}</el-tag></template
         ></el-table-column
       >
       <el-table-column v-if="!mine" label="操作" width="150" fixed="right"
         ><template #default="{ row }"
           ><el-button
-            v-if="!row.systemClass && row.status === 'SERVING'"
+            v-if="row.availableActions?.includes('UPDATE')"
             v-hasPermi="['zsjos:delivery-class:update']"
             link
             type="primary"
             @click.stop="openEditor(row)"
             >编辑</el-button
           ><el-button
-            v-if="!row.systemClass && row.status === 'SERVING'"
+            v-if="row.availableActions?.includes('COMPLETE')"
             v-hasPermi="['zsjos:delivery-class:complete']"
             link
             type="danger"
@@ -92,6 +93,7 @@
     destroy-on-close
     @closed="resetDetail"
   >
+    <el-button v-if="selected?.status === 'SERVING' && selected?.classKind !== 'EXCEPTION'" v-hasPermi="['zsjos:student:create']" class="mb-12px" @click="openEntry(selected?.id)">添加学员</el-button>
     <el-alert v-if="detailError" :title="detailError" type="error" show-icon :closable="false"
       ><template #default
         ><el-button link @click="selected && loadStudents(selected, studentQuery.pageNo)"
@@ -105,19 +107,18 @@
         prop="personNo"
       /><el-table-column label="接收状态" prop="acceptanceStatus" /><el-table-column
         label="服务状态"
-        prop="serviceStatus"
-      /><el-table-column label="规划师" prop="ownerUserName" />
+      ><template #default="{ row }">{{ ({ active: '服务中', paused: '已暂停', completed: '已结业', closed: '已关闭' })[row.serviceStatus] || '历史状态未记录' }}</template></el-table-column><el-table-column label="规划师" prop="ownerUserName" />
       <el-table-column label="操作" width="110"
         ><template #default="{ row }"
           ><el-button
-            v-if="!mine"
+            v-if="row.availableActions?.includes('DIRECT_TRANSFER') && checkPermi(['zsjos:delivery-class:direct-transfer'])"
             v-hasPermi="['zsjos:delivery-class:direct-transfer']"
             link
             type="primary"
             @click="openTransfer(row)"
             >直接调班</el-button
           ><el-button
-            v-else
+            v-else-if="row.availableActions?.includes('REQUEST_TRANSFER') && checkPermi(['zsjos:class-transfer:create'])"
             v-hasPermi="['zsjos:class-transfer:create']"
             link
             type="primary"
@@ -137,7 +138,7 @@
     />
   </el-drawer>
 
-  <ContentWrap v-if="mine && canQueryTransfers">
+  <ContentWrap v-if="canQuery && mine && canQueryTransfers">
     <h3>我的调班申请</h3>
     <el-table :data="transferRecords" row-key="id" size="small">
       <el-table-column label="原班级" prop="fromClassName" /><el-table-column
@@ -164,7 +165,7 @@
       <el-form-item label="班级名称" prop="className"
         ><el-input v-model="editor.className" maxlength="100" placeholder="请填写班级名称"
       /></el-form-item>
-      <el-form-item label="考期日期" prop="startDate"><el-date-picker v-model="editor.startDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" /></el-form-item>
+      <el-form-item label="考期日期" prop="startDate"><el-date-picker v-model="editor.startDate" type="date" value-format="YYYY-MM-DD" placeholder="可暂不填写，后续补填" /></el-form-item>
       <el-form-item><el-button @click="calendarOpen = true">选择已有考期</el-button></el-form-item>
       <el-form-item label="班主任" prop="homeroomUserId"
         ><el-select v-model="editor.homeroomUserId" filterable
@@ -183,7 +184,7 @@
 
   <Dialog
     v-model="transferOpen"
-    :title="mine ? '申请调班' : '主管直接调班'"
+    :title="canDirectTransfer ? '直接调班' : '申请调班'"
     width="520px"
     @closed="resetTransfer"
   >
@@ -227,6 +228,9 @@
       ></template
     >
   </Dialog>
+  <el-dialog v-model="entryOpen" title="添加教学学员" width="min(560px, calc(100vw - 24px))" :close-on-click-modal="false" :close-on-press-escape="!entryBusy" :show-close="!entryBusy" destroy-on-close>
+    <StudentEntryForm v-if="entryOpen" type="teaching" :class-id="entryClassId" @busy="entryBusy = $event" @saved="entrySaved" />
+  </el-dialog>
   <ClassExamCalendar v-model="calendarOpen" :initial-date="editor.startDate" @select="selectExamDates" />
 </template>
 
@@ -235,11 +239,16 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as Api from '@/api/zsjos/deliveryClass'
 import ClassExamCalendar from './ClassExamCalendar.vue'
+import StudentEntryForm from './studentEntry/StudentEntryForm.vue'
 import { checkPermi } from '@/utils/permission'
 
 defineOptions({ name: 'ZsjosClassManagement' })
+const entryOpen = ref(false), entryBusy = ref(false), entryClassId = ref<number>()
+const openEntry = (classId?: number) => { entryClassId.value = classId; entryOpen.value = true }
+const entrySaved = () => { ElMessage.success('学员已添加'); entryOpen.value = false; void load(); if (selected.value) void loadStudents(selected.value) }
 const props = withDefaults(defineProps<{ mine?: boolean }>(), { mine: false })
 const mine = computed(() => props.mine)
+const canQuery = computed(() => checkPermi(['zsjos:delivery-class:query', mine.value ? 'zsjos:delivery-class:query-my' : 'zsjos:delivery-class:query-managed']))
 const canQueryTransfers = computed(() => checkPermi(['zsjos:class-transfer:query']))
 const query = reactive({ pageNo: 1, pageSize: 10, status: 'SERVING', keyword: '' })
 const list = ref<Api.DeliveryClass[]>([])
@@ -267,12 +276,13 @@ const editor = reactive({
 })
 const rules: FormRules = {
   className: [{ required: true, whitespace: true, message: '请填写班级名称' }],
-  startDate: [{ required: true, message: '请选择考期日期' }],
   homeroomUserId: [{ required: true, message: '请选择班主任' }]
 }
 const transferOpen = ref(false)
 const transferRef = ref<FormInstance>()
 const transferStudent = ref<Api.DeliveryClassStudent>()
+const canDirectTransfer = computed(() => !!transferStudent.value?.availableActions?.includes('DIRECT_TRANSFER') && checkPermi(['zsjos:delivery-class:direct-transfer']))
+const canRequestTransfer = computed(() => !!transferStudent.value?.availableActions?.includes('REQUEST_TRANSFER') && checkPermi(['zsjos:class-transfer:create']))
 const transferOptions = ref<Api.DeliveryClassOption[]>([])
 const transferLoading = ref(false)
 const transferError = ref('')
@@ -284,6 +294,7 @@ const transferRules: FormRules = {
 const transferRecords = ref<Api.ClassTransfer[]>([])
 
 const load = async () => {
+  if (!canQuery.value) { list.value = []; total.value = 0; return }
   loading.value = true
   error.value = ''
   try {
@@ -338,6 +349,8 @@ const resetDetail = () => {
   detailError.value = ''
 }
 const openEditor = async (row?: Api.DeliveryClass) => {
+  if (row ? !row.availableActions?.includes('UPDATE') || !checkPermi(['zsjos:delivery-class:update'])
+    : !checkPermi(['zsjos:delivery-class:create'])) return
   editing.value = row
   editorOpen.value = true
   referenceLoading.value = true
@@ -361,16 +374,18 @@ const selectExamDates = (date: string) => {
   calendarOpen.value = false
 }
 const save = async () => {
+  if (editing.value ? !editing.value.availableActions?.includes('UPDATE') || !checkPermi(['zsjos:delivery-class:update'])
+    : !checkPermi(['zsjos:delivery-class:create'])) return
   if (!(await editorRef.value?.validate())) return
   saving.value = true
   try {
     const value = {
       className: editor.className.trim(),
-      startDate: editor.startDate!,
+      startDate: editor.startDate || undefined,
       homeroomUserId: editor.homeroomUserId!
     }
     if (editing.value)
-      await Api.updateDeliveryClass(editing.value.id, { ...value, preserveExamDate: true, version: editing.value.version })
+      await Api.updateDeliveryClass(editing.value.id, { ...value, preserveExamDate: value.startDate === (editing.value.startDate || undefined), version: editing.value.version })
     else await Api.createDeliveryClass(value)
     ElMessage.success('班级已保存')
     editorOpen.value = false
@@ -382,6 +397,7 @@ const save = async () => {
   }
 }
 const finish = async (row: Api.DeliveryClass) => {
+  if (!row.availableActions?.includes('COMPLETE') || !checkPermi(['zsjos:delivery-class:complete'])) return
   await ElMessageBox.confirm(`确认结课“${row.className}”吗？`)
   try {
     await Api.completeDeliveryClass(row.id)
@@ -405,6 +421,7 @@ const loadTransferOptions = async (_row: Api.DeliveryClassStudent) => {
 }
 const openTransfer = async (row: Api.DeliveryClassStudent) => {
   transferStudent.value = row
+  if (!canDirectTransfer.value && !canRequestTransfer.value) return
   transferForm.targetClassId = undefined
   transferForm.reason = ''
   transferOptions.value = []
@@ -421,6 +438,7 @@ const resetTransfer = () => {
   transferForm.reason = ''
 }
 const submitTransfer = async () => {
+  if (!canDirectTransfer.value && !canRequestTransfer.value) return
   if (
     !transferStudent.value ||
     transferLoading.value ||
@@ -435,9 +453,9 @@ const submitTransfer = async () => {
       version: transferStudent.value.version,
       reason: transferForm.reason.trim()
     }
-    if (mine.value) await Api.requestTransfer(transferStudent.value.serviceRelationId, data)
-    else await Api.directTransfer(transferStudent.value.serviceRelationId, data)
-    ElMessage.success(mine.value ? '调班申请已提交审批' : '调班已完成')
+    if (canDirectTransfer.value) await Api.directTransfer(transferStudent.value.serviceRelationId, data)
+    else await Api.requestTransfer(transferStudent.value.serviceRelationId, data)
+    ElMessage.success(canDirectTransfer.value ? '调班已完成' : '调班申请已提交审批')
     transferOpen.value = false
     await load()
     if (selected.value) await loadStudents(selected.value, studentQuery.pageNo)

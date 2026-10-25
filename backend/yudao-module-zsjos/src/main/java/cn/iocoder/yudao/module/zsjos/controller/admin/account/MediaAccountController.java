@@ -131,6 +131,14 @@ public class MediaAccountController {
         return success(deleteService.submit(id, req.getReason(), getLoginUserId()));
     }
 
+    @PostMapping("/{id}/delete")
+    @Operation(summary = "所属编导直接删除账号")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account:delete')")
+    public CommonResult<Boolean> deleteDirectly(@PathVariable Long id, @Valid @RequestBody MediaAccountDeleteReqVO req) {
+        deleteService.deleteDirectly(id, req.getReason(), getLoginUserId());
+        return success(true);
+    }
+
     @PostMapping("/{id}/withdraw-delete")
     @Operation(summary = "撤回删除账号申请")
     @PreAuthorize("@ss.hasPermission('zsjos:media-account:delete')")

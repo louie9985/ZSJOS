@@ -16,7 +16,7 @@ const fields: MaterialFieldDefinition[] = [
   ] },
   { key: 'plan', label: '搭建建议', type: 'textarea', section: 'BUILD_SUGGESTION' }
 ]
-const type = { id: 2, code: 'viral_account', name: '爆款账号', status: 0, currentSchema: { fields } }
+const type = { id: 2, code: params.has('content') ? 'viral_content' : 'viral_account', name: '爆款账号', status: 0, currentSchema: { fields } }
 const rows: Material[] = (['DRAFT', 'IN_APPROVAL', 'EFFECTIVE', 'REJECTED'] as const).map((status, index) => ({
   id: index + 1, materialTypeId: 2, materialTypeName: '爆款账号', materialNo: `MAT-TEST-${index + 1}`,
   title: ['草稿拆解', '修订审核中', '已通过拆解', '驳回待修改'][index], status: index === 1 ? 'EFFECTIVE' : status,
@@ -27,7 +27,7 @@ const rows: Material[] = (['DRAFT', 'IN_APPROVAL', 'EFFECTIVE', 'REJECTED'] as c
   availableActions: params.has('no-action') ? [] : status === 'IN_APPROVAL' ? ['CANCEL'] : ['UPDATE'],
   currentVersion: { id: index + 10, materialId: index + 1, versionNo: index === 1 ? 2 : 1, schemaVersionId: 1,
     status, title: ['草稿拆解', '修订审核中', '已通过拆解', '驳回待修改'][index], fields, version: 1,
-    values: { account_name: ['草稿拆解', '修订审核中', '已通过拆解', '驳回待修改'][index],
+    values: { work_title: ['draft', 'review', 'effective', 'rejected'][index], account_name: ['草稿拆解', '修订审核中', '已通过拆解', '驳回待修改'][index],
       homepage: 'https://example.com/home', works: [{ link: 'https://example.com/work' }], plan: '保留主题与原始内容' },
     dictSnapshot: {}, files: [], processInstanceId: index === 1 ? 'synthetic-process' : undefined,
     pendingApproverNames: index === 1 ? ['审核员甲', '审核员乙'] : [], submittedAt: index ? 1790208000000 : undefined,
@@ -38,7 +38,7 @@ let cancelFailed = false
 http.defaults.adapter = async config => {
   const url = config.url || ''; let data: unknown
   if (url.endsWith('/material-type/list')) data = [type]
-  else if (url.endsWith('/material/page')) {
+  else if ((url.endsWith('/material/page') || url.endsWith('/material/browse/page'))) {
     const status = config.params?.versionStatus
     document.documentElement.dataset.filter = status || 'ALL'
     const list = rows.filter(item => !status || item.currentVersion?.status === status)

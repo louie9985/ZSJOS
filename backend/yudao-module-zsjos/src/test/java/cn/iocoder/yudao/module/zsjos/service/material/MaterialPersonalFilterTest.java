@@ -79,4 +79,17 @@ class MaterialPersonalFilterTest {
         assertTrue(wrapper.getValue().getParamNameValuePairs().containsValue("IN_APPROVAL"));
         assertTrue(wrapper.getValue().getParamNameValuePairs().containsValue(7L));
     }
+    @ParameterizedTest @CsvSource({"true,false", "false,false", "true,true"})
+    void keywordUsesPersonalRevisionWithoutChangingAdminOrPublicSearch(boolean mine, boolean browse) {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), MaterialDO.class);
+        MaterialMapper mapper=mock(MaterialMapper.class,CALLS_REAL_METHODS);
+        doReturn(PageResult.empty()).when(mapper).selectPage(any(MaterialPageReqVO.class),any(LambdaQueryWrapperX.class));
+        var req=new MaterialPageReqVO();req.setMine(mine);req.setKeyword("draft-only");mapper.selectPage(req,7L,true,browse);
+        ArgumentCaptor<LambdaQueryWrapperX> wrapper=ArgumentCaptor.forClass(LambdaQueryWrapperX.class);
+        verify(mapper).selectPage(eq(req),wrapper.capture());String sql=wrapper.getValue().getSqlSegment();
+        assertEquals(mine&&!browse,sql.contains("COALESCE(zsjos_material.current_draft_version_id"));
+        if(!mine&&!browse) assertTrue(sql.contains(" OR title LIKE "));
+        if(mine&&!browse) assertTrue(sql.contains("mv.material_id=zsjos_material.id"));
+    }
+
 }
