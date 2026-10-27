@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class StudentServiceSummaryReader {
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.TeachingServiceEventMapper lifecycleEvents;
     @Resource private BusinessTaskMapper tasks;
     @Resource private StudentContactRecordMapper contacts;
     @Resource private DeliveryClassMapper classes;
@@ -40,6 +41,9 @@ public class StudentServiceSummaryReader {
 
     public Map<Long, StudentServiceSummaryVO> read(Long actor, List<ServiceRelationDO> relations, LocalDateTime now) {
         if (relations.isEmpty()) return Map.of();
+        // Current closure comes from the operator's persisted event; restored services retain history only.
+        var closedIds = relations.stream().filter(r -> Boolean.TRUE.equals(r.getTeachingClosed())).map(ServiceRelationDO::getId).toList();
+        var closures = index(closedIds.isEmpty() ? List.<TeachingServiceEventDO>of() : lifecycleEvents.latestClosures(closedIds), TeachingServiceEventDO::getServiceRelationId);
         var ids = relations.stream().map(ServiceRelationDO::getId).toList();
         var taskRows = tasks.selectList(new LambdaQueryWrapper<BusinessTaskDO>()
                 .select(BusinessTaskDO::getId, BusinessTaskDO::getBizId, BusinessTaskDO::getTaskType, BusinessTaskDO::getStatus, BusinessTaskDO::getDueAt)
@@ -80,8 +84,10 @@ public class StudentServiceSummaryReader {
             value.setDeliveryStage(relation.getDeliveryStage() == null || relation.getDeliveryStage().isBlank() ? "first_contact" : relation.getDeliveryStage());
             value.setDeliveryStageLabel(StudentContactReadPolicy.stageLabel(value.getDeliveryStage()));
             value.setExamDate(relation.getExamDate());
-            value.setPausedAt(relation.getPausedAt()); value.setPauseReason(relation.getPauseReason());
-            value.setCompletedAt(relation.getCompletedAt()); value.setTerminatedAt(relation.getTerminatedAt()); value.setTerminationReason(relation.getTerminationReason());
+            value.setPausedAt(relation.getPausedAt());
+            value.setCompletedAt(relation.getCompletedAt()); value.setTerminatedAt(relation.getTerminatedAt());
+            var closure = closures.get(relation.getId());
+            if (closure != null) value.setCloseReason(closure.getReason());
             var task = StudentContactReadPolicy.currentTask(byTask.getOrDefault(relation.getId(), List.of()));
             if (task != null) {
                 var current = new StudentContactContextRespVO.CurrentTaskVO();

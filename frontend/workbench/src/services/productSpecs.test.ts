@@ -8,6 +8,14 @@ const attrs = [
   { attrKey: 'level', attrName: '考试等级', values: [{ value: '2', label: '二级' }] }
 ]
 describe('named product specifications across runtimes', () => {
+  it.each([catalogSpecs, adminCatalogSpecs, h5CatalogSpecs])('accepts filtered business-catalog values and empty enabled catalogs', resolve => {
+    const filtered = [{ attrKey: 'sales_spec', attrName: '销售规格', values: [{ value: 'on', label: '在售班型' }] }]
+    expect(resolve({ sales_spec: 'on' }, filtered)).toEqual([
+      { attrKey: 'sales_spec', attrName: '销售规格', value: 'on', label: '在售班型', labelMissing: false }
+    ])
+    expect(resolve({}, [{ ...filtered[0], values: [] }])).toEqual([])
+    expect(resolve({ sales_spec: 'off' }, filtered)[0].labelMissing).toBe(true)
+  })
   it.each([catalogSpecs, adminCatalogSpecs, h5CatalogSpecs])('uses named values and configured ordering', resolve => {
     expect(resolve({ level: '2', place: 'bj' }, attrs).map(spec => spec.attrName)).toEqual(['考试地点', '考试等级'])
     expect(resolve({ level: '2' }, attrs).map(spec => spec.label)).toEqual(['二级'])

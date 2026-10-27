@@ -1,6 +1,12 @@
 # Withdrawal and offline payout API
 
-The independent partner frontend uses `/part-api/zsjos/**`; only an enabled ordinary partner may apply. Admin/workbench review APIs remain under `/admin-api/zsjos/**`. The server locks selected `available` cashback rows in ascending ID order, snapshots the full bank account, creates one Withdrawal and item rows, changes cashback to `withdrawing`, and starts BPM process `zsjos_partner_withdrawal` with the single task key `financeReview`. Reviewers are enabled System users who currently have `zsjos:withdrawal:review`; V063 creates the permission but intentionally assigns no finance user.
+The independent partner frontend uses `/part-api/zsjos/**`; only an enabled ordinary partner may apply. Admin/workbench review APIs remain under `/admin-api/zsjos/**`. The server locks selected `available` cashback rows in ascending ID order, snapshots the full bank account, creates one Withdrawal and item rows, changes cashback to `withdrawing`, and starts BPM process `zsjos_partner_withdrawal` with the single task key `financeReview`. Reviewers are enabled System users in the configured finance center department tree who currently have `zsjos:withdrawal:review`; V063 creates the permission but intentionally assigns no finance user.
+
+### Finance recipient scope (2026-10-26)
+
+New process assignees and the finance audience of submitted/approved/rejected/paid/periodic notifications share this intersection: enabled System account, membership in `zsjos_order_approval_config.finance_dept_id` or any descendant returned by System, and `zsjos:withdrawal:review`. Reuse the existing finance-center membership resolver; do not hardcode department IDs or infer membership from labels. Tenant 1 read-only database verification found root 1040 and current child 1041. Future descendants are resolved dynamically. Super-administrator permission bypass does not bypass department membership. Missing configuration produces no finance recipients; application retains its existing no-reviewer error.
+
+Applicant result notifications remain unchanged. The generic notification engine still honors explicitly specified users in notification rules; all withdrawal rules inspected in tenant 1 had empty specified-user lists. Existing event payloads, sent messages and running BPM assignees are not rewritten. This change does not alter review/payout command permissions, existing task authorization or either frontend API contract. Deployment of the backend is required for new events/applications to use the narrowed audience.
 
 ## State contract
 

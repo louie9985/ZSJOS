@@ -101,6 +101,30 @@
   width: 100%;
 }
 
+/* Course names and SKU differences must remain readable before and after selection. */
+.sales-order-course-picker .ant-select {
+  height: auto;
+  min-height: var(--crm-control-h);
+}
+
+.sales-order-course-picker .ant-select-selector {
+  height: auto;
+}
+
+.sales-order-course-picker .ant-select-single .ant-select-content,
+.sales-order-course-picker .ant-select-selection-item,
+.sales-order-course-popup .ant-select-item-option-content,
+.sales-order-course-popup .ant-cascader-menu-item-content {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  overflow: visible;
+}
+
+.sales-order-course-popup .ant-cascader-menu {
+  max-width: calc(100vw - 48px);
+}
+
 /* Shared positioning attachment picker: documents, images, audio and video in one control. */
 .positioning-attachment-picker {
   display: flex;

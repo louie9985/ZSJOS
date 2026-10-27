@@ -52,8 +52,15 @@ with sync_playwright() as p:
     page.get_by_role('button',name='确认提交',exact=True).click()
     expect(page.get_by_text('本次操作已完成',exact=True)).to_be_visible()
     assert page.evaluate('approvalFixture.actions.length')==1
+    expect(detail.get_by_text('历史标签', exact=True)).to_be_visible()
+    detail.get_by_role('button',name='刷新流程',exact=True).click()
+    expect(detail.get_by_text('历史标签', exact=True)).to_be_visible()
+    assert page.evaluate("approvalFixture.businessRequests.some(r => r.taskId === 't1' && r.completed && r.view === 'done')")
+    assert page.evaluate("approvalFixture.businessRequests.every(r => r.taskId !== 't1' || !r.completed || r.view === 'done')")
     page.get_by_role('button',name='下一条待办',exact=True).click()
     expect(page.locator('.bpm-unified-detail')).to_contain_text('第二条申请')
+    expect(page.locator('.bpm-unified-detail').get_by_text('历史标签', exact=True)).to_be_visible()
+    assert page.evaluate("approvalFixture.businessRequests.some(r => r.taskId === 't2' && r.view === 'todo')")
     print('PASS draft, refresh, confirm, one submit, retained result, next task',flush=True)
     for query in ['feedback','table','table&feedback','readonly','stale','recordFail','commentFail','sign','long&dark']:
         if 'recordFail' in query or 'commentFail' in query:

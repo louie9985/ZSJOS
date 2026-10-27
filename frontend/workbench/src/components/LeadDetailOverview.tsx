@@ -619,6 +619,7 @@ function LeadStatusLabels({ lead }: { lead: ManagedLead }) {
 export type StudentOverviewContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[]; onRefresh?: () => Promise<void> }
 
 export type LeadOverviewSlots = {
+  studentAfterFirstContact?: React.ReactNode
   latestActivity?: React.ReactNode
   timeline?: React.ReactNode
   taskStatus?: React.ReactNode
@@ -794,6 +795,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                 {studentContext.contactContext.currentTask?.dueAt ? <div className="lead-deadlines"><DeadlineIndicator label="下次联系截止" deadline={new Date(studentContext.contactContext.currentTask.dueAt).getTime()} /></div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未安排下次联系" />}
               </section>}
               {studentContext && <StudentFirstContactProgress key={studentContext.contactContext.serviceRelationId} context={studentContext.contactContext} onRefresh={studentContext.onRefresh} />}
+              {studentContext && slots?.studentAfterFirstContact}
               {!studentContext && lead && (lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
                 <section className="lead-card">
                   <div className="lead-card-header">

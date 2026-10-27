@@ -773,7 +773,7 @@ export type StudentServiceSummary = {
   currentTask?: { id: number; type: string; status: string; dueAt?: Timestamp; overdue?: boolean };
   latestContact?: StudentContactRecord;
   classNo?: string; systemClass?: boolean; classKind?: 'NORMAL' | 'PENDING' | 'UNSCHEDULED' | 'EXCEPTION'; classDepartment?: string; classExamSchedule?: string;
-  pausedAt?: Timestamp; pauseReason?: string; completedAt?: Timestamp; terminatedAt?: Timestamp; terminationReason?: string;
+  pausedAt?: Timestamp; completedAt?: Timestamp; terminatedAt?: Timestamp; closeReason?: string;
   orderHandoff?: { access: 'readable' | 'denied' | 'absent'; orderType?: string; status?: string;
     formalSalesUserName?: string; submitterUserName?: string; formalOwnerIdentity?: string;
     submittedAt?: Timestamp; effectiveAt?: Timestamp; studentNatureLabel?: string; studentSourceLabel?: string;

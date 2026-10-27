@@ -4,6 +4,18 @@ import { studentServiceColumnDefinitions, studentColumnDefaults, StudentServiceS
 vi.mock('./LeadDetailOverview', () => ({ NameAvatar: () => <span /> }))
 const row: ServiceStudent = { serviceRelationId: 2, personId: 7, personNo: 'XY7', name: '学员', services: [{ serviceRelationId: 2, status: 'active', ownerUserId: 8, ownerUserName: '本课程老师', acceptanceStatus: 'pending', courseName: '课程乙' }], summary: { deliveryStageLabel: '常规督学', currentTask: { id: 3, type: 'student_contact', status: 'pending', overdue: true }, orderHandoff: { access: 'denied', remark: '不应泄露' }, infoSubmission: { access: 'denied', status: 'SUBMITTED' } } }
 describe('student service management projection', () => {
+  it('shows closure snapshot only for closed services and removes obsolete reason columns', () => {
+    const closed = { ...row, services: [{ ...row.services[0], status: 'closed' }], summary: { closeReason: '学员申请关闭本课程' } }
+    const html = renderToStaticMarkup(<StudentServiceSummaryDetail student={closed} />)
+    expect(html).toContain('关闭服务原因')
+    expect(html).toContain('学员申请关闭本课程')
+    expect(html).not.toContain('暂停原因')
+    expect(html).not.toContain('终止原因')
+    expect(studentServiceColumnDefinitions().map(c => c.key)).not.toContain('pauseReason')
+    expect(studentServiceColumnDefinitions().map(c => c.key)).not.toContain('terminationReason')
+    const restored = { ...closed, services: row.services }
+    expect(renderToStaticMarkup(<StudentServiceSummaryDetail student={restored} />)).not.toContain('学员申请关闭本课程')
+  })
   it('renders current service owner, task and denied states without restricted values', () => {
     const html = renderToStaticMarkup(<StudentServiceSummaryDetail student={row} />)
     expect(html).toContain('本课程老师'); expect(html).toContain('已逾期'); expect(html).toContain('无权查看')

@@ -26,8 +26,6 @@ final class StudentFilterFields {
         add(result, date(Sensitivity.STANDARD, "service.pausedAt", TIME, "服务暂停时间", bind("student", "sr.paused_at", serviceFromStudent)));
         add(result, date(Sensitivity.STANDARD, "service.completedAt", TIME, "服务完成时间", bind("student", "sr.completed_at", serviceFromStudent)));
         add(result, date(Sensitivity.STANDARD, "service.terminatedAt", TIME, "服务终止时间", bind("student", "sr.terminated_at", serviceFromStudent)));
-        add(result, text(Sensitivity.FREE_TEXT, "service.pauseReason", EXTRA, "暂停原因", bind("student", "sr.pause_reason", serviceFromStudent)));
-        add(result, text(Sensitivity.FREE_TEXT, "service.terminationReason", EXTRA, "终止原因", bind("student", "sr.termination_reason", serviceFromStudent)));
     }
 
 }

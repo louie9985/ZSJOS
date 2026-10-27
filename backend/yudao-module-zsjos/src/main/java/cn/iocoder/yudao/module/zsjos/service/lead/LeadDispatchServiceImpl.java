@@ -457,6 +457,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 transferredAt, reason);
         lifecycleTaskService.cancelFirstFollowUpTasks(leadId, transferredAt, reason);
         lifecycleTaskService.cancelFollowUpReminders(leadId, transferredAt, reason);
+        // Close the old round before createQualificationTask advances the lead's round number.
+        lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), transferredAt, reason);
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
         history.setLeadId(leadId); history.setActionType(ACTION_TRANSFER); history.setFromOwnerUserId(from);
         history.setToOwnerUserId(salesUserId); history.setOwnerIdentitySnapshot(ownerIdentity); history.setOperatorUserId(operatorUserId);

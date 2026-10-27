@@ -18,10 +18,9 @@ public class StudentServiceSummaryVO {
     private String classDepartment;
     private String classExamSchedule;
     private LocalDateTime pausedAt;
-    private String pauseReason;
     private LocalDateTime completedAt;
     private LocalDateTime terminatedAt;
-    private String terminationReason;
+    private String closeReason;
     private OrderHandoff orderHandoff;
     private InfoSubmission infoSubmission;
 

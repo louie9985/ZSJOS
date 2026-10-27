@@ -26,6 +26,6 @@ const leads = (): ManagedLead[] => [3, 1, 2].map(id => ({
 http.defaults.adapter = async config => ({ data: { code: 0, data: config.url?.endsWith('/page') ? { list: [], total: 0 } : [] }, status: 200, statusText: 'OK', headers: {}, config })
 api.dictDataByType = async () => []
 api.leadInboxFilterProfile = async () => ({ groups: [] })
-api.allLeadPage = async query => { if (query.pendingTasksFirst !== false) throw new Error('默认列表不得请求待办置顶'); state.reads++; if (params.has('hold') && state.reads === 1) await new Promise<void>(resolve => { state.releaseRead = resolve }); if (state.fail) throw new Error('测试列表读取失败'); return { list: leads().sort((a, b) => b.submittedAt! - a.submittedAt!), total: 3 } }
+api.allLeadPage = async query => { if (query.pendingTasksFirst !== true) throw new Error('默认列表必须请求待办置顶'); state.reads++; if (params.has('hold') && state.reads === 1) await new Promise<void>(resolve => { state.releaseRead = resolve }); if (state.fail) throw new Error('测试列表读取失败'); return { list: leads().sort((a, b) => Number(Boolean(b.pendingTasks?.length)) - Number(Boolean(a.pendingTasks?.length)) || b.submittedAt! - a.submittedAt!), total: 3 } }
 api.managedLead = async id => leads().find(item => item.id === id)!
 createRoot(document.getElementById('root')!).render(<BrowserRouter><ThemeProvider><App><OverlayCoordinatorProvider><RealtimeProvider platform="PC"><LeadManagementPage permissions={[]}/></RealtimeProvider></OverlayCoordinatorProvider></App></ThemeProvider></BrowserRouter>)

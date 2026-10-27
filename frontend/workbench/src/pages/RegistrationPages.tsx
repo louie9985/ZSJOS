@@ -6,6 +6,8 @@ import { MENU_TASK_INVALIDATED_EVENT } from '../services/menuTaskRefresh'
 import { studentContactSchedule } from '../services/studentContactSchedule';
 import StudentServiceFilters, { type StudentQuickFilters } from '../components/StudentServiceFilters'
 import StudentServiceCard from '../components/StudentServiceCard'
+import StudentServiceAnnotationCard from '../components/StudentServiceAnnotationCard'
+import { STUDENT_ANNOTATION_READ, STUDENT_ANNOTATION_UPDATE } from '../services/studentServiceAnnotation'
 import RegistrationStudentInfo from '../components/RegistrationStudentInfo'
 import { studentServiceColumnDefinitions, studentServiceColumns, studentColumnDefaults, StudentServiceSummaryDetail, assignedName, acceptanceLabel, type ServiceStudent } from '../components/StudentServiceColumns'
 import BusinessSortMenu from '../components/BusinessSortMenu'
@@ -493,7 +495,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           {selected.assignmentMode === "class_per_item" ? selected.classAssignments?.map(assignment => {
             const options = classOptions.map(row => ({ value: row.id, disabled: false, label: row.classKind === "PENDING" || (row.systemClass && !row.classKind) ? "待分班" : `${row.className} · ${row.homeroomUserName || "未配置班主任"}` }));
             if (assignment.classId && !options.some(row => row.value === assignment.classId)) {
-              options.push({ value: assignment.classId, label: assignment.className || "已选班级", disabled: true });
+              options.push({ value: assignment.classId, label: assignment.classKind === "PENDING" || (assignment.systemClass && !assignment.classKind) ? "待分班" : `${assignment.className || "已选班级"} · ${assignment.homeroomUserName || "班主任姓名未记录"}`, disabled: true });
             }
             return <div className="registration-checklist-row registration-route-row" key={assignment.orderItemId}>
               <div className="registration-checklist-copy"><strong>{assignment.productName || '历史产品信息缺失'}</strong><ProductSpecs product={assignment} /><span>{assignment.categoryName || "产品分类"}{assignment.errorReason ? ` · ${assignment.errorReason}` : ""}</span></div>
@@ -919,6 +921,8 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
           pendingTasksFirst: true,
           ...quickFilters,
           personId: requestedPersonId,
+          sortField: 'acceptedAt',
+          sortOrder: 'descend',
           ...studentSort,
           ...(tenantReadAll ? readScope : {}),
           pageNo: targetPage,
@@ -1016,7 +1020,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
       contactContext={{ ...studentContactContext, visibleTabs: studentContactContext.visibleTabs.filter(tab => tab !== 'student-info' || hasPermission(permissions, 'zsjos:student-archive:read')) }}
       contactRecords={studentContactRecords}
       toolbar={<OverflowToolbar actions={studentToolbarActions} />}
-      overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords, onRefresh: refreshCurrentStudent }} slots={{ sidebarAfterStatus: <StudentServiceCard service={selectedService} /> }} />}
+      overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} toolbar={<OverflowToolbar actions={studentToolbarActions} />} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords, onRefresh: refreshCurrentStudent }} slots={{ sidebarAfterStatus: <StudentServiceCard service={selectedService} />, studentAfterFirstContact: hasPermission(permissions, STUDENT_ANNOTATION_READ) ? <StudentServiceAnnotationCard key={selectedService.serviceRelationId} relationId={selectedService.serviceRelationId} canUpdate={hasPermission(permissions, STUDENT_ANNOTATION_UPDATE)} /> : undefined }} />}
       extraTabs={[
         { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> },
         { key: 'student-service', label: '课程服务与交接', children: <StudentServiceSummaryDetail student={selected} /> },
@@ -1533,7 +1537,7 @@ export function StudentPlannerOperations({ student, service, context, permission
     </Modal>
     <Modal title="调班" open={transferOpen} confirmLoading={transferSaving} okButtonProps={{ disabled: transferTargetsLoading || !!transferTargetsError }} okText={canDirectTransfer ? "确认调班" : "提交申请"} onCancel={() => setTransferOpen(false)} onOk={() => void submitTransfer()} destroyOnHidden>
       {transferTargetsError && <Alert type="error" showIcon message={transferTargetsError} action={<Button onClick={() => void openTransfer()}>重试</Button>} />}
-      <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch loading={transferTargetsLoading} disabled={transferTargetsLoading || !!transferTargetsError} notFoundContent={transferTargetsLoading ? '加载中…' : '暂无可调入的班级'} optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: row.classKind === "UNSCHEDULED" ? `${row.className} · ${row.homeroomUserName || "班主任姓名未记录"}` : row.className || row.classNo }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
+      <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch loading={transferTargetsLoading} disabled={transferTargetsLoading || !!transferTargetsError} notFoundContent={transferTargetsLoading ? '加载中…' : '暂无可调入的班级'} optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: `${row.className || row.classNo} · ${row.homeroomUserName || "班主任姓名未记录"}` }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
     </Modal>
     <Modal title={assignmentType === "content_director" ? "分配编导" : "分配职业规划师"} open={Boolean(assignmentType)} confirmLoading={assignmentSaving} okText="确认分配" onCancel={() => setAssignmentType(undefined)} onOk={() => void assign()} destroyOnHidden>
       <Space direction="vertical" size="middle" style={{ width: "100%" }}>

@@ -12,6 +12,16 @@ public class DeliveryClassPageReqVO extends PageParam {
     private Long targetUserId;
     private String status;
     private String keyword;
+    /** Optional ordering for grouped class pages and their children; flat pages retain their existing order. */
+    @jakarta.validation.constraints.Pattern(regexp = "name|date|count")
+    private String sortField;
+    @jakarta.validation.constraints.Pattern(regexp = "asc|desc")
+    private String sortOrder;
+
+    @jakarta.validation.constraints.AssertTrue(message = "排序字段和方向必须同时提供")
+    public boolean isSortValid() {
+        return (sortField == null) == (sortOrder == null);
+    }
     private Long categoryId;
     private Long examScheduleId;
     private Long homeroomUserId;

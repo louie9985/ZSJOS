@@ -32,6 +32,21 @@ class StudentServiceSummaryReaderTest {
                 cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO.class))
             com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(assistant, type);
     }
+    @Mock cn.iocoder.yudao.module.zsjos.dal.mysql.registration.TeachingServiceEventMapper lifecycleEvents;
+    @Test void closureReasonUsesCurrentServiceEventAndDoesNotLeakToRestoredServices() {
+        var closed = relation(1); closed.setTeachingClosed(true);
+        closed.setTerminationReason("订单取消原因");
+        var restored = relation(2); restored.setTeachingClosed(false);
+        var missing = relation(3); missing.setTeachingClosed(true);
+        var event = new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.TeachingServiceEventDO();
+        event.setServiceRelationId(1L); event.setReason("学员申请关闭本课程");
+        when(lifecycleEvents.latestClosures(List.of(1L, 3L))).thenReturn(List.of(event));
+        var result = reader.read(7L, List.of(closed, restored, missing), LocalDateTime.now());
+        assertEquals("学员申请关闭本课程", result.get(1L).getCloseReason());
+        assertNull(result.get(2L).getCloseReason());
+        assertNull(result.get(3L).getCloseReason());
+        verify(lifecycleEvents).latestClosures(List.of(1L, 3L));
+    }
     @InjectMocks StudentServiceSummaryReader reader;
     @Mock BusinessTaskMapper tasks; @Mock StudentContactRecordMapper contacts;
     @Mock DeliveryClassMapper classes; @Mock SalesOrderMapper orders; @Mock SalesOrderApprovalRoundMapper rounds;

@@ -116,6 +116,60 @@ class DeliveryClassGroupServiceTest {
     private DeliveryClassPageReqVO request(int page,int size){var r=new DeliveryClassPageReqVO();r.setPageNo(page);r.setPageSize(size);return r;}
     private Move move(Long target,long... ids){var m=new Move();m.setTargetGroupId(target);m.setClasses(Arrays.stream(ids).mapToObj(id -> {var e=new Member();e.setId(id);e.setVersion(0);return e;}).toList());return m;}
 
+    @Test void headerSortOrdersBeforePagingAndKeepsSystemPositions(){
+        addGroup(1,"A组"); addGroup(2,"Z组");
+        for (long id=1;id<=15;id++) addClass(id,1L,"NORMAL",9);
+        addClass(20,2L,"NORMAL",9); addClass(21,null,"PENDING",9);
+        addClass(22,null,"UNSCHEDULED",9); addClass(23,null,"EXCEPTION",9);
+        var req=request(2,2); req.setSortField("count"); req.setSortOrder("asc");
+        assertEquals(List.of("group:2","group:1"),service.page(9L,req,true).getList().stream().map(Node::getKey).toList());
+        req.setSortOrder("desc");
+        assertEquals(List.of("group:1","group:2"),service.page(9L,req,true).getList().stream().map(Node::getKey).toList());
+        req.setPageNo(1);
+        assertEquals(List.of("class:21","system:UNSCHEDULED"),service.page(9L,req,true).getList().stream().map(Node::getKey).toList());
+        req.setPageNo(3); assertEquals("system:EXCEPTION",service.page(9L,req,true).getList().getFirst().getKey());
+        req.setPageNo(2); req.setSortField("name"); req.setSortOrder("asc");
+        assertEquals("group:1",service.page(9L,req,true).getList().getFirst().getKey());
+        req.setSortOrder("desc"); assertEquals("group:2",service.page(9L,req,true).getList().getFirst().getKey());
+    }
+
+    @Test void dateSortUsesEarliestVisibleChildAndAlwaysPlacesMissingDatesLast(){
+        addGroup(1,"组"); addClass(1,1L,"NORMAL",9); addClass(2,1L,"NORMAL",10);
+        addClass(3,null,"NORMAL",9); addClass(4,null,"NORMAL",9);
+        jdbc.update("UPDATE zsjos_delivery_class SET exam_schedule_snapshot='2026-01-01' WHERE id=2");
+        jdbc.update("UPDATE zsjos_delivery_class SET exam_schedule_snapshot='2026-06-01' WHERE id=3");
+        jdbc.update("UPDATE zsjos_delivery_class SET exam_schedule_snapshot=NULL WHERE id=4");
+        var req=request(1,12); req.setSortField("date"); req.setSortOrder("asc");
+        assertEquals(List.of("group:1","class:3","class:4"),service.page(9L,req,true).getList().stream().map(Node::getKey).toList());
+        assertEquals(List.of("class:3","group:1","class:4"),service.page(9L,req,false).getList().stream().map(Node::getKey).toList());
+        req.setSortOrder("desc");
+        assertEquals(List.of("class:3","group:1","class:4"),service.page(9L,req,true).getList().stream().map(Node::getKey).toList());
+    }
+
+    @Test void childSortingSpansPagesAndKeepsStableTies(){
+        addGroup(1,"组"); for(long id=1;id<=15;id++) addClass(id,1L,"NORMAL",9);
+        jdbc.update("UPDATE zsjos_delivery_class SET class_name='AAA',exam_schedule_snapshot='2025-01-01' WHERE id=1");
+        var req=request(1,12); req.setSortField("name"); req.setSortOrder("asc");
+        assertEquals(1L,service.children(9L,"group:1",req,true).getList().getFirst().getId());
+        req.setSortField("date");
+        assertEquals(1L,service.children(9L,"group:1",req,true).getList().getFirst().getId());
+        req.setSortOrder("desc"); req.setPageNo(2);
+        assertEquals(List.of(3L,2L,1L),service.children(9L,"group:1",req,true).getList().stream().map(DeliveryClassRespVO::getId).toList());
+        req.setSortField("count");
+        assertEquals(List.of(3L,2L,1L),service.children(9L,"group:1",req,true).getList().stream().map(DeliveryClassRespVO::getId).toList());
+    }
+
+    @Test void sortingRequestRejectsUnpairedAndUnknownValues(){
+        try(var factory=jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator=factory.getValidator(); var req=request(1,12);
+            assertTrue(validator.validate(req).isEmpty()); req.setSortField("name");
+            assertFalse(validator.validate(req).isEmpty()); req.setSortOrder("asc");
+            assertTrue(validator.validate(req).isEmpty()); req.setSortField("arbitrarySql");
+            assertFalse(validator.validate(req).isEmpty()); req.setSortField("date"); req.setSortOrder("arbitrarySql");
+            assertFalse(validator.validate(req).isEmpty());
+        }
+    }
+
     @Test void groupIsPagedAsOneRootAndSummariesIncludeAllMatchingChildren(){
         addGroup(1,"同名组");for(long id=1;id<=25;id++)addClass(id,1L,"NORMAL",9);
         addClass(30,null,"NORMAL",9);addClass(40,null,"UNSCHEDULED",9);addClass(41,null,"EXCEPTION",9);addClass(42,null,"PENDING",9);

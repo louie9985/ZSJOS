@@ -10,7 +10,7 @@ import { http } from '../src/services/api'
 import '../src/styles/index.css'
 const params = new URLSearchParams(location.search)
 localStorage.setItem('crm-theme', JSON.stringify({ inboxLayoutMode: params.has('table') ? 'table' : 'inbox', preset: params.has('dark') ? 'default-dark' : 'default-light' }))
-const state = { actions: [] as unknown[], decision: false, fail: params.has('fail'), recordFail: params.has('recordFail'), commentFail: params.has('commentFail'), rejectWrite: params.has('rejectWrite'), requests: [] as string[] }
+const state = { actions: [] as unknown[], businessRequests: [] as { taskId: string; view: string; completed: boolean }[], decision: false, fail: params.has('fail'), recordFail: params.has('recordFail'), commentFail: params.has('commentFail'), rejectWrite: params.has('rejectWrite'), requests: [] as string[] }
 Object.assign(window, { approvalFixture: state })
 const task = { id: 't1', name: '上级审批', status: 1, processInstanceId: 'p1', reasonRequire: true, signEnable: params.has('sign'), createTime: Date.now(), processDefinitionKey: params.has('feedback') ? 'zsjos_feedback_requirement_approval' : 'points', processInstance: { name: '500积分兑换申请', startUser: { id: 11, nickname: '申请人甲' } }, buttonsSetting: params.has('hidden') ? { 1: { enable: false }, 2: { enable: false } } : undefined }
 const tasks = [task, { ...task, id: 't2', processInstanceId: 'p2', name: '第二条审批', processInstance: { ...task.processInstance, name: '第二条申请' } }]
@@ -24,6 +24,8 @@ http.defaults.adapter = async config => {
   else if (config.url?.endsWith('/done-page')) data = { list: [{ ...task, status: 2, reason: '已同意', endTime: Date.now() }], total: 1 }
   else if (config.url?.endsWith('/business-summary-batch')) data = { t1: brief, t2: { ...brief, title: '第二条申请' } }
   else if (config.url?.endsWith('/business-detail')) {
+    state.businessRequests.push({ taskId: config.params.taskId, view: config.params.view, completed: state.decision })
+    if (state.decision && selected.id === 't1' && config.params.view === 'todo') throw new Error('任务不存在')
     if (state.fail) throw new Error('业务快照暂不可用')
     data = { ...brief, groups: [{ title: '申请内容', fields: [{ label: '申请理由', value: '申请兑换500积分，用于本次活动。'.repeat(params.has('long') ? 60 : 1), span: 2 }, { label: '历史标签', value: '提交时冻结的标签' }] }] }
   } else if (config.url?.endsWith('/get-approval-detail')) data = { processDefinition: {}, processInstance: { ...selected.processInstance, status: state.decision ? 2 : 1 }, todoTask: params.has('stale') ? { ...selected, id: 'other' } : state.decision && selected.id === 't1' ? undefined : selected, activityNodes: [{ id: 'start', name: '发起申请', status: 2, tasks: [{ id: 'start', status: 2, assigneeUser: { nickname: '申请人甲' } }] }, { id: 'current', name: '上级审批', status: 1, tasks: [{ ...selected, reason: state.decision ? '同意申请' : undefined, assigneeUser: { nickname: '审批人乙' } }] }, { id: 'future', name: '结束', status: -1, candidateUsers: [{ nickname: '候选人丙' }] }] }

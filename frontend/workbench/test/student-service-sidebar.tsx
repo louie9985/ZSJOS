@@ -15,6 +15,7 @@ const rows: StudentServiceSubject[] = [1, 2].map(id => ({
   personId: 7, personNo: 'XY-FIXTURE-7', name: '示例学员',
   serviceRelationId: id,
   service: {
+    acceptedAt: 1700000000000 - id * 1000,
     serviceRelationId: id, courseName: `课程${id}${long ? '大健康轻创技能提升与职业发展'.repeat(3) : ''}`,
     className: `班级${id}${long ? '技能提升2026秋班（班主任：示例老师）'.repeat(3) : ''}`,
     status: 'active', acceptanceStatus: id === 1 ? 'pending' : 'accepted', owner: true, version: 0,
@@ -30,7 +31,7 @@ const projected = () => rows.map(row => ({ ...structuredClone(row), pendingTasks
   { id: 51, taskType: 'student_contact', title: '学员跟进', dueAt: Date.now() - 86400000, overdue: true },
   { id: 52, taskType: 'student_first_contact_assistance', title: '首联协助', overdue: false },
 ] : [] }))
-api.myStudentServices = async query => { if (params.has('tasks') && !query.pendingTasksFirst) throw Error('未请求待办置顶'); return { list: projected().sort((a,b) => Number(Boolean(b.pendingTasks.length)) - Number(Boolean(a.pendingTasks.length))), total: rows.length } }
+api.myStudentServices = async query => { if (params.has('tasks') && (!query.pendingTasksFirst || query.sortField !== 'acceptedAt' || query.sortOrder !== 'descend')) throw Error('未请求待办优先及接收时间倒序'); return { list: projected().sort((a,b) => Number(Boolean(b.pendingTasks.length)) - Number(Boolean(a.pendingTasks.length)) || b.service.acceptedAt! - a.service.acceptedAt!), total: rows.length } }
 api.myStudentService = async id => {
   if (id === 1 && state.delay) await new Promise(resolve => setTimeout(resolve, state.delay))
   if (state.fail) throw Error('服务读取失败')

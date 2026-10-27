@@ -39,6 +39,7 @@ class WithdrawalServiceImplTest {
     @Mock BpmProcessTaskApi taskApi; @Mock AdminUserApi userApi; @Mock PermissionApi permissionApi;
     @Mock ConfigApi configApi; @Mock FileApi fileApi; @Mock BusinessAuditService auditService; @Mock WithdrawalNotifyPublisher publisher;
     @Mock cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
+    @Mock cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService financeCenterMembership;
 
     @BeforeEach void setup() {
         TenantContextHolder.setTenantId(9L);
@@ -50,6 +51,7 @@ class WithdrawalServiceImplTest {
         ReflectionTestUtils.setField(service,"fileApi",fileApi);ReflectionTestUtils.setField(service,"auditService",auditService);
         ReflectionTestUtils.setField(service,"notifyPublisher",publisher);
         ReflectionTestUtils.setField(service,"readScopeService",readScopeService);
+        ReflectionTestUtils.setField(service,"financeCenterMembership",financeCenterMembership);
     }
     @AfterEach void clear(){TenantContextHolder.clear();}
 
@@ -70,6 +72,7 @@ class WithdrawalServiceImplTest {
         when(cashbackMapper.selectByIdForUpdate(1L,9L)).thenReturn(one); when(cashbackMapper.selectByIdForUpdate(2L,9L)).thenReturn(two);
         when(userApi.getUserListByStatus(0)).thenReturn(List.of(new AdminUserRespDTO().setId(30L).setStatus(0)));
         when(permissionApi.hasAnyPermissions(30L,"zsjos:withdrawal:review")).thenReturn(true);
+        when(financeCenterMembership.isFinanceCenterMember(30L)).thenReturn(true);
         when(cashbackMapper.transitionStatus(anyLong(),eq(0),eq("available"),eq("withdrawing"))).thenReturn(1);
         doAnswer(inv->{invocationWithdrawal(inv).setId(50L);return 1;}).when(withdrawalMapper).insert(any(WithdrawalDO.class));
         when(processApi.createProcessInstance(eq(7L),any())).thenReturn("p1");

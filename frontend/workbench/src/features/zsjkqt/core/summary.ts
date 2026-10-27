@@ -100,6 +100,13 @@ function recalculateAdjustedLeaveHours(
   let compLeaveHours = toNumber(firstSourceSummary(input.sourceSummaries, COMP_LEAVE_HOUR_ALIASES)) ?? 0;
 
   for (const day of input.days) {
+    const wholeDayReplacement = untimedWholeDayLeaveReplacement(day, workSchedule);
+    if (wholeDayReplacement) {
+      const { original, final, hours } = wholeDayReplacement;
+      personalLeaveHours += (final === "事假" ? hours : 0) - (original === "事假" ? hours : 0);
+      compLeaveHours += (final === "调休" ? hours : 0) - (original === "调休" ? hours : 0);
+      continue;
+    }
     const morningDelta = leaveHourDelta(day, "morning", day.systemMorning, day.finalMorning, workSchedule, day.attendanceMorning);
     const afternoonDelta = leaveHourDelta(day, "afternoon", day.systemAfternoon, day.finalAfternoon, workSchedule, day.attendanceAfternoon);
     personalLeaveHours += morningDelta.personalLeaveHours + afternoonDelta.personalLeaveHours;
@@ -110,6 +117,20 @@ function recalculateAdjustedLeaveHours(
     personalLeaveHours: blankZero(Math.max(0, personalLeaveHours)),
     compLeaveHours: blankZero(Math.max(0, compLeaveHours)),
   };
+}
+
+function untimedWholeDayLeaveReplacement(day: DayReview, workSchedule: AttendanceWorkSchedule) {
+  if (!day.modified || day.finalMorning !== day.finalAfternoon) return null;
+  const original = originalLeaveStatus(day.systemMorning, day.attendanceMorning);
+  if (original !== originalLeaveStatus(day.systemAfternoon, day.attendanceAfternoon)
+    || original === day.finalMorning || !ADJUSTABLE_HOUR_STATUSES.has(original)
+    || !ADJUSTABLE_HOUR_STATUSES.has(day.finalMorning)) return null;
+  const labels = hourLabelsForStatuses(original);
+  const entries = extractStatusHourEntries(day.rawDetail, workSchedule).filter(entry => labels.includes(entry.label));
+  // A duration without a time range belongs to the day once. Only a whole-day
+  // replacement is unambiguous; do not invent a morning/afternoon allocation.
+  if (!entries.length || entries.some(entry => entry.startMinutes != null || entry.endMinutes != null)) return null;
+  return { original, final: day.finalMorning, hours: sumHours(entries) };
 }
 
 function leaveHourDelta(
@@ -249,6 +270,12 @@ function recalculateActualAttendanceDays(days: DayReview[], workSchedule: Attend
 }
 
 function actualAttendanceForDay(day: DayReview, workSchedule: AttendanceWorkSchedule): number {
+  const wholeDayReplacement = untimedWholeDayLeaveReplacement(day, workSchedule);
+  if (wholeDayReplacement && day.workMorning !== "出勤" && day.workAfternoon !== "出勤"
+    && day.attendanceMorning !== "出勤" && day.attendanceAfternoon !== "出勤") {
+    return wholeDayReplacement.final === "调休"
+      ? Math.min(wholeDayReplacement.hours, workSchedule.standardWorkHours) / workSchedule.standardWorkHours : 0;
+  }
   const attendedHours =
     attendanceHoursForHalf(day, "morning", actualAttendanceStatusForHalf(day, "morning"), workSchedule) +
     attendanceHoursForHalf(day, "afternoon", actualAttendanceStatusForHalf(day, "afternoon"), workSchedule);
@@ -275,7 +302,9 @@ function attendanceHoursForHalf(day: DayReview, half: DayHalf, status: Attendanc
   const workStatus = half === "morning" ? day.workMorning : day.workAfternoon;
   // Paid leave and normal work cover the same scheduled half once, even when
   // overtime has replaced the leave label and its immediate attendance basis.
-  if (finalStatus === systemStatus && DURATION_STATUSES.has(status) && workStatus === "出勤") {
+  const personalLeaveToComp = status === "调休"
+    && originalLeaveStatus(systemStatus, half === "morning" ? day.attendanceMorning : day.attendanceAfternoon) === "事假";
+  if ((finalStatus === systemStatus || personalLeaveToComp) && DURATION_STATUSES.has(status) && workStatus === "出勤") {
     return fallbackHoursForHalf(half, workSchedule);
   }
   if (status === "早退") {
@@ -364,7 +393,12 @@ function addAbsenceStats(stats: ReturnType<typeof createStatsShape>, day: DayRev
 
   const parsedHours = sumHours(extractAbsenceHourEntries(day.rawDetail, workSchedule));
   if (parsedHours > 0) {
-    stats.absenceDays += parsedHours / workSchedule.standardWorkHours;
+    // Full-day absence has a known allocation across both work halves. A
+    // corrected half must not retain its original absence hours.
+    const remainingHours = absenceHalves.reduce((total, half) => total + fallbackHoursForHalf(half, workSchedule), 0);
+    const correctedFullDay = day.systemMorning === "旷工" && day.systemAfternoon === "旷工"
+      && absenceHalves.length < 2 && parsedHours >= workSchedule.standardWorkHours;
+    stats.absenceDays += (correctedFullDay ? Math.min(parsedHours, remainingHours) : parsedHours) / workSchedule.standardWorkHours;
     return;
   }
 

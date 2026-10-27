@@ -502,6 +502,35 @@ class LeadDispatchServiceImplTest {
     }
 
     @Test
+    void ownerTransferClosesPreviousQualificationBeforeStartingNewRound() {
+        LeadDO lead = lead();
+        lead.setStatus("submitted");
+        lead.setAssignmentStatus("owned");
+        lead.setOwnerUserId(10L);
+        lead.setQualificationRoundNo(3);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        doAnswer(invocation -> {
+            invocation.getArgument(0, LeadAssignmentHistoryDO.class).setId(88L);
+            return 1;
+        }).when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
+        doAnswer(invocation -> {
+            lead.setQualificationRoundNo(4);
+            return null;
+        }).when(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any());
+
+        service.transferOwned(1L, 10L, 20L, 10L, "转派", "transfer-test");
+
+        var ordered = org.mockito.Mockito.inOrder(lifecycleTaskService);
+        ordered.verify(lifecycleTaskService).cancelQualificationTask(eq(1L), eq(3), any(), eq("转派"));
+        ordered.verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any());
+        verify(lifecycleTaskService).cancelFirstFollowUpTasks(eq(1L), any(), eq("转派"));
+        verify(lifecycleTaskService).createFirstFollowUpTask(eq(1L), eq(20L), eq(88L), any(), any(), eq("owned"));
+        assertEquals(20L, lead.getOwnerUserId());
+        assertEquals(4, lead.getQualificationRoundNo());
+    }
+
+    @Test
     void approvedTransferInvalidatesWhenOriginalOwnerChanged() {
         LeadDO lead = lead();
         lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(11L);

@@ -74,11 +74,34 @@ public class DeliveryClassGroupService {
                     .filter(g -> req.getKeyword() == null || g.getName().contains(req.getKeyword().trim()))
                     .forEach(g -> nodes.add(node("group:"+g.getId(), List.of(), g, maintenance, req.getKeyword())));
         }
-        nodes.sort(Comparator.comparingInt(DeliveryClassGroupService::rank)
+        Comparator<Node> defaultOrder = Comparator.comparingInt(DeliveryClassGroupService::rank)
                 .thenComparing(Node::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(Node::getSortId, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(Node::getKey));
+                .thenComparing(Node::getKey);
+        if (req.getSortField() != null) {
+            // Aggregate the authorized match set before sorting, so counts and dates span every page.
+            enrichNodes(nodes, matches, userId);
+            Comparator<Node> requested = switch (req.getSortField()) {
+                case "name" -> Comparator.comparing(Node::getName, valueOrder(req));
+                case "count" -> Comparator.comparing(Node::getServiceCount, valueOrder(req));
+                case "date" -> Comparator.comparing(n -> buckets.getOrDefault(n.getKey(), List.of()).stream()
+                        .map(r -> DeliveryClassDates.fromSnapshot(r.getExamScheduleSnapshot()))
+                        .filter(Objects::nonNull).map(DeliveryClassDates::start)
+                        .min(Comparator.naturalOrder()).orElse(null), valueOrder(req));
+                default -> throw exception(INVALID);
+            };
+            nodes.sort(Comparator.comparingInt(DeliveryClassGroupService::rank).thenComparing(requested).thenComparing(defaultOrder));
+        } else nodes.sort(defaultOrder);
         List<Node> selected = slice(nodes, req.getPageNo(), req.getPageSize());
+        if (req.getSortField() == null) enrichNodes(selected, matches, userId);
+        return new Page(selected, nodes.size(), matches.size());
+    }
+
+    private static <T extends Comparable<? super T>> Comparator<T> valueOrder(DeliveryClassPageReqVO req) {
+        return Comparator.nullsLast("desc".equals(req.getSortOrder()) ? Comparator.<T>reverseOrder() : Comparator.<T>naturalOrder());
+    }
+
+    private void enrichNodes(List<Node> selected, List<DeliveryClassDO> matches, Long userId) {
         Set<String> selectedKeys = selected.stream().map(Node::getKey).collect(Collectors.toSet());
         List<DeliveryClassDO> selectedClasses = matches.stream().filter(c -> selectedKeys.contains(key(c))).toList();
         List<DeliveryClassRespVO> values = selectedClasses.isEmpty() ? List.of()
@@ -86,7 +109,6 @@ public class DeliveryClassGroupService {
         Map<Long,String> classKeys=selectedClasses.stream().collect(Collectors.toMap(DeliveryClassDO::getId,DeliveryClassGroupService::key));
         Map<String,List<DeliveryClassRespVO>> details = values.stream().collect(Collectors.groupingBy(v -> classKeys.get(v.getId())));
         for (Node n : selected) enrich(n, details.getOrDefault(n.getKey(), List.of()));
-        return new Page(selected, nodes.size(), matches.size());
     }
 
     private boolean emptyMatches(DeliveryClassPageReqVO req) {
@@ -147,7 +169,17 @@ public class DeliveryClassGroupService {
             authorization.check(id,"read",userId);
             query.eq(DeliveryClassDO::getGroupId,id);
         } else throw exception(INVALID);
-        return classService.toPageResult(classes.selectPage(req,query), userId);
+        if (req.getSortField() == null) return classService.toPageResult(classes.selectPage(req,query), userId);
+        var matches = classes.selectList(query);
+        var rows = new ArrayList<>(classService.toPageResult(new PageResult<>(matches, (long) matches.size()), userId).getList());
+        Comparator<DeliveryClassRespVO> requested = switch (req.getSortField()) {
+            case "name" -> Comparator.comparing(DeliveryClassRespVO::getClassName, valueOrder(req));
+            case "date" -> Comparator.comparing(DeliveryClassRespVO::getStartDate, valueOrder(req));
+            case "count" -> Comparator.comparing(DeliveryClassRespVO::getStudentCount, valueOrder(req));
+            default -> throw exception(INVALID);
+        };
+        rows.sort(requested.thenComparing(DeliveryClassRespVO::getId, Comparator.reverseOrder()));
+        return new PageResult<>(slice(rows, req.getPageNo(), req.getPageSize()), (long) rows.size());
     }
 
     @ZsjosPermission(bizType="delivery-class-group",bizId="#id",action="read")

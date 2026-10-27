@@ -6,7 +6,7 @@ import BusinessTable from '../components/BusinessTable'
 import { ClassGroupEditor, ClassGroupOrganizer } from '../components/DeliveryClassGroupDialogs'
 import { APP_ROUTES } from '../constants'
 import type { DeliveryClass, DeliveryClassPageQuery, DeliveryClassProject } from '../services/api'
-import { classDate, classGroups, hasClassPermission, isClassGroupDenied, type ClassGroup, type ClassGroupNode } from '../services/deliveryClassGroups'
+import { classDate, classGroups, hasClassPermission, isClassGroupDenied, type ClassGroup, type ClassGroupNode, type ClassSort, type ClassSortField } from '../services/deliveryClassGroups'
 import { createClassReadQueue, restoreClassPages } from '../services/classGroupRestore'
 
 type Query = Omit<DeliveryClassPageQuery, 'pageNo' | 'pageSize'>
@@ -21,7 +21,11 @@ const statusTag = (r: DeliveryClass) => <Tag color={isSystemClass(r) ? 'blue' : 
 const projects = (items: DeliveryClassProject[] = []) => items.length ? <Space wrap>{items.slice(0, 3).map(p => <Tag key={p.id} title={p.path}>{p.name}</Tag>)}{items.length > 3 && <Tag>另 {items.length - 3} 项</Tag>}</Space> : null
 const isSystemRow = (r: TableRow) => r.node?.type === 'SYSTEM' || !!r.row && isSystemClass(r.row)
 
-export default forwardRef<ClassGroupListHandle, { query: Query; managed: boolean; table: boolean; permissions: string[]; onEdit: (row: DeliveryClass) => void; onAdd: (group: ClassGroup) => void; onStudent: (row: DeliveryClass) => void; onComplete: (row: DeliveryClass) => Promise<void> }>(function DeliveryClassGroups({ query, managed, table, permissions, onEdit, onAdd, onComplete, onStudent }, ref) {
+export default forwardRef<ClassGroupListHandle, { query: Query; managed: boolean; table: boolean; permissions: string[]; onEdit: (row: DeliveryClass) => void; onAdd: (group: ClassGroup) => void; onStudent: (row: DeliveryClass) => void; onComplete: (row: DeliveryClass) => Promise<void> }>(function DeliveryClassGroups({ query: filters, managed, table, permissions, onEdit, onAdd, onComplete, onStudent }, ref) {
+  const [sort, setSort] = useState<ClassSort>({})
+  const query = useMemo(() => ({ ...filters, ...sort }), [filters, sort])
+  const resetPosition = useRef(false)
+  const sortable = (field: ClassSortField) => ({ sorter: true, sortOrder: sort.sortField === field ? sort.sortOrder === 'asc' ? 'ascend' as const : 'descend' as const : null })
   const navigate = useNavigate()
   const [nodes, setNodes] = useState<ClassGroupNode[]>([])
   const [total, setTotal] = useState(0)
@@ -103,6 +107,7 @@ export default forwardRef<ClassGroupListHandle, { query: Query; managed: boolean
     generation.current++; rootBusy.current = false; childRequests.current = {}; setNodes([]); setChildren({}); setTotal(0); setClassTotal(0)
     let saved: { expanded?: string[]; page?: number; childPages?: Record<string, number>; scroll?: number } = {}
     try { saved = JSON.parse(sessionStorage.getItem(storageKey) || '{}') } catch { /* Session state is optional. */ }
+    if (resetPosition.current) { saved = {}; resetPosition.current = false }
     restoreChildPages.current = saved.childPages || {}; restoreScroll.current = saved.scroll
     setExpanded(saved.expanded || []); void loadRef.current(Math.max(1, Math.min(100, saved.page || 1)), true, true)
     return () => { generation.current++; rootRequest.current++ }
@@ -192,17 +197,25 @@ export default forwardRef<ClassGroupListHandle, { query: Query; managed: boolean
       <Button disabled={!expanded.length} onClick={() => setExpanded([])}>收起全部</Button>
     </Space>
     {table ? <BusinessTable<TableRow> tableKey="delivery-class-management" rowKey="key" dataSource={tableRows} loading={loading} error={error} unauthorized={denied} onReload={() => error ? retryLoad() : load(page, true)} emptyText="暂无符合条件的班级"
+      onChange={(_pagination, _filters, sorter, extra) => {
+        if (extra.action !== 'sort') return
+        const selected = Array.isArray(sorter) ? sorter[0] : sorter
+        const field = selected.columnKey
+        resetPosition.current = true
+        setSort(selected.order && (field === 'name' || field === 'date' || field === 'count')
+          ? { sortField: field, sortOrder: selected.order === 'ascend' ? 'asc' : 'desc' } : {})
+      }}
       expandable={{ expandedRowKeys: expanded, onExpand: (_open, row) => toggle(row.key), showExpandColumn: false, indentSize: 0 }}
       rowClassName={r => [r.node && r.node.type !== 'CLASS' ? 'delivery-group-row' : r.parent ? 'delivery-group-child-row' : '', isSystemRow(r) ? 'delivery-class-system-row' : ''].filter(Boolean).join(' ')}
       pagination={{ current: page, pageSize: SIZE, total, showSizeChanger: false, onChange: p => void load(p, true) }}
       columns={[
-        { title: '班级名称', key: 'name', width: 250, ellipsis: false, render: (_, r) => r.more ? more(r.parent!) : r.node && r.node.type !== 'CLASS' ? <Button className="delivery-group-name" type="text" icon={expanded.includes(r.key) ? <DownOutlined /> : <RightOutlined />} onClick={() => toggle(r.key)}>{r.node.name} · {r.node.classCount}个班级</Button> : canQueryStudents ? <Typography.Link className={`delivery-class-name${r.parent ? ' delivery-group-child-name' : ''}`} onClick={() => openStudents(r.row!)}>{r.row?.className}</Typography.Link> : r.row?.className },
+        { title: '班级名称', key: 'name', ...sortable('name'), width: 250, ellipsis: false, render: (_, r) => r.more ? more(r.parent!) : r.node && r.node.type !== 'CLASS' ? <Button className="delivery-group-name" type="text" icon={expanded.includes(r.key) ? <DownOutlined /> : <RightOutlined />} onClick={() => toggle(r.key)}>{r.node.name} · {r.node.classCount}个班级</Button> : canQueryStudents ? <Typography.Link className={`delivery-class-name${r.parent ? ' delivery-group-child-name' : ''}`} onClick={() => openStudents(r.row!)}>{r.row?.className}</Typography.Link> : r.row?.className },
         { title: '班级编号', key: 'no', width: 190, render: (_, r) => r.more || isSystemRow(r) ? '' : r.row?.classNo || '—' },
         { title: '状态', key: 'status', width: 170, render: (_, r) => r.more ? '' : r.row ? statusTag(r.row) : groupStatus(r.node!) },
         { title: '项目', key: 'projects', width: 220, ellipsis: false, render: (_, r) => r.more || isSystemRow(r) ? '' : projects(r.row?.projects || r.node?.projects) },
         { title: '班主任', key: 'homeroom', width: 150, render: (_, r) => r.more ? '' : r.row ? r.row.homeroomUserNameSnapshot || (isSystemClass(r.row) ? '' : '未记录') : `${r.node?.homeroomCount}位班主任` },
-        { title: '考期', key: 'date', width: 210, render: (_, r) => r.more || isSystemRow(r) ? '' : r.row ? classDate(r.row) : r.node?.examDate },
-        { title: '服务数量', key: 'count', width: 110, render: (_, r) => r.more ? '' : r.row ? r.row.studentCount : r.node?.serviceCount },
+        { title: '考期', tooltip: '班级组按当前筛选结果中最早考期排序；未设置考期排在最后', key: 'date', ...sortable('date'), width: 210, render: (_, r) => r.more || isSystemRow(r) ? '' : r.row ? classDate(r.row) : r.node?.examDate },
+        { title: '服务数量', key: 'count', ...sortable('count'), width: 110, render: (_, r) => r.more ? '' : r.row ? r.row.studentCount : r.node?.serviceCount },
         { title: '操作', key: 'action', width: managed ? 390 : 110, ellipsis: false, render: (_, r) => r.more ? '' : r.row ? rowActions(r.row) : groupActions(r.node!) },
       ]} /> : <>
       {error && <Alert type={denied ? 'warning' : 'error'} showIcon message={error} action={!denied && <Button onClick={() => void retryLoad()}>重试</Button>} />}

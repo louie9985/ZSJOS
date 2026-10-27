@@ -45,6 +45,7 @@ import {
   isLeadInboxUnauthorized,
   mergeUniqueLeads,
   pinLeadFirst,
+  prioritizeLeads,
   sortLeadsBySubmission,
   protocolDisplayLabel,
   resolveLeadSelection,
@@ -112,7 +113,7 @@ const LEAD_SORT_FIELD_BY_COLUMN_KEY: Partial<Record<string, LeadSortField>> = {
 }
 
 const LEAD_INBOX_SORT_OPTIONS: Array<{ field?: LeadSortField; order?: 'ascend' | 'descend'; label: string }> = [
-  { label: '默认排序（客资提交时间，从新到旧）' },
+  { label: '默认排序（待办优先，再按提交时间从新到旧）' },
   { field: 'lastActivityAt', order: 'descend', label: '最近活动时间（从新到旧）' },
   { field: 'lastActivityAt', order: 'ascend', label: '最近活动时间（从旧到新）' },
   { field: 'updateTime', order: 'descend', label: '更新时间（从新到旧）' },
@@ -193,8 +194,10 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
   const [leadPageSize, setLeadPageSize] = useState(PAGE_SIZE)
   const [sortField, setSortField] = useState<LeadSortField>()
   const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>()
-  const orderLeadRows = useCallback((rows: ManagedLead[]) =>
-    !sortField || !sortOrder ? sortLeadsBySubmission(rows) : rows, [sortField, sortOrder])
+  const orderLeadRows = useCallback((rows: ManagedLead[]) => {
+    const ordered = !sortField || !sortOrder ? sortLeadsBySubmission(rows) : rows
+    return salesUserId === undefined ? prioritizeLeads(ordered, []) : ordered
+  }, [salesUserId, sortField, sortOrder])
   const [initialLoading, setInitialLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [initialError, setInitialError] = useState('')
@@ -299,7 +302,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     }
     try {
       const params: ManagedLeadPageParams = {
-        pendingTasksFirst: false,
+        pendingTasksFirst: salesUserId === undefined,
         pageNo: targetPage,
         pageSize: options.pageSize ?? leadPageSize,
         keyword: keyword || undefined, advancedFilter,
@@ -814,7 +817,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
             selectedKeys: [sortField ? `${sortField}:${sortOrder}` : 'default'],
             items: LEAD_INBOX_SORT_OPTIONS.map(option => ({
               key: option.field ? `${option.field}:${option.order}` : 'default',
-              label: option.label,
+              label: !option.field && salesUserId !== undefined ? '默认排序（客资提交时间，从新到旧）' : option.label,
             })),
             onClick: ({ key }) => {
               const option = LEAD_INBOX_SORT_OPTIONS.find(item => (item.field ? `${item.field}:${item.order}` : 'default') === key)

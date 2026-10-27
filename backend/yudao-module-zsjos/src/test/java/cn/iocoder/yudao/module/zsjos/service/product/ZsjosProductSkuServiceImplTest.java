@@ -89,6 +89,32 @@ class ZsjosProductSkuServiceImplTest {
     }
 
     @Test
+    void salesCatalogOnlyOffersAttributeValuesBackedByEnabledSkus() {
+        var product = new ZsjosProductDO(); product.setId(1L); product.setProductRef("spu-1");
+        when(productService.getEnabledSimpleList()).thenReturn(List.of(
+                new cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductSimpleRespVO(
+                        "spu-1", "课程", 100L, "分类", List.of(), null, null, null, null)));
+        when(productMapper.selectListByRefs(List.of("spu-1"))).thenReturn(List.of(product));
+        var attr = new ZsjosProductAttrDO(); attr.setId(10L); attr.setAttrKey("sales_spec");
+        attr.setAttrName("销售规格"); attr.setRequired(true); attr.setSort(0);
+        when(attrMapper.selectListBySpuId(1L)).thenReturn(List.of(attr));
+        var enabled = new ZsjosProductAttrValueDO(); enabled.setAttrId(10L); enabled.setValue("enabled"); enabled.setLabel("在售");
+        var retired = new ZsjosProductAttrValueDO(); retired.setAttrId(10L); retired.setValue("retired"); retired.setLabel("停用规格属性仍启用");
+        when(attrValueMapper.selectListByAttrIds(List.of(10L))).thenReturn(List.of(enabled, retired));
+        var sku = new ZsjosProductSkuDO(); sku.setSpuId(1L); sku.setSkuRef("sku-on");
+        sku.setSkuName("在售规格"); sku.setAttrValuesJson("{\"sales_spec\":\"enabled\"}"); sku.setPrice(BigDecimal.ONE);
+        when(skuMapper.selectEnabledListBySpuIds(any())).thenReturn(List.of(sku));
+        var result = service.getLeadCatalog();
+        assertEquals(List.of("enabled"), result.spus().getFirst().attrs().getFirst().values().stream()
+                .map(cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadProductCatalogRespVO.Value::value).toList());
+        assertEquals("sku-on", result.skus().getFirst().skuRef());
+        assertEquals(2, service.getAttrs(1L).getFirst().values().size(), "Management retains all configured values");
+        when(skuMapper.selectEnabledListBySpuIds(any())).thenReturn(List.of());
+        assertTrue(service.getLeadCatalog().spus().getFirst().attrs().getFirst().values().isEmpty());
+        assertTrue(service.getLeadCatalog().skus().isEmpty());
+    }
+
+    @Test
     void rejectsRealSkuWhenSpuIsUnknown() {
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.validateLeadProduct(null, true, "sku_x", false));

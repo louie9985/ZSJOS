@@ -8,6 +8,8 @@ const FULL: FollowUpTimeShortcut[] = [...SHORT,
   { key: '1-day', label: '+1 天', amount: 1, unit: 'day' },
   { key: '2-days', label: '+2 天', amount: 2, unit: 'day' },
   { key: '3-days', label: '+3 天', amount: 3, unit: 'day' },
+  { key: '7-days', label: '+7 天', amount: 7, unit: 'day' },
+  { key: '30-days', label: '+30 天', amount: 30, unit: 'day' },
 ]
 export function studentContactSchedule(type: string, successful: boolean, planCompleted: boolean,
   firstContactMinutes = 0, studyPlanMinutes = 0) {

@@ -16,7 +16,7 @@ def handler(route):
  else:data=[]
  route.fulfill(json={'code':0,'data':data})
 with sync_playwright() as p:
- browser=p.chromium.launch(channel='chrome',headless=True);page=browser.new_page();page.on('pageerror',lambda e:errors.append(str(e)));page.add_init_script("document.addEventListener('DOMContentLoaded',()=>{const s=document.createElement('style');s.textContent='*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}';document.head.appendChild(s)})");page.route('**/admin-api/**',handler)
+ browser=p.chromium.launch(channel='chrome',headless=True);page=browser.new_page();page.on('pageerror',lambda e:errors.append(str(e)));page.add_init_script("document.addEventListener('DOMContentLoaded',()=>{const s=document.createElement('style');s.textContent='*,*::before,*::after{animation-duration:0.01s!important;transition-duration:0.01s!important;scroll-behavior:auto!important}';document.head.appendChild(s)})");page.route('**/admin-api/**',handler)
  for width in (1440,390):
   page.set_viewport_size({'width':width,'height':950});page.goto('http://127.0.0.1:5174/test/first-contact-progress.html')
   expect(page.get_by_text('已完成 1 / 2',exact=True)).to_be_visible();expect(page.get_by_text('学习计划：首联时已完成',exact=False)).to_be_visible()
@@ -26,7 +26,7 @@ with sync_playwright() as p:
   page.goto('http://127.0.0.1:5174/test/first-contact-progress.html?form=1');page.get_by_role('radio',name='是',exact=True).check()
   expect(page.get_by_role('checkbox',name='首联时已完成学习计划制定')).not_to_be_checked()
   page.get_by_role('checkbox',name='首联时已完成学习计划制定').locator('xpath=ancestor::label').click();expect(page.get_by_role('checkbox',name='首联时已完成学习计划制定')).to_be_checked();page.locator('textarea#remark').fill('首联已完成学习计划')
-  expect(page.get_by_role('button',name='+7 天',exact=True)).to_have_count(0);expect(page.get_by_text('将发起延期审批',exact=False)).to_have_count(0)
+  expect(page.get_by_role('button',name='+7 天',exact=True)).to_be_visible();expect(page.get_by_role('button',name='+30 天',exact=True)).to_be_visible();expect(page.get_by_text('将发起延期审批',exact=False)).to_have_count(0)
   page.screenshot(path=str(out/f'form-{width}.png'),full_page=True);assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
   page.get_by_role('button',name='提交首联',exact=True).click();expect(page.get_by_text('首联已提交',exact=True)).to_be_visible()
   assert mutations[-1][1]['nextContactAt'] is None;assert mutations[-1][1]['studyPlanCompletedAtFirstContact'] is True;assert not mutations[-1][1].get('completedChecklistKeys')
@@ -39,8 +39,29 @@ with sync_playwright() as p:
  page.goto('http://127.0.0.1:5174/test/first-contact-progress.html?form=1');page.get_by_role('radio',name='否',exact=True).check()
  expect(page.get_by_role('button',name='+1 小时',exact=True)).to_be_visible();expect(page.get_by_role('button',name='+1 天',exact=True)).to_have_count(0)
  page.goto('http://127.0.0.1:5174/test/first-contact-progress.html?form=1&ordinary=1');page.get_by_role('radio',name='是',exact=True).check();page.locator('textarea#remark').fill('无待办主动跟进');page.get_by_role('button',name='提交普通跟进',exact=True).click();expect(page.get_by_text('首联已提交',exact=True)).to_be_visible();assert mutations[-1][1]['nextContactAt'] is None;assert 'taskId' not in mutations[-1][1]
+ # Verify new shortcuts from click-time, including submitted payloads.
+ for width in (1440,390):
+  page.set_viewport_size({'width':width,'height':950})
+  for days in (7,30):
+   page.goto('http://127.0.0.1:5174/test/first-contact-progress.html?form=1&ordinary=1')
+   page.get_by_role('radio',name='是',exact=True).check()
+   page.locator('textarea#remark').fill('快捷时间验证')
+   page.get_by_role('button',name=f'+{days} 天',exact=True).click()
+   expected=page.evaluate('(days)=>{const d=new Date();d.setDate(d.getDate()+days);return d.getTime()}',days)
+   expected_text=page.evaluate('(ts)=>{const d=new Date(ts);const p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`}',expected)
+   expect(page.locator('input#nextContactAt')).to_have_value(expected_text)
+   assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+   page.wait_for_timeout(400)
+   page.screenshot(path=str(out/f'shortcut-{days}-{width}.png'),full_page=True)
+   page.get_by_role('button',name='提交普通跟进',exact=True).click()
+   expect(page.get_by_text('首联已提交',exact=True)).to_be_visible()
+   assert abs(mutations[-1][1]['nextContactAt']-expected)<2000
+ page.goto('http://127.0.0.1:5174/test/first-contact-progress.html?form=1')
+ page.get_by_role('radio',name='是',exact=True).check()
+ page.get_by_role('button',name='+7 天',exact=True).click()
+ expect(page.get_by_text('将发起延期审批',exact=False)).to_be_visible()
  # A manually chosen date beyond 72h must still display the approval form.
- page.goto('http://127.0.0.1:5174/test/first-contact-progress.html?form=1');page.get_by_role('radio',name='是',exact=True).check()
+ page.goto('http://127.0.0.1:5174/test/first-contact-progress.html?form=1&manual=1');page.get_by_role('radio',name='是',exact=True).check()
  import datetime
  future=(datetime.datetime.now()+datetime.timedelta(days=5)).strftime('%Y-%m-%d %H:%M')
  page.locator('input#nextContactAt').fill(future);page.locator('input#nextContactAt').press('Enter');page.locator('textarea#remark').click()

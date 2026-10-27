@@ -213,9 +213,10 @@ export default function BpmApprovalDetail({
   const navigate = useNavigate()
   const processInstanceId = task?.processInstanceId
   const taskId = task?.id
-  const identity = (taskId ?? '') + view
+  const detailView = completed ? 'done' : view
+  const identity = (taskId ?? '') + detailView
   const { data: detail, loading: detailLoading, error: detailError, reload: loadDetail } = useApprovalResource(identity, () => processInstanceId ? api.bpmApprovalDetail({ processInstanceId, taskId }) : Promise.resolve(undefined))
-  const { data: businessCard, loading: businessCardLoading, error: businessCardError, reload: loadBusinessCard } = useApprovalResource(identity, () => taskId ? api.bpmApprovalBusinessDetail(taskId, view) : Promise.resolve(null))
+  const { data: businessCard, loading: businessCardLoading, error: businessCardError, reload: loadBusinessCard } = useApprovalResource(identity, () => taskId ? api.bpmApprovalBusinessDetail(taskId, detailView) : Promise.resolve(null))
   const { data: records = [], loading: recordsLoading, error: recordsError, reload: loadRecords } = useApprovalResource(identity, () => processInstanceId ? api.bpmTaskListByProcessInstance(processInstanceId) : Promise.resolve([]))
   const { data: comments = [], loading: commentsLoading, error: commentsError, reload: loadComments } = useApprovalResource(identity, () => processInstanceId ? api.bpmCommentList(processInstanceId) : Promise.resolve([]))
   const [actionDirty, setActionDirty] = useState(false)
@@ -237,7 +238,11 @@ export default function BpmApprovalDetail({
   const reloadAll = useCallback(() => { void loadDetail(); void loadBusinessCard(); void loadRecords(); void loadComments() }, [loadDetail, loadBusinessCard, loadRecords, loadComments])
   const previousRefresh = useRef(refreshVersion)
   useEffect(() => { if (previousRefresh.current !== refreshVersion) { previousRefresh.current = refreshVersion; reloadAll() } }, [refreshVersion, reloadAll])
-  const refresh = useCallback((taskCompleted?: boolean) => { reloadAll(); onActionSuccess?.(taskCompleted) }, [reloadAll, onActionSuccess])
+  const refresh = useCallback((taskCompleted?: boolean) => {
+    // 完成后由 completed 切换资源身份再加载，避免查询已退出待办的任务。
+    if (!taskCompleted) reloadAll()
+    onActionSuccess?.(taskCompleted)
+  }, [reloadAll, onActionSuccess])
   const ready = view === 'todo' && detail?.todoTask?.status === 1 && !completed && !detailLoading && !detailError && !businessCardLoading && !businessCardError && detail?.todoTask?.id === taskId
 
   const processDefinition = detail?.processDefinition

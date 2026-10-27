@@ -74,6 +74,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     @Resource private BpmProcessTaskApi processTaskApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService financeCenterMembership;
     @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Resource private ConfigApi configApi;
     @Resource private FileApi fileApi;
@@ -553,6 +554,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
 
     private List<Long> financeReviewers() {
         return adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
+                // Permission bypass for administrators must not expand the configured finance department audience.
+                .filter(user -> financeCenterMembership.isFinanceCenterMember(user.getId()))
                 .map(user -> user.getId()).filter(id -> permissionApi.hasAnyPermissions(id, "zsjos:withdrawal:review"))
                 .sorted().toList();
     }

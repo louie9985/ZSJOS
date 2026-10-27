@@ -277,12 +277,20 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         for (ZsjosProductSimpleRespVO item : products) {
             ZsjosProductDO spu = productByRef.get(item.productRef());
             List<ZsjosProductAttrRespVO> attrs = getAttrs(spu.getId());
+            List<ZsjosProductSkuDO> enabledSkus = skus.getOrDefault(spu.getId(), List.of());
+            // Management keeps all values; business selectors only offer values backed by an enabled SKU.
+            Map<String, Set<String>> selectableValues = enabledSkus.stream()
+                    .flatMap(sku -> parseAttrs(sku.getAttrValuesJson()).entrySet().stream())
+                    .collect(Collectors.groupingBy(Map.Entry::getKey,
+                            Collectors.mapping(Map.Entry::getValue, Collectors.toSet())));
             spus.add(new LeadProductCatalogRespVO.Spu(item.categoryId(), item.categoryName(), item.categoryPath(),
                     item.level1CategoryId(), item.level1CategoryName(), item.level2CategoryId(), item.level2CategoryName(),
                     item.productRef(), item.name(),
                     attrs.stream().map(attr -> new LeadProductCatalogRespVO.Attr(attr.attrKey(), attr.attrName(), attr.required(),
-                            attr.values().stream().map(value -> new LeadProductCatalogRespVO.Value(value.value(), value.label())).toList())).toList()));
-            catalogSkus.addAll(skus.getOrDefault(spu.getId(), List.of()).stream().map(sku -> new LeadProductCatalogRespVO.Sku(
+                            attr.values().stream()
+                                    .filter(value -> selectableValues.getOrDefault(attr.attrKey(), Set.of()).contains(value.value()))
+                                    .map(value -> new LeadProductCatalogRespVO.Value(value.value(), value.label())).toList())).toList()));
+            catalogSkus.addAll(enabledSkus.stream().map(sku -> new LeadProductCatalogRespVO.Sku(
                     item.productRef(), sku.getSkuRef(), sku.getSkuName(), parseAttrs(sku.getAttrValuesJson()), sku.getPrice(),
                     ProductSpecVO.resolve(parseAttrs(sku.getAttrValuesJson()), attrs))).toList());
         }

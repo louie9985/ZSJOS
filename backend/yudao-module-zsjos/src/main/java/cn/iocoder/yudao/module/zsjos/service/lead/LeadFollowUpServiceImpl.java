@@ -309,7 +309,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             DictDataRespDTO result, DictDataRespDTO beforeCategory, DictDataRespDTO afterCategory,
             String categoryAfter, AdminUserRespDTO operator, Map<Long, FileInfoRespDTO> files) {
         boolean won = STATUS_WON.equals(lead.getStatus());
-        if (opportunity == null || !won && !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
+        if (opportunity == null || !won && !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING,
+                OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL)
                 .contains(opportunity.getStatus())) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         OpportunityFollowUpRecordDO record = new OpportunityFollowUpRecordDO();
         record.setOpportunityId(opportunity.getId()); record.setLeadId(lead.getId());
@@ -358,7 +359,10 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         lead.setSalesStage(record.getSalesStageAfter());
         lead.setSalesStageLabelSnapshot(record.getSalesStageAfterLabelSnapshot());
         updateFollowUpLead(lead);
-        if (!won) opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
+        // Recording contact during approval must not move the opportunity out of approval.
+        if (!won && !OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL.equals(opportunity.getStatus())) {
+            opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
+        }
         opportunity.setNextFollowUpAt(reqVO.getNextFollowUpAt()); opportunityMapper.updateById(opportunity);
         if (reqVO.getNextFollowUpAt() == null) {
             opportunityMapper.update(null, new LambdaUpdateWrapper<OpportunityDO>()

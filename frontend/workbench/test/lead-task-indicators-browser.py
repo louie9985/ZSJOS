@@ -15,13 +15,13 @@ with sync_playwright() as p:
             marker = page.locator('.lead-task-indicator')
             expect(marker).to_have_count(2)
             if layout == 'split' or width < 768:
-                expect(page.locator('.lead-inbox-item').first).to_have_attribute('aria-label', re.compile('.*KZ-TEST-3.*'))
+                expect(page.locator('.lead-inbox-item').first).to_have_attribute('aria-label', re.compile('.*KZ-TEST-2.*'))
                 cards = page.locator('.lead-inbox-item')
                 expect(cards).to_have_count(3)
                 expect(page.locator('.lead-inbox-item.has-pending-tasks')).to_have_count(2)
                 first = page.locator('.lead-inbox-item[aria-label*="KZ-TEST-1"]')
                 second = page.locator('.lead-inbox-item[aria-label*="KZ-TEST-2"]')
-                expect(page.locator('.lead-inbox-item[aria-label*="KZ-TEST-3"]')).to_have_class(re.compile('.*active.*'))
+                expect(page.locator('.lead-inbox-item[aria-label*="KZ-TEST-2"]')).to_have_class(re.compile('.*active.*'))
                 expect(first).to_have_class(re.compile('.*unseen.*'))
                 expect(second).to_contain_text('已逾期：客资判定')
                 second.click()
@@ -57,7 +57,7 @@ with sync_playwright() as p:
                 assert size >= max(box['width'], box['height'])
             else:
                 expect(page.locator('.lead-task-indicator.is-compact')).to_have_count(2)
-                expect(page.locator('tbody tr.ant-table-row').first).to_contain_text('KZ-TEST-3')
+                expect(page.locator('tbody tr.ant-table-row').first).to_contain_text('KZ-TEST-2')
                 page.locator('.lead-task-indicator[aria-label^="待处理 2"]').focus()
                 tooltip = page.get_by_role('tooltip').last
                 expect(tooltip).to_contain_text('首次跟进')

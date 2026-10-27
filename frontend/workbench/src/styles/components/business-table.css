@@ -21,6 +21,14 @@
   z-index: var(--crm-z-sticky);
   background: var(--crm-bg-container);
 }
+/* The sticky header receives measured body col widths. max-content/auto lets
+   header labels and sorters enlarge them again, accumulating horizontal drift.
+   A definite width enables fixed layout; the measured colgroup still expands
+   the header beyond the viewport when horizontal scrolling is needed. */
+.business-table .ant-table-header > table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
 .business-table .ant-table-thead > tr > th {
   background: var(--crm-bg-container);
 }

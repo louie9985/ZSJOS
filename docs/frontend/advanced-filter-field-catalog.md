@@ -135,8 +135,6 @@
 | service.pausedAt | 时间 | 服务暂停时间 | date | DATE | 无下拉选项 | student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/StudentFilterFields.java#L15) |
 | service.completedAt | 时间 | 服务完成时间 | date | DATE | 无下拉选项 | student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/StudentFilterFields.java#L16) |
 | service.terminatedAt | 时间 | 服务终止时间 | date | DATE | 无下拉选项 | student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/StudentFilterFields.java#L17) |
-| service.pauseReason | 补充信息 | 暂停原因 | text | TEXT | 无下拉选项 | student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/StudentFilterFields.java#L18) |
-| service.terminationReason | 补充信息 | 终止原因 | text | TEXT | 无下拉选项 | student | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/StudentFilterFields.java#L19) |
 | subordinate.name | 身份与联系 | 姓名 | text | TEXT | 无下拉选项 | subordinate_sales | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/SubordinateSalesFilterFields.java#L13) |
 | subordinate.username | 身份与联系 | 账号 | text | TEXT | 无下拉选项 | subordinate_sales | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/SubordinateSalesFilterFields.java#L14) |
 | subordinate.mobile | 身份与联系 | 手机号 | text | TEXT | 无下拉选项 | subordinate_sales | [注册](../../backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/SubordinateSalesFilterFields.java#L15) |
@@ -1358,8 +1356,6 @@
 | service.pausedAt | standard | false | false | false |
 | service.completedAt | standard | false | false | false |
 | service.terminatedAt | standard | false | false | false |
-| service.pauseReason | free_text | true | false | false |
-| service.terminationReason | free_text | true | false | false |
 | subordinate.name | personal | true | false | false |
 | subordinate.username | personal | true | false | false |
 | subordinate.mobile | personal | true | false | false |

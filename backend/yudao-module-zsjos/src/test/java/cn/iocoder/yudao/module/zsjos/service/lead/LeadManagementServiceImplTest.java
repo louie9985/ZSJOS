@@ -714,6 +714,18 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void pendingDealFollowUpActionRequiresConfiguredPermission() {
+        LeadDO lead = actionLead("valid", "owned", true);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("deal_pending_approval");
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(40L); order.setStatus("pending_approval");
+        assertActions(lead, opportunity, order);
+        when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
+        assertActions(lead, opportunity, order, "ADD_FOLLOW_UP");
+    }
+
+    @Test
     void wonFollowUpActionRequiresConfiguredPermission() {
         LeadDO lead = actionLead("won", "owned", true);
         assertActions(lead, null, "ENTER_REPURCHASE");

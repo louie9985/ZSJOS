@@ -53,7 +53,8 @@ describe('unified Lead management route', () => {
 
     expect(page).toContain('preserveRequestedId: routeSelectionRef.current !== undefined')
     expectSourceToContainTokens(page, 'setItems(current => orderLeadRows(current.some(item => item.id === id) ? current.map(item => item.id === id ? loaded : item) : silent ? current : pinLeadFirst(current, loaded)))')
-    expect(page).toContain('pendingTasksFirst: false')
+    expect(page).toContain('pendingTasksFirst: salesUserId === undefined')
+    expect(page).toContain('salesUserId === undefined ? prioritizeLeads(ordered, []) : ordered')
     expect(page).toContain('sortLeadsBySubmission(rows)')
     expect(page).toContain('const loaded = await api.managedLead(leadId)')
     expect(page).toContain('routeSelectionRef.current = undefined')

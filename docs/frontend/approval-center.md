@@ -28,6 +28,8 @@
 
 详情、业务卡、流转记录和评论独立加载、重试，请求序号防止旧响应覆盖最新数据；失败不展示为正常空列表。业务卡不支持时仍保留既有表单兜底，业务读取失败明确提示。无新增接口、依赖、SQL、角色授权或 Admin 修改。
 
+通用审批动作完成后，保留详情的业务卡按 `view=done` 查询；先切换完成状态，再随资源身份变化加载，避免先用 `view=todo` 刷新已结束任务。完成后的手动刷新继续查询已办，进入下一条待办后恢复 `view=todo`；非终结操作仍刷新当前待办。
+
 验证入口：npm run typecheck；定向 Vitest approvalHistoryModel、bpm-approval-labels.guard 和 bpm-approval-actions.guard；python test/approval-center-layout-browser.py（使用既有本地 Vite 5174，全部请求在 fixture adapter 内终止）。浏览器覆盖 1920/1440/1024/768/390、表格抽屉、需求审批、签名必需、草稿保护、失败重试、评论、已办和深色主题。fixture 是隔离组件证据，不代表已登录运行环境或生产审批验收。
 
 三类业务任务验证：独立 Vite 5198 下执行 `python -B test/unified-business-approval-browser.py`。所有 HTTP 请求均由测试 adapter 截止，覆盖原业务命令、编导与终审、批次退回、爆款通过／驳回、未保存提醒、失败重试、已办只读、权限及任务变化、表格抽屉和桌面／移动显示。后端需同步部署内容卡批次定位元数据；未同步时界面明确提示并阻止通用审批兜底。

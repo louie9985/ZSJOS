@@ -403,18 +403,12 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void forbiddenStatesAndPendingDealRemainRejected() {
-        for (String status : List.of("invalid", "closed", "suspended", "valid")) {
+    void forbiddenStatesRemainRejected() {
+        for (String status : List.of("invalid", "closed", "suspended")) {
             reset(leadMapper, recordMapper, opportunityMapper, opportunityRecordMapper, dictDataApi,
                     adminUserApi, attachmentService, imageMapper, opportunityImageMapper);
             LeadDO lead = validLead().setStatus(status);
-            if ("valid".equals(status)) {
-                stubSuccessfulCreate(lead);
-                when(opportunityMapper.selectByLeadId(1L)).thenReturn(
-                        new OpportunityDO().setId(30L).setStatus("deal_pending_approval"));
-            } else {
-                when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
-            }
+            when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
             ServiceException error = assertThrows(ServiceException.class,
                     () -> withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusDays(1)))));
             assertEquals(LEAD_FOLLOW_UP_STATE_INVALID.getCode(), error.getCode());
@@ -422,6 +416,30 @@ class LeadFollowUpServiceImplTest {
             verify(opportunityRecordMapper, never()).insert(any(OpportunityFollowUpRecordDO.class));
         }
         verifyNoInteractions(lifecycleTaskService);
+    }
+
+    @Test
+    void pendingDealFollowUpPreservesApprovalAndUpdatesReminder() {
+        LeadDO lead = validLead().setStatus("valid");
+        stubSuccessfulCreate(lead);
+        OpportunityDO opportunity = new OpportunityDO().setId(30L).setStatus("deal_pending_approval");
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        doAnswer(invocation -> {
+            invocation.<OpportunityFollowUpRecordDO>getArgument(0).setId(50L);
+            return 1;
+        }).when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
+        LocalDateTime nextAt = LocalDateTime.now().plusDays(1);
+
+        LeadFollowUpRespVO result = withTenant(() -> service.create(1L, 20L, request(nextAt)));
+
+        assertEquals("opportunity", result.getRecordScope());
+        assertEquals("deal_pending_approval", opportunity.getStatus());
+        assertEquals("valid", lead.getStatus());
+        assertEquals(nextAt, opportunity.getNextFollowUpAt());
+        assertEquals(1, lead.getFollowUpCount());
+        verify(opportunityMapper).updateById(opportunity);
+        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq("opportunity"), eq(50L),
+                eq(nextAt), any(LocalDateTime.class));
     }
 
     @Test

@@ -1,0 +1,22 @@
+.student-annotation-card .student-annotation-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-3);
+  font-size: var(--crm-font-sm);
+}
+.student-annotation-field label { color: var(--crm-text-secondary); }
+.student-annotation-field > * { min-width: 0; overflow-wrap: anywhere; }
+.student-annotation-field .ant-select { width: 100%; }
+.student-annotation-status {
+  text-align: right;
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+  margin-top: var(--crm-sp-3);
+}
+.student-annotation-card .ant-alert { margin-top: var(--crm-sp-3); }
+@media (pointer: coarse) {
+  .student-annotation-card .ant-input,
+  .student-annotation-card .ant-select { min-height: 44px; }
+}

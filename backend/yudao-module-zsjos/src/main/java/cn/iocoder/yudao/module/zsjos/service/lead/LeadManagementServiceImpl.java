@@ -721,6 +721,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                             canCreateOrder && formalOwner && salesOrderPermissionService.canRevise(activeOrder, currentUserId)));
                 }
             }
+        } else if (STATUS_VALID.equals(lead.getStatus()) && opportunity != null
+                && OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL.equals(opportunity.getStatus())) {
+            if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
         } else if (STATUS_WON.equals(lead.getStatus())) {
             if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
             boolean enabled = securityFrameworkService.hasPermission("zsjos:sales-order:create")

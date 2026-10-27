@@ -5,11 +5,14 @@ export type ClassGroupNode = { key: string; type: 'CLASS' | 'GROUP' | 'SYSTEM'; 
 export type GroupSave = { name: string; referenceDate?: string; version?: number }
 export type GroupMode = 'NONE' | 'EXISTING' | 'NEW'
 export type GroupedClassCreate = { className: string; startDate?: string; homeroomUserIds: number[]; groupMode: GroupMode; groupId?: number; newGroup?: GroupSave }
+export type ClassSortField = 'name' | 'date' | 'count'
+export type ClassSort = { sortField?: ClassSortField; sortOrder?: 'asc' | 'desc' }
+
 type Page<T> = { list: T[]; total: number }
 const base = '/zsjos/delivery-class/group'
 export const classGroups = {
-  page: async (params: DeliveryClassPageQuery, managed: boolean) => unwrap<Page<ClassGroupNode> & { classTotal: number }>(await http.get(`${base}/${managed ? 'page' : 'my-page'}`, { params })),
-  children: async (key: string, params: DeliveryClassPageQuery, managed: boolean) => unwrap<Page<DeliveryClass>>(await http.get(`${base}/${managed ? 'children' : 'my-children'}`, { params: { ...params, key } })),
+  page: async (params: DeliveryClassPageQuery & ClassSort, managed: boolean) => unwrap<Page<ClassGroupNode> & { classTotal: number }>(await http.get(`${base}/${managed ? 'page' : 'my-page'}`, { params })),
+  children: async (key: string, params: DeliveryClassPageQuery & ClassSort, managed: boolean) => unwrap<Page<DeliveryClass>>(await http.get(`${base}/${managed ? 'children' : 'my-children'}`, { params: { ...params, key } })),
   options: async (keyword = '', pageNo = 1) => unwrap<Page<ClassGroup>>(await http.get(`${base}/options`, { params: { keyword: keyword || undefined, pageNo, pageSize: 12 } })),
   candidates: async (keyword = '', pageNo = 1) => unwrap<Page<DeliveryClass>>(await http.get(`${base}/candidates`, { params: { keyword: keyword || undefined, pageNo, pageSize: 12 } })),
   create: async (data: GroupSave) => unwrap<number>(await http.post(`${base}/create`, data)),

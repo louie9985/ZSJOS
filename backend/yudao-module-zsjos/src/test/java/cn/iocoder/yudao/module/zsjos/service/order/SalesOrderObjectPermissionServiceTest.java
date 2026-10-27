@@ -99,6 +99,32 @@ class SalesOrderObjectPermissionServiceTest {
                 new SalesOrderDO().setSubmitterUserId(30L), 30L));
     }
 
+    @Test
+    void queryAllExpandsManagementReadsWithoutCommandOwnership() {
+        when(permissionApi.hasAnyPermissions(30L, "zsjos:sales-order:query-all")).thenReturn(true);
+        SalesOrderDO unrelated = new SalesOrderDO().setId(1L).setSubmitterUserId(999L);
+
+        org.junit.jupiter.api.Assertions.assertTrue(service.resolveManagementScope(30L).isAll());
+        org.junit.jupiter.api.Assertions.assertTrue(service.canReadManagement(unrelated, 30L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canRevise(unrelated, 30L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canContinue(unrelated, 30L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canRead(unrelated, 30L));
+        verify(permissionApi, never()).getDeptDataPermission(30L);
+    }
+
+    @Test
+    void withoutQueryAllManagementRetainsSelfAndDepartmentScope() {
+        when(permissionApi.getDeptDataPermission(30L)).thenReturn(scope(false, true, Set.of(10L)));
+        when(adminUserApi.getUserListByDeptIds(Set.of(10L))).thenReturn(List.of(
+                user(101L, ENABLE.getStatus()), user(102L, DISABLE.getStatus())));
+
+        SalesOrderManagementScope result = service.resolveManagementScope(30L);
+        org.junit.jupiter.api.Assertions.assertFalse(result.isAll());
+        assertEquals(Set.of(30L, 101L), result.getSubmitterUserIds());
+        org.junit.jupiter.api.Assertions.assertTrue(service.canReadManagement(new SalesOrderDO().setSubmitterUserId(101L), 30L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canReadManagement(new SalesOrderDO().setSubmitterUserId(999L), 30L));
+    }
+
     private cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO scope(
             boolean all, boolean self, Set<Long> deptIds) {
         var result = new cn.iocoder.yudao.framework.common.biz.system.permission.dto.DeptDataPermissionRespDTO();

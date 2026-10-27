@@ -116,11 +116,13 @@ public class SalesOrderObjectPermissionService {
 
     /**
      * Resolves the submitters visible to the unified order-management list from
-     * System data scope. The result is tenant-scoped by the System APIs.
+     * System data scope, extended by the independent management read-all permission.
+     * This only expands reads; command ownership and page permissions remain separate.
      */
     public SalesOrderManagementScope resolveManagementScope(Long userId) {
         if (permissionApi == null) return SalesOrderManagementScope.empty();
-        if (permissionApi.hasTenantReadAllAccess(userId)) {
+        if (permissionApi.hasTenantReadAllAccess(userId)
+                || permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_ALL)) {
             return new SalesOrderManagementScope(true, true, Set.of(), Set.of());
         }
         DeptDataPermissionRespDTO scope = permissionApi.getDeptDataPermission(userId);
