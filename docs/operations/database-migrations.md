@@ -1,5 +1,25 @@
 # Database migration operations
 
+## Schema verification: inline primary keys and data findings
+
+The desired-schema parser recognizes both `id bigint PRIMARY KEY` and the table
+constraint `PRIMARY KEY (id)` as a unique `primary` index. Inline primary keys
+also imply `NOT NULL` in MySQL; quoted defaults and comments are not constraints.
+This covers the V346 diagnosis metric/member definitions without changing their
+baseline, migration, installed indexes, or checksums. Do not drop the actual
+primary keys or add index exceptions to resolve this parser error.
+
+Run `python3 -B script/sql/mysql/tools/test_schema_drift.py` for the parser and
+fail-closed drift regressions. A schema PASS means the enabled modules match the
+desired structure. Data-grade FAIL/MISSING findings remain separate warnings:
+empty business dictionaries, version-1 filters and fixed historical template/menu
+snapshots can diverge after configuration or later migrations. Number integrity,
+counter consistency, duplicate role-menu assignments and contact-claim completeness
+still need individual investigation; they are not automatically valid differences.
+Never replay bootstrap, reset business configuration or rewrite grants/checksums
+to make these warnings disappear. Shared-data or permission repairs require a
+separately reviewed target, impact and authorization under the repository rules.
+
 ## V339 在 V343 之后重跑
 
 V343 将 `pending_guard` 从“每租户一个非异常系统班”收窄为“每租户一个 PENDING 班”，

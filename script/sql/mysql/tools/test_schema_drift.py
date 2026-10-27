@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Protect exact operational-backup exceptions and fail-closed schema checks."""
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import zsjos_db as db
@@ -24,6 +26,50 @@ REPAIR_BACKUPS = (
     'zsjos_media_account_bak_create_time_20261008_pt2',
     'zsjos_person_bak_mobile_20261008',
 )
+
+
+class DesiredSchemaPrimaryKeyTest(unittest.TestCase):
+    def parse(self, sql):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'schema.sql'
+            path.write_text(sql, encoding='utf-8')
+            return db.desired_schema(path)
+
+    def test_inline_primary_key_and_implicit_not_null(self):
+        for definition, column_type in (
+            ('id bigint NOT NULL AUTO_INCREMENT PRIMARY KEY', 'bigint'),
+            ('`ID` BIGINT UNSIGNED pRiMaRy\nKeY', 'bigint unsigned'),
+        ):
+            with self.subTest(definition=definition):
+                columns, indexes, _ = self.parse(f'CREATE TABLE probe ({definition});')
+                self.assertEqual('NO', columns[('probe', 'id')][1])
+                self.assertEqual(column_type, columns[('probe', 'id')][0])
+                self.assertEqual({('probe', 'primary'): (0, ('id',))}, indexes)
+
+    def test_primary_key_text_in_literals_does_not_create_index(self):
+        columns, indexes, _ = self.parse("""CREATE TABLE probe (
+            id bigint COMMENT 'PRIMARY KEY',
+            label varchar(64) DEFAULT 'PRIMARY KEY' COMMENT 'owner''s PRIMARY KEY',
+            other varchar(64) COMMENT "PRIMARY KEY NOT NULL"
+        );""")
+        self.assertEqual({}, indexes)
+        self.assertTrue(all(nullable == 'YES' for _, nullable in columns.values()))
+
+    def test_table_level_composite_primary_key_is_preserved(self):
+        _, indexes, _ = self.parse('''CREATE TABLE probe (
+            tenant_id bigint NOT NULL, id bigint NOT NULL,
+            PRIMARY KEY (tenant_id, id), KEY id_lookup (id)
+        );''')
+        self.assertEqual({('probe', 'primary'): (0, ('tenant_id', 'id')),
+                          ('probe', 'id_lookup'): (1, ('id',))}, indexes)
+
+    def test_diagnosis_primary_keys_in_schema_baseline_and_migration(self):
+        for relative in ('schema/core.sql', '00-bootstrap-schema.sql',
+                         'migrations/V346__weekly_account_diagnosis.sql'):
+            with self.subTest(path=relative):
+                _, indexes, _ = db.desired_schema(db.SQL_ROOT / relative)
+                for table in ('zsjos_account_diagnosis_metric', 'zsjos_account_diagnosis_member'):
+                    self.assertEqual((0, ('id',)), indexes[(table, 'primary')])
 
 
 class SchemaDriftTest(unittest.TestCase):
@@ -158,6 +204,19 @@ class SchemaDriftTest(unittest.TestCase):
             self.add_table('zsjos_unreviewed_bak_20260930012653')
             with self.assertRaisesRegex(db.CommandError, 'unexpected table zsjos_unreviewed_bak'):
                 db.verify_database('production', self.client)
+
+    def test_data_findings_remain_visible_without_masking_schema_failure(self):
+        self.client.execute_file.return_value = 'historical\tFAIL\nabsent\tMISSING\nvalid\tPASS\n'
+        with patch.object(db, 'enabled_manifests', return_value=self.manifests), \
+                patch.object(db, 'info'), patch.object(db, 'warn') as warning:
+            db.verify_database('production', self.client)
+            self.assertIn('core: historical\tFAIL', warning.call_args.args[0])
+            self.assertIn('core: absent\tMISSING', warning.call_args.args[0])
+            self.assertNotIn('core: valid', warning.call_args.args[0])
+            self.actual_indexes = []
+            with self.assertRaisesRegex(db.CommandError, 'missing index zsjos_order.primary'):
+                db.verify_database('production', self.client)
+            self.assertEqual(2, warning.call_count)
 
 
 class PendingNamingDriftTest(unittest.TestCase):

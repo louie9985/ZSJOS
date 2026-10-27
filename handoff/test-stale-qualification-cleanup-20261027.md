@@ -1,0 +1,17 @@
+# 转派遗留判定任务清理
+
+- Registration: 2026-10-27 Beijing; workstream `test-stale-qualification-cleanup-20261027`; owner `/root`; environment `test` (environment marker); branch `main`; worktree `/opt/zsjos`; base/HEAD `8279212fb97129ba6b006dbb0452ad843dfde4b5`.
+- User goal/authorization: 用户明确要求清理所描述的转派遗留判定任务。使用现有数据库连接配置，只在当前 test 环境 tenant 1 取消已核实遗留任务，保留历史。
+- Scope/ownership: this handoff; `script/sql/mysql/repairs/cleanup_stale_qualification_20261027.py`; `docs/operations/stale-qualification-cleanup-20261027.md`; private evidence `/opt/zsjos-runtime/backups/stale-qualification-cleanup-20261027-test/`. Database scope: 30 pending qualification tasks with older rounds, different current owners and explicit subsequent transfer evidence; their 29 pending performance attribution rows.
+- Non-goals: application implementation/deployment, other task types, current-round tasks, notifications, schema/ledgers, permissions, branches/commits/pushes. Preserve all existing unrelated Git changes.
+- Dependencies: existing MySQL 8.4.11 and repository PyMySQL connection helper; no new dependency. Target branch/integration order: None.
+- Verification plan: exact before-image plan; MySQL session-local temporary copies for initial/repeat/rollback/recovery/stale-plan refusal; serializable live transaction with lead/task/history/attribution locks, complete scoped before/after comparison, Chinese HEX; independent postcommit read and zero-write repeat. No browser claim.
+
+## Delivery — 2026-10-27 18:14 Beijing
+
+- Context: registration above; owner `/root`; branch/worktree/HEAD unchanged; integration None.
+- Result: test tenant 1 committed cancellation of exactly 30 stale qualification tasks (29 Leads, 5 former assignees; 29 overdue at inspection), plus ending their 29 pending qualification performance rows. One task has no attribution row; no historical fact invented. No business rows deleted. Current-owner/current-round pending tasks retained (52).
+- Verification: MySQL 8.4.11 session-local temporary copies passed initial application, repeat no-op, injected failure rollback and recovery, stale-preimage refusal, exact scoped comparisons and Chinese HEX. Initial rehearsal setup encountered same-name CREATE LIKE and generated-column insertion limitations; corrected using SHOW CREATE TABLE and excluding generated columns. These failures wrote no live business rows. Live serializable transaction locked and verified full scoped preimages; postimages saved before commit. New independent read-only connection verified exact postimages and zero remaining stale candidates; active qualification totals completed 1392, cancelled 404, pending 52. Live repeat returned zero task/attribution writes.
+- Evidence: private 0700 directory recorded above with 0600 plan.json, rehearsal.json, precommit.json, verified.json; no sensitive payloads in repository or reports. Python AST/UTF-8/scoped whitespace, evidence permissions and git diff --check passed.
+- Changed files: scoped repair script, operations document, this handoff only. Existing unrelated Git changes preserved. No schema/ledger, permission, notification, service lifecycle, branch, commit, push or deployment changes.
+- Remaining: ordinary-transfer source defect is unchanged and can create future stale tasks; this is historical cleanup only. Authenticated browser/API verification was not performed; database state and existing pending-task query contract verified. Requested cleanup complete; ownership released.

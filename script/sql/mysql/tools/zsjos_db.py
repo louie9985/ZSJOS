@@ -361,7 +361,17 @@ def desired_schema(path: Path) -> tuple[
                     column_type += " unsigned"
                 if re.search(r"\bZEROFILL\b", item, re.IGNORECASE):
                     column_type += " zerofill"
-                nullable = "NO" if re.search(r"\bNOT\s+NULL\b", item, re.IGNORECASE) else "YES"
+                # MySQL exposes a column-level PRIMARY KEY as the same PRIMARY
+                # index as a table constraint, and makes the column NOT NULL.
+                # Ignore quoted defaults/comments when looking for attributes.
+                attributes = re.sub(
+                    r"""'(?:[^'\\]|\\.|'')*'|"(?:[^"\\]|\\.|"")*"|`(?:[^`]|``)*`|/\*.*?\*/""",
+                    "", item[column_match.end():], flags=re.DOTALL,
+                )
+                inline_primary = re.search(r"\bPRIMARY\s+KEY\b", attributes, re.IGNORECASE)
+                if inline_primary:
+                    indexes[(table, "primary")] = (0, (column,))
+                nullable = "NO" if inline_primary or re.search(r"\bNOT\s+NULL\b", attributes, re.IGNORECASE) else "YES"
                 columns[(table, column)] = (column_type, nullable)
                 continue
     # Standalone `CREATE [UNIQUE] INDEX name ON table (cols);` statements
@@ -1146,9 +1156,9 @@ def verify_database(environment: str, client: MysqlClient | None = None) -> None
     if data_failures:
         warn(
             "Database data-grade verifiers reported FAIL/MISSING; "
-            "these are base-state snapshots that may legitimately diverge on "
-            "an already-in-use production database. See below and confirm each "
-            "against business intent:\n" + "\n".join(sorted(set(data_failures)))
+            "these include historical initialization snapshots and data-integrity audits. "
+            "Review each against the current business contract; a schema PASS "
+            "does not clear these findings:\n" + "\n".join(sorted(set(data_failures)))
         )
     if drift:
         fail("Database verification failed:\n" + "\n".join(f"core drift: {item}" for item in drift))
