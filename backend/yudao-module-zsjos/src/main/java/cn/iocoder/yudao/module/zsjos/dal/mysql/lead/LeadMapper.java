@@ -308,6 +308,22 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                             LeadInboxFilterQuery inboxFilter,
                                                             List<Long> matchedLeadIds,
                                                             List<Long> priorityLeadIds) {
+        return selectScopedManagementPage(reqVO, visibleSourceUserIds, visibleOwnerUserIds, queryAll,
+                inboxFilter, matchedLeadIds, priorityLeadIds, false);
+    }
+
+    default PageResult<LeadDO> selectOperationsPage(LeadManagementPageReqVO reqVO, Long memberId,
+                                                    LeadInboxFilterQuery inboxFilter, List<Long> matchedLeadIds) {
+        return selectScopedManagementPage(reqVO, List.of(memberId), List.of(), false,
+                inboxFilter, matchedLeadIds, List.of(), true);
+    }
+
+    private PageResult<LeadDO> selectScopedManagementPage(LeadManagementPageReqVO reqVO,
+                                                         List<Long> visibleSourceUserIds,
+                                                         List<Long> visibleOwnerUserIds, boolean queryAll,
+                                                         LeadInboxFilterQuery inboxFilter,
+                                                         List<Long> matchedLeadIds, List<Long> priorityLeadIds,
+                                                         boolean operationsOnly) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
@@ -317,6 +333,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getProviderOwnerId, reqVO.getProviderOwnerId())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
+        if (operationsOnly) query.isNull(LeadDO::getPartnerId);
         if (reqVO.isSalesOnly()) query.apply(SubordinateSalesIdentitySql.CONDITION);
         applySubmitterFilters(query, reqVO);
         if (inboxFilter != null && inboxFilter.matchNone()) {
@@ -331,7 +348,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
         if (!queryAll) {
-            if (isFollowUpView(reqVO, inboxFilter) && !"submitted".equals(reqVO.getRelationScope())
+            if (!operationsOnly && isFollowUpView(reqVO, inboxFilter) && !"submitted".equals(reqVO.getRelationScope())
                     && !"submitter".equals(reqVO.getAudience())) {
                 applyFollowUpScope(query, visibleOwnerUserIds);
             } else {
@@ -343,7 +360,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                     .or(nested -> nested.eq(LeadDO::getSubmittedAt, reqVO.getCursorSubmittedAt())
                             .lt(LeadDO::getId, reqVO.getCursorId())));
         }
-        if (!priorityLeadIds.isEmpty()) {
+        // Explicit sorting must apply globally before pagination, even for older clients requesting task priority.
+        if (!priorityLeadIds.isEmpty() && (reqVO.getSortField() == null || reqVO.getSortOrder() == null)) {
             // IDs are typed Long values derived by the service, never a client-provided SQL fragment.
             String ids = priorityLeadIds.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
             query.getExpression().add(com.baomidou.mybatisplus.core.enums.SqlKeyword.ORDER_BY,

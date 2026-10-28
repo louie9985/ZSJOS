@@ -449,3 +449,7 @@ MySQL 可存多个 NULL，未预约跟进仍受提交幂等键约束。升级以
 新履约按商品选班允许 `NORMAL/PENDING/UNSCHEDULED`；`UNSCHEDULED` 名称“未确定考期”，owner 必须实时校验并绑定班主任，不能因 systemClass=true 置空。保存分班及建立交付都重新校验目标服务状态及规划师资格，异常结业班不允许。直接选规划师的新履约进入该规划师唯一 UNSCHEDULED，保持逐订单商品服务身份、通知和接收规则；已建立服务的班级不被报名重放覆盖，历史数据不自动搬迁。响应 ClassAssignment 增加 classKind，双端以班型区分全局待分班和规划师默认班。参见 delivery-class-management.md 的 V343 部署顺序。
 
 2026-10-22：兼容聚合学员及新媒体学员的关键词查询先以订单姓名快照/联系方式等筛出数据库候选，仍以授权显示投影进行精确核验；带关键词排序只收集一次匹配集，不按结果页重复扫描。内部候选字段不作为新的授权来源。
+
+### Legacy exam workflow retirement (2026-10-28)
+
+The authorized exam-date PUT and delivery-stage POST endpoints now reject all commands with business error `1900010090` (legacy exam flow retired), without business writes. First-contact, study-plan and ordinary-contact APIs remain active. Stage navigation ends at supervision; historical later stages remain readable and allow ordinary contact for open services. Exam-date reminders and their scheduler are removed. No database history or role assignments are rewritten. Class exam schedules and the exam calendar are unchanged.

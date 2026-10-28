@@ -64,6 +64,8 @@ http.defaults.adapter = async config => {
       funnel: month === '2026-08' ? { submitted: 8, valid: 5, converted: 2 } : { submitted: 0, valid: 0, converted: 0 }
     }
     if (location.search.includes('legacy')) data = { ...(data as typeof overview), funnel: undefined }
+    const targetState = new URLSearchParams(location.search).get('summaryTarget')
+    if (targetState) data = { ...(data as typeof overview), target: { ...target, targetCount: targetState === 'unset' ? null : Number(targetState) } }
   }
   else if (path.endsWith('/revisions')) data = [{
     id: 9, targetId: 3, beforeJson: JSON.stringify({ targetCount: 15, manual: true }),

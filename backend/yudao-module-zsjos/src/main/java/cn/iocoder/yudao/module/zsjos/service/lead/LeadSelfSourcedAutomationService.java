@@ -45,8 +45,8 @@ public class LeadSelfSourcedAutomationService {
         }
         if (request.getRemark() == null || request.getRemark().isBlank()) throw exception(LEAD_SELF_SOURCED_REMARK_REQUIRED);
         request.setRemark(request.getRemark().trim());
-        if (request.getSelfSourcedNextFollowUpAt() != null
-                && !request.getSelfSourcedNextFollowUpAt().isAfter(LocalDateTime.now(ZoneId.of("Asia/Shanghai")))) {
+        if (request.getSelfSourcedNextFollowUpAt() == null
+                || !request.getSelfSourcedNextFollowUpAt().isAfter(LocalDateTime.now(ZoneId.of("Asia/Shanghai")))) {
             throw exception(LEAD_FOLLOW_UP_TIME_INVALID);
         }
         requireDictionary(DICT_FOLLOW_UP_METHOD, LeadAutomaticGeneration.METHOD);

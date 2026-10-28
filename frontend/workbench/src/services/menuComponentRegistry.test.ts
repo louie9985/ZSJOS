@@ -14,6 +14,10 @@ describe('workbench menu component registry', () => {
     expect(resolveWorkbenchComponent('zsjos/subordinateSales/index')).toBe(WORKBENCH_COMPONENT.SUBORDINATE_SALES)
   })
 
+  it('maps the server-owned operations page independently', () => {
+    expect(resolveWorkbenchComponent('zsjos/myOperations/index')).toBe(WORKBENCH_COMPONENT.MY_OPERATIONS)
+  })
+
   it('maps education team independently', () => { expect(resolveWorkbenchComponent('zsjos/educationTeam/index')).toBe(WORKBENCH_COMPONENT.EDUCATION_TEAM) })
   it('leaves unknown server components on the migration placeholder', () => {
     expect(resolveWorkbenchComponent('zsjos/notMigrated/index')).toBeUndefined()

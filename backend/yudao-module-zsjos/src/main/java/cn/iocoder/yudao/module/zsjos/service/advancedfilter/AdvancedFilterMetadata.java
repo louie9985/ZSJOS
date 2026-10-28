@@ -14,7 +14,7 @@ final class AdvancedFilterMetadata {
 
     // Known pageKey integrations, not a menu tree or permission allowlist.
     private static final Map<String, List<String>> PAGES = Map.of(
-            "lead", List.of("lead_management", "lead_claim_pool", "lead_public_sea_pool", "subordinate_sales_leads"),
+            "lead", List.of("lead_management", "lead_claim_pool", "lead_public_sea_pool", "subordinate_sales_leads", "my_operations_leads"),
             "order", List.of("sales_order_management", "sales_order_approval:registration",
                     "sales_order_approval:finance", "sales_order_approval", "sales_order_supervisor_confirm"),
             "lead_appeal", List.of("lead_appeal"),

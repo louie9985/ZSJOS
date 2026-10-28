@@ -61,6 +61,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LeadManagementServiceImplTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService myOperationsService;
 
     @InjectMocks
     private LeadManagementServiceImpl service;
@@ -108,6 +109,42 @@ class LeadManagementServiceImplTest {
     @Mock private cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService menuTaskSummaryService;
 
     @Test
+    void operationsListOverridesCallerAudienceAndKeepsProviderScopeForFollowUpFilters() {
+        var req = new LeadManagementPageReqVO();
+        req.setAudience("owner"); req.setRelationScope("owned"); req.setPendingTasksFirst(true);
+        req.setSimpleStatus("following");
+        var config = new LeadInboxFilterConfigVO();
+        var filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false);
+        when(inboxFilterConfigService.getPublishedConfig("management")).thenReturn(config);
+        when(inboxFilterConfigService.resolveQuery(config, null, req.getInboxSectionOptions())).thenReturn(filter);
+        when(leadMapper.selectOperationsPage(req, 20L, filter, null)).thenReturn(PageResult.empty());
+        assertTrue(service.getOperationsLeadPage(req, 20L, 10L).getList().isEmpty());
+        verify(myOperationsService).checkMember(10L, 20L);
+        assertEquals("management", req.getAudience());
+        assertEquals("submitted", req.getRelationScope());
+        assertFalse(req.getPendingTasksFirst());
+        verifyNoInteractions(menuTaskSummaryService);
+    }
+
+    @Test
+    void operationsListRejectsForgedMemberBeforeQueries() {
+        org.mockito.Mockito.doThrow(new ServiceException(LEAD_PERMISSION_DENIED)).when(myOperationsService).checkMember(10L, 20L);
+        assertThrows(ServiceException.class, () -> service.getOperationsLeadPage(new LeadManagementPageReqVO(), 20L, 10L));
+        verifyNoInteractions(leadMapper, advancedFilterService, inboxFilterConfigService);
+    }
+
+    @Test
+    void operationsDetailChecksSelectedMemberBeforeLoadingObject() throws Exception {
+        org.mockito.Mockito.doThrow(new ServiceException(LEAD_PERMISSION_DENIED)).when(myOperationsService).checkLead(10L, 20L, 30L);
+        assertThrows(ServiceException.class, () -> service.getOperationsLead(20L, 30L, 10L));
+        verifyNoInteractions(leadMapper);
+        var annotation = LeadManagementServiceImpl.class.getMethod("getOperationsLead", Long.class, Long.class, Long.class)
+                .getAnnotation(ZsjosPermission.class);
+        assertEquals("read", annotation.action());
+        assertEquals("#id", annotation.bizId());
+    }
+
+    @Test
     void managedSalesFiltersIntersectForcedOwnerAndRejectCallerScopeOverrides() {
         LeadManagementPageReqVO request = new LeadManagementPageReqVO();
         request.setAudience("management"); request.setInboxGroup("valid"); request.setInboxQuick("today");
@@ -124,6 +161,33 @@ class LeadManagementServiceImplTest {
         assertEquals(20L, request.getOwnerUserId()); assertNull(request.getRecycleSourceOwnerUserId());
         assertEquals("owned", request.getRelationScope()); assertTrue(request.isSalesOnly());
         verify(leadMapper).selectManagementPage(request, 20L, List.of(), filter, null);
+    }
+
+    @Test
+    void supervisorRecycleProjectsOnlyForManagedSalesAcrossStates() {
+        LeadDO lead = actionLead("won", "owned", true);
+        lead.setClosedAt(LocalDateTime.now());
+        when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
+        when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-recycle")).thenReturn(true);
+        when(publicSeaPoolService.canOperate(1L, 20L, 20L)).thenReturn(false);
+        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("sales", "education");
+        assertActions(lead, null, "SUPERVISOR_RECYCLE");
+        assertActions(lead, null);
+    }
+
+    @Test
+    void recycledSalesTransferPreservesStatusActionsAndDoesNotOfferInvalidRelease() {
+        LeadDO lead = actionLead("suspended", "recycle_pending", true);
+        lead.setOwnerUserId(null); lead.setRecycleSourceOwnerUserId(20L);
+        when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
+        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("sales");
+        when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-transfer")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead:qualification:manage")).thenReturn(true);
+        when(leadObjectPermissionService.canManageQualificationException(lead, 20L)).thenReturn(true);
+        assertActions(lead, null, "QUALIFICATION_TRANSFER", "SUPERVISOR_TRANSFER");
+
+        lead.setStatus("won"); lead.setClosedAt(LocalDateTime.now());
+        assertActions(lead, null, "SUPERVISOR_TRANSFER");
     }
 
     @Test
@@ -200,6 +264,8 @@ class LeadManagementServiceImplTest {
         LeadRestoreOwnerPolicy policy = new LeadRestoreOwnerPolicy();
         LeadSubmissionIdentityService identityService = org.mockito.Mockito.mock(LeadSubmissionIdentityService.class);
         when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
+        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("education");
+        org.springframework.test.util.ReflectionTestUtils.setField(policy, "teamTransferPolicy", teamTransferPolicy);
         org.springframework.test.util.ReflectionTestUtils.setField(policy, "identityService", identityService);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "restoreOwnerPolicy", policy);
         assertActions(lead, null);
@@ -810,6 +876,7 @@ class LeadManagementServiceImplTest {
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
         when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("sales");
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());

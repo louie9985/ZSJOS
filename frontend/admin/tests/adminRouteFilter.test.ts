@@ -93,3 +93,13 @@ test('new-media analysis and target pages remain Workbench-only', () => {
   ] }])
   assert.deepEqual(routes[0].children?.map(route => route.path), ['roles'])
 })
+
+
+test('my operations stays Workbench-only while System configuration remains available', () => {
+  const routes = filterAdminRoutes([{ path: '/zsjos', children: [
+    { path: 'my-operations', component: 'zsjos/myOperations/index' },
+    { path: 'subordinate-sales', component: 'zsjos/subordinateSales/index' }
+  ] }, { path: '/system/role', component: 'system/role/index' }])
+  assert.deepEqual(routes[0].children?.map(route => route.path), ['subordinate-sales'])
+  assert.equal(routes[1].path, '/system/role')
+})

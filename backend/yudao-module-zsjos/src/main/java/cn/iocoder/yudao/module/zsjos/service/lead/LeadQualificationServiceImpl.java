@@ -26,6 +26,14 @@ import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterServic
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import jakarta.annotation.Resource;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadTransferRequestDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadTransferRequestMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCompatibilityRecordMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +49,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Resource private LeadMapper leadMapper;
+    @Resource private SalesOrderMapper salesOrderMapper;
+    @Resource private LeadTransferRequestMapper leadTransferRequestMapper;
+    @Resource private LeadPublicSeaPoolCompatibilityRecordMapper publicSeaPoolCompatibilityRecordMapper;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Resource private LeadTeamTransferPolicy teamTransferPolicy;
@@ -247,6 +259,10 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         }
         SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead);
         boolean education = teamTransferPolicy.isEducation(lead);
+        if (recycled && !education) {
+            salesSupervisorTransferRecycled(leadId, userId, reqVO);
+            return;
+        }
         if (education) teamTransferPolicy.requireTarget(lead, reqVO.getSalesUserId(), userId);
         else requireEligibleSales(reqVO.getSalesUserId(), userId, true);
         LocalDateTime now = LocalDateTime.now();
@@ -296,6 +312,10 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         if (!STATUS_SUSPENDED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
+        if (!teamTransferPolicy.isEducation(lead)) {
+            salesSupervisorRecycle(leadId, userId, reqVO);
+            return;
+        }
         LocalDateTime now = LocalDateTime.now();
         Long fromOwner = lead.getOwnerUserId();
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管回收");
@@ -330,6 +350,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         boolean suspended = STATUS_SUSPENDED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
         boolean recycled = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus());
         if (!suspended && !recycled) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        if (recycled && !STATUS_SUBMITTED.equals(lead.getStatus())) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         LocalDateTime now = LocalDateTime.now();
         Long fromOwner = suspended ? lead.getOwnerUserId() : lead.getRecycleSourceOwnerUserId();
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管释放到抢单池");
@@ -350,6 +371,95 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                         "assignmentHistoryId", history.getId()));
         publishDispositionNotification(QUALIFICATION_RELEASED, lead, userId, key,
                 fromOwner, null, reqVO.getReason().trim(), now);
+    }
+
+    @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-qualification.process-expired", targetType = "lead")
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="主管回收", target="lead", id=0, actor=1, actorType="ADMIN")
+    public void salesSupervisorRecycle(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
+        LeadDO lead = requireLeadForUpdate(leadId);
+        String key = dispositionKey(reqVO.getIdempotencyKey());
+        if (isIdempotent(key, leadId, userId, EVENT_LEAD_RECYCLED)) return;
+        if (!SupervisorLeadActionPolicy.isSalesRecycleAllowed(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        requireNoSalesRecycleApproval(leadId);
+        LocalDateTime now = LocalDateTime.now();
+        Long fromOwner = lead.getOwnerUserId();
+        publicSeaPoolService.terminateForOwnerTransfer(leadId, null, userId, now, "主管回收，原公海周期终止");
+        var compatibilityRecord = publicSeaPoolCompatibilityRecordMapper.selectByLeadIdForUpdate(
+                leadId, TenantContextHolder.getRequiredTenantId());
+        if (compatibilityRecord != null) publicSeaPoolCompatibilityRecordMapper.deleteById(compatibilityRecord.getId());
+        lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管回收");
+        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, now, "主管回收");
+        lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资回收");
+        LeadAssignmentHistoryDO history = addHistory(leadId, ACTION_RECYCLE, fromOwner, null, userId, reqVO.getReason(), now);
+        history.setOwnerIdentitySnapshot(lead.getOwnerIdentity());
+        historyMapper.updateById(history);
+        lead.setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING);
+        lead.setRecycleSourceOwnerUserId(fromOwner);
+        lead.setOwnerUserId(null); lead.setOwnerIdentity(null);
+        lead.setCurrentAssignmentHistoryId(null); lead.setCurrentAssignmentFirstFollowUpAt(null);
+        lead.setCurrentAssignmentFirstFollowUpDeadlineAt(null); lead.setNextFollowUpAt(null);
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
+        if (opportunity != null && opportunity.getNextFollowUpAt() != null) {
+            opportunityMapper.update(null, new LambdaUpdateWrapper<OpportunityDO>().eq(OpportunityDO::getId, opportunity.getId())
+                    .set(OpportunityDO::getNextFollowUpAt, null));
+        }
+        if (STATUS_SUBMITTED.equals(lead.getStatus())) {
+            lead.setQualificationStartedAt(null); lead.setQualificationDeadlineAt(null); lead.setQualificationRuleSnapshot(null);
+        }
+        LeadMapper.advanceActivity(lead, now);
+        leadMapper.update(null, new LambdaUpdateWrapper<LeadDO>().eq(LeadDO::getId, leadId)
+                .set(LeadDO::getAssignmentStatus, ASSIGNMENT_RECYCLE_PENDING)
+                .set(LeadDO::getOwnerUserId, null).set(LeadDO::getOwnerIdentity, null)
+                .set(LeadDO::getRecycleSourceOwnerUserId, fromOwner)
+                .set(LeadDO::getCurrentAssignmentHistoryId, null).set(LeadDO::getCurrentAssignmentFirstFollowUpAt, null)
+                .set(LeadDO::getCurrentAssignmentFirstFollowUpDeadlineAt, null).set(LeadDO::getNextFollowUpAt, null)
+                .set(STATUS_SUBMITTED.equals(lead.getStatus()), LeadDO::getQualificationStartedAt, null)
+                .set(STATUS_SUBMITTED.equals(lead.getStatus()), LeadDO::getQualificationDeadlineAt, null)
+                .set(STATUS_SUBMITTED.equals(lead.getStatus()), LeadDO::getQualificationRuleSnapshot, null)
+                .set(LeadDO::getLastActivityAt, lead.getLastActivityAt()));
+        addEvent(EVENT_LEAD_RECYCLED, lead, userId, ASSIGNMENT_OWNED, ASSIGNMENT_RECYCLE_PENDING,
+                reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner, "assignmentHistoryId", history.getId()));
+        publishDispositionNotification(QUALIFICATION_RECYCLED, lead, userId, key, fromOwner, null, reqVO.getReason().trim(), now);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="主管转派", target="lead", id=0, actor=1, actorType="ADMIN")
+    public void salesSupervisorTransferRecycled(Long leadId, Long userId, LeadTransferReqVO reqVO) {
+        LeadDO lead = requireLeadForUpdate(leadId);
+        String key = dispositionKey(reqVO.getIdempotencyKey());
+        if (isIdempotent(key, leadId, userId, EVENT_LEAD_TRANSFERRED)) return;
+        if (!SupervisorLeadActionPolicy.isSalesRecycledTransferAllowed(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        requireEligibleSales(reqVO.getSalesUserId(), userId, true);
+        LocalDateTime now = LocalDateTime.now();
+        Long fromOwner = lead.getRecycleSourceOwnerUserId();
+        lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管转派");
+        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, now, "主管转派");
+        lifecycleTaskService.cancelFollowUpReminders(leadId, now, "主管转派");
+        LeadAssignmentHistoryDO history = addHistory(leadId, ACTION_TRANSFER, fromOwner, reqVO.getSalesUserId(), userId, reqVO.getReason(), now);
+        lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(reqVO.getSalesUserId());
+        lead.setOwnerIdentity(OWNER_SALES); lead.setRecycleSourceOwnerUserId(null);
+        lead.setCurrentAssignmentHistoryId(history.getId()); lead.setCurrentAssignmentFirstFollowUpAt(null);
+        lead.setCurrentAssignmentFirstFollowUpDeadlineAt(null); lead.setNextFollowUpAt(null);
+        lead.setOwnershipStartedAt(now);
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
+        if (opportunity != null) { opportunity.setOwnerUserId(reqVO.getSalesUserId()); opportunityMapper.updateById(opportunity); }
+        if (lead.getClosedAt() == null && Set.of(STATUS_SUBMITTED, STATUS_VALID, STATUS_CONVERTED).contains(lead.getStatus())) {
+            lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
+                    leadId, reqVO.getSalesUserId(), history.getId(), now, EVENT_LEAD_TRANSFERRED, ASSIGNMENT_RECYCLE_PENDING));
+            if (STATUS_SUBMITTED.equals(lead.getStatus())) lifecycleTaskService.createQualificationTask(lead, reqVO.getSalesUserId(), now);
+        }
+        LeadMapper.advanceActivity(lead, now);
+        leadMapper.update(lead, new LambdaUpdateWrapper<LeadDO>().eq(LeadDO::getId, leadId)
+                .set(LeadDO::getRecycleSourceOwnerUserId, null).set(LeadDO::getCurrentAssignmentFirstFollowUpAt, null)
+                .set(LeadDO::getNextFollowUpAt, null));
+        addEvent(EVENT_LEAD_TRANSFERRED, lead, userId, ASSIGNMENT_RECYCLE_PENDING, ASSIGNMENT_OWNED,
+                reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner, "toOwnerUserId", reqVO.getSalesUserId(), "assignmentHistoryId", history.getId()));
+        publishDispositionNotification(QUALIFICATION_TRANSFERRED, lead, userId, key, fromOwner, reqVO.getSalesUserId(), reqVO.getReason().trim(), now);
     }
 
     @Override
@@ -451,6 +561,17 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
             processed++;
         }
         return processed;
+    }
+
+    private void requireNoSalesRecycleApproval(Long leadId) {
+        boolean order = salesOrderMapper.selectOne(new LambdaQueryWrapper<SalesOrderDO>()
+                .eq(SalesOrderDO::getLeadId, leadId).eq(SalesOrderDO::getStatus, "pending_approval").last("LIMIT 1 FOR UPDATE")) != null;
+        boolean transfer = leadTransferRequestMapper.selectOne(new LambdaQueryWrapper<LeadTransferRequestDO>()
+                .eq(LeadTransferRequestDO::getLeadId, leadId).eq(LeadTransferRequestDO::getStatus, "pending").last("LIMIT 1 FOR UPDATE")) != null;
+        boolean appeal = appealMapper.selectOne(new LambdaQueryWrapper<LeadAppealDO>()
+                .eq(LeadAppealDO::getLeadId, leadId).in(LeadAppealDO::getStatus, APPEAL_STATUS_SALES_MANAGER_REVIEWING,
+                        APPEAL_STATUS_QUALITY_REVIEWING, APPEAL_STATUS_CHAIRMAN_REVIEWING, "pending").last("LIMIT 1 FOR UPDATE")) != null;
+        if (order || transfer || appeal) throw exception(LEAD_RECYCLE_APPROVAL_ACTIVE);
     }
 
     private void requireQualificationPending(LeadDO lead, Long userId) {

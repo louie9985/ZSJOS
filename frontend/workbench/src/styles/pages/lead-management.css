@@ -628,6 +628,10 @@
 .inbox-avatar-filters .advanced-filter-toolbar > .ant-badge { flex: none; }
 .inbox-avatar-filters .lead-inbox-toolbar > .ant-dropdown { grid-column: 3; grid-row: 1; }
 .inbox-avatar-filters .advanced-filter-tags { grid-column: 1 / -1; }
+.lead-inbox-controls { grid-template-columns: auto minmax(0, 1fr); }
+.lead-inbox-controls .advanced-filter-tags { min-width: 0; margin: 0; }
+.lead-inbox-controls .advanced-filter-tags .ant-tag { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.lead-inbox-result-count { grid-column: 1 / -1; display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--crm-sp-3); font-size: var(--crm-font-sm); padding-block: var(--crm-sp-2); }
 .inbox-avatar-secondary-filters { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--crm-sp-2); }
 .inbox-avatar-secondary-filters > .ant-select { min-width: 0; }
 .inbox-avatar-layout.is-avatar-collapsed .inbox-avatar-toolbar { display: flex; justify-content: center; padding-right: var(--crm-sp-1); }

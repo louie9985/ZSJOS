@@ -28,16 +28,17 @@ export function isSupervisorLeadActionAllowed(
   action: SupervisorLeadBatchAction,
   lead: Pick<ManagedLead, 'status' | 'assignmentStatus' | 'closedAt'>,
 ) {
-  const ownedOrRecyclePending = lead.assignmentStatus === 'owned' || lead.assignmentStatus === 'recycle_pending'
   if (action === 'transfer') {
-    return ['submitted', 'suspended', 'valid', 'converted'].includes(lead.status) && ownedOrRecyclePending
+    return lead.assignmentStatus === 'recycle_pending'
+      || (['submitted', 'suspended', 'valid', 'converted'].includes(lead.status) && lead.assignmentStatus === 'owned')
   }
   if (action === 'restore') return lead.status === 'suspended' && lead.assignmentStatus === 'owned'
   if (action === 'recycle') {
-    return ['submitted', 'suspended'].includes(lead.status) && lead.assignmentStatus === 'owned'
+    return lead.assignmentStatus === 'owned'
   }
   if (action === 'claimPool') {
-    return ['submitted', 'suspended'].includes(lead.status) && ownedOrRecyclePending
+    return (lead.status === 'submitted' && ['owned', 'recycle_pending'].includes(lead.assignmentStatus))
+      || (lead.status === 'suspended' && lead.assignmentStatus === 'owned')
   }
   return ['valid', 'converted'].includes(lead.status) && lead.assignmentStatus === 'owned' && !lead.closedAt
 }

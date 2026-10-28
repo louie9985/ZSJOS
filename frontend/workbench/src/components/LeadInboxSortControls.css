@@ -1,0 +1,5 @@
+.lead-inbox-sort-controls { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--crm-border); padding-top: var(--crm-sp-4); }
+.lead-inbox-sort-fields { display: grid; grid-template-columns: minmax(0, 1fr) 110px; gap: var(--crm-sp-3); }
+.lead-inbox-sort-fields label { display: flex; flex-direction: column; min-width: 0; gap: var(--crm-sp-2); }
+.lead-inbox-sort-fields .ant-select { width: 100%; min-width: 0; }
+.lead-inbox-sort-hint { display: block; margin-top: var(--crm-sp-2); font-size: var(--crm-font-sm); }

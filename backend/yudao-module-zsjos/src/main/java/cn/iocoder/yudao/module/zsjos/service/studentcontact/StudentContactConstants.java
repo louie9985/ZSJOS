@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 
 public interface StudentContactConstants {
+    cn.iocoder.yudao.framework.common.exception.ErrorCode LEGACY_EXAM_FLOW_RETIRED = new cn.iocoder.yudao.framework.common.exception.ErrorCode(1_900_010_090, "旧考试流程已停用，请继续督学，等待新的考试流程");
+
     String RETIRED_PLAN_CHECKLIST_KEY = "voice_learning_plan";
     String PERMISSION_CHECKLIST_UPDATE = "zsjos:student-contact:checklist-update";
     String ACTION_CHECKLIST_UPDATE = "UPDATE_FIRST_CONTACT_CHECKLIST";

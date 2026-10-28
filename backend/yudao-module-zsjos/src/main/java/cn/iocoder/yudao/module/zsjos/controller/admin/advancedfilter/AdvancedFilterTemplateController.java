@@ -40,7 +40,7 @@ public class AdvancedFilterTemplateController {
     @PreAuthorize("(#scene == 'lead' && @ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted',"
             + "'zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:claim-pool:query',"
             + "'zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query'))"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:my-operations:query'))"
             + " || (#scene == 'order' && @ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-management','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create'))"
             + " || (#scene == 'lead_appeal' && @ss.hasAnyPermissions('zsjos:lead:appeal:query',"
@@ -63,7 +63,7 @@ public class AdvancedFilterTemplateController {
 
     @PostMapping("/personal")
     @Operation(summary = "创建个人高级筛选模板")
-    @PreAuthorize("(#reqVO.scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
+    @PreAuthorize("(#reqVO.scene == 'lead' && @ss.hasPermission('zsjos:my-operations:query')) || (#reqVO.scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
             + " || (#reqVO.scene == 'education_team' && @ss.hasPermission('zsjos:education-team:query')) || (#reqVO.scene != 'media_student' && #reqVO.scene != 'education_team' && @ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
@@ -77,7 +77,7 @@ public class AdvancedFilterTemplateController {
 
     @PutMapping("/personal")
     @Operation(summary = "修改个人高级筛选模板")
-    @PreAuthorize("(#reqVO.scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
+    @PreAuthorize("(#reqVO.scene == 'lead' && @ss.hasPermission('zsjos:my-operations:query')) || (#reqVO.scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
             + " || (#reqVO.scene == 'education_team' && @ss.hasPermission('zsjos:education-team:query')) || (#reqVO.scene != 'media_student' && #reqVO.scene != 'education_team' && @ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
@@ -94,7 +94,7 @@ public class AdvancedFilterTemplateController {
     @Operation(summary = "删除个人高级筛选模板")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:education-team:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:my-operations:query','zsjos:education-team:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
             + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my','zsjos:media-student:query-my',"
             + "'zsjos:cashback:my-query','zsjos:cashback:finance-query','zsjos:withdrawal:my-query',"

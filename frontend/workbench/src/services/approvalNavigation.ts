@@ -1,10 +1,9 @@
 import { APP_ROUTES } from '../constants'
 import type { WorkbenchMenu } from './api'
 
-// 专属业务入口承接的审批不计入通用审批中心。
+// 订单保留专属审批入口；申诉同时出现在工作流程和申诉处理入口。
 export const BUSINESS_APPROVAL_PROCESS_KEYS = [
-  'zsjos_sales_order_dual_approval',
-  'zsjos_lead_appeal_review'
+  'zsjos_sales_order_dual_approval'
 ].join(',')
 
 export function approvalOpenPaths(menus: WorkbenchMenu[], activePath: string): string[] {

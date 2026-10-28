@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { annotationChanged, annotationOptions, annotationValues } from './studentServiceAnnotation'
+import { annotationChanged, annotationOptions, annotationValues, supervisionNotNeededOptions } from './studentServiceAnnotation'
 
 describe('student course annotation', () => {
   it('defaults to non-proxy and service required without writing on load', () => {
@@ -13,4 +13,10 @@ describe('student course annotation', () => {
     expect(annotationOptions([{value:'true',label:'改名'}], 'true', '原标签')[0].label).toBe('原标签')
     expect(annotationOptions([], 'true', '原标签')).toEqual([{value:'true',label:'原标签',disabled:true}])
   })
+})
+
+it('maps no-supervision dictionary choices to the positive API without changing labels', () => {
+  expect(supervisionNotNeededOptions([{ value: 'true', label: '是' }, { value: 'false', label: '否' }]))
+    .toEqual([{ value: 'false', label: '是' }, { value: 'true', label: '否' }])
+  expect(supervisionNotNeededOptions([])).toEqual([])
 })

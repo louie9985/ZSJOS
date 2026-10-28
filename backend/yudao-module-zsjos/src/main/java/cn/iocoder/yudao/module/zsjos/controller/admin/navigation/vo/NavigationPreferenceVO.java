@@ -19,5 +19,7 @@ public class NavigationPreferenceVO {
         private String parentKey;
         @NotNull @Size(max = 500)
         private List<@NotBlank @Size(max = 160) String> keys;
+        @NotNull @Size(max = 500)
+        private List<@NotBlank @Size(max = 160) String> hiddenKeys = new ArrayList<>();
     }
 }

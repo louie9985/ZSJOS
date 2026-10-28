@@ -21,7 +21,7 @@
 - 消费端只匹配当前可见、已授权且本端支持的菜单；过期键被忽略，新菜单追加在同级末尾，
   新增项之间沿用默认顺序。偏好加载失败回退默认顺序，不阻塞登录导航。
 - 这是已确认的个人展示顺序例外，替代旧规范中必须逐项保留服务端顺序的约束；
-  不允许自行构造菜单树、隐藏授权菜单或改变授权。
+  2026-10-28 用户新增要求允许个人隐藏导航菜单，不允许自行构造菜单树或改变授权。
 - zsjos:navigation-preference:query 控制设置入口与读取；
   保存同时要求 query 和 zsjos:navigation-preference:update。
   只有读取权限时可查看顺序，调整和保存按钮禁用。
@@ -73,5 +73,12 @@ script/sql/mysql/migrations/V325__personal_navigation_preference.sql。
 - node script/ui/personal-navigation/build.mjs 后运行
   python script/ui/personal-navigation/check.py：使用现有依赖构建实际 Vue 弹窗与 React 设置/弹窗，
   在脚本内临时本地 HTTP 服务验证，退出后关闭；请求被明确的测试接口拦截。
-  测试数据不接入生产流，输出在 backend/target/personal-navigation-verification。
+  测试数据不接入生产流，输出在 tmp/navigation-visibility-verification。
 - 两端类型检查、生产构建及真实登录会话验收分别记录，不相互替代。
+
+## 个人导航显示（2026-10-28）
+两端每行提供显示开关；隐藏父级同时隐藏其导航子树，设置弹窗仍显示所有原本可见的授权菜单，允许恢复。
+每组新增可选 hiddenKeys，旧数据缺失时为空；排序与隐藏互不覆盖，恢复默认同时清除两者。
+隐藏只应用于导航展示，不影响授权路由、登录落点及页面访问。全部隐藏仍可从系统设置恢复。
+沿用现有本人/客户端隔离和 query/update 权限、JSON 存储，无数据库迁移。
+需先部署支持 hiddenKeys 的后端，再部署两端前端；旧后端不会持久化新增字段。

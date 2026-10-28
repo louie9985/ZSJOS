@@ -388,7 +388,7 @@ export default function LeadSubmissionPage({
                 </div>)}
               </Radio.Group>
             </Form.Item></>}
-          {automatic && <Form.Item name="selfSourcedNextFollowUpAt" label="下次跟进时间" preserve={false} extra="选填，不填写则不安排后续提醒" rules={[{ validator: (_, value) => !value || value.valueOf() > Date.now() ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
+          {automatic && <Form.Item name="selfSourcedNextFollowUpAt" label="下次跟进时间" preserve={false} extra="请选择晚于当前时间的下次跟进时间" rules={[{ required: true, message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.valueOf() > Date.now() ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
             <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%', maxWidth: 360 }} />
           </Form.Item>}
           <Title level={5}>信息确认</Title>
@@ -416,7 +416,7 @@ export default function LeadSubmissionPage({
                   </Tag>)}</Space>
                   : '—'
               },
-              ...(automatic ? [{ key: 'automation', label: '提交处理', children: '查重通过并新建后：归属本人、自动首跟、判有效、生成商机' }, { key: 'reminder', label: '后续提醒', children: nextFollowUpAt ? formatTimestamp(nextFollowUpAt.valueOf()) : '不安排' }] : []),
+              ...(automatic ? [{ key: 'automation', label: '提交处理', children: '查重通过并新建后：归属本人、自动首跟、判有效、生成商机' }, { key: 'reminder', label: '后续提醒', children: nextFollowUpAt ? formatTimestamp(nextFollowUpAt.valueOf()) : '请选择下次跟进时间' }] : []),
               { key: 'files', label: '附件图片', children: files.length ? `${files.length} 张` : '未上传' },
               { key: 'remark', label: '备注信息', span: { xs: 1, md: 2 }, children: summary?.remark?.trim() || '—' }
             ]} />

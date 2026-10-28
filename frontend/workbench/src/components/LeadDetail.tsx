@@ -34,13 +34,14 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant, appealReview }: {
+export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant, appealReview, readOnly: forcedReadOnly = false }: {
   lead: ManagedLead
   refreshVersion?: number
   categories: DictData[]
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
   mode: LeadDetailMode
+  readOnly?: boolean
   autoExpandFollowUp: boolean
   initialTab?: LeadDetailTab
   activeTab?: string
@@ -59,7 +60,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   hideProviderOwner?: boolean
   appealReview?: AppealReviewContext
 }) {
-  const readOnly = mode === 'student-readonly'
+  const readOnly = forcedReadOnly || mode === 'student-readonly'
   const managerMode = mode === 'manager-readonly'
   const [overturnToken, setOverturnToken] = useState<string>()
   useEffect(() => { setOverturnToken(undefined) }, [lead.id])

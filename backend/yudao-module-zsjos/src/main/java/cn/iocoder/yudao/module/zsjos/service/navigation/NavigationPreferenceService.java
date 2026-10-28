@@ -50,6 +50,12 @@ public class NavigationPreferenceService {
                 if (!validKey(key, 160) || !keys.add(key)) throw exception(BAD_REQUEST);
             }
             total += keys.size();
+            if (group.getHiddenKeys() == null || group.getHiddenKeys().size() > 500) throw exception(BAD_REQUEST);
+            Set<String> hidden = new HashSet<>();
+            for (String key : group.getHiddenKeys()) {
+                if (!validKey(key, 160) || !hidden.add(key)) throw exception(BAD_REQUEST);
+            }
+            total += hidden.size();
         }
         if (total > 3000 || JsonUtils.toJsonString(preference).length() > 100000) throw exception(BAD_REQUEST);
     }

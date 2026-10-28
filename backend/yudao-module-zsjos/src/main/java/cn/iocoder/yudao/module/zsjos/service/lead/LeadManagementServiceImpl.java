@@ -107,6 +107,49 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private LeadAppealSummaryService appealSummaryService;
     @Resource private MenuTaskSummaryService menuTaskSummaryService;
 
+    @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService myOperationsService;
+
+    @Override
+    public PageResult<LeadManagementRespVO> getOperationsLeadPage(LeadManagementPageReqVO reqVO, Long memberId, Long userId) {
+        myOperationsService.checkMember(userId, memberId);
+        // This inbox follows provider attribution even when sales owns follow-up responsibility.
+        reqVO.setRelationScope("submitted");
+        reqVO.setPendingTasksFirst(false);
+        if (reqVO.getAudience() != null) reqVO.setAudience(INBOX_AUDIENCE_MANAGEMENT);
+        LeadInboxFilterQuery inboxQuery = reqVO.getAudience() == null
+                ? new LeadInboxFilterQuery(Set.of(), Set.of(), false)
+                : inboxFilterConfigService.resolveQuery(
+                        inboxFilterConfigService.getPublishedConfig(reqVO.getAudience()),
+                        reqVO.getInboxGroup(), reqVO.getInboxSectionOptions());
+        List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
+        PageResult<LeadDO> page = leadMapper.selectOperationsPage(reqVO, memberId, inboxQuery, matchedLeadIds);
+        if (page.getList().isEmpty()) {
+            return PageResult.empty(page.getTotal());
+        }
+        List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
+        Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
+                intendedProductMapper.selectListByLeadIds(leadIds), LeadIntendedProductDO::getLeadId);
+        Map<Long, OpportunityDO> opportunities = getOpportunityMap(leadIds);
+        Map<Long, PartnerDO> partners = getPartnerMap(page.getList());
+        Map<Long, AdminUserRespDTO> users = getUserMap(page.getList());
+        List<LeadManagementRespVO> result = page.getList().stream()
+                .map(lead -> convert(lead, userId, users, products.getOrDefault(lead.getId(), List.of()),
+                        List.of(), Map.of(), false, opportunities, partners))
+                .toList();
+        populatePageTimestamps(page.getList(), result, userId);
+        result.forEach(row -> row.setAvailableActions(List.of()));
+        return new PageResult<>(result, page.getTotal());
+    }
+
+    @Override
+    @ZsjosPermission(bizType = "lead", bizId = "#id", action = "read")
+    public LeadManagementRespVO getOperationsLead(Long memberId, Long id, Long userId) {
+        myOperationsService.checkLead(userId, memberId, id);
+        LeadManagementRespVO result = getLead(id, userId);
+        result.setAvailableActions(List.of());
+        return result;
+    }
+
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
         String relationScope = resolveRelationScope(reqVO);
@@ -667,8 +710,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 }
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RECYCLE, true));
             }
-            actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
-            if (salesPoolAllowed(lead)) actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
+            if (SupervisorLeadActionPolicy.isAllowed(TRANSFER, lead)) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
+            }
+            if (salesPoolAllowed(lead) && (!recyclePending || STATUS_SUBMITTED.equals(lead.getStatus()))) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
+            }
         }
         addSupervisorActions(actions, lead, currentUserId);
         if (Objects.equals(currentUserId, lead.getOwnerUserId())
@@ -746,6 +793,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) { return false; }
     }
 
+    private boolean salesSupervisorLead(LeadDO lead) {
+        try { return OWNER_SALES.equals(teamTransferPolicy.resolveIdentity(lead)); }
+        catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) { return false; }
+    }
+
     private void addSupervisorActions(List<LeadManagementRespVO.ActionVO> actions, LeadDO lead,
                                       Long currentUserId) {
         if (currentUserId == null) return;
@@ -756,15 +808,18 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             var overturn = supervisorOverturnService.action(lead, currentUserId);
             if (overturn != null) actions.add(overturn);
         }
-        if (SupervisorLeadActionPolicy.isAllowed(TRANSFER, lead)
+        boolean salesLead = salesSupervisorLead(lead);
+        if (salesLead && (SupervisorLeadActionPolicy.isAllowed(TRANSFER, lead)
+                || SupervisorLeadActionPolicy.isSalesRecycledTransferAllowed(lead))
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_TRANSFER)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_TRANSFER, true));
         }
-        if (SupervisorLeadActionPolicy.isAllowed(RECYCLE, lead)
+        if (salesLead && SupervisorLeadActionPolicy.isSalesRecycleAllowed(lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RECYCLE)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RECYCLE, true));
         }
         if (salesPoolAllowed(lead) && SupervisorLeadActionPolicy.isAllowed(RELEASE_CLAIM_POOL, lead)
+                && (!ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus()) || STATUS_SUBMITTED.equals(lead.getStatus()))
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_CLAIM_POOL)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_CLAIM_POOL, true));
         }

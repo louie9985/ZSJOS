@@ -37,3 +37,9 @@ export function annotationOptions(options: AnnotationOption[], value: Annotation
   return options.some(item => item.value === value)
     ? options.map(item => item.value === value ? current : item) : [...options, current]
 }
+
+// The UI asks whether supervision is unnecessary; the API retains its positive serviceNeeded meaning.
+export function supervisionNotNeededOptions(options: { value: string; label: string }[]) {
+  return options.filter(option => option.value === 'true' || option.value === 'false')
+    .map(option => ({ ...option, value: option.value === 'true' ? 'false' : 'true' }))
+}

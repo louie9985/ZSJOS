@@ -29,7 +29,9 @@ import static org.junit.jupiter.api.Assertions.*;
  AdminUserRespDTO person(long id,Integer status){var u=new AdminUserRespDTO();u.setId(id);u.setStatus(status);u.setDeptId(10L);return u;}
  @Test void bothTreesExcludeDisabledAndUnknownStatusUsers(){
   var enabled=person(2,0);
-  when(userApi.getUserListByStatus(0)).thenReturn(List.of(enabled,person(3,1),person(4,null)));
+  var post=new cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO();post.setId(7L);
+  when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+  when(userApi.getUserListByPostIds(List.of(7L))).thenReturn(List.of(enabled,person(3,1),person(4,null)));
   when(userApi.getUser(2L)).thenReturn(enabled);
   when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
   when(permissionApi.hasAnyPermissions(1L,"zsjos:sales-performance-target:query")).thenReturn(true);
@@ -37,10 +39,28 @@ import static org.junit.jupiter.api.Assertions.*;
   assertEquals(List.of(2L),access.tree(true).stream().map(n->n.scopeId()).toList());
   assertEquals(List.of(2L),access.tree(false).stream().map(n->n.scopeId()).toList());
   verify(userApi,never()).getUser(3L);verify(userApi,never()).getUser(4L);
+  assertEquals(List.of(2L),access.sales().stream().map(AdminUserRespDTO::getId).toList());
+ }
+ @Test void supervisorWithoutSalesPostIsExcludedWhileDeliveryKeepsDepartmentEmployees(){
+  var seller=person(2,0);var supervisor=person(3,0);
   var post=new cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO();post.setId(7L);
   when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
-  when(userApi.getUserListByPostIds(List.of(7L))).thenReturn(List.of(enabled));
-  assertEquals(List.of(2L),access.sales().stream().map(AdminUserRespDTO::getId).toList());
+  when(userApi.getUserListByPostIds(List.of(7L))).thenReturn(List.of(seller));
+  when(userApi.getUserListByStatus(0)).thenReturn(List.of(seller,supervisor));
+  when(userApi.getUser(2L)).thenReturn(seller);when(userApi.getUser(3L)).thenReturn(supervisor);
+  when(permissionApi.hasTenantReadAllAccess(1L)).thenReturn(true);
+  when(permissionApi.hasAnyPermissions(eq(1L),anyString())).thenAnswer(invocation->{
+   String permission=invocation.getArgument(1);return permission.endsWith(":query")||permission.endsWith(":department");
+  });
+  for(boolean targets:List.of(true,false))
+   assertEquals(List.of(2L),access.tree(targets).stream().filter(n->"USER".equals(n.scopeType())).map(n->n.scopeId()).toList());
+  verify(userApi,never()).getUserListByStatus(0);
+  String previous=PerformanceDomain.enter("delivery");
+  try {
+   for(boolean targets:List.of(true,false))
+    assertEquals(List.of(2L,3L),access.tree(targets).stream().filter(n->"USER".equals(n.scopeType())).map(n->n.scopeId()).toList());
+  } finally {PerformanceDomain.restore(previous);}
+  assertEquals(List.of(2L),access.tree(true).stream().filter(n->"USER".equals(n.scopeType())).map(n->n.scopeId()).toList());
  }
  @Test void enabledHistoricalContributorsNeedNotStillHoldSalesPost(){
   when(userApi.getUserList(Set.of(2L,3L,4L))).thenReturn(List.of(person(2,0),person(3,1)));

@@ -249,10 +249,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (stage == null || stage.isBlank()) stage = STAGE_FIRST_CONTACT;
         result.setDeliveryStage(stage);
         result.setDeliveryStageLabel(stageLabel(stage));
-        boolean canSubmitDeliveryStage = operational && owner && accepted
-                && !Set.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED).contains(stage)
-                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT);
-        result.setDeliveryStages(deliveryStages(stage, canSubmitDeliveryStage));
+        result.setDeliveryStages(deliveryStages(stage, false));
         result.setExamDate(relation.getExamDate());
         result.setFormFields(director ? formFields(config, "director_" + directorStage, null)
                 : formFields(config, stage, task));
@@ -261,20 +258,6 @@ public class StudentContactServiceImpl implements StudentContactService {
                 && relationMapper.selectMediaActiveByPersonIds(List.of(relation.getPersonId())).stream()
                 .map(ServiceRelationDO::getOperatorUserId).filter(Objects::nonNull).distinct().limit(2).count() > 1;
         result.setOperatorAssignmentConflict(operatorConflict);
-        if (operational && owner && accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_EXAM_DATE)
-                && Set.of(STAGE_SUPERVISION, STAGE_EXAM_PREPARATION).contains(stage)) {
-            availableActions.add(CONTEXT_ACTION_UPDATE_EXAM_DATE);
-        }
-        if (operational && owner && accepted && Set.of(STAGE_EXAM_PREPARATION, STAGE_POST_EXAM).contains(stage)
-                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
-            availableActions.add(stage.equals(STAGE_EXAM_PREPARATION) ? CONTEXT_ACTION_EXAM_NOTICE_DONE : CONTEXT_ACTION_POST_EXAM_DONE);
-        } else if (operational && owner && accepted && Set.of(STAGE_RESULT, STAGE_CERTIFICATE).contains(stage)
-                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
-            availableActions.add(CONTEXT_ACTION_COMPLETE_STAGE);
-        } else if (operational && owner && accepted && STAGE_CONTINUOUS_FOLLOW_UP.equals(stage)
-                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
-            availableActions.add(CONTEXT_ACTION_END_SERVICE);
-        }
         if (operational && accepted && owner && progress != null && !Boolean.TRUE.equals(progress.getHistoryIncomplete())
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_CHECKLIST_UPDATE)) availableActions.add(ACTION_CHECKLIST_UPDATE);
         if (Boolean.TRUE.equals(relation.getTeachingRestored()) && task == null && owner && accepted
@@ -400,74 +383,15 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Override @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "delivery-stage")
     public Long submitDeliveryStage(Long relationId, StudentDeliveryStageSubmitReqVO request, Long userId) {
-        if (!permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
-            throw exception(STUDENT_PERMISSION_DENIED);
-        }
-        ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
-        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
-        if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
-        String fingerprint = deliveryFingerprint(relationId, request);
-        StudentContactRecordDO replay = recordMapper.selectByIdempotencyKey(request.getIdempotencyKey());
-        if (replay != null) {
-            if (!fingerprint.equals(replay.getRequestFingerprint()) || !relationId.equals(replay.getServiceRelationId())) {
-                throw exception(STUDENT_CONTACT_FORM_INVALID);
-            }
-            return replay.getId();
-        }
-        List<String> stages = deliveryStageCodes();
-        String current = relation.getDeliveryStage();
-        boolean invalidPersistedStage = current == null || current.isBlank() || !stages.contains(current);
-        if (invalidPersistedStage) current = STAGE_FIRST_CONTACT;
-        if (!stages.contains(request.getStage()) || invalidPersistedStage || !request.getStage().equals(current)
-                || Set.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED).contains(current)) {
-            throw exception(STUDENT_CONTACT_TASK_INVALID);
-        }
-        validateAttachments(request.getAttachmentFileIds(), relationId, userId);
-        if (Boolean.TRUE.equals(request.getSuccessful())) validateDeliveryData(request.getStage(), request.getData());
-        String next = Boolean.TRUE.equals(request.getSuccessful()) ? stages.get(stages.indexOf(current) + 1 < stages.size() ? stages.indexOf(current) + 1 : stages.size() - 1) : current;
-        LocalDateTime now = LocalDateTime.now();
-        StudentContactRecordDO record = new StudentContactRecordDO();
-        record.setServiceRelationId(relationId); record.setTaskId(null); record.setContactType(TYPE_DELIVERY_STAGE);
-        record.setSuccessful(request.getSuccessful()); record.setRemark(request.getRemark().trim());
-        List<Long> normalizedAttachments = normalizeAttachmentIds(request.getAttachmentFileIds());
-        record.setAttachmentFileIdsJson(JsonUtils.toJsonString(normalizedAttachments));
-        record.setChecklistResultJson("[]"); record.setDeliveryStage(request.getStage());
-        record.setDeliveryDataJson(JsonUtils.toJsonString(request.getData() == null ? Map.of() : request.getData()));
-        record.setNextContactAt(now); record.setOperatorUserId(userId); record.setSubmittedAt(now);
-        record.setIdempotencyKey(request.getIdempotencyKey()); record.setRequestFingerprint(fingerprint);
-        try { recordMapper.insert(record); } catch (DuplicateKeyException duplicate) {
-            StudentContactRecordDO concurrent = recordMapper.selectByIdempotencyKey(request.getIdempotencyKey());
-            if (concurrent == null) throw duplicate;
-            if (!fingerprint.equals(concurrent.getRequestFingerprint())
-                    || !relationId.equals(concurrent.getServiceRelationId())) throw exception(STUDENT_CONTACT_FORM_INVALID);
-            return concurrent.getId();
-        }
-        if (Boolean.TRUE.equals(request.getSuccessful())
-                && relationMapper.advanceDeliveryStage(relationId, userId, current, next,
-                record.getDeliveryDataJson(), relation.getVersion()) != 1) {
-            throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
-        }
-        return record.getId();
+        // Keep the authorized endpoint explicit for older clients; no legacy mutation is allowed.
+        throw exception(LEGACY_EXAM_FLOW_RETIRED);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "update-exam-date")
     public void updateExamDate(Long relationId, StudentExamDateUpdateReqVO request, Long userId) {
-        ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId, TenantContextHolder.getRequiredTenantId());
-        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
-        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
-        if (!Objects.equals(relation.getOwnerUserId(), userId)
-                && !permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_EXAM_DATE)) throw exception(STUDENT_PERMISSION_DENIED);
-        if (!"accepted".equals(relation.getAcceptanceStatus())
-                || !Set.of(STAGE_SUPERVISION, STAGE_EXAM_PREPARATION).contains(relation.getDeliveryStage())) {
-            throw exception(STUDENT_CONTACT_TASK_INVALID);
-        }
-        if (request.getExamDate().isBefore(LocalDate.now())) throw exception(STUDENT_CONTACT_FORM_INVALID);
-        String nextStage = STAGE_SUPERVISION;
-        if (relation.getExamDate() != null && relation.getExamNoticeSentAt() == null) nextStage = relation.getDeliveryStage();
-        if (relationMapper.updateExamDate(relationId, userId, request.getExamDate(), request.getVersion(), nextStage, LocalDateTime.now()) != 1) {
-            throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
-        }
+        // Keep the authorized endpoint explicit for older clients; no legacy mutation is allowed.
+        throw exception(LEGACY_EXAM_FLOW_RETIRED);
     }
 
     private Long submit(Long relationId, Long taskId, String expectedType, Boolean successful, String unsuccessfulReason,
@@ -1019,7 +943,7 @@ public class StudentContactServiceImpl implements StudentContactService {
                 .map(DictDataRespDTO::getLabel).findFirst().orElseThrow(() -> exception(STUDENT_CONTACT_REASON_INVALID));
     }
     private boolean canContactWithoutTask(ServiceRelationDO relation) {
-        return Set.of(STAGE_SUPERVISION, STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
+        return Set.of(STAGE_SUPERVISION, "exam_confirmation", STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
                 STAGE_CERTIFICATE, STAGE_CONTINUOUS_FOLLOW_UP).contains(relation.getDeliveryStage() == null ? "" : relation.getDeliveryStage());
     }
     private int timeout(StudentContactConfigVersionDO config, String type) {
@@ -1085,14 +1009,6 @@ public class StudentContactServiceImpl implements StudentContactService {
         payload.put("data", data == null ? Map.of() : data);
         return DigestUtil.sha256Hex(JsonUtils.toJsonString(payload));
     }
-    private String deliveryFingerprint(Long relationId, StudentDeliveryStageSubmitReqVO request) {
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("relationId", relationId); payload.put("stage", request.getStage());
-        payload.put("successful", request.getSuccessful()); payload.put("remark", request.getRemark().trim());
-        payload.put("data", request.getData() == null ? Map.of() : request.getData());
-        payload.put("attachmentFileIds", normalizeAttachmentIds(request.getAttachmentFileIds()));
-        return DigestUtil.sha256Hex(JsonUtils.toJsonString(payload));
-    }
     private String attachmentDirectory(Long relationId, Long userId) {
         return "zsjos/student-contact/" + relationId + "/" + userId;
     }
@@ -1100,9 +1016,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     private List<String> parseStrings(String json) { return json == null ? List.of() : JsonUtils.parseArray(json, String.class); }
 
     private List<String> deliveryStageCodes() {
-        return List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
-                STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
-                STAGE_CERTIFICATE, STAGE_CONTINUOUS_FOLLOW_UP, STAGE_COMPLETED);
+        return List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_SUPERVISION);
     }
 
     private String stageLabel(String code) {
@@ -1116,8 +1030,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         for (int i = 0; i < stages.size(); i++) {
             StudentContactContextRespVO.DeliveryStageVO row = new StudentContactContextRespVO.DeliveryStageVO();
             row.setCode(stages.get(i)); row.setLabel(stageLabel(stages.get(i))); row.setCurrent(i == currentIndex);
-            row.setAvailable(canSubmit && i == currentIndex
-                    && !Set.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED).contains(stages.get(i)));
+            row.setAvailable(false);
             row.setStatus(i < currentIndex ? "done" : i == currentIndex ? "current" : "pending");
             result.add(row);
         }
@@ -1383,21 +1296,6 @@ public class StudentContactServiceImpl implements StudentContactService {
     private List<Long> normalizeAttachmentIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) return List.of();
         return ids.stream().filter(Objects::nonNull).distinct().sorted().toList();
-    }
-
-    private void validateDeliveryData(String stage, Map<String, Object> values) {
-        if (values == null) throw exception(STUDENT_CONTACT_FORM_INVALID);
-        List<String> required = switch (stage) {
-            case STAGE_EXAM_PREPARATION -> List.of("examNoticeSent", "admissionTicketNoticeSent");
-            case STAGE_POST_EXAM -> List.of("examFeedback");
-            case STAGE_RESULT -> List.of("result");
-            case STAGE_CERTIFICATE -> List.of("certificateNotice", "mailingInfo");
-            default -> List.of();
-        };
-        if (required.stream().anyMatch(key -> values.get(key) == null
-                || Boolean.FALSE.equals(values.get(key)) || String.valueOf(values.get(key)).isBlank())) {
-            throw exception(STUDENT_CONTACT_FORM_INVALID);
-        }
     }
 
     private List<StudentContactContextRespVO.FormFieldVO> formFields(StudentContactConfigVersionDO config,

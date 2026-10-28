@@ -78,16 +78,28 @@ Workbench 客资详情同时收到 `QUALIFICATION_TRANSFER` 与 `SUPERVISOR_TRAN
 The legacy `/leads/batch-public-sea` endpoint remains temporarily available under its existing
 permission for compatible clients, but it uses the same valid-pre-deal public-sea state validation.
 
-Supervisor state rules are authoritative on the backend: submitted Leads may be transferred,
-recycled, or released to the claim pool; suspended Leads additionally support restore; recycle-pending
-Leads support transfer or claim-pool release; valid pre-deal Leads support transfer or release to the
-public sea. Won and closed Leads reject every supervisor command. Public-sea release preserves formal
+Supervisor state rules are authoritative on the backend: a sales supervisor may recycle a managed,
+owned Lead regardless of its main status or close time, provided no directly associated order,
+transfer request or Lead appeal is being approved. Recycling retains the main status and historical
+orders, ends the active public-sea cycle, and cancels the existing Lead tasks. A person-only repurchase
+approval does not block the Lead. Recycling requires a current owner and does not repeat for an
+already recycled Lead. A recycled Lead can be transferred while retaining its main status; applicable
+new-owner tasks are created according to that status. Recycled Leads may enter the claim pool only
+when their main status is submitted; owned submitted or suspended Leads retain the existing release
+rule. Other supervisor actions retain their existing state rules. Public-sea release preserves formal
 ownership and may assign an eligible actual follow-up salesperson in the created public-sea cycle;
 that collaborator may follow up but cannot submit a first-purchase order until a formal transfer is completed.
 
 `assignmentStatus=recycle_pending` is displayed as `回收待处理`. It means the supervisor has removed
-the current formal owner, retained that employee in `recycleSourceOwnerUserId`, and must next either
-transfer the Lead or release it to the claim pool. It is an assignment state, not a Lead main status.
+the current formal owner and retained that employee in `recycleSourceOwnerUserId`. The supervisor may
+transfer it; release to the claim pool is available only when its main status is submitted. It is an
+assignment state, not a Lead main status.
+
+For legacy public-sea compatibility associations, recycling logically ends the association; the
+physical row and the Lead recycle audit remain, but ordinary active-association queries no longer
+show the row. Error `1900003182` reports a directly associated approval in progress. Concurrent
+approval and recycle requests can contend on database locks; a transaction rolled back by a deadlock
+must be retried, and must not be treated as a successful recycle.
 
 Error code `1900003058` remains the stable supervisor state-conflict code. Its message includes the
 attempted command, current Lead/assignment labels, the applicable state requirement, and whether a

@@ -9,6 +9,8 @@ import {
   findNavigationLevel,
   navigationKey,
   setSiblingOrder,
+  setNavigationVisible,
+  isNavigationVisible,
   NAVIGATION_QUERY,
   NAVIGATION_UPDATE,
   type NavigationOrder
@@ -33,7 +35,7 @@ const canSave = computed(
     (user.getPermissions.has(NAVIGATION_UPDATE) || user.getPermissions.has('*:*:*'))
 )
 const tree = computed(() =>
-  applyNavigationOrder(visibleNavigation(permission.navigationSource), draft.value)
+  applyNavigationOrder(visibleNavigation(permission.navigationSource), draft.value, 'root', true)
 )
 const rows = computed(() => findNavigationLevel(tree.value, path.value))
 const parent = computed(() => path.value.join('/') || 'root')
@@ -111,7 +113,7 @@ async function save() {
           ><span>{{ path.length ? '子菜单顺序' : '一级菜单顺序' }}</span
           ><ElButton v-if="path.length" link @click="path.pop()">返回上一级</ElButton></div
         >
-        <p class="navigation-order-hint">拖动排序，或使用上下箭头；仅对我生效。</p>
+        <p class="navigation-order-hint">拖动或使用箭头排序，关闭开关可隐藏菜单；仅对我生效。</p>
         <ElEmpty v-if="!rows.length" description="暂无可调整的导航菜单" />
         <div
           v-for="(row, index) in rows"
@@ -123,6 +125,9 @@ async function save() {
           @dragover.prevent
           @drop.prevent="drop(index)"
         >
+          <ElSwitch :aria-label="'显示' + row.name" :disabled="!canSave || saving"
+            :model-value="isNavigationVisible(draft, parent, navigationKey(row))"
+            @change="value => draft = setNavigationVisible(draft, parent, navigationKey(row), Boolean(value))" />
           <span class="navigation-order-grip" aria-hidden="true">⠿</span
           ><span class="navigation-order-name">{{ row.name }}</span>
           <ElButton

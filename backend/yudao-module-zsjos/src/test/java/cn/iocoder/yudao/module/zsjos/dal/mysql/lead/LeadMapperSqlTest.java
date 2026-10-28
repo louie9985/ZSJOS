@@ -30,6 +30,43 @@ import static org.mockito.Mockito.verify;
 class LeadMapperSqlTest {
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
+    void operationsQuickFilterKeepsProviderScopeInsteadOfSalesResponsibility() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        LeadMapper mapper = mock(LeadMapper.class, CALLS_REAL_METHODS);
+        doReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty()).when(mapper)
+                .selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        var req = new LeadManagementPageReqVO();
+        req.setRelationScope("owned"); req.setSimpleStatus("following"); req.setKeyword("KZ20261028");
+        mapper.selectOperationsPage(req, 42L, null, List.of(7L, 8L));
+        var capture = org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(mapper).selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), capture.capture());
+        var query = (LambdaQueryWrapperX<LeadDO>) capture.getValue();
+        String sql = query.getSqlSegment();
+        assertTrue(sql.contains("provider_owner_type ="), sql);
+        assertTrue(sql.contains("provider_owner_id IN"), sql);
+        assertTrue(sql.contains("partner_id IS NULL"), sql);
+        assertFalse(sql.contains("source_user_id"), sql);
+        assertTrue(sql.contains("lead_no LIKE"), sql);
+        assertTrue(query.getParamNameValuePairs().containsValue(42L));
+        assertTrue(query.getParamNameValuePairs().containsValue("system_user"));
+        assertTrue(query.getParamNameValuePairs().containsValue(7L));
+        var interceptor = new com.baomidou.mybatisplus.extension.plugins.inner.TenantLineInnerInterceptor(
+                new cn.iocoder.yudao.framework.tenant.core.db.TenantDatabaseInterceptor(
+                        new cn.iocoder.yudao.framework.tenant.config.TenantProperties()));
+        try {
+            for (long tenant : List.of(1L, 2L)) {
+                TenantContextHolder.setTenantId(tenant);
+                String scoped = interceptor.parserSingle("SELECT id FROM zsjos_lead WHERE "
+                        + sql.replaceAll("#\\{[^}]+}", "?"), null);
+                assertTrue(scoped.contains("AND tenant_id = " + tenant), scoped);
+            }
+        } finally {
+            TenantContextHolder.clear();
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
     void partnerQuickFilterRetainsPartnerScope() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
         LeadMapper mapper = mock(LeadMapper.class, CALLS_REAL_METHODS);
@@ -176,6 +213,31 @@ class LeadMapperSqlTest {
             assertTrue(sql.contains("id <"), sql);
             assertTrue(sql.contains("ORDER BY submitted_at DESC,id DESC"), sql);
             assertFalse(sql.contains("last_activity_at"), sql);
+        }
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void explicitTimeSortOverridesPendingTaskPriorityBeforePagination() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        for (String direction : new String[] {null, "ascend", "descend"}) {
+            LeadMapper mapper = mock(LeadMapper.class, CALLS_REAL_METHODS);
+            doReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(), 0L)).when(mapper)
+                    .selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+            var req = new LeadManagementPageReqVO();
+            req.setSortField("currentAssignmentFirstFollowUpAt");
+            req.setSortOrder(direction);
+            req.setPageNo(3);
+            mapper.selectManagementPageByScope(req, List.of(1L), List.of(1L), false, null, null, List.of(99L));
+            var capture = org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+            verify(mapper).selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), capture.capture());
+            String sql = capture.getValue().getSqlSegment();
+            if (direction == null) assertTrue(sql.contains("CASE WHEN id IN (99)"), sql);
+            else {
+                assertFalse(sql.contains("CASE WHEN"), sql);
+                assertTrue(sql.contains("ORDER BY current_assignment_first_follow_up_at "
+                        + ("ascend".equals(direction) ? "ASC" : "DESC") + ",id DESC"), sql);
+            }
         }
     }
 

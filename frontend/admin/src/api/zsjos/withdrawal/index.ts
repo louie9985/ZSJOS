@@ -12,8 +12,6 @@ export interface WithdrawalPageQuery {
 }
 
 export interface WithdrawalVO {
-  applicantName?: string; partnerName?: string; paidByName?: string; cashbackCount?: number
-  availableBalanceSnapshot?: number; approvedAmount?: number
   version?: number
   reviewedByName?: string
   reviewedAt?: string

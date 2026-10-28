@@ -1,3 +1,4 @@
+import MyOperationsPage from '../pages/MyOperationsPage'
 import { lazy, Suspense } from "react"
 const ZsjkqtPage = lazy(() => import("../features/zsjkqt/ZsjkqtPage"))
 import StudentEntryPage from '../pages/StudentEntryPage'
@@ -97,6 +98,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
 
   if (menu?.path === APP_ROUTES.POSITIONING_INTERVIEW_TEMPLATE) return <DirectorTemplateConfigPage permissions={permissions} />
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MY_OPERATIONS) return <MyOperationsPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.PERSONAL_CALENDAR) return <PersonalCalendarPage permissions={permissions} tenantReadAll={tenantReadAll}/>

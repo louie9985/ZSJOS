@@ -6,7 +6,7 @@ from functools import partial
 import json,re
 from playwright.sync_api import sync_playwright
 
-root=Path(__file__).resolve().parents[3]/'backend/target/personal-navigation-verification/browser'
+root=Path(__file__).resolve().parents[3]/'tmp/navigation-visibility-verification/browser'
 class QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self,*args): pass
 server=ThreadingHTTPServer(('127.0.0.1',0),partial(QuietHandler,directory=str(root)))
@@ -46,6 +46,14 @@ with sync_playwright() as pw:
   with page.expect_navigation(): page.get_by_role('button',name='保存并关闭',exact=True).click()
   assert state['value']['groups'][0]['keys']==['menu:2','menu:1']
   open_dialog()
+  toggle=page.get_by_role('switch',name='显示客资管理',exact=True)
+  (toggle.locator('..') if client=='admin' else toggle).click()
+  with page.expect_navigation(): page.get_by_role('button',name='保存并关闭',exact=True).click()
+  assert 'menu:2' in next(g for g in state['value']['groups'] if g['parentKey']=='root')['hiddenKeys']
+  open_dialog()
+  assert not page.get_by_role('switch',name='显示客资管理',exact=True).is_checked()
+  toggle=page.get_by_role('switch',name='显示客资管理',exact=True)
+  (toggle.locator('..') if client=='admin' else toggle).click()
   page.get_by_role('button',name='子菜单',exact=True).click()
   page.get_by_role('button',name='上移角色管理',exact=True).click()
   page.get_by_role('button',name='返回上一级',exact=True).click()

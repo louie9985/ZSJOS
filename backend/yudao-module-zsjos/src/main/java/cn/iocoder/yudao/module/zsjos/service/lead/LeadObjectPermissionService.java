@@ -39,6 +39,8 @@ public class LeadObjectPermissionService {
     private SecurityFrameworkService securityFrameworkService;
     @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
+    @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService myOperationsService;
+
     public boolean hasTenantReadAll(Long userId) {
         return permissionApi.hasTenantReadAllAccess(userId);
     }
@@ -117,7 +119,7 @@ public class LeadObjectPermissionService {
      */
     public boolean canReadDetail(LeadDO lead, Long userId) {
         // Submitted-list department visibility grants reads only, not submitter-assistance commands.
-        return hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId)
+        return myOperationsService.canReadLead(lead, userId) || hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId)
                 || canReadRecycledSourceOwner(lead, userId)
                 || userId != null && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                     && securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)

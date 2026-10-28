@@ -82,7 +82,7 @@ export default function StudentServiceAnnotationCard({ relationId, canUpdate }: 
     setSavedOnce(false)
   }
   const choice = (field: 'proxyStudent' | 'serviceNeeded', label: string) => {
-    // The service API remains positive; only the "无需服务" control is inverted.
+    // The service API remains positive; only the "无需督学" control is inverted.
     const checked = field === 'proxyStudent' ? draft?.proxyStudent === 'true' : draft?.serviceNeeded === 'false'
     const next = field === 'proxyStudent' ? (checked ? 'false' : 'true') : (checked ? 'true' : 'false')
     const disabled = !editable || saving || !optionsReady || Boolean(optionError) || conflict || !options.some(option => option.value === next)
@@ -98,7 +98,7 @@ export default function StudentServiceAnnotationCard({ relationId, canUpdate }: 
         ? <Input id={`${id}-agent`} aria-label="代理人" size="small" value={draft.agentName ?? ''} maxLength={100} placeholder="填写代理人" disabled={saving || conflict || draft.proxyStudent !== 'true'} onChange={event => change({ agentName: event.target.value })} />
         : <span>{saved.agentName || '未填写'}</span>}</div>
       </div>
-      {choice('serviceNeeded', '无需服务')}
+      {choice('serviceNeeded', '无需督学')}
       {invalid && editable && <Typography.Text type="warning">请填写代理人后保存</Typography.Text>}
       {optionError && <Alert type="error" title={optionError} action={<Button size="small" onClick={reload}>重试</Button>} />}
       {saveError && <Alert type="error" title={saveError} action={<Button size="small" onClick={conflict ? reload : () => void save()}>{conflict ? '读取最新' : '重试保存'}</Button>} />}

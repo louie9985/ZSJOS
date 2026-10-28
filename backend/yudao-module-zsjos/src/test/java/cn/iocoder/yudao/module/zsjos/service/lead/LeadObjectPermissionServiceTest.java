@@ -41,6 +41,7 @@ import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class LeadObjectPermissionServiceTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService myOperationsService;
     @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     @InjectMocks
@@ -58,6 +59,22 @@ class LeadObjectPermissionServiceTest {
     @Mock private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
     @Mock private LeadPublicSeaPoolService leadPublicSeaPoolService;
     @Mock private MediaAccountMapper mediaAccountMapper;
+
+    @Test
+    void operationsRelationAllowsReadButDoesNotCreateSalesOrAssistanceRights() {
+        LeadDO row = lead(10L, 20L);
+        when(leadMapper.selectById(1L)).thenReturn(row);
+        when(myOperationsService.canReadLead(row, 30L)).thenReturn(true);
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
+            service.check(1L, "read");
+            service.check(1L, "follow-up-read");
+            service.check(1L, "flow-read");
+            for (String action : List.of("owner-transfer", "basic-info-update", "qualify", "request-submitter-assist")) {
+                assertThrows(ServiceException.class, () -> service.check(1L, action), action);
+            }
+        }
+    }
 
     @BeforeEach
     void setUpPermissionDefaults() {

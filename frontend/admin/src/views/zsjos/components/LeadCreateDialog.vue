@@ -101,12 +101,12 @@
       <el-form-item label="备注" prop="remark" :required="automatic"
         ><el-input v-model="form.remark" type="textarea" :rows="3" maxlength="1000" show-word-limit
       /></el-form-item>
-      <el-form-item v-if="automatic" label="下次跟进" prop="selfSourcedNextFollowUpAt">
-        <el-date-picker v-model="form.selfSourcedNextFollowUpAt" type="datetime" value-format="x" placeholder="选填，不填则不安排提醒" class="w-100%" />
+      <el-form-item v-if="automatic" label="下次跟进" prop="selfSourcedNextFollowUpAt" :required="automatic">
+        <el-date-picker v-model="form.selfSourcedNextFollowUpAt" type="datetime" value-format="x" placeholder="请选择下次跟进时间" class="w-100%" />
       </el-form-item>
       <el-alert v-if="automatic" type="info" :closable="false"
         :title="'提交摘要：查重通过并新建后归属本人、自动首跟、判有效、生成商机。'"
-        :description="form.selfSourcedNextFollowUpAt ? '后续提醒：' + formatZsjosTimestamp(Number(form.selfSourcedNextFollowUpAt)) : '后续提醒：不安排'" />
+        :description="form.selfSourcedNextFollowUpAt ? '后续提醒：' + formatZsjosTimestamp(Number(form.selfSourcedNextFollowUpAt)) : '请选择下次跟进时间'" />
     </el-form>
     <template #footer
       ><el-button @click="visible = false">取消</el-button
@@ -166,7 +166,7 @@ watch(automatic, enabled => {
 })
 const rules: FormRules = {
   remark: [{ validator: (_r, value, cb) => !automatic.value || value?.trim() ? cb() : cb(new Error('请填写已联系客户及意向情况，作为首跟内容和判有效依据')) }],
-  selfSourcedNextFollowUpAt: [{ validator: (_r, value, cb) => !automatic.value || !value || Number(value) > Date.now() ? cb() : cb(new Error('下次跟进时间必须晚于当前时间')) }],
+  selfSourcedNextFollowUpAt: [{ validator: (_r, value, cb) => !automatic.value ? cb() : !value ? cb(new Error('请选择下次跟进时间')) : Number(value) > Date.now() ? cb() : cb(new Error('下次跟进时间必须晚于当前时间')) }],
   name: [{ required: true, message: '请输入客户姓名' }],
   mobile: [
     {

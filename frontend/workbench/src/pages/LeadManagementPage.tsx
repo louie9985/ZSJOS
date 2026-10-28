@@ -1,3 +1,5 @@
+import LeadInboxSortControls from '../components/LeadInboxSortControls'
+import { myOperationsApi } from '../services/myOperations'
 import { managementApi } from '../services/managementApi'
 import { LeadAppealPendingTag } from '../components/LeadAppealSummary'
 import { useWorkbenchPageGuard } from '../components/WorkbenchPageNavigation'
@@ -29,7 +31,7 @@ import {
   Tooltip,
   Typography
 } from 'antd'
-import { ArrowLeftOutlined, DeleteOutlined, DownOutlined, ExportOutlined, EyeOutlined, ReloadOutlined, RollbackOutlined, SortAscendingOutlined, SwapOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, DownOutlined, ExportOutlined, EyeOutlined, ReloadOutlined, RollbackOutlined, SwapOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type AdvancedFilterGroup, type AssignmentUser, type DictData, type LeadBatchAction, type LeadInboxFilterProfile, type LeadSortField, type ManagedLead, type ManagedLeadPageParams, type SubordinateBatchResult } from '../services/api'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
@@ -113,18 +115,6 @@ const LEAD_SORT_FIELD_BY_COLUMN_KEY: Partial<Record<string, LeadSortField>> = {
   updateTime: 'updateTime',
 }
 
-const LEAD_INBOX_SORT_OPTIONS: Array<{ field?: LeadSortField; order?: 'ascend' | 'descend'; label: string }> = [
-  { label: '默认排序（待办优先，再按提交时间从新到旧）' },
-  { field: 'lastActivityAt', order: 'descend', label: '最近活动时间（从新到旧）' },
-  { field: 'lastActivityAt', order: 'ascend', label: '最近活动时间（从旧到新）' },
-  { field: 'updateTime', order: 'descend', label: '更新时间（从新到旧）' },
-  { field: 'updateTime', order: 'ascend', label: '更新时间（从旧到新）' },
-  { field: 'submittedAt', order: 'descend', label: '提交时间（从新到旧）' },
-  { field: 'submittedAt', order: 'ascend', label: '提交时间（从旧到新）' },
-  { field: 'leadNo', order: 'ascend', label: '客资编号（从小到大）' },
-  { field: 'leadNo', order: 'descend', label: '客资编号（从大到小）' },
-]
-
 const LEAD_BATCH_ACTIONS: Array<{ type: LeadBatchFormAction; label: string; permissions: string[]; icon: React.ReactNode; danger?: boolean }> = [
   { type: 'transfer', label: '批量转派', permissions: ['zsjos:lead:owner-transfer', 'zsjos:subordinate-sales:lead-transfer', 'zsjos:lead:qualification:manage'], icon: <SwapOutlined /> },
   { type: 'restore', label: '批量恢复', permissions: ['zsjos:subordinate-sales:lead-restore', 'zsjos:lead:qualification:manage'], icon: <RollbackOutlined /> },
@@ -171,8 +161,9 @@ function LeadStateTags({ lead }: { lead: ManagedLead }) {
   </Space>
 }
 
-export default function LeadManagementPage({ permissions, detailOnly = false, salesUserId, partnerId, onScopeChanged, onDirtyChange }: { permissions: string[]; detailOnly?: boolean; salesUserId?: number; partnerId?: number; onScopeChanged?: () => void; onDirtyChange?: (dirty: boolean) => void }) {
-  const embedded = salesUserId !== undefined || partnerId !== undefined
+export default function LeadManagementPage({ permissions, detailOnly = false, salesUserId, partnerId, operationsUserId, onScopeChanged, onDirtyChange }: { permissions: string[]; detailOnly?: boolean; salesUserId?: number; partnerId?: number; operationsUserId?: number; onScopeChanged?: () => void; onDirtyChange?: (dirty: boolean) => void }) {
+  const operationsReadOnly = operationsUserId !== undefined
+  const embedded = salesUserId !== undefined || partnerId !== undefined || operationsReadOnly
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
@@ -184,9 +175,9 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
   const { useTableLayout: preferredTableLayout } = useInboxTableLayout()
   const useTableLayout = embedded || preferredTableLayout
   const requestedLeadId = routeState?.leadId || queryLeadId
-  const requestedTab = parseLeadDetailTab(searchParams.get('tab'))
+  const requestedTab = !operationsReadOnly ? parseLeadDetailTab(searchParams.get('tab'))
     || parseLeadDetailTab(routeState?.tab)
-    || (routeState?.openFollowUp ? 'follow-ups' : undefined)
+    || (routeState?.openFollowUp ? 'follow-ups' : undefined) : undefined
   const returnToValue = !embedded ? searchParams.get('returnTo') : null
   const returnTo = returnToValue?.startsWith('/zsjos/sales-order-approvals') ? returnToValue : undefined
   const audience: LeadAudience = 'all'
@@ -198,7 +189,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
   const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>()
   const orderLeadRows = useCallback((rows: ManagedLead[]) => {
     const ordered = !sortField || !sortOrder ? sortLeadsBySubmission(rows) : rows
-    return salesUserId === undefined ? prioritizeLeads(ordered, []) : ordered
+    return salesUserId === undefined && (!sortField || !sortOrder) ? prioritizeLeads(ordered, []) : ordered
   }, [salesUserId, sortField, sortOrder])
   const [initialLoading, setInitialLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -279,13 +270,13 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
   const loadFilterProfile = useCallback(async () => {
     setFilterProfileError('')
     try {
-      setFilterProfile(await (partnerId !== undefined ? managementApi.partnerLeadFilterProfile() : api.leadInboxFilterProfile('management')))
+      setFilterProfile(await (operationsUserId !== undefined ? myOperationsApi.profile() : partnerId !== undefined ? managementApi.partnerLeadFilterProfile() : api.leadInboxFilterProfile('management')))
     } catch (profileError) {
       // 管理员维护的筛选项不可用时不得回退到硬编码选项，只提示并保留关键词与高级筛选。
       setFilterProfile({ groups: [] })
       setFilterProfileError(profileError instanceof Error ? profileError.message : '客资筛选方案加载失败')
     }
-  }, [partnerId])
+  }, [partnerId, operationsUserId])
 
   const loadPage = useCallback(async (
     targetPage: number,
@@ -304,7 +295,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     }
     try {
       const params: ManagedLeadPageParams = {
-        pendingTasksFirst: salesUserId === undefined,
+        pendingTasksFirst: salesUserId === undefined && !operationsReadOnly && (!sortField || !sortOrder),
         pageNo: targetPage,
         pageSize: options.pageSize ?? leadPageSize,
         keyword: keyword || undefined, advancedFilter,
@@ -319,7 +310,9 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
         sortField,
         sortOrder,
       }
-      const result = partnerId !== undefined
+      const result = operationsUserId !== undefined
+        ? await myOperationsApi.leads(operationsUserId, params)
+        : partnerId !== undefined
         ? await managementApi.partnerLeads(partnerId, params)
         : salesUserId !== undefined
         ? await api.subordinateSalesLeads(salesUserId, params)
@@ -334,7 +327,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
         const next = orderLeadRows(
           replace ? result.list : mergeUniqueLeads(current, result.list)
         )
-        return previousPinned && !next.some(item => item.id === previousPinned.id)
+        return !useTableLayout && previousPinned && !next.some(item => item.id === previousPinned.id)
           ? orderLeadRows(pinLeadFirst(next, previousPinned))
           : next
       })
@@ -375,7 +368,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
         }
       }
     }
-  }, [partnerId, advancedFilter, audience, filterProfile.groups.length, inboxGroup, keyword, leadPageSize, salesUserId, requestedLeadId, routeState?.relationScope, sectionOptions, sortField, sortOrder, orderLeadRows, useTableLayout])
+  }, [operationsUserId, partnerId, advancedFilter, audience, filterProfile.groups.length, inboxGroup, keyword, leadPageSize, salesUserId, requestedLeadId, routeState?.relationScope, sectionOptions, sortField, sortOrder, orderLeadRows, useTableLayout])
 
   useEffect(() => { void loadMetadata(); void loadFilterProfile() }, [loadFilterProfile, loadMetadata])
   useEffect(() => {
@@ -401,11 +394,11 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     if (!silent) setDetailLoading(true)
     setDetailError('')
     try {
-      const loaded = partnerId !== undefined ? await managementApi.partnerLead(id) : await api.managedLead(id)
+      const loaded = operationsUserId !== undefined ? await myOperationsApi.lead(operationsUserId, id) : partnerId !== undefined ? await managementApi.partnerLead(id) : await api.managedLead(id)
       if (version !== detailRequestVersion.current) return
       setDetail(loaded)
       // 静默刷新不能把已被服务端筛选排除的客资重新插入列表。
-      setItems(current => orderLeadRows(current.some(item => item.id === id) ? current.map(item => item.id === id ? loaded : item) : silent ? current : pinLeadFirst(current, loaded)))
+      setItems(current => orderLeadRows(current.some(item => item.id === id) ? current.map(item => item.id === id ? loaded : item) : silent || useTableLayout ? current : pinLeadFirst(current, loaded)))
     } catch (loadError) {
       if (version !== detailRequestVersion.current) return
       setDetail(undefined)
@@ -413,7 +406,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     } finally {
       if (version === detailRequestVersion.current) setDetailLoading(false)
     }
-  }, [orderLeadRows, partnerId])
+  }, [orderLeadRows, partnerId, operationsUserId, useTableLayout])
 
   const loadDetailByNo = useCallback(async (leadNo: string) => {
     const version = ++detailRequestVersion.current
@@ -424,7 +417,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
       if (version !== detailRequestVersion.current) return
       setSelectedId(loaded.id)
       setDetail(loaded)
-      setItems(current => orderLeadRows(current.some(item => item.id === loaded.id) ? current.map(item => item.id === loaded.id ? loaded : item) : pinLeadFirst(current, loaded)))
+      setItems(current => orderLeadRows(current.some(item => item.id === loaded.id) ? current.map(item => item.id === loaded.id ? loaded : item) : useTableLayout ? current : pinLeadFirst(current, loaded)))
     } catch (loadError) {
       if (version !== detailRequestVersion.current) return
       setDetail(undefined)
@@ -432,7 +425,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     } finally {
       if (version === detailRequestVersion.current) setDetailLoading(false)
     }
-  }, [orderLeadRows, partnerId])
+  }, [orderLeadRows, partnerId, operationsUserId, useTableLayout])
 
   useEffect(() => {
     if (selectedId) void loadDetail(selectedId)
@@ -497,7 +490,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
       await Promise.all([loadMetadata(), loadPage(1, true, version)])
       if (leadId == null || itemIdsRef.current.includes(leadId)) return
     }
-    if (leadId != null && !itemIdsRef.current.includes(leadId)) {
+    if (!useTableLayout && leadId != null && !itemIdsRef.current.includes(leadId)) {
       try {
         const loaded = await api.managedLead(leadId)
         setItems(current => orderLeadRows(pinLeadFirst(current, loaded)))
@@ -505,7 +498,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
         // The list refresh remains best effort; object authorization is enforced by managedLead.
       }
     }
-  }, [loadMetadata, loadPage, orderLeadRows, salesUserId, embedded])
+  }, [loadMetadata, loadPage, orderLeadRows, salesUserId, embedded, useTableLayout])
 
   // 接单成功由 LeadAssignmentHost 打标记，这里据此刷新，销售不必手动刷新页面
   useEffect(() => {
@@ -585,7 +578,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
       ? <Alert type="error" showIcon message={detailError} action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
       : detail
         ? <LeadDetail lead={detail} refreshVersion={detailRefreshVersion} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
-          mode={partnerId !== undefined ? "manager-readonly" : audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
+          readOnly={operationsReadOnly} mode={partnerId !== undefined || operationsReadOnly ? "manager-readonly" : audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
           onDirtyChange={setFollowUpDirty} onChanged={() => { void refreshAfterLeadChange(detail.id); onScopeChanged?.() }} profileVariant="contact-rows"/>
         : <Empty description="从左侧选择一条客资"/>
@@ -666,7 +659,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     selectedRowKeys.length, selectedRowKeys.map(id => selectedLeadMap.get(Number(id))).filter((row): row is ManagedLead => Boolean(row))
   )
   const openBatchAction = async (action: LeadBatchFormAction) => {
-    if (!selectedRowKeys.length || (salesUserId !== undefined && (initialLoading || initialError || !scopedBatchEligibility(action).allowed))) return
+    if (operationsReadOnly || !selectedRowKeys.length || (salesUserId !== undefined && (initialLoading || initialError || !scopedBatchEligibility(action).allowed))) return
     setBatchAction(action)
     batchIdempotencyKey.current = createIdempotencyKey()
     batchForm.resetFields()
@@ -682,7 +675,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
   }
 
   const submitBatchAction = async () => {
-    if (!batchAction || (salesUserId !== undefined && (initialLoading || initialError || !scopedBatchEligibility(batchAction).allowed))) return
+    if (operationsReadOnly || !batchAction || (salesUserId !== undefined && (initialLoading || initialError || !scopedBatchEligibility(batchAction).allowed))) return
     const values = await batchForm.validateFields()
     setBatchSaving(true)
     try {
@@ -719,7 +712,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
   }
 
   const batchMenuItems = LEAD_BATCH_ACTIONS
-    .filter(() => partnerId === undefined)
+    .filter(() => partnerId === undefined && !operationsReadOnly)
     .filter(action => salesUserId === undefined
       ? action.permissions.some(permission => permissions.includes(permission))
       : permissions.includes(`zsjos:subordinate-sales:lead-${action.type}`))
@@ -778,19 +771,19 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     </>}
     <div className={useTableLayout ? 'lead-management-table-shell' : `lead-inbox-layout inbox-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
       {useTableLayout ? <>
-        <BusinessTable<ManagedLead> tableKey={partnerId !== undefined ? 'partner-leads' : salesUserId === undefined ? 'lead-management-page-1' : 'subordinate-sales-leads'}
+        <BusinessTable<ManagedLead> tableKey={operationsReadOnly ? 'my-operations-leads' : partnerId !== undefined ? 'partner-leads' : salesUserId === undefined ? 'lead-management-page-1' : 'subordinate-sales-leads'}
           className="lead-management-table"
           rowKey="id"
 
-          batchActions={partnerId === undefined && <Dropdown menu={{ items: batchMenuItems }} disabled={!selectedRowKeys.length || !batchMenuItems.length}>
+          batchActions={partnerId === undefined && !operationsReadOnly && <Dropdown menu={{ items: batchMenuItems }} disabled={!selectedRowKeys.length || !batchMenuItems.length}>
             <Button icon={<DownOutlined />} disabled={!selectedRowKeys.length || !batchMenuItems.length}>批量操作</Button>
           </Dropdown>}
-          filters={partnerId !== undefined ? <Input.Search allowClear placeholder="搜索客资" onSearch={setKeyword}/> : <AdvancedFilterToolbar scene="lead" pageKey={salesUserId === undefined ? 'lead_management' : 'subordinate_sales_leads'} placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>}
+          filters={partnerId !== undefined ? <Input.Search allowClear placeholder="搜索客资" onSearch={setKeyword}/> : <AdvancedFilterToolbar scene="lead" pageKey={operationsReadOnly ? 'my_operations_leads' : salesUserId === undefined ? 'lead_management' : 'subordinate_sales_leads'} placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>}
           onReload={refreshPage}
           error={initialError}
           unauthorized={Boolean(initialError && isLeadInboxUnauthorized(initialError))}
-          widthPersistenceKey={partnerId !== undefined ? 'crm-partner-leads-widths' : salesUserId === undefined ? 'crm-lead-management-table-column-widths' : 'crm-subordinate-sales-leads-column-widths'}
-          columnsState={{ persistenceKey: partnerId !== undefined ? 'crm-partner-leads-columns' : salesUserId === undefined ? 'crm-lead-management-table-columns' : 'crm-subordinate-sales-leads-columns', persistenceType: 'localStorage' }}
+          widthPersistenceKey={operationsReadOnly ? 'crm-my-operations-leads-widths' : partnerId !== undefined ? 'crm-partner-leads-widths' : salesUserId === undefined ? 'crm-lead-management-table-column-widths' : 'crm-subordinate-sales-leads-column-widths'}
+          columnsState={{ persistenceKey: operationsReadOnly ? 'crm-my-operations-leads-columns' : partnerId !== undefined ? 'crm-partner-leads-columns' : salesUserId === undefined ? 'crm-lead-management-table-columns' : 'crm-subordinate-sales-leads-columns', persistenceType: 'localStorage' }}
           loading={initialLoading}
           dataSource={items}
           pagination={{
@@ -811,31 +804,25 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
             { title: '提交时归属', key: 'partnerOwnerSnapshot', width: 140, render: (_, lead) => lead.partnerOwnerNameSnapshot || '未记录' },
           ]}
           onChange={handleLeadTableChange}
-          rowSelection={partnerId === undefined ? leadRowSelection : undefined}
+          rowSelection={partnerId === undefined && !operationsReadOnly ? leadRowSelection : undefined}
 
         />
       </> : <>
       <aside className="lead-inbox-list-pane">
-        <div className="inbox-avatar-toolbar"><InboxAvatarControls label="客资" listId="lead-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
+        <div className="inbox-avatar-toolbar lead-inbox-controls"><InboxAvatarControls label="客资" listId="lead-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
         <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
-          <AdvancedFilterToolbar scene="lead" pageKey={salesUserId === undefined ? 'lead_management' : 'subordinate_sales_leads'} placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
-          <Dropdown menu={{
-            selectable: true,
-            selectedKeys: [sortField ? `${sortField}:${sortOrder}` : 'default'],
-            items: LEAD_INBOX_SORT_OPTIONS.map(option => ({
-              key: option.field ? `${option.field}:${option.order}` : 'default',
-              label: !option.field && salesUserId !== undefined ? '默认排序（客资提交时间，从新到旧）' : option.label,
-            })),
-            onClick: ({ key }) => {
-              const option = LEAD_INBOX_SORT_OPTIONS.find(item => (item.field ? `${item.field}:${item.order}` : 'default') === key)
-              if (!option) return
+          <AdvancedFilterToolbar scene="lead" pageKey={operationsReadOnly ? 'my_operations_leads' : salesUserId === undefined ? 'lead_management' : 'subordinate_sales_leads'} placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+          <LeadInboxSortControls field={sortField} order={sortOrder} submissionOnly={salesUserId !== undefined}
+            onChange={(field, order) => {
               clearLeadSelection()
-              setSortField(option.field)
-              setSortOrder(option.order)
-            },
-          }}>
-            <Button aria-label="选择客资排序" icon={<SortAscendingOutlined />}>排序</Button>
-          </Dropdown>
+              setSortField(field)
+              setSortOrder(order)
+            }} />
+          <div className="lead-inbox-result-count" role="status" aria-live="polite">
+            {initialLoading ? <Typography.Text type="secondary">正在统计…</Typography.Text>
+              : initialError ? <Typography.Text type="secondary">数量暂不可用</Typography.Text>
+                : <><span>当前结果 <strong>{total}</strong> 条</span><Typography.Text type="secondary">已加载 {items.length} 条</Typography.Text></>}
+          </div>
         </div></div></div>
         {initialError && (avatarRail.collapsed ? <InboxAvatarError message={initialError} expand={() => avatarRail.change(false)} retry={isLeadInboxUnauthorized(initialError) ? undefined : () => void loadPage(1, true, requestVersion.current)} /> : <Alert className="lead-list-error" type={isLeadInboxUnauthorized(initialError) ? 'warning' : 'error'} showIcon
           message={isLeadInboxUnauthorized(initialError) ? '无权查看客资收件箱' : '客资列表加载失败'} description={initialError}

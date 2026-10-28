@@ -49,6 +49,17 @@ public final class SupervisorLeadActionPolicy {
         };
     }
 
+    /** Sales supervisor recovery preserves the business state, including closed records. */
+    public static boolean isSalesRecycleAllowed(LeadDO lead) {
+        return lead != null && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                && lead.getOwnerUserId() != null;
+    }
+
+    public static boolean isSalesRecycledTransferAllowed(LeadDO lead) {
+        return lead != null && ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
+                && lead.getOwnerUserId() == null && lead.getRecycleSourceOwnerUserId() != null;
+    }
+
     public static void requireAllowed(Action action, LeadDO lead) {
         if (isAllowed(action, lead)) return;
         throw exception(SUBORDINATE_LEAD_STATE_INVALID, action.label, describeCurrentState(lead),

@@ -9,12 +9,29 @@ import { useRealtime, useRealtimeEvent } from './RealtimeProvider'
 type ContextValue = { summary?: MenuTaskSummary; loading: boolean; error: string; refresh: () => Promise<void>; resolve: MenuTaskBadgeResolver }
 const Context = createContext<ContextValue | null>(null)
 
-export default function MenuTaskBadgeProvider({ children, enabled = true, bpmEnabled = false }: PropsWithChildren<{ enabled?: boolean; bpmEnabled?: boolean }>) {
+export default function MenuTaskBadgeProvider({ children, enabled = true, bpmEnabled = false, appealEnabled = false }: PropsWithChildren<{ enabled?: boolean; bpmEnabled?: boolean; appealEnabled?: boolean }>) {
   const { status } = useRealtime()
   const [summary, setSummary] = useState<MenuTaskSummary>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [bpmCount, setBpmCount] = useState<number>()
+  const [appealCount, setAppealCount] = useState<number>()
+  const appealGeneration = useRef(0)
+  const refreshAppeals = useCallback(async () => {
+    if (!enabled || !appealEnabled) return
+    const request = ++appealGeneration.current
+    try {
+      const result = await api.leadAppealInboxPage(false, { pageNo: 1, pageSize: 1 })
+      if (request === appealGeneration.current) setAppealCount(result.total)
+    } catch {
+      // 查询失败不能将未知待办数伪装成零；后续焦点、实时事件或轮询会重试。
+      if (request === appealGeneration.current) setAppealCount(undefined)
+    }
+  }, [enabled, appealEnabled])
+  useEffect(() => {
+    setAppealCount(undefined)
+    return () => { appealGeneration.current++ }
+  }, [enabled, appealEnabled])
   const bpmGeneration = useRef(0)
   const refreshBpm = useCallback(async () => {
     if (!enabled || !bpmEnabled) return
@@ -49,8 +66,8 @@ export default function MenuTaskBadgeProvider({ children, enabled = true, bpmEna
     }
   }, [enabled])
   const refresh = useCallback(async () => {
-    await Promise.all([refreshBusiness(), refreshBpm()])
-  }, [refreshBusiness, refreshBpm])
+    await Promise.all([refreshBusiness(), refreshBpm(), refreshAppeals()])
+  }, [refreshBusiness, refreshBpm, refreshAppeals])
   useEffect(() => {
     if (enabled) void refresh()
     else { setSummary(undefined); setLoading(false); setError('') }
@@ -78,8 +95,9 @@ export default function MenuTaskBadgeProvider({ children, enabled = true, bpmEna
   const map = useMemo(() => {
     const result = buildMenuTaskBadgeMap(summary)
     if (enabled && bpmEnabled && bpmCount !== undefined) result.set(APP_ROUTES.BPM_TODO, { count: bpmCount })
+    if (enabled && appealEnabled && appealCount !== undefined) result.set(APP_ROUTES.LEAD_APPEALS, { count: appealCount })
     return result
-  }, [summary, bpmCount, enabled, bpmEnabled])
+  }, [summary, bpmCount, appealCount, enabled, bpmEnabled, appealEnabled])
   const value = useMemo(() => ({ summary, loading, error, refresh, resolve: (path: string) => map.get(path) }), [error, loading, map, refresh, summary])
   return <Context.Provider value={value}>{children}</Context.Provider>
 }

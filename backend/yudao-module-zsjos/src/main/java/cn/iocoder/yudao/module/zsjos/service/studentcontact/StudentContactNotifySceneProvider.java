@@ -32,7 +32,6 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
         return List.of(scene(NOTIFY_FIRST_CONTACT, "学员首次联系时限提醒"),
                 scene(NOTIFY_STUDY_PLAN, "学员学习计划时限提醒"),
                 scene(NOTIFY_CONTACT, "学员普通联系提醒"),
-                scene(NOTIFY_EXAM_NOTICE, "学员考前通知提醒"),
                 scene(NOTIFY_OPERATOR_ASSIGNED, "学员运营指派通知"));
     }
 

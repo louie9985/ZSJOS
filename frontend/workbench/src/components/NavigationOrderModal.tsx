@@ -1,8 +1,8 @@
 import { ArrowDownOutlined, ArrowUpOutlined, HolderOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Flex, Modal, Spin, Typography, theme } from 'antd'
+import { Alert, Button, Empty, Flex, Modal, Spin, Switch, Typography, theme } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { getNavigationPreference, saveNavigationPreference } from '../services/navigationPreference'
-import { applyNavigationOrder, visibleNavigation, findNavigationLevel, navigationKey, setSiblingOrder, type NavigationNode, type NavigationOrder } from '../services/navigationOrder'
+import { applyNavigationOrder, visibleNavigation, findNavigationLevel, navigationKey, setSiblingOrder, setNavigationVisible, isNavigationVisible, type NavigationNode, type NavigationOrder } from '../services/navigationOrder'
 
 type Props = { open: boolean; menus: NavigationNode[]; canSave: boolean; onClose: () => void }
 export default function NavigationOrderModal({ open, menus, canSave, onClose }: Props) {
@@ -25,7 +25,7 @@ export default function NavigationOrderModal({ open, menus, canSave, onClose }: 
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [open, attempt])
-  const tree = useMemo(() => applyNavigationOrder(visibleNavigation(menus), draft), [menus, draft])
+  const tree = useMemo(() => applyNavigationOrder(visibleNavigation(menus), draft, 'root', true), [menus, draft])
   const rows = findNavigationLevel(tree, path)
   const dirty = JSON.stringify(draft) !== original
   function move(from: number, to: number) {
@@ -47,13 +47,16 @@ export default function NavigationOrderModal({ open, menus, canSave, onClose }: 
       {error && <Alert type="error" title={error} action={!original ? <Button onClick={() => setAttempt(value => value + 1)}>重试</Button> : undefined} />}
       {!loading && original && <>
         <Flex justify="space-between" align="center"><Typography.Text>{path.length ? '子菜单顺序' : '一级菜单顺序'}</Typography.Text>{path.length > 0 && <Button type="link" onClick={() => setPath(value => value.slice(0, -1))}>返回上一级</Button>}</Flex>
-        <Typography.Text type="secondary">拖动排序，或使用上下箭头；仅对我生效。</Typography.Text>
+        <Typography.Text type="secondary">拖动或使用箭头排序，关闭开关可隐藏菜单；仅对我生效。</Typography.Text>
         {!rows.length && <Empty description="暂无可调整的导航菜单" />}
         {rows.map((row, index) => <div key={navigationKey(row)} draggable={canSave && !saving}
           onDragStart={event => { dragged.current = navigationKey(row); event.dataTransfer.setData('text/plain', dragged.current); event.dataTransfer.effectAllowed = 'move' }}
           onDragEnd={() => { dragged.current = null }} onDragOver={event => event.preventDefault()}
           onDrop={event => { event.preventDefault(); move(rows.findIndex(item => navigationKey(item) === dragged.current), index); dragged.current = null }}
           style={{ display: 'flex', alignItems: 'center', gap: token.marginXS, padding: token.paddingXS, border: '1px solid ' + token.colorBorderSecondary, borderRadius: token.borderRadius }}>
+          <Switch size="small" aria-label={'显示' + row.name} checkedChildren="显示" unCheckedChildren="隐藏" disabled={!canSave || saving}
+            checked={isNavigationVisible(draft, path.join('/') || 'root', navigationKey(row))}
+            onChange={checked => setDraft(value => setNavigationVisible(value, path.join('/') || 'root', navigationKey(row), checked))} />
           <HolderOutlined style={{ color: token.colorTextSecondary, cursor: 'grab' }} />
           <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{row.name}</span>
           {!!row.children?.length && <Button type="link" size="small" disabled={saving} onClick={() => setPath(value => [...value, navigationKey(row)])}>子菜单</Button>}

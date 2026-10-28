@@ -27,6 +27,7 @@ public class AdvancedFilterVisibleUserService {
         }
     }
 
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAssignmentService leadAssignmentService;
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
     @Resource private ServiceRelationMapper serviceRelationMapper;
     @Resource private AdminUserApi adminUserApi;
@@ -72,7 +73,8 @@ public class AdvancedFilterVisibleUserService {
                 var ids = advancedFilterService.mediaStudentOperatorIds(userId);
                 yield Resolution.supported(ids.isEmpty() ? List.of() : options(adminUserApi.getUserList(ids)));
             }
-            case "lead", "order", "lead_appeal", "duplicate_review", "registration" ->
+            case "lead" -> Resolution.supported(operationsAndLeadUsers(userId));
+            case "order", "lead_appeal", "duplicate_review", "registration" ->
                     Resolution.supported(leadUsers(userId));
             case "subordinate_sales" -> Resolution.supported(
                     enabledOptions(leadObjectPermissionService.getManagedUserIds(userId)));
@@ -80,6 +82,21 @@ public class AdvancedFilterVisibleUserService {
                     ? enabledOptions(Set.of(userId)) : List.of());
             default -> Resolution.unsupported();
         };
+    }
+
+    private List<AdvancedFilterCatalogRespVO.OptionVO> operationsAndLeadUsers(Long userId) {
+        if (!permissionApi.hasAnyPermissions(userId,
+                cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService.QUERY_PERMISSION)) return leadUsers(userId);
+        var related = leadAssignmentService.getActiveTargetUserIds(
+                cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService.RELATION_SCENE, userId);
+        var result = new java.util.LinkedHashMap<String, AdvancedFilterCatalogRespVO.OptionVO>();
+        // A new page grant alone must not expose the department hierarchy's personnel catalog.
+        if (permissionApi.hasAnyPermissions(userId, "zsjos:lead:query", "zsjos:lead:query-submitted",
+                "zsjos:lead:query-owned", "zsjos:lead:claim", "zsjos:lead:claim-pool:query",
+                "zsjos:lead:query-all", "zsjos:lead-public-sea-pool:query", "zsjos:lead:qualification:query",
+                "zsjos:subordinate-sales:query")) leadUsers(userId).forEach(option -> result.put(option.value(), option));
+        if (!related.isEmpty()) options(adminUserApi.getUserList(related)).forEach(option -> result.put(option.value(), option));
+        return List.copyOf(result.values());
     }
 
     private List<AdvancedFilterCatalogRespVO.OptionVO> leadUsers(Long userId) {

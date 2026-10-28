@@ -29,7 +29,7 @@ public class AdvancedFilterController {
     @PreAuthorize("(#scene == 'lead' && @ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted',"
             + "'zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:claim-pool:query',"
             + "'zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
-            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query'))"
+            + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:my-operations:query'))"
             + " || (#scene == 'order' && @ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-management','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create'))"
             + " || (#scene == 'lead_appeal' && @ss.hasAnyPermissions('zsjos:lead:appeal:query',"

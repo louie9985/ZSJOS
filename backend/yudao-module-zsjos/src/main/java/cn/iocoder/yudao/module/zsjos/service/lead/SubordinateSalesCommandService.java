@@ -59,7 +59,8 @@ public class SubordinateSalesCommandService {
         if (!beginCommand("transfer", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
         if (expectedVersion != null && !Objects.equals(expectedVersion, lead.getVersion())) throw exception(LEAD_FEEDBACK_VERSION_CONFLICT);
-        SupervisorLeadActionPolicy.requireAllowed(TRANSFER, lead);
+        if (!SupervisorLeadActionPolicy.isSalesRecycledTransferAllowed(lead))
+            SupervisorLeadActionPolicy.requireAllowed(TRANSFER, lead);
         Long beforeOwner = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
                 ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
         if (Objects.equals(beforeOwner, targetUserId)) {
@@ -71,7 +72,9 @@ public class SubordinateSalesCommandService {
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
             LeadTransferReqVO request = new LeadTransferReqVO();
             request.setSalesUserId(targetUserId); request.setReason(reason); request.setIdempotencyKey(idempotencyKey);
-            qualificationService.transfer(leadId, managerUserId, request);
+            if (ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus()))
+                qualificationService.salesSupervisorTransferRecycled(leadId, managerUserId, request);
+            else qualificationService.transfer(leadId, managerUserId, request);
 
         } else {
             dispatchService.adminTransfer(leadId, targetUserId, managerUserId, reason, idempotencyKey);
@@ -119,10 +122,10 @@ public class SubordinateSalesCommandService {
         String fingerprint = fingerprint("recycle", List.of(leadId), null, null, reason);
         if (!beginCommand("recycle", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
-        SupervisorLeadActionPolicy.requireAllowed(RECYCLE, lead);
+        if (!SupervisorLeadActionPolicy.isSalesRecycleAllowed(lead))
+            SupervisorLeadActionPolicy.requireAllowed(RECYCLE, lead);
         LeadDispositionReqVO request = disposition(reason, idempotencyKey);
-        if (STATUS_SUSPENDED.equals(lead.getStatus())) qualificationService.recycle(leadId, managerUserId, request);
-        else qualificationService.supervisorRecycleOwned(leadId, managerUserId, request);
+        qualificationService.salesSupervisorRecycle(leadId, managerUserId, request);
         addAudit("lead_recycle", managerUserId, lead.getOwnerUserId(), leadId,
                 ASSIGNMENT_OWNED, ASSIGNMENT_RECYCLE_PENDING, reason);
         completeCommand(managerUserId, idempotencyKey, "true");

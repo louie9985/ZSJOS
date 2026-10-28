@@ -14,3 +14,18 @@
 - Verification: zsjos_db.py check PASS, resolving the earlier V352 baseline finding. Schema-drift/migration-execution/numbering suites 32 tests PASS. All 13 imported Python source files parse without execution. Scoped staged whitespace check PASS, conflict-marker/high-confidence private-key/token counts zero; no staged binary/temp artifacts.
 - Evidence limits: per-feature Java/frontend/MySQL/browser evidence and remaining deployment limits remain in owning handoffs. No new full application build, authenticated runtime/browser acceptance or local fresh/upgrade database execution performed by this source integration. Operational database changes described by remote handoffs were not repeated here.
 - Publication: commit scoped local source/tests/docs/SQL/handoffs and this record, normal push origin/main, verify exact remote commit and report identity after execution. Temporary files, reports, screenshots, raw workbook, editor files and four tracked caches remain local. No database/service/permission/deployment or other branch/worktree changes. Ownership released on remote verification.
+
+## Registration update — subsequent publication / 2026-10-28 Beijing
+- Context: local/main/D:/ZSJ-OS; owner /root; base 0628f72f2c6208a6cc553f3f29b893de8f4ec697. User repeats merge/commit/push request. Fetch confirms origin/main equals HEAD; merge --ff-only reports already up to date.
+- Scope: current pending My Operations/navigation visibility, embedded appeal/badges, Lead sorting/self-followup/supervisor recycle, student exam-entry retirement and related source/tests/docs/handoffs. Git publication only, no new business implementation.
+- Review: exam scheduler deletion follows explicit retirement delivery, preserving historical data and ordinary contact; sales personnel restoration follows latest sales/delivery-independent scope rather than blanket performance rollback. Shared Lead-management changes preserved per ownership handoff. Per-feature handoffs contain verification evidence/limits, including existing unrelated test failures.
+- Migration: cloud through V353; local V354 My Operations is unique and subsequent. Static database check PASS. No renumbering necessary.
+
+## Delivery preparation — subsequent publication / 2026-10-28 Beijing
+- Plan/result: publish current source snapshot with unchanged cloud history. Temporary/cache/editor/raw-workbook/report artifacts remain excluded; no database repair/script execution, schema application, service/deployment, role grants, dependencies or feature-branch changes.
+- Verification: staged scope/whitespace/conflict/private-key checks, static DB and migration regression checks; final commit/remote equality reported in conversation after normal push. Existing feature-specific acceptance limits remain; no full server/UI/runtime acceptance claimed by Git publication.
+- Ownership released on remote verification.
+
+## Publication evidence — subsequent snapshot / 2026-10-28 Beijing
+- Staged snapshot: 121 files. Core V001–V354 continuous and unique; schema-drift/migration-execution/numbering 32 tests PASS. No staged conflict markers/high-confidence private-key-token matches or binary files; only pre-existing EOF blank-line warning in lead-sort-pagination-browser.py:38, preserved.
+- Runtime/build limits from feature handoffs remain unchanged, including known unrelated PerformanceDomainTest annotation expectation and full-client checks not run by publication. Commit current snapshot then normal push; actual remote result/identity verified and reported after execution.

@@ -167,7 +167,8 @@ public class PerformanceAccess {
    if(!allowed)continue;
    addDept(m.getDeptId(),true,m.getKind(),result,included);
   }
-  for(var u:visibleEmployees()) {
+  // Delivery's department-wide personnel scope must not expand current sales target candidates.
+  for(var u:PerformanceDomain.delivery()?visibleEmployees():sales()) {
    Query q=new Query();q.setScopeType("USER");q.setScopeId(u.getId());
    try{authorize(q,targets);}catch(ServiceException ex){continue;}
    if(u.getDeptId()!=null)addDept(u.getDeptId(),false,"DEPT",result,included);

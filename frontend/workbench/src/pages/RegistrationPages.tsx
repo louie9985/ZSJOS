@@ -1297,12 +1297,6 @@ export function StudentPlannerOperations({ student, service, context, permission
   const [candidateUserId, setCandidateUserId] = useState<number>();
   const [correctionReason, setCorrectionReason] = useState("");
   const [assignmentSaving, setAssignmentSaving] = useState(false);
-  const [deliveryOpen, setDeliveryOpen] = useState(false);
-  const [deliverySaving, setDeliverySaving] = useState(false);
-  const [deliveryForm] = Form.useForm();
-  const [examDateForm] = Form.useForm();
-  const [examDateOpen, setExamDateOpen] = useState(false);
-  const [examDateSaving, setExamDateSaving] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferSaving, setTransferSaving] = useState(false);
   const [transferTargetsLoading, setTransferTargetsLoading] = useState(false);
@@ -1310,7 +1304,6 @@ export function StudentPlannerOperations({ student, service, context, permission
   const [transferTargets, setTransferTargets] = useState<DeliveryClassOption[]>([]);
   const [transferTargetId, setTransferTargetId] = useState<number>();
   const [transferReason, setTransferReason] = useState("");
-  const deliveryIdempotencyKey = useRef<string | undefined>(undefined);
   const available = teachingLifecycle && context.teachingClosed ? [] : context.availableActions || [];
   const canAction = (action: import('../services/api').StudentContactAction, permission: string) => available.includes(action) && hasPermission(permissions, permission);
   const canDirectTransfer = canAction('DIRECT_TRANSFER', 'zsjos:delivery-class:direct-transfer');
@@ -1398,19 +1391,6 @@ export function StudentPlannerOperations({ student, service, context, permission
     } catch (error) { message.error(errorMessage(error)); }
     finally { setAssignmentSaving(false); }
   };
-  const currentDeliveryStage = context.deliveryStages?.find(item => item.current);
-  const saveExamDate = async (values: { examDate: unknown }) => {
-    if (!values.examDate) return;
-    setExamDateSaving(true);
-    try {
-      const timestamp = Number((values.examDate as { valueOf: () => number }).valueOf());
-      const date = new Date(timestamp);
-      const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      await api.studentExamDate(service.serviceRelationId, { examDate: iso, version: context.version, idempotencyKey: key() });
-      message.success("考试时间已更新"); setExamDateOpen(false); await onRefresh();
-    } catch (error) { message.error(errorMessage(error)); }
-    finally { setExamDateSaving(false); }
-  };
   const openTransfer = async () => {
     if (!canDirectTransfer && !canRequestTransfer) return;
     setTransferOpen(true); setTransferReason(""); setTransferTargetId(undefined);
@@ -1448,61 +1428,14 @@ export function StudentPlannerOperations({ student, service, context, permission
     } catch (error) { message.error(errorMessage(error)); }
     finally { setTransferSaving(false); }
   };
-  const submitDeliveryStage = async (values: { remark: string; data: string }) => {
-    if (!currentDeliveryStage) return;
-    let parsed: Record<string, unknown> = {};
-    try {
-      const value: unknown = values.data?.trim() ? JSON.parse(values.data) : {};
-      if (value === null || typeof value !== "object" || Array.isArray(value)) {
-        message.warning("阶段事实必须是 JSON 对象"); return;
-      }
-      parsed = value as Record<string, unknown>;
-    }
-    catch { message.warning("阶段事实必须是合法 JSON"); return; }
-    const requiredFacts: Record<string, Record<string, "boolean" | "string">> = {
-      exam_confirmation: { examIntention: "string", examDate: "string" },
-      exam_preparation: { examNoticeSent: "boolean", admissionTicketNoticeSent: "boolean" },
-      post_exam: { examFeedback: "string" }, result: { result: "string" },
-      certificate: { certificateNotice: "string", mailingInfo: "string" },
-    };
-    const schema = requiredFacts[currentDeliveryStage.code] || {};
-    if (Object.entries(schema).some(([field, type]) => typeof parsed[field] !== type
-        || type === "string" && !String(parsed[field]).trim())) {
-      message.warning("阶段事实缺少必填字段或字段类型不正确"); return;
-    }
-    setDeliverySaving(true);
-    try {
-      const idempotencyKey = deliveryIdempotencyKey.current ||= key();
-      await api.studentDeliveryStage(service.serviceRelationId, { stage: currentDeliveryStage.code, successful: true, remark: values.remark.trim(), data: parsed, idempotencyKey });
-      message.success("交付阶段已完成"); setDeliveryOpen(false); deliveryIdempotencyKey.current = undefined; deliveryForm.resetFields(); await onRefresh();
-    } catch (error) { message.error(errorMessage(error)); }
-    finally { setDeliverySaving(false); }
-  };
-
   const toolbarActions: ToolbarAction[] = [
     canAction('ACCEPT', 'zsjos:student:accept') && { key: "student-accept", icon: <CheckOutlined />, label: "接收", onClick: accept },
     stageAction && { key: `student-${stageAction.toLowerCase()}`, icon: <PhoneOutlined />, label: stageLabel, onClick: () => setContactOpen(true) },
     canAction('EDIT_BASIC_INFO', 'zsjos:student:update-basic-info') && { key: "student-edit-basic-info", icon: <EditOutlined />, label: "修改信息", onClick: openBasicInfo },
     available.includes("ASSIGN_CONTENT_DIRECTOR") && canAssignCollaborator && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
     available.includes("ASSIGN_CAREER_PLANNER") && canAssignCollaborator && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
-    canAction('UPDATE_EXAM_DATE', 'zsjos:student:exam-date-update') && { key: "student-exam-date", icon: <EditOutlined />, label: "修改考试时间", onClick: () => { examDateForm.setFieldsValue({ examDate: context.examDate ? dayjs(context.examDate) : undefined }); setExamDateOpen(true); } },
     !context.teachingClosed && (canDirectTransfer || canRequestTransfer)
       && { key: "student-class-transfer", icon: <EditOutlined />, label: "调班", onClick: () => void openTransfer() },
-    canAction('EXAM_NOTICE_DONE', 'zsjos:student-contact:delivery-stage-submit') && { key: "student-exam-notice-done", icon: <CheckOutlined />, label: "已考前通知", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
-    canAction('POST_EXAM_DONE', 'zsjos:student-contact:delivery-stage-submit') && { key: "student-post-exam-done", icon: <CheckOutlined />, label: "已考后回访", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
-    (canAction('COMPLETE_STAGE', 'zsjos:student-contact:delivery-stage-submit') || canAction('END_SERVICE', 'zsjos:student-contact:delivery-stage-submit')) && currentDeliveryStage
-      && !["first_contact", "study_plan", "supervision"].includes(currentDeliveryStage.code)
-      && { key: "student-delivery-stage", icon: <CheckOutlined />, label: currentDeliveryStage.label, onClick: () => {
-        const templates: Record<string, Record<string, unknown>> = {
-          supervision: {}, exam_confirmation: { examIntention: "", examDate: "" },
-          exam_preparation: { examNoticeSent: true, admissionTicketNoticeSent: true },
-          post_exam: { examFeedback: "" }, result: { result: "" },
-          certificate: { certificateNotice: "", mailingInfo: "" },
-        };
-        deliveryIdempotencyKey.current = key();
-        deliveryForm.setFieldsValue({ data: JSON.stringify(templates[currentDeliveryStage.code] || {}, null, 2) });
-        setDeliveryOpen(true);
-      } },
   ].filter(Boolean) as ToolbarAction[];
 
   return <>
@@ -1521,11 +1454,6 @@ export function StudentPlannerOperations({ student, service, context, permission
         <Form.Item name="reason" label="修改原因" rules={[{ required: true, whitespace: true, max: 500 }]}><Input.TextArea rows={3} showCount maxLength={500} /></Form.Item>
       </Form>
     </Modal>
-    <Modal title="修改考试时间" open={examDateOpen} confirmLoading={examDateSaving} okText="保存" onCancel={() => setExamDateOpen(false)} onOk={() => void examDateForm.submit()} destroyOnHidden>
-      <Form form={examDateForm} layout="vertical" onFinish={saveExamDate}>
-        <Form.Item name="examDate" label="考试时间" rules={[{ required: true, message: "请选择考试日期" }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
-      </Form>
-    </Modal>
     <Modal title="调班" open={transferOpen} confirmLoading={transferSaving} okButtonProps={{ disabled: transferTargetsLoading || !!transferTargetsError }} okText={canDirectTransfer ? "确认调班" : "提交申请"} onCancel={() => setTransferOpen(false)} onOk={() => void submitTransfer()} destroyOnHidden>
       {transferTargetsError && <Alert type="error" showIcon message={transferTargetsError} action={<Button onClick={() => void openTransfer()}>重试</Button>} />}
       <Form layout="vertical"><Form.Item label="目标班级" required><Select showSearch loading={transferTargetsLoading} disabled={transferTargetsLoading || !!transferTargetsError} notFoundContent={transferTargetsLoading ? '加载中…' : '暂无可调入的班级'} optionFilterProp="label" value={transferTargetId} onChange={setTransferTargetId} options={transferTargets.map(row => ({ value: row.id, label: `${row.className || row.classNo} · ${row.homeroomUserName || "班主任姓名未记录"}` }))} placeholder="请选择目标班级" /></Form.Item><Form.Item label="调班原因" required><Input.TextArea rows={4} maxLength={500} showCount value={transferReason} onChange={event => setTransferReason(event.target.value)} /></Form.Item></Form>
@@ -1540,13 +1468,7 @@ export function StudentPlannerOperations({ student, service, context, permission
         </>}
       </Space>
     </Modal>
-    <Modal title={currentDeliveryStage?.label || "完成交付阶段"} open={deliveryOpen} confirmLoading={deliverySaving} okText="完成阶段" onCancel={() => { setDeliveryOpen(false); deliveryIdempotencyKey.current = undefined; }} onOk={() => void deliveryForm.submit()} destroyOnHidden>
-      <Form form={deliveryForm} layout="vertical" onFinish={submitDeliveryStage} initialValues={{ data: "{}" }}>
-        <Alert type="info" showIcon title="完成后将推进到下一阶段，阶段事实会作为历史快照保留。" />
-        <Form.Item name="remark" label="本次处理说明" rules={[{ required: true, whitespace: true, max: 2000 }]}><Input.TextArea rows={4} showCount maxLength={2000} /></Form.Item>
-        <Form.Item name="data" label="阶段事实（JSON）" rules={[{ required: true }]}><Input.TextArea rows={7} placeholder='例如：{"examDate":"2026-12-20","examIntention":"参加"}' /></Form.Item>
-      </Form>
-    </Modal>
+
   </>;
 }
 

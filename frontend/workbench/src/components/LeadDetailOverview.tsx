@@ -778,7 +778,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                 </section>
 
                 {(slots?.latestActivity || studentContext || lead) && <section className="lead-card">
-                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : lead ? <LatestFollowUp leadId={lead.id} refreshVersion={`${followUpRefreshVersion}:${lead.lastActivityAt ?? ''}`} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无最近联系" />)}
+                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : lead && showFollowUp ? <LatestFollowUp leadId={lead.id} refreshVersion={`${followUpRefreshVersion}:${lead.lastActivityAt ?? ''}`} /> : lead ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未开放跟进记录查看" /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无最近联系" />)}
                 </section>}
               </div>
 

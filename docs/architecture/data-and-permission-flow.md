@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## My Operations (2026-10-28)
+
+`zsjos:my-operations:query` gates the Workbench-only page. Current enabled `content_director_operator` relations define its member scope; system-user provider ownership defines Lead scope, including assisted entry and excluding Partner leads. Read visibility does not grant sales commands or submitter-assistance commands. Every selected member and detail is revalidated against live relationships. V354 defines metadata only; System role management owns grants. Both frontend menu consumers are covered; Vue Admin filters the unsupported component. See [My Operations](../api/my-operations.md).
+
 ## Student delivery strict read scope (2026-10-19)
 
 Delivery-class and student reads consume System's merged all/dept grants without converting SELF into the current department. Existing `delivery-class:query` / `query-managed` entry compatibility is retained; feature permissions alone never grant department data. Personal ownership and existing collaboration remain independent grants. Class lists/filter contexts/object reads, service lists/search/detail, legacy student reads and contact subresources enforce the same service boundary; a readable sibling service does not expose another course. Only configured `query-managed` (or an already approved tenant-wide reader) gets the existing real system pending-class exception; explicit SELF/USER does not append it. Read-scope resolution is separate from existing command department/ownership checks. No role grants or business ownership are rewritten.
@@ -899,11 +903,11 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 
 ### Student service stages and configurable forms (V126)
 
-- 学员服务阶段由服务关系维护固定状态机：首联、制定学习计划、常规督学、考前通知与冲刺、考后回访、成绩通知、证书通知与邮寄、持续回访、结束服务；“考期确认与报名资料”不再是活动阶段，历史记录保留原快照。
+- 2026-10-28 已确认停用旧考试流程：当前教学流程保留首联、制定学习计划、常规督学；旧考试确认、考前、考后、成绩、证书及后续完成阶段不再推进。历史阶段与记录保留，未关闭服务可继续普通联系。新考试流程另行制定。
 - 业务表单字段由租户发布版本维护，字段值提交时保存字段定义与字典 label 快照；历史详情不得重新解析当前字典。
 - Lead 来源渠道与客资分类、第三方账号平台、内容分类以及媒体/EAM 动态下拉字段均由服务端校验字典值并固化选择时标签；编辑时未改变的字典值沿用原标签快照，通知、订单资料和各端历史详情只展示已存快照。快照字段为空的旧记录明确显示“历史未记录”，不以当前字典补写或回退展示。
-- 服务关系保存日粒度 `examDate` 和考试日期版本。负责人或管理员修改考试日期时，已发通知的关系回退到常规督学并按新日期版本重新计算提醒；考后回访及之后阶段禁止普通修改。
-- 考前提醒由 ZSJOS 定时扫描产生 System 站内信和 Workbench WebSocket 提示，通知幂等键包含服务关系、考试日期版本和日期。
+- 服务关系的历史 `examDate` 和版本字段保留；旧考试日期更新及通用交付阶段提交接口返回“旧考试流程已停用”，不写入数据。
+- 旧考前提醒调度器及场景注册已移除，不再按学员考试日期自动通知或推进阶段；历史通知不删除。班级考期、考试日历不受影响。
 
 - `registrationReview` first approval creates one tenant/order-unique public-pool case. Finance pending or `revision_required` cases remain editable. Completion requires an `effective` order, every manual item checked, every required attachment present, at least one selected route, and a currently eligible assignee for each route. Planner eligibility is role code `study_planner`; director eligibility is post code `content_director`; both are restricted to the selected System department subtree. Completed route rows retain department and assignee snapshots. Planner/director My Students visibility is derived from these completed route relations, while public-pool permission remains independent.
 - Feature permissions (`query-pool`, `update`, `complete`) and registration object checks are cumulative. Public-pool access is never inferred from role or department. The planner candidate query uses System public APIs and never reads System tables.

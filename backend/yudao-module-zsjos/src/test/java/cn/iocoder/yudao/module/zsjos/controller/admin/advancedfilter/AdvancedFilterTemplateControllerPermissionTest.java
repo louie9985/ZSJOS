@@ -10,6 +10,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AdvancedFilterTemplateControllerPermissionTest {
 
+    @Test void operationsPermissionOnlyEnablesLeadCatalogAndPersonalLeadTemplates() throws Exception {
+        var parser = new org.springframework.expression.spel.standard.SpelExpressionParser();
+        String guard = visibleListGuard().value();
+        assertEquals(AdvancedFilterController.class.getMethod("catalog", String.class).getAnnotation(PreAuthorize.class).value(), guard);
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterTemplateSaveReqVO();
+        for (String scene : List.of("lead", "order", "cashback", "media_student")) {
+            var context = new org.springframework.expression.spel.support.StandardEvaluationContext();
+            context.setVariable("scene", scene); request.setScene(scene); context.setVariable("reqVO", request);
+            context.setBeanResolver((ctx, name) -> new PermissionProbe("zsjos:my-operations:query"));
+            assertEquals(scene.equals("lead"), parser.parseExpression(guard).getValue(context, Boolean.class));
+            for (String method : List.of("createPersonal", "updatePersonal")) {
+                String writeGuard = AdvancedFilterTemplateController.class.getMethod(method, request.getClass()).getAnnotation(PreAuthorize.class).value();
+                assertEquals(scene.equals("lead"), parser.parseExpression(writeGuard).getValue(context, Boolean.class));
+            }
+        }
+    }
+
     @Test void financeCatalogGuardAllowsOnlyMatchingQueryPermissions() throws Exception {
         String guard = AdvancedFilterController.class.getMethod("catalog", String.class)
                 .getAnnotation(PreAuthorize.class).value();

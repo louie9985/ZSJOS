@@ -7,10 +7,24 @@ import { ApiError, AuthenticationError } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import BusinessTable from '../components/BusinessTable'
 import './performance/performance.css'
+import './MediaLeadAnalysisPage.css'
 
 const date = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 const monthRange = (month: string): [string, string] => [month + '-01', month + '-' + new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()]
-function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) { return <Card size="small"><Typography.Text type="secondary">{label}</Typography.Text><Typography.Title level={3} style={{ margin: '8px 0 0' }}>{value}</Typography.Title>{hint && <Typography.Text type="secondary">{hint}</Typography.Text>}</Card> }
+function MonthlySummary({ target }: { target: Overview['target'] }) {
+  const completion = target.targetCount != null && target.targetCount > 0 ? target.actualCount / target.targetCount : null
+  const unavailable = target.targetCount == null ? '目标未设置' : target.targetCount === 0 ? '目标为 0' : ''
+  return <>
+    <div className="media-lead-summary">
+      <Card size="small" className="media-lead-summary-card"><Typography.Text type="secondary">本月有效客资目标</Typography.Text><div className="media-lead-summary-value">{target.targetCount ?? '未设置'}</div></Card>
+      <Card size="small" className="media-lead-summary-card media-lead-summary-actual"><Typography.Text type="secondary">本月有效客资</Typography.Text><div className="media-lead-summary-value">{target.actualCount}</div></Card>
+    </div>
+    <div className="media-lead-completion">
+      <div className="media-lead-completion-label"><span>月度目标完成进度</span><span>完成率 {percent(completion)}{unavailable && ` · ${unavailable}`}</span></div>
+      <Progress percent={Math.min(100, (completion ?? 0) * 100)} showInfo={false} status="normal" aria-label={`月度目标完成进度：${unavailable || percent(completion)}`} />
+    </div>
+  </>
+}
 function MemberMetricTags({ submitted, valid, converted }: { submitted: number; valid?: number; converted: number }) {
   return <Space size={4} wrap className="media-lead-metric-tags">
     <Tag color="processing" style={{ marginInlineEnd: 0 }}>提交 {submitted}</Tag>
@@ -177,13 +191,13 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
       <div className="performance-heading"><div><Typography.Title level={3} style={{ margin: 0 }}>新媒体客资分析大盘</Typography.Title><Typography.Text type="secondary">按冻结引流贡献人统计，数据使用北京时间</Typography.Text></div><Button onClick={() => void load(scope)}>刷新</Button></div>
       {error && <Alert type="error" showIcon title={error} action={<Button size="small" onClick={() => void load(scope)}>重试</Button>} />}
       {loading ? <Card><Spin /></Card> : !data ? <Empty description="暂无数据" /> : <>
-        <Card title="团队大盘"><Space wrap style={{ width: '100%' }}><Stat label="本月有效客资目标" value={data.target.targetCount ?? '未设置'} /><Stat label="本月有效客资" value={data.target.actualCount} hint={`完成率 ${percent(data.target.targetCount ? data.target.actualCount / data.target.targetCount : null)}`} /></Space><Progress style={{ width: '100%' }} percent={Math.min(100, data.target.targetCount ? data.target.actualCount / data.target.targetCount * 100 : 0)} format={() => percent(data.target.targetCount ? data.target.actualCount / data.target.targetCount : null)} status={data.target.targetCount == null ? 'exception' : undefined} />
-          <Alert type="info" showIcon title="成交率统计口径" style={{ marginBlock: 16 }} description={<>
+        <Card title="团队大盘" className="media-lead-overview"><MonthlySummary target={data.target} />
+          <details className="media-lead-methodology"><summary>按提交日期统计，判定与成交截至查询时更新 · 查看完整统计口径</summary><div>
             <p>成交率 = 该期间提交的有效客资中，截至查询时已成交的客资数 ÷ 该期间提交的有效客资数 × 100%。有效客资按当前判定统计，包含已转化、已成交客资；无效、待判等不计入分母。无有效客资时显示“—”。</p>
             <p>成交须有关联的已生效首购订单，且单笔订单总金额≥1280元（含1280元）；复购不计，多笔小额订单不累加，同一客资只计一次。</p>
             <p>期间按客资提交日期划分，成交可发生在后续期间，不限60天；历史成交率随当前状态和后续成交动态更新，不是期末冻结值。归属采用首次计数时冻结的引流贡献人和部门，日期按北京时间计算，周一为每周起点。</p>
-          </>} />
-          <BusinessTable tableKey="media-lead-periods" mode="compact" columnMode="native" rowKey="key" size="small" scroll={{ x: 750 }} pagination={false} dataSource={data.periods} columns={[{ title: '期间', dataIndex: 'label' }, { title: '客资总数', dataIndex: 'total' }, { title: '有效客资', dataIndex: 'valid' }, { title: '无效客资', dataIndex: 'invalid' }, { title: '客资有效率', dataIndex: 'validRate', render: (v: number) => percent(v) }, { title: '成交客资', dataIndex: 'converted' }, { title: '成交率', dataIndex: 'convertedRate', render: (v: number) => percent(v) }]} /></Card>
+          </div></details>
+          <BusinessTable rowClassName={row => row.key === 'today' || row.key === 'month' ? 'media-lead-current-period' : ''} tableKey="media-lead-periods" mode="compact" columnMode="native" rowKey="key" size="small" scroll={{ x: 750 }} pagination={false} dataSource={data.periods} columns={[{ title: '期间', dataIndex: 'label' }, { title: '客资总数', dataIndex: 'total' }, { title: '有效客资', dataIndex: 'valid' }, { title: '无效客资', dataIndex: 'invalid' }, { title: '客资有效率', dataIndex: 'validRate', render: (v: number) => percent(v) }, { title: '成交客资', dataIndex: 'converted' }, { title: '成交率', dataIndex: 'convertedRate', render: (v: number) => percent(v) }]} /></Card>
         <Card title="团队成员进度表">
           <p className="performance-subtle">成员成交数按合格首购订单的最早生效日期统计，包含往期提交客资；不能直接用成员本期成交数除以本期有效客资数来核对上方成交率。</p>
           <BusinessTable<Member>

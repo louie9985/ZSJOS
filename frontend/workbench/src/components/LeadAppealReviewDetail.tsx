@@ -4,8 +4,9 @@ import { api, type LeadAppeal, type LeadAppealReviewDetail as ReviewDetail } fro
 import LeadDetail from './LeadDetail'
 import { LEAD_QUALIFICATION_STATUS_LABELS } from '../constants'
 
-export default function LeadAppealReviewDetail({ item, onDirtyChange, onChanged, onBusyChange }: {
-  item: LeadAppeal
+export default function LeadAppealReviewDetail({ item, onDirtyChange, onChanged, onBusyChange, readOnly = false }: {
+  item: Pick<LeadAppeal, 'id' | 'taskId'>
+  readOnly?: boolean
   onDirtyChange: (dirty: boolean) => void
   onChanged: () => void
   onBusyChange: (busy: boolean) => void
@@ -28,7 +29,7 @@ export default function LeadAppealReviewDetail({ item, onDirtyChange, onChanged,
   return <div className="appeal-shared-detail">
     {error && <Alert type="error" showIcon message={error} action={<Button onClick={() => void reload().catch(() => {})}>重试</Button>} />}
     {loading && <Skeleton active paragraph={{ rows: 8 }} />}
-    {data && <LeadDetail lead={data.lead} categories={[]} categoryLabel={() => data.lead.leadCategoryLabelSnapshot || '未记录分类'}
+    {data && <LeadDetail readOnly={readOnly} lead={data.lead} categories={[]} categoryLabel={() => data.lead.leadCategoryLabelSnapshot || '未记录分类'}
       channelLabel={() => data.lead.sourceChannelLabelSnapshot || '未记录渠道'} mode="manager-readonly" autoExpandFollowUp={false} initialTab="appeals"
       onDirtyChange={onDirtyChange} onChanged={() => void refresh().catch(() => {})}
       contextHeader={<Space wrap className="appeal-lead-context"><Typography.Text>{data.lead.leadNo}</Typography.Text>

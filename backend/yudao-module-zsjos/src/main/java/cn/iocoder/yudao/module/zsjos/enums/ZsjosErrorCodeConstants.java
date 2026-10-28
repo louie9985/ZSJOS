@@ -185,6 +185,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode USER_RELATION_MODE_INVALID = new ErrorCode(1_900_002_009, "不支持的用户关系操作模式");
     ErrorCode USER_RELATION_SCENE_ELIGIBILITY_INVALID = new ErrorCode(1_900_002_010, "用户关系场景目标资格配置无效");
 
+    ErrorCode LEAD_RECYCLE_APPROVAL_ACTIVE = new ErrorCode(1_900_003_182, "客资存在审批中的订单、转派申请或申诉，暂不可回收");
     ErrorCode LEAD_SELF_SOURCED_REMARK_REQUIRED = new ErrorCode(1_900_003_180, "销售自拓自动判有效需填写录单备注，说明已联系及意向情况");
     ErrorCode LEAD_CONTACT_REQUIRED = new ErrorCode(1_900_003_001, "手机号和微信号至少填写一个");
     ErrorCode LEAD_CONTACT_CONFLICT = new ErrorCode(1_900_003_002, "手机号和微信号分别属于不同客户，请核对后重试");

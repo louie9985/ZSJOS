@@ -1,3 +1,4 @@
+import { supervisionNotNeededOptions } from '../services/studentServiceAnnotation'
 import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import { useEffect, useState } from 'react'
 import { Alert, Button, Select } from 'antd'
@@ -22,5 +23,5 @@ export default function StudentServiceFilters({ value, onChange, canReadAnnotati
     ['acceptanceStatus', 'service.acceptanceStatus', '全部接收状态'],
     ['deliveryStage', 'service.deliveryStage', '全部交付阶段'],
     ['taskState', 'service.taskState', '全部任务状态'],
-  ] as const).map(([key, field, placeholder]) => <Select key={key} aria-label={placeholder} allowClear showSearch optionFilterProp="label" loading={loading} disabled={loading} placeholder={placeholder} value={value[key]} options={(fields.find(f => f.fieldKey === field)?.options || []).map(option => ({ ...option, value: key === 'ownerUserId' ? Number(option.value) : option.value }))} onChange={selected => onChange({ ...value, [key]: selected })}  {...filterSelectDisplayProps}/>) }{canReadAnnotation && ([ ['proxyStudent', '是否为代理'], ['serviceNeeded', '是否需要督学'] ] as const).map(([key, label]) => <Select key={key} aria-label={label} placeholder={label} allowClear loading={loading} disabled={loading} value={value[key]} options={annotationChoices} onChange={selected => onChange({ ...value, [key]: selected })} {...filterSelectDisplayProps} />)}</>
+  ] as const).map(([key, field, placeholder]) => <Select key={key} aria-label={placeholder} allowClear showSearch optionFilterProp="label" loading={loading} disabled={loading} placeholder={placeholder} value={value[key]} options={(fields.find(f => f.fieldKey === field)?.options || []).map(option => ({ ...option, value: key === 'ownerUserId' ? Number(option.value) : option.value }))} onChange={selected => onChange({ ...value, [key]: selected })}  {...filterSelectDisplayProps}/>) }{canReadAnnotation && ([ ['proxyStudent', '是否为代理'], ['serviceNeeded', '是否无需督学'] ] as const).map(([key, label]) => <Select key={key} aria-label={label} placeholder={label} allowClear loading={loading} disabled={loading} value={value[key]} options={key === 'serviceNeeded' ? supervisionNotNeededOptions(annotationChoices) : annotationChoices} onChange={selected => onChange({ ...value, [key]: selected })} {...filterSelectDisplayProps} />)}</>
 }

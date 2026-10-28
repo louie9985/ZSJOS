@@ -65,4 +65,19 @@ class NavigationPreferenceServiceTest {
         preference.setGroups(List.of(group));
         assertThrows(ServiceException.class, () -> NavigationPreferenceService.validate(preference));
     }
+    @Test void validatesHiddenKeysAndPreservesLegacyDefaults() {
+        var preference = new NavigationPreferenceVO();
+        var group = new NavigationPreferenceVO.Group();
+        group.setParentKey("root"); group.setKeys(List.of());
+        preference.setGroups(List.of(group));
+        assertDoesNotThrow(() -> NavigationPreferenceService.validate(preference));
+        group.setHiddenKeys(List.of("menu:1"));
+        assertDoesNotThrow(() -> NavigationPreferenceService.validate(preference));
+        group.setHiddenKeys(List.of("menu:1", "menu:1"));
+        assertThrows(ServiceException.class, () -> NavigationPreferenceService.validate(preference));
+        group.setHiddenKeys(List.of("x".repeat(161)));
+        assertThrows(ServiceException.class, () -> NavigationPreferenceService.validate(preference));
+        group.setHiddenKeys(null);
+        assertThrows(ServiceException.class, () -> NavigationPreferenceService.validate(preference));
+    }
 }

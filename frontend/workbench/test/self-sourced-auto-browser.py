@@ -75,13 +75,17 @@ with sync_playwright() as p:
         expect(page.get_by_text(REQUIRED,exact=True)).to_be_visible()
         page.locator('#remark').fill('  已联系，有意向  ')
         wb_confirm(page)
-        expect(page.get_by_text('不安排',exact=True)).to_be_visible()
+        page.get_by_role('button',name='提交客资').click()
+        expect(page.get_by_text('请选择下次跟进时间',exact=True).first).to_be_visible()
+        assert not page.evaluate('window.autoFixture.requests.length')
+        page.locator('#selfSourcedNextFollowUpAt').fill('2099-01-01 10:00')
+        page.locator('#selfSourcedNextFollowUpAt').press('Enter')
         page.screenshot(path=str(OUT/f'workbench-{width}.png'),full_page=True)
         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth+2')
         wb_submit(page)
         expect(page.get_by_text('客资已判有效',exact=True).last).to_be_visible()
         req=page.evaluate('window.autoFixture.requests.at(-1)')
-        assert req['remark']=='已联系，有意向' and 'selfSourcedNextFollowUpAt' not in req
+        assert req['remark']=='已联系，有意向' and req['selfSourcedNextFollowUpAt'] > 0
 
         admin_open(page)
         expect(page.get_by_text(HINT,exact=True)).to_be_visible()
@@ -89,7 +93,11 @@ with sync_playwright() as p:
         page.get_by_role('button',name='确认提交',exact=True).click()
         expect(page.get_by_text(REQUIRED,exact=True)).to_be_visible()
         admin_field(page,'备注').locator('textarea').fill('  已联系，有意向  ')
-        admin_field(page,'下次跟进').locator('input').first.focus()
+        page.get_by_role('button',name='确认提交',exact=True).click()
+        expect(page.get_by_text('请选择下次跟进时间',exact=True).first).to_be_visible()
+        assert not page.evaluate('window.autoFixture.requests.length')
+        admin_field(page,'下次跟进').locator('input').first.fill('2099-01-01 10:00:00')
+        admin_field(page,'下次跟进').locator('input').first.press('Enter')
         admin_field(page,'下次跟进').locator('input').first.press('Tab')
         expect(page.get_by_text(REQUIRED,exact=True)).not_to_be_visible()
         page.locator('.el-overlay-dialog').evaluate('(element) => { element.scrollTop = 0 }')
@@ -98,7 +106,7 @@ with sync_playwright() as p:
         page.get_by_role('button',name='确认提交',exact=True).click()
         expect(page.get_by_text('客资已判有效，已生成首跟记录和商机',exact=True)).to_be_visible()
         req=page.evaluate('window.autoFixture.requests.at(-1)')
-        assert req['remark']=='已联系，有意向' and 'selfSourcedNextFollowUpAt' not in req
+        assert req['remark']=='已联系，有意向' and req['selfSourcedNextFollowUpAt'] > 0
 
     page.set_viewport_size({'width':1440,'height':1000})
     wb_open(page)
@@ -135,10 +143,15 @@ with sync_playwright() as p:
     assert 'selfSourcedNextFollowUpAt' not in page.evaluate('window.autoFixture.requests.at(-1)')
 
     for outcome, wb_title, admin_title in [('review_pending','疑似重复，等待管理员审核','疑似重复，待复核；尚未新建或判有效'),('activated','客资已存在，已激活提醒','客资已存在，已激活提醒')]:
-        wb_open(page,'?outcome='+outcome);wb_base(page);wb_confirm(page);wb_submit(page)
+        wb_open(page,'?outcome='+outcome);wb_base(page);wb_confirm(page)
+        page.locator('#selfSourcedNextFollowUpAt').fill('2099-01-01 10:00')
+        page.locator('#selfSourcedNextFollowUpAt').press('Enter')
+        wb_submit(page)
         expect(page.get_by_text(wb_title,exact=True).last).to_be_visible()
         expect(page.get_by_text('客资已判有效',exact=True).last).not_to_be_visible()
         admin_open(page,'?outcome='+outcome);admin_base(page)
+        admin_field(page,'下次跟进').locator('input').first.fill('2099-01-01 10:00:00')
+        admin_field(page,'下次跟进').locator('input').first.press('Enter')
         page.get_by_role('button',name='确认提交',exact=True).click()
         expect(page.get_by_text(admin_title,exact=True)).to_be_visible()
 
@@ -183,4 +196,4 @@ with sync_playwright() as p:
         page.screenshot(path=str(OUT/f'history-{width}.png'),full_page=True)
     assert not errors, errors
     browser.close()
-print(('EDUCATION ' if EDUCATION else 'SALES ')+'PASS: both frontend forms at 1440/390, required remark, optional time, provider switch, review/activation/education, history and manual charts')
+print(('EDUCATION ' if EDUCATION else 'SALES ')+'PASS: both frontend forms at 1440/390, required remark and future time, provider switch, review/activation/education, history and manual charts')

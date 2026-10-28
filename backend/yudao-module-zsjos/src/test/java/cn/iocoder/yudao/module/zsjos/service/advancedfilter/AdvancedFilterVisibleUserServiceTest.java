@@ -23,6 +23,17 @@ import static org.mockito.Mockito.when;
 class AdvancedFilterVisibleUserServiceTest {
 
     @InjectMocks private AdvancedFilterVisibleUserService service;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadAssignmentService leadAssignmentService;
+
+    @Test void operationsOnlyOptionsExcludeDepartmentUsersAndRetainRelatedDisabledMembers() {
+        when(permissionApi.hasAnyPermissions(7L, "zsjos:my-operations:query")).thenReturn(true);
+        when(leadAssignmentService.getActiveTargetUserIds("content_director_operator", 7L)).thenReturn(Set.of(8L));
+        when(adminUserApi.getUserList(Set.of(8L))).thenReturn(List.of(user(8L, "运营", 1)));
+        assertEquals(List.of("8"), service.resolve("lead", 7L).options().stream().map(option -> option.value()).toList());
+        org.mockito.Mockito.verify(leadObjectPermissionService, org.mockito.Mockito.never()).getRelatedAndManagedUserIds(7L);
+    }
+
     @Mock private LeadObjectPermissionService leadObjectPermissionService;
     @Mock private ServiceRelationMapper serviceRelationMapper;
     @Mock private AdminUserApi adminUserApi;

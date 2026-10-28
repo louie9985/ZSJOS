@@ -3,7 +3,7 @@ import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync as writeRaw } from 'node:fs'
 import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '../../..').replaceAll('\\', '/')
-const out = resolve(root, 'backend/target/personal-navigation-verification/browser')
+const out = resolve(root, 'tmp/navigation-visibility-verification/browser')
 mkdirSync(out, { recursive: true })
 const writeFileSync = (path, content) => writeRaw(path, content.replaceAll('D:/ZSJ-OS', root))
 const reqAdmin = createRequire(root + '/frontend/admin/package.json')

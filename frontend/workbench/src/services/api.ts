@@ -6117,30 +6117,6 @@ export const api = {
     unwrap<number>(
       await http.post(`/zsjos/student/service/${relationId}/contacts`, data),
     ),
-  studentDeliveryStage: async (
-    relationId: number,
-    data: {
-      stage: string;
-      successful: boolean;
-      remark: string;
-      attachmentFileIds?: number[];
-      data?: Record<string, unknown>;
-      idempotencyKey: string;
-    },
-  ) =>
-    unwrap<number>(
-      await http.post(
-        `/zsjos/student/service/${relationId}/delivery-stage`,
-        data,
-      ),
-    ),
-  studentExamDate: async (
-    relationId: number,
-    data: { examDate: string; version: number; idempotencyKey: string },
-  ) =>
-    unwrap<boolean>(
-      await http.put(`/zsjos/student/service/${relationId}/exam-date`, data),
-    ),
   studentDirectorPrecheckDraft: async (
     relationId: number,
     data: {
