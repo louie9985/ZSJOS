@@ -72,6 +72,23 @@ class DesiredSchemaPrimaryKeyTest(unittest.TestCase):
                     self.assertEqual((0, ('id',)), indexes[(table, 'primary')])
 
 
+class AnnotationSchemaContractTest(unittest.TestCase):
+    def test_v352_table_is_declared_in_desired_and_fresh_schemas(self):
+        table = 'zsjos_student_service_annotation'
+        migration = db.desired_schema(
+            db.SQL_ROOT / 'migrations/V352__student_service_annotation.sql')
+        self.assertEqual(14, len(migration[0]))
+        self.assertEqual((0, ('tenant_id', 'service_relation_id', 'deleted')),
+                         migration[1][(table, 'uk_tenant_service')])
+        for relative in ('schema/core.sql', '00-bootstrap-schema.sql'):
+            with self.subTest(path=relative):
+                actual = db.desired_schema(db.SQL_ROOT / relative)
+                self.assertEqual(migration, tuple(
+                    {key: value for key, value in objects.items() if key[0] == table}
+                    for objects in actual))
+        self.assertNotIn(table, db.load_manifests()['core']['allowedExtraTables'])
+
+
 class SchemaDriftTest(unittest.TestCase):
     def setUp(self):
         self.manifests = {'core': db.load_manifests()['core']}

@@ -8372,3 +8372,23 @@ CREATE TABLE IF NOT EXISTS zsjos_account_diagnosis_member (
   tenant_id bigint NOT NULL DEFAULT 1,
   UNIQUE KEY uk_diagnosis_member(tenant_id,metric_id,lead_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='周期截止有效客资固定集合';
+
+-- V352 empty annotation structure; migration owns menu metadata and version records.
+CREATE TABLE IF NOT EXISTS zsjos_student_service_annotation (
+  id BIGINT NOT NULL AUTO_INCREMENT,
+  service_relation_id BIGINT NOT NULL COMMENT '课程服务ID',
+  proxy_student VARCHAR(5) NULL COMMENT 'infra_boolean_string 字典值',
+  proxy_student_label VARCHAR(100) NULL COMMENT '代理学员选择标签快照',
+  agent_name VARCHAR(100) NULL COMMENT '代理人',
+  service_needed VARCHAR(5) NULL COMMENT 'infra_boolean_string 字典值，仅批注',
+  service_needed_label VARCHAR(100) NULL COMMENT '需要服务选择标签快照',
+  version INT NOT NULL DEFAULT 0,
+  creator VARCHAR(64) NOT NULL DEFAULT '',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater VARCHAR(64) NOT NULL DEFAULT '',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0',
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_tenant_service (tenant_id,service_relation_id,deleted)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员课程服务批注';

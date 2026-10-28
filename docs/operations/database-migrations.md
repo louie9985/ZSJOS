@@ -1,5 +1,32 @@
 # Database migration operations
 
+## V352 annotation table schema drift
+
+V352 creates `zsjos_student_service_annotation`; the desired Core schema and fresh
+baseline must also declare its 14 columns, primary key and tenant/service/deleted
+unique key. Their missing declaration caused `unexpected table
+zsjos_student_service_annotation` after a successful migration. Both declarations
+now match V352; the table is not an allowed-extra exception and remains subject to
+normal column/index drift checks.
+
+This correction changes only the desired structure and fresh empty-table baseline.
+Existing installations retain the applied V352 file, both ledgers, checksums, data
+and administrator permissions. Rebuild the migration-tool image from this source
+when using the containerized runner, then run `plan` and `verify` for the intended
+environment. Do not replay bootstrap or delete the table to resolve this error.
+Fresh environments still run bootstrap followed by pending migrations through
+V351 → V352; V352 owns its prerequisites, menu metadata and version records.
+Repeated table creation preserves existing rows; DDL cannot be transactionally
+rolled back, so application rollback retains any annotation data and schema.
+
+Verification covers `test_schema_drift.py`, the complete fresh migration chain,
+`test_student_service_annotation.py` initial/repeat/failure/recovery cases, and
+read-only comparison of the target table metadata including UTF-8 comments.
+Data-grade warnings remain separate findings; V188's historical requirement that
+every system class be the sole `PENDING` class predates the later `EXCEPTION` and
+V339/V343 `UNSCHEDULED` classes. Assess current class invariants before changing
+any business rows.
+
 ## Schema verification: inline primary keys and data findings
 
 The desired-schema parser recognizes both `id bigint PRIMARY KEY` and the table

@@ -509,6 +509,21 @@ def verify(q, plan):
     return after,result
 
 
+def check_existing_courses(source, current):
+    # A user-confirmed second enrollment may share a product but never a SKU.
+    # Freeze the exact existing service IDs so confirmation cannot cover later drift.
+    allowed = set(source.get('confirmed_same_product_ids', []))
+    seen = set()
+    for rel in current:
+        snap = json.loads(rel['service_snapshot']) if rel['service_snapshot'] else {}
+        h.require(snap, 'Existing service lacks course snapshot')
+        if snap.get('productRef') == source['product_ref'] or snap.get('name', snap.get('productName')) == source['product']:
+            h.require(rel['id'] in allowed and snap.get('skuRef') != source['skuRef']
+                      and snap.get('skuName') != source['sku'], 'Same-product service appeared')
+            seen.add(rel['id'])
+    h.require(seen == allowed, 'Confirmed existing course scope changed')
+
+
 def mutate(c, plan, fail_after=None):
     with c.cursor() as q:
         state=capture(q,plan,lock=True)
@@ -570,10 +585,8 @@ def mutate(c, plan, fail_after=None):
                 h.require(len(claims)==1 and live(claims[0]) and claims[0]['person_id']==pid and claims[0]['reservation_key'] is None, 'Contact claim conflict')
             else:
                 insert(q,CLAIM,dict(contact_value=source['mobile'],person_id=pid,reservation_key=None),now); checkpoint()
-            current=rows(q,f'SELECT service_snapshot FROM {S} WHERE tenant_id=1 AND deleted=0 AND person_id=%s',(pid,))
-            for rel in current:
-                snap=json.loads(rel['service_snapshot']) if rel['service_snapshot'] else {}
-                h.require(snap and snap.get('productRef')!=source['product_ref'] and snap.get('name',snap.get('productName'))!=source['product'], 'Same-product service appeared')
+            current=rows(q,f'SELECT id,service_snapshot FROM {S} WHERE tenant_id=1 AND deleted=0 AND person_id=%s',(pid,))
+            check_existing_courses(source,current)
             rid=insert(q,S,dict(person_id=pid,student_name_snapshot=source['name'],student_name_source='independent_entry',
                 teaching_delivery=1,media_ready=0,class_id=class_ids[(source['class_name'],source['owner_id'])],
                 status='active',owner_user_id=source['owner_id'],acceptance_status='accepted',accepted_by_user_id=1,
