@@ -48,6 +48,12 @@ public class AdvancedFilterController {
         var userScope = visibleUserService.resolve(scene, getLoginUserId());
         var catalog = userScope.supported() ? service.catalog(scene, userScope.options())
                 : service.catalogWithoutVisibleUsers(scene);
+        if ("student_service".equals(scene)) {
+            var planners = visibleUserService.studyPlannerOptions(userScope.options());
+            catalog = new AdvancedFilterCatalogRespVO(catalog.fields().stream().map(field ->
+                    "service.ownerUserId".equals(field.fieldKey()) ? field.withResolvedOptions(planners) : field
+            ).toList(), catalog.relativeDateOptions());
+        }
         if ("lead".equals(scene)) {
             var organizationOptions = organizations.options(userScope.options());
             var visiblePartners = partnerOptions.options(getLoginUserId());

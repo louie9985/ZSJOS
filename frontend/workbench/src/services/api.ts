@@ -5894,6 +5894,7 @@ export const api = {
     pageSize: number;
     status?: string;
     statusGroup?: 'pending' | 'processed' | 'all';
+    classAssigned?: boolean;
     keyword?: string;
     advancedFilter?: AdvancedFilterGroup;
   }) =>
@@ -5998,7 +5999,7 @@ export const api = {
     data: { version: number; idempotencyKey: string; reason: string },
   ) =>
     unwrap<boolean>(await http.post(`/zsjos/registration/${id}/close`, data)),
-  myStudentServices: async (params: BusinessSort & { pendingTasksFirst?: boolean; ownerUserId?: number; acceptanceStatus?: string; deliveryStage?: string; taskState?: string; pageNo: number; pageSize: number; personId?: number; keyword?: string; classId?: number; serviceStatus?: string; readScope?: string; targetUserId?: number; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+  myStudentServices: async (params: BusinessSort & { pendingTasksFirst?: boolean; proxyStudent?: string; serviceNeeded?: string; ownerUserId?: number; acceptanceStatus?: string; deliveryStage?: string; taskState?: string; pageNo: number; pageSize: number; personId?: number; keyword?: string; classId?: number; serviceStatus?: string; readScope?: string; targetUserId?: number; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
     ? unwrap<PageResult<StudentServiceSubject>>(await http.post("/zsjos/student/my-service/search-page", params))
     : unwrap<PageResult<StudentServiceSubject>>(await http.get("/zsjos/student/my-service-page", { params })),
   myStudentService: async (id: number) => unwrap<StudentServiceSubject>(await http.get(`/zsjos/student/my-service/${id}`)),

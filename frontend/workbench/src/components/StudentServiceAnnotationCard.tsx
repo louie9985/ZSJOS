@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Alert, Button, Input, Select, Skeleton, Typography } from 'antd'
+import { Alert, Button, Input, Checkbox, Skeleton, Typography } from 'antd'
 import { ApiError } from '../services/api'
-import { annotationChanged, annotationOptions, annotationValues, studentServiceAnnotationApi, STUDENT_ANNOTATION_CONFLICT, type AnnotationChoice, type AnnotationOption, type StudentAnnotationValues, type StudentServiceAnnotation } from '../services/studentServiceAnnotation'
+import { annotationChanged, annotationValues, studentServiceAnnotationApi, STUDENT_ANNOTATION_CONFLICT, type AnnotationOption, type StudentAnnotationValues, type StudentServiceAnnotation } from '../services/studentServiceAnnotation'
 import { useStudentArchiveEditor } from './StudentArchiveEditGuard'
 import './StudentServiceAnnotationCard.css'
 
@@ -82,22 +82,23 @@ export default function StudentServiceAnnotationCard({ relationId, canUpdate }: 
     setSavedOnce(false)
   }
   const choice = (field: 'proxyStudent' | 'serviceNeeded', label: string) => {
-    const value = draft?.[field] ?? null
-    const snapshot = field === 'proxyStudent' ? saved?.proxyStudentLabel : saved?.serviceNeededLabel
-    const choices = annotationOptions(options, saved?.[field] ?? null, snapshot ?? null)
-    return <div className="student-annotation-field"><label htmlFor={`${id}-${field}`}>{label}</label>{editable
-      ? <Select id={`${id}-${field}`} aria-label={label} size="small" allowClear placeholder="未标注" value={value ?? undefined} options={choices} disabled={saving || !optionsReady || Boolean(optionError) || conflict}
-        onChange={(next: AnnotationChoice | undefined) => change({ [field]: next ?? null, ...(field === 'proxyStudent' && next !== 'true' ? { agentName: null } : {}) })} />
-      : <span>{saved?.[field] ? snapshot || '历史标签未记录' : '未标注'}</span>}</div>
+    // The service API remains positive; only the "无需服务" control is inverted.
+    const checked = field === 'proxyStudent' ? draft?.proxyStudent === 'true' : draft?.serviceNeeded === 'false'
+    const next = field === 'proxyStudent' ? (checked ? 'false' : 'true') : (checked ? 'true' : 'false')
+    const disabled = !editable || saving || !optionsReady || Boolean(optionError) || conflict || !options.some(option => option.value === next)
+    return <div className="student-annotation-field"><Checkbox checked={checked} disabled={disabled}
+      onChange={() => change({ [field]: next, ...(field === 'proxyStudent' && next === 'false' ? { agentName: null } : {}) })}>{label}</Checkbox></div>
   }
   return <section className="lead-card student-annotation-card" aria-label="学员批注">
     <div className="lead-card-header"><Typography.Text strong>学员批注</Typography.Text></div>
     {loading ? <Skeleton active title={false} paragraph={{ rows: 3 }} /> : loadError ? <Alert type="error" title={loadError} action={<Button size="small" onClick={() => void load()}>重试</Button>} /> : saved && draft && <>
-      {choice('proxyStudent', '是否为代理学员')}
-      <div className="student-annotation-field"><label htmlFor={`${id}-agent`}>代理人</label>{editable
+      <div className="student-annotation-proxy-row">
+      {choice('proxyStudent', '代理学员')}
+      <div className="student-annotation-agent"><label htmlFor={`${id}-agent`}>代理人</label>{editable
         ? <Input id={`${id}-agent`} aria-label="代理人" size="small" value={draft.agentName ?? ''} maxLength={100} placeholder="填写代理人" disabled={saving || conflict || draft.proxyStudent !== 'true'} onChange={event => change({ agentName: event.target.value })} />
         : <span>{saved.agentName || '未填写'}</span>}</div>
-      {choice('serviceNeeded', '是否需要服务')}
+      </div>
+      {choice('serviceNeeded', '无需服务')}
       {invalid && editable && <Typography.Text type="warning">请填写代理人后保存</Typography.Text>}
       {optionError && <Alert type="error" title={optionError} action={<Button size="small" onClick={reload}>重试</Button>} />}
       {saveError && <Alert type="error" title={saveError} action={<Button size="small" onClick={conflict ? reload : () => void save()}>{conflict ? '读取最新' : '重试保存'}</Button>} />}

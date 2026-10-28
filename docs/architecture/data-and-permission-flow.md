@@ -788,15 +788,16 @@ The independent `zsjos:subordinate-sales:pause-all` command resolves that same l
 Partner ownership is an explicit ZSJOS relationship because Partner is an independent `PARTNER`
 subject and has no System department or post. One Partner has at most one current employee owner; an
 employee may own multiple Partners. The consolidated Partner route is a permission-free menu container.
-`zsjos:partner:query` retains the existing read scope: the current employee, enabled employees returned by
-the current System department data-permission projection, and employees configured through
-`content_director_partner_visibility`; no role or department name is interpreted as a supervisor.
-`zsjos:partner:manage` is a read-only, strict-self scope that includes only Partners whose current ownership
-row points to the logged-in employee and does not consume the department or relationship projections.
-`zsjos:partner:manage-all` provides tenant-wide Partner scope and the create, enable/disable, mobile,
-password, conversion, student-link and ownership commands. The three read scopes are additive, so strict
-self-only configuration must not also grant `zsjos:partner:query`. Unassigned Partners remain visible only
-to `manage-all`. `zsjos:partner-invitation:*` grants the invitation list, generation and voiding controls on the
+`zsjos:partner:query` reads current employee ownership plus employees linked by enabled
+`content_director_operator` relations. System department data scope and the legacy
+`content_director_partner_visibility` scene no longer expand Partner reads.
+`zsjos:partner:manage` remains a legacy strict-self read permission.
+`zsjos:partner:query-all` expands an existing query grant to all Partners in the current tenant,
+including unassigned Partners, without granting commands. `zsjos:partner:manage-all` retains
+full reads and its existing account/ownership commands. Role names are never scope inputs.
+Lists, counts, Partner Lead reads and batch object checks use the same current scope.
+Historical attribution is unchanged. See [Partner scope](../api/partner-read-scope.md).
+`zsjos:partner-invitation:*` grants the invitation list, generation and voiding controls on the
 same Vue Admin Partner page; these permissions do not create Partner accounts until H5 activation succeeds.
 Student invitations explicitly select an operator (prefilled from the received student service). Activation creates both the student identity link and the independent Partner ownership; student-service reassignment does not change that ownership. Legacy student invitations without a selected operator retain identity-link-only activation. Student invitation context reads require create-student permission, student object read access and a current accepted director relationship; they do not grant full invitation-list access.
 Every Partner and Partner-Lead detail request independently checks that scope. Reassignment

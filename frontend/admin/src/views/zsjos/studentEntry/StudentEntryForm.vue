@@ -73,7 +73,7 @@
               v-for="c in options.classes"
               :key="c.id"
               :value="c.id"
-              :label="`${c.className}${c.homeroomUserName ? ' · ' + c.homeroomUserName : ''}`"
+              :label="`${c.className} · ${c.homeroomUserName || '班主任姓名未记录'}`"
             /> </el-select
         ></el-form-item>
         <p

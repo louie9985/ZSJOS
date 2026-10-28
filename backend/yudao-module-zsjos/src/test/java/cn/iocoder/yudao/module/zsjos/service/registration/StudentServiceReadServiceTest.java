@@ -36,6 +36,46 @@ class StudentServiceReadServiceTest {
     @Mock cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService taskReminders;
     @BeforeEach void before(){TenantContextHolder.setTenantId(1L);}
     @AfterEach void after(){TenantContextHolder.clear();}
+    @Test void annotationFiltersRequireReadPermission() {
+        var req = new StudentServicePageReqVO(); req.setServiceNeeded("false");
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.query(7L, req));
+    }
+    @Test void annotationFiltersMatchSameServiceAndTenantBeforePagination() {
+        when(permissionApi.hasAnyPermissions(7L, StudentServiceAnnotationConstants.READ)).thenReturn(true);
+        var req = new StudentServicePageReqVO(); req.setProxyStudent("true"); req.setServiceNeeded("false");
+        var q = service.query(7L, req);
+        assertTrue(q.getWhereSql().contains("sa.service_relation_id=sr.id"));
+        assertTrue(q.getWhereSql().contains("sa.tenant_id=sr.tenant_id AND sa.deleted=0"));
+        assertEquals("true", q.getParameters().get("proxyStudent"));
+        assertEquals("false", q.getParameters().get("serviceNeeded"));
+        assertTrue(q.getParameters().containsKey("subject"));
+    }
+    @Test void annotationDefaultsIncludeMissingNullAndDeletedRowsInCombinedFilters() throws Exception {
+        when(permissionApi.hasAnyPermissions(7L, StudentServiceAnnotationConstants.READ)).thenReturn(true);
+        try (var connection = java.sql.DriverManager.getConnection("jdbc:h2:mem:annotationDefaults;MODE=MySQL");
+             var statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE sr(id BIGINT, tenant_id BIGINT)");
+            statement.execute("CREATE TABLE zsjos_student_service_annotation(service_relation_id BIGINT, tenant_id BIGINT, deleted INT, proxy_student VARCHAR(8), service_needed VARCHAR(8))");
+            statement.execute("INSERT INTO sr VALUES(1,1),(2,1),(3,1),(4,1),(5,1),(6,1)");
+            // Missing, NULL, explicit defaults, inverse values, deleted, and another tenant's annotation.
+            statement.execute("INSERT INTO zsjos_student_service_annotation VALUES(2,1,0,NULL,NULL),(3,1,0,'false','true'),(4,1,0,'true','false'),(5,1,1,'true','false'),(6,2,0,'true','false')");
+            for (String proxy : List.of("false", "true")) {
+                for (String needed : List.of("false", "true")) {
+                    var req = new StudentServicePageReqVO(); req.setProxyStudent(proxy); req.setServiceNeeded(needed);
+                    String where = service.query(7L, req).getWhereSql();
+                    String predicate = where.substring(where.indexOf("COALESCE((SELECT sa.proxy_student"))
+                            .replace("#{query.parameters.proxyStudent}", "'" + proxy + "'")
+                            .replace("#{query.parameters.serviceNeeded}", "'" + needed + "'");
+                    List<Long> ids = new ArrayList<>();
+                    try (var rows = statement.executeQuery("SELECT id FROM sr WHERE " + predicate + " ORDER BY id")) {
+                        while (rows.next()) ids.add(rows.getLong(1));
+                    }
+                    assertEquals(proxy.equals("false") && needed.equals("true") ? List.of(1L,2L,3L,5L,6L)
+                            : proxy.equals("true") && needed.equals("false") ? List.of(4L) : List.of(), ids);
+                }
+            }
+        }
+    }
     @Test void queryAllRemovesOwnerScopeBeforePaginationButKeepsTeachingAndTenantBoundaries() {
         when(permissionApi.hasAnyPermissions(7L, StudentReadScope.QUERY_ALL)).thenReturn(true);
         var req = new StudentServicePageReqVO(); req.setPageNo(2); req.setPageSize(10);
@@ -55,6 +95,16 @@ class StudentServiceReadServiceTest {
         org.mockito.Mockito.lenient().when(permissionApi.hasAnyPermissions(7L, DeliveryClassService.PERMISSION_QUERY_ALL)).thenReturn(true);
         assertEquals(7L, service.query(7L, new StudentServicePageReqVO()).getParameters().get("subject"));
     }
+    @Test void agentKeywordRequiresAnnotationReadAndStaysWithinServiceTenant() {
+        var req = new StudentServicePageReqVO(); req.setKeyword("  代理姓名  ");
+        assertFalse(service.query(7L, req).getWhereSql().contains("sa.agent_name"));
+        when(permissionApi.hasAnyPermissions(7L, StudentServiceAnnotationConstants.READ)).thenReturn(true);
+        var query = service.query(7L, req);
+        assertEquals("%代理姓名%", query.getParameters().get("keyword"));
+        assertTrue(query.getWhereSql().contains("OR EXISTS (SELECT 1 FROM zsjos_student_service_annotation sa WHERE sa.service_relation_id=sr.id AND sa.tenant_id=sr.tenant_id AND sa.deleted=0 AND sa.agent_name LIKE #{query.parameters.keyword})"));
+        assertTrue(query.getWhereSql().contains("sr.owner_user_id"));
+    }
+
     @Test void nameKeywordAndSortUseServiceSnapshot() {
         var req = new StudentServicePageReqVO(); req.setKeyword("订单姓名"); req.setSortField("name"); req.setSortOrder("ascend");
         var q = service.query(7L, req);

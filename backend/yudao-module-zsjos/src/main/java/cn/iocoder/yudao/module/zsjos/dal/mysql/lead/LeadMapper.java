@@ -581,6 +581,11 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     }
 
     default PageResult<LeadDO> selectPartnerPage(LeadManagementPageReqVO reqVO, Long partnerId) {
+        return selectPartnerPage(reqVO, partnerId, null);
+    }
+
+    default PageResult<LeadDO> selectPartnerPage(LeadManagementPageReqVO reqVO, Long partnerId,
+                                               LeadInboxFilterQuery inboxFilter) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eq(LeadDO::getPartnerId, partnerId)
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
@@ -589,6 +594,9 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
+        // 快捷筛选只收窄当前兼职范围，不替代 partnerId 条件。
+        if (inboxFilter != null && inboxFilter.matchNone()) query.eq(LeadDO::getId, -1L);
+        else if (inboxFilter != null) applyInboxFilter(query, inboxFilter);
         applyPartnerView(query, reqVO.getView());
         if (reqVO.getView() == null || reqVO.getView().isBlank() || "all".equals(reqVO.getView())) {
             applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));

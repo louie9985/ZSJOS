@@ -38,7 +38,8 @@ export const managementApi = {
   partners: async () => unwrap<Partner[]>(await http.get('/zsjos/partner/list')),
   partnerPage: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
     unwrap<PageResult<Partner>>(await http.get('/zsjos/partner/page', { params })),
-  partnerLeads: async (partnerId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
+  partnerLeadFilterProfile: async () => unwrap<import('./api').LeadInboxFilterProfile>(await http.get('/zsjos/partner/leads/filter-profile')),
+  partnerLeads: async (partnerId: number, params: import('./api').ManagedLeadPageParams) =>
     unwrap<PageResult<import('./api').ManagedLead>>(await http.get(`/zsjos/partner/${partnerId}/leads/page`, { params })),
   partnerLead: async (leadId: number) => unwrap<import('./api').ManagedLead>(await http.get(`/zsjos/partner/leads/${leadId}`)),
   createPartner: async (data: PartnerCreate) => unwrap<number>(await http.post('/zsjos/partner/create', data)),

@@ -1,6 +1,6 @@
 .student-annotation-card .student-annotation-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: var(--crm-sp-3);
   margin-bottom: var(--crm-sp-3);
@@ -9,6 +9,30 @@
 .student-annotation-field label { color: var(--crm-text-secondary); }
 .student-annotation-field > * { min-width: 0; overflow-wrap: anywhere; }
 .student-annotation-field .ant-select { width: 100%; }
+.student-annotation-proxy-row {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-3);
+}
+.student-annotation-card .student-annotation-proxy-row .student-annotation-field {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+.student-annotation-agent {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--crm-font-sm);
+}
+.student-annotation-agent > label {
+  flex-shrink: 0;
+  color: var(--crm-text-secondary);
+}
+.student-annotation-agent > .ant-input { min-width: 0; }
+.student-annotation-agent > span { overflow-wrap: anywhere; min-width: 0; }
 .student-annotation-status {
   text-align: right;
   color: var(--crm-text-tertiary);

@@ -1,0 +1,14 @@
+# Registration
+- Environment: local (environment variable and /etc identity absent); owner Codex /root; branch main; worktree D:/ZSJ-OS; base 42fa03db3302282101beb2294b2e90c23991f4e6; integration None.
+- Goal: relation-based Partner reads and independently configured full-read capability. Non-goals: role grants, changing relationships, service restart, commits or deployment.
+- Ownership: PartnerOwnershipService, SubordinatePartnerService and their tests; Workbench SubordinatePartnerPage and Vue partner page (preserve delivered partner-lead-reuse changes); V353 migration and its focused SQL test; data-and-permission-flow and partner-scope API documentation; this record.
+- Dependencies: existing System permission/user APIs and content_director_operator relationship; prior partner-lead-reuse ownership released.
+- Verification: focused backend authorization tests, both frontend static checks, controlled MySQL initial/replay/failure/recovery and local metadata-only apply, browser if available. Full-read is a scope modifier requiring an existing page query permission; no new access bypass.
+
+## Delivery
+- Ordinary query now uses current owner plus enabled content_director_operator relations; generic department scope and legacy separate Partner visibility scene are no longer read. Legacy manage stays self-only. Shared object/batch checks use the same service, including Lead reads.
+- Added query-all scope modifier requiring existing query permission; commands retain manage-all. Updated both frontend scope descriptions, preserved prior partner-lead reuse edits, and synchronized architecture/API contract.
+- V353 metadata migration passed nine controlled MySQL cases (initial/replay/partial recovery/missing or conflicting parents/identity conflict/retired or duplicate permission/ledger failures). Retained fixtures prefix partner_all_20261028110537. Local ruoyi-vue-pro application and replay passed; two ledgers and Chinese HEX checked; role-menu signature unchanged. No real role grants, ownership or relationship data modified.
+- Backend focused reactor tests: 52 passed (ownership 11, subordinate 5, controller 2, Lead object permission 34); compile passed. Workbench typecheck passed. Chrome fixture confirmed full-read text without create button and ordinary relation text; fixture is not real-account acceptance.
+- Admin typecheck reached existing duplicate identifiers in src/api/zsjos/withdrawal/index.ts; no unrelated fixes. Admin browser and real-account API acceptance remain unverified. No backend running at checked local 48080; no service start/restart, deployment, commit or push performed.
+- Initial parallel verification exhausted host memory; serialized reruns resolved it. Mockito defaults updated for the added full-read permission call, all backend tests then passed. Diff check passed. Ownership released.

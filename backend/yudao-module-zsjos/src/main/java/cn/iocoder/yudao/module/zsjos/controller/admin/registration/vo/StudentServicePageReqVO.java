@@ -3,6 +3,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 @Data @EqualsAndHashCode(callSuper = true)
 public class StudentServicePageReqVO extends MyStudentPageReqVO {
+    @jakarta.validation.constraints.Pattern(regexp = "true|false") private String proxyStudent;
+    @jakarta.validation.constraints.Pattern(regexp = "true|false") private String serviceNeeded;
     private Boolean pendingTasksFirst;
     private Long personId;
     @jakarta.validation.constraints.Positive private Long ownerUserId;

@@ -36,6 +36,15 @@ public interface RegistrationCaseMapper extends BaseMapperX<RegistrationCaseDO> 
         } else if ("processed".equals(pageParam.getStatusGroup())) {
             query.in(RegistrationCaseDO::getStatus, STATUS_COMPLETED, STATUS_CANCELLED, STATUS_ENDED);
         }
+        if (pageParam.getClassAssigned() != null) {
+            // Saved assignments, not processing status (also changed by checklist edits), define this filter.
+            String assignment = "SELECT 1 FROM zsjos_registration_class_assignment a "
+                    + "WHERE a.registration_case_id = zsjos_registration_case.id "
+                    + "AND a.tenant_id = zsjos_registration_case.tenant_id "
+                    + "AND a.deleted = b'0' AND a.class_id IS NOT NULL";
+            if (pageParam.getClassAssigned()) query.exists(assignment);
+            else query.notExists(assignment);
+        }
         if (orderIds != null) {
             if (orderIds.isEmpty()) query.eq(RegistrationCaseDO::getOrderId, -1L);
             else query.in(RegistrationCaseDO::getOrderId, orderIds);

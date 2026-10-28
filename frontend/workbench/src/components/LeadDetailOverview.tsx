@@ -788,7 +788,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
               </section>
             </div>
 
-            {/* 4 列：联系任务时效、首联完成情况与客资流转 */}
+            {/* 交付场景展示联系任务与首联进度，销售场景展示客资流转。 */}
             <div className="lead-overview-col-secondary">
               {studentContext && <section className="lead-card">
                 <div className="lead-card-header"><Typography.Text strong>联系任务时效</Typography.Text></div>
@@ -815,8 +815,8 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                 </section>
               )}
 
-              {(slots?.timeline || lead) && <section className="lead-card">
-                {slots?.timeline || (lead && <FlowTimeline lead={lead} />)}
+              {(slots?.timeline || (!studentContext && lead)) && <section className="lead-card">
+                {slots?.timeline || (!studentContext && lead && <FlowTimeline lead={lead} />)}
               </section>}
             </div>
           </div>

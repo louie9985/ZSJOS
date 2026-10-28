@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest'
 import { annotationChanged, annotationOptions, annotationValues } from './studentServiceAnnotation'
 
 describe('student course annotation', () => {
-  it('clears agent for non-proxy and retains unmarked values', () => {
-    expect(annotationValues({ proxyStudent: null, agentName: 'old', serviceNeeded: null })).toEqual({ proxyStudent: null, agentName: null, serviceNeeded: null })
+  it('defaults to non-proxy and service required without writing on load', () => {
+    expect(annotationValues({ proxyStudent: null, agentName: 'old', serviceNeeded: null })).toEqual({ proxyStudent: 'false', agentName: null, serviceNeeded: 'true' })
+    expect(annotationChanged({ proxyStudent: null, agentName: null, serviceNeeded: null }, { proxyStudent: 'false', agentName: null, serviceNeeded: 'true' })).toBe(false)
   })
   it('normalizes whitespace without making a spurious write', () => {
     expect(annotationChanged({ proxyStudent: 'true', agentName: '张', serviceNeeded: null }, { proxyStudent: 'true', agentName: ' 张 ', serviceNeeded: null })).toBe(false)

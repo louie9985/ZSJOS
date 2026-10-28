@@ -124,11 +124,26 @@ public class StudentServiceReadService {
         add(clauses,params,"sr.acceptance_status","acceptanceStatus",req.getAcceptanceStatus());
         add(clauses,params,"COALESCE(NULLIF(sr.delivery_stage,''),'first_contact')","deliveryStage",req.getDeliveryStage());
         add(clauses,params,StudentServiceSummarySql.TASK_STATE,"taskState",req.getTaskState());
+        if (req.getProxyStudent() != null || req.getServiceNeeded() != null) {
+            if (!permissionApi.hasAnyPermissions(actor, StudentServiceAnnotationConstants.READ))
+                throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED);
+            // Match the unchecked UI defaults even before a service has its first annotation.
+            String annotationSource = " FROM zsjos_student_service_annotation sa WHERE sa.service_relation_id=sr.id"
+                    + " AND sa.tenant_id=sr.tenant_id AND sa.deleted=0)";
+            add(clauses, params, "COALESCE((SELECT sa.proxy_student" + annotationSource + ", 'false')",
+                    "proxyStudent", req.getProxyStudent());
+            add(clauses, params, "COALESCE((SELECT sa.service_needed" + annotationSource + ", 'true')",
+                    "serviceNeeded", req.getServiceNeeded());
+        }
         add(clauses,params,"sr.person_id","personId",req.getPersonId());
         add(clauses,params,"p.in_service_period","inServicePeriod",req.getInServicePeriod());
         if (req.getKeyword()!=null && !req.getKeyword().isBlank()) {
             params.put("keyword","%"+req.getKeyword().trim()+"%");
-            clauses.add("(sr.student_name_snapshot LIKE #{query.parameters.keyword} OR p.mobile LIKE #{query.parameters.keyword} OR p.wechat_id LIKE #{query.parameters.keyword} OR p.person_no LIKE #{query.parameters.keyword} OR rl.lead_no LIKE #{query.parameters.keyword})");
+            String agentMatch = permissionApi.hasAnyPermissions(actor, StudentServiceAnnotationConstants.READ)
+                    ? " OR EXISTS (SELECT 1 FROM zsjos_student_service_annotation sa WHERE sa.service_relation_id=sr.id"
+                    + " AND sa.tenant_id=sr.tenant_id AND sa.deleted=0 AND sa.agent_name LIKE #{query.parameters.keyword})"
+                    : "";
+            clauses.add("(sr.student_name_snapshot LIKE #{query.parameters.keyword} OR p.mobile LIKE #{query.parameters.keyword} OR p.wechat_id LIKE #{query.parameters.keyword} OR p.person_no LIKE #{query.parameters.keyword} OR rl.lead_no LIKE #{query.parameters.keyword}" + agentMatch + ")");
         }
         params.put("sortField",req.getSortField()); params.put("sortOrder",req.getSortOrder());
         if (Boolean.TRUE.equals(req.getPendingTasksFirst())) {

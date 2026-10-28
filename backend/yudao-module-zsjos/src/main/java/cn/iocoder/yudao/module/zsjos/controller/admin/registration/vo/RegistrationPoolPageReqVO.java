@@ -12,6 +12,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class RegistrationPoolPageReqVO extends PageParam {
     private String status;
+    private Boolean classAssigned;
     @Pattern(regexp = "pending|processed|all")
     private String statusGroup;
     @Size(max = 100) private String keyword;

@@ -117,6 +117,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const location = useLocation();
   const routeState = location.state as { registrationCaseId?: number } | null;
   const [statusGroup, setStatusGroup] = useState<'pending' | 'processed' | 'all'>('pending');
+  const [classAssigned, setClassAssigned] = useState<boolean>();
   const handledLocation = useRef<string | undefined>(undefined);
   const [rows, setRows] = useState<RegistrationCase[]>([]);
   const [total, setTotal] = useState(0);
@@ -217,7 +218,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   );
   const load = useCallback(
     async (targetPage = pageNo, preferredId?: number) => {
-      const requestKey = `${statusGroup}:${targetPage}:${preferredId || "current"}:${keyword}:${JSON.stringify(advancedFilter)}`;
+      const requestKey = `${statusGroup}:${classAssigned}:${targetPage}:${preferredId || "current"}:${keyword}:${JSON.stringify(advancedFilter)}`;
       if (inflightLists.current.has(requestKey)) return;
       inflightLists.current.add(requestKey);
       const generation = ++listGeneration.current;
@@ -226,6 +227,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       try {
         const page = await api.registrationPoolPage({
             statusGroup,
+            classAssigned: statusGroup === "pending" ? classAssigned : undefined,
             pageNo: targetPage,
             pageSize: PAGE_SIZE,
             keyword: keyword || undefined,
@@ -245,14 +247,14 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, keyword, loadCase, pageNo, selected?.id, statusGroup],
+    [advancedFilter, classAssigned, keyword, loadCase, pageNo, selected?.id, statusGroup],
   );
 
   useEffect(() => {
     const preferredId = handledLocation.current !== location.key ? routeState?.registrationCaseId : undefined;
     handledLocation.current = location.key;
     void load(1, preferredId);
-  }, [advancedFilter, keyword, location.key, routeState?.registrationCaseId, statusGroup]);
+  }, [advancedFilter, classAssigned, keyword, location.key, routeState?.registrationCaseId, statusGroup]);
   useEffect(() => {
     const refresh = (event: Event) => {
       const caseId = Number(
@@ -623,37 +625,30 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
 
   return (
     <section className={"workspace-page registration-page" + (mobileDetailOpen ? " is-detail-open" : "")}>
-      <header className="registration-filter-shell">
-        <div>
-          <Typography.Title level={4}>报名履约公共池</Typography.Title>
-          <Typography.Text type="secondary">
-            协作完成成交后的学员入学事项
-          </Typography.Text>
+      <div className="lead-filter-sections">
+        <div className="lead-filter-row" role="group" aria-label="处理状态">
+          <span className="lead-filter-row-label">处理状态</span>
+          {([{ key: 'pending', label: '待处理中' }, { key: 'processed', label: '已处理' }, { key: 'all', label: '全部' }] as const).map(option => (
+            <button type="button" key={option.key} className={statusGroup === option.key ? 'active' : ''}
+              aria-pressed={statusGroup === option.key} onClick={() => confirmLeave(() => {
+                clearSelection(); setRows([]); setTotal(0); setPageNo(1);
+                setClassAssigned(undefined); setStatusGroup(option.key);
+              })}>{option.label}</button>
+          ))}
         </div>
+        {statusGroup === 'pending' && <div className="lead-filter-row" role="group" aria-label="分班情况">
+          <span className="lead-filter-row-label">分班情况</span>
+          {[{ value: undefined, label: '全部' }, { value: false, label: '待分班' }, { value: true, label: '已分班' }].map(option => (
+            <button type="button" key={option.label} className={classAssigned === option.value ? 'active' : ''}
+              aria-pressed={classAssigned === option.value} onClick={() => confirmLeave(() => {
+                clearSelection(); setRows([]); setTotal(0); setPageNo(1); setClassAssigned(option.value);
+              })}>{option.label}</button>
+          ))}
+        </div>}
+      </div>
+      <div className="lead-filter-actions">
         <Button icon={<ReloadOutlined />} onClick={() => confirmLeave(() => void load(1))}>刷新</Button>
-      </header>
-      <Tabs
-        className="lead-inbox-group-tabs"
-        activeKey={statusGroup}
-        items={[
-          { key: 'pending', label: '待处理' },
-          { key: 'processed', label: '已处理' },
-          { key: 'all', label: '全部' },
-        ]}
-        onChange={(value) => confirmLeave(() => {
-          clearSelection();
-          ++listGeneration.current;
-          ++detailGeneration.current;
-          inflightLists.current.clear();
-          setDetailLoading(false);
-          setDetailError('');
-          setSelected(undefined);
-          setRows([]);
-          setTotal(0);
-          setPageNo(1);
-          setStatusGroup(value as typeof statusGroup);
-        })}
-      />
+      </div>
       <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
           <div className="lead-inbox-toolbar">
@@ -801,7 +796,6 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
   const [categoryError, setCategoryError] = useState(false);
   const [channelError, setChannelError] = useState(false);
   const [keyword, setKeyword] = useState("");
-  const [serviceStatus, setServiceStatus] = useState<'active' | 'paused' | 'completed' | 'closed'>();
   const [quickFilters, setQuickFilters] = useState<StudentQuickFilters>({});
   const [listUnauthorized, setListUnauthorized] = useState(false);
   const [classId, setClassId] = useState<number | undefined>(requestedClassId);
@@ -905,7 +899,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
       if (options.reloadDetail !== false && !canLeaveArchive()) return;
       if (!canQuery) { setRows([]); setTotal(0); setSelected(undefined); setListUnauthorized(true); setLoading(false); return; }
       if (readScope.readScope === 'USER' && !readScope.targetUserId) { setRows([]); setTotal(0); setSelected(undefined); return; }
-      const baseRequestKey = JSON.stringify(quickFilters) + ":" + `${JSON.stringify(studentSort)}:${JSON.stringify(readScope)}:${targetPage}:${keyword}:${serviceStatus || ''}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
+      const baseRequestKey = JSON.stringify(quickFilters) + ":" + `${JSON.stringify(studentSort)}:${JSON.stringify(readScope)}:${targetPage}:${keyword}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
       if (!options.force && inflightLists.current.has(baseRequestKey)) return;
       const requestKey = options.force
         ? `${baseRequestKey}:force:${++forcedListSequence.current}`
@@ -928,7 +922,6 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
           pageNo: targetPage,
           pageSize: PAGE_SIZE,
           keyword: keyword || undefined,
-          serviceStatus,
           classId,
           advancedFilter,
         });
@@ -954,11 +947,11 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus, readScope, tenantReadAll, studentSort, quickFilters, canQuery, canLeaveArchive],
+    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, readScope, tenantReadAll, studentSort, quickFilters, canQuery, canLeaveArchive],
   );
   useEffect(() => {
     void load(1);
-  }, [advancedFilter, classId, keyword, serviceStatus, readScope, studentSort, quickFilters, canQuery]);
+  }, [advancedFilter, classId, keyword, readScope, studentSort, quickFilters, canQuery]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
   // Reload only the list when obligations change; the active editor keeps its draft.
   useEffect(() => {
@@ -1081,9 +1074,9 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
   const studentTableColumns = studentServiceColumns(studentSort);
   const changeStudentSort = (sort: BusinessSort) => { if (!resetSelection()) return; ++listGeneration.current; setPageNo(1); setRows([]); setStudentSort(sort); };
   const studentSortMenu = <BusinessSortMenu label="学员" value={studentSort} fields={sortChoices(studentTableColumnSource.filter(column => column.sorter))} onChange={changeStudentSort} />;
-  const classFilterOptions = classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }));
+  const classFilterOptions = classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo} · ${item.homeroomUserNameSnapshot || "班主任姓名未记录"}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }));
   const studentFilterControls = <div className="student-filter-controls">
-    <StudentServiceFilters value={quickFilters} onChange={value => { if (!resetSelection()) return; setPageNo(1); setQuickFilters(value); }} />
+    <StudentServiceFilters canReadAnnotation={hasPermission(permissions, "zsjos:student-service-annotation:read")} value={quickFilters} onChange={value => { if (!resetSelection()) return; setPageNo(1); setQuickFilters(value); }} />
     {canQueryClasses && <Select aria-label="全部班级" allowClear showSearch filterOption={false} onSearch={value => void loadClassOptions(value)} value={classId} loading={classOptionsLoading} placeholder="全部班级"
       popupMatchSelectWidth={false} virtual={false}
       classNames={{ popup: { root: 'student-class-filter-popup' } }}
@@ -1092,11 +1085,9 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
       onChange={value => { if (!resetSelection()) return; setPageNo(1); setClassId(value); }}
       options={classFilterOptions}
       notFoundContent={classOptionsLoading ? <Spin size="small" /> : '暂无可选班级'} />}
-    <Select aria-label="全部服务状态" allowClear value={serviceStatus} placeholder="全部服务状态"
-      onChange={value => { if (!resetSelection()) return; setPageNo(1); setServiceStatus(value); }}
-      options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }, { value: 'closed', label: '已关闭' }]} />
+
   </div>;
-  const studentSearchToolbar = <AdvancedFilterToolbar scene="student_service" pageKey="student_my" placeholder="搜索姓名、学员编号、手机号、微信号或客资编号" keyword={keyword} value={advancedFilter}
+  const studentSearchToolbar = <AdvancedFilterToolbar scene="student_service" pageKey="student_my" placeholder="搜索姓名、代理人、学员编号、手机号、微信号或客资编号" keyword={keyword} value={advancedFilter}
     onKeyword={value => { if (!resetSelection()) return; setPageNo(1); setKeyword(value); }}
     onChange={value => { if (!resetSelection()) return false; setPageNo(1); setAdvancedFilter(value); }} />;
   if (!canQuery) return <Alert type="warning" showIcon message="暂无学员查询权限" />;
@@ -1117,7 +1108,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
         className="lead-management-table"
         rowKey="serviceRelationId"
 
-        filters={<div className="student-filter-toolbar" role="group" aria-label="学员筛选">{studentSortMenu}{studentFilterControls}{studentSearchToolbar}</div>}
+        filters={<div className="student-filter-toolbar" role="group" aria-label="学员筛选">{studentFilterControls}{studentSearchToolbar}</div>}
 
         columnsState={{ defaultValue: studentColumnDefaults, persistenceKey: "crm-student-management-table-columns", persistenceType: "localStorage" }}
         loading={loading}
@@ -1130,7 +1121,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
         onChange={(_, __, sorter, extra) => { if (extra.action === "sort") changeStudentSort(readTableSort(sorter)); }}
       /> : <div className={`lead-inbox-layout inbox-avatar-layout student-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
         <aside className="lead-inbox-list-pane">
-          <div className="inbox-avatar-toolbar">{studentSortMenu}<InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || serviceStatus || Object.values(quickFilters).some(value => value !== undefined) || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
+          <div className="inbox-avatar-toolbar">{studentSortMenu}<InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || Object.values(quickFilters).some(value => value !== undefined) || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
           <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
             {studentSearchToolbar}
             <div className="inbox-avatar-secondary-filters">{studentFilterControls}</div>

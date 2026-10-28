@@ -33,6 +33,12 @@ class PartnerOwnershipServiceTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadAssignmentService leadAssignmentService;
 
+    @org.junit.jupiter.api.BeforeEach
+    void scopeDefaults() {
+        lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PartnerOwnershipService.QUERY_ALL_PERMISSION))).thenReturn(false);
+        lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PartnerOwnershipService.MANAGE_ALL_PERMISSION))).thenReturn(false);
+    }
+
     @Test
     void permissionLossImmediatelyInvalidatesRetainedOwnership() {
         when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(20L));
@@ -52,11 +58,8 @@ class PartnerOwnershipServiceTest {
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
                 PartnerOwnershipService.MANAGE_PERMISSION,
                 PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
-        when(permissionApi.getDeptDataPermission(20L)).thenReturn(new DeptDataPermissionRespDTO()
-                .setAll(false).setDeptIds(Set.of()));
 
         assertTrue(service.canRead(20L, 10L));
         assertFalse(service.canRead(21L, 10L));
@@ -73,21 +76,17 @@ class PartnerOwnershipServiceTest {
     }
 
     @Test
-    void departmentScopeCanReadPartnersAssignedToDepartmentEmployees() {
+    void departmentScopeDoesNotGrantUnrelatedPartnerReads() {
         when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(21L));
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
                 PartnerOwnershipService.MANAGE_PERMISSION,
                 PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Manager"));
-        when(permissionApi.getDeptDataPermission(20L)).thenReturn(new DeptDataPermissionRespDTO()
-                .setAll(false).setDeptIds(Set.of(30L, 31L)));
-        when(adminUserApi.getUserListByDeptIds(Set.of(30L, 31L)))
-                .thenReturn(java.util.List.of(user(21L, "Employee")));
 
-        assertTrue(service.canRead(20L, 10L));
+        assertFalse(service.canRead(20L, 10L));
+        verify(permissionApi, never()).getDeptDataPermission(anyLong());
     }
 
     @Test
@@ -107,7 +106,6 @@ class PartnerOwnershipServiceTest {
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
                 PartnerOwnershipService.MANAGE_PERMISSION,
                 PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(false);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
 
@@ -123,16 +121,12 @@ class PartnerOwnershipServiceTest {
                 PartnerOwnershipService.MANAGE_PERMISSION,
                 PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
-        when(leadAssignmentService.getActiveTargetUserIds("content_director_partner_visibility", 20L))
+        when(leadAssignmentService.getActiveTargetUserIds("content_director_operator", 20L))
                 .thenReturn(Set.of(22L));
-        when(permissionApi.getDeptDataPermission(20L)).thenReturn(new DeptDataPermissionRespDTO()
-                .setAll(false).setDeptIds(Set.of(30L)));
-        when(adminUserApi.getUserListByDeptIds(Set.of(30L))).thenReturn(List.of(user(21L, "Employee")));
 
-        assertEquals(Set.of(20L, 21L, 22L), service.getReadableEmployeeUserIds(20L));
+        assertEquals(Set.of(20L, 22L), service.getReadableEmployeeUserIds(20L));
     }
 
     @Test
@@ -163,6 +157,35 @@ class PartnerOwnershipServiceTest {
                 && value.getEmployeeNameSnapshot().equals("Owner")));
         verify(logMapper).insert(argThat((cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipLogDO log) -> "assign".equals(log.getActionType())
                 && log.getOperatorUserId().equals(99L) && "initial owner".equals(log.getReason())));
+    }
+
+    @Test
+    void fullReadRequiresPagePermissionAndDoesNotGrantCommands() {
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_ALL_PERMISSION)).thenReturn(true);
+        assertFalse(service.canReadAll(20L));
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
+                PartnerOwnershipService.MANAGE_PERMISSION, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Reader"));
+        when(partnerMapper.selectById(10L)).thenReturn(new PartnerDO().setId(10L));
+        assertTrue(service.canRead(20L, 10L));
+        assertFalse(service.canManageAll(20L));
+        assertFalse(service.canRead(20L, 11L));
+        verifyNoInteractions(ownershipMapper, leadAssignmentService);
+    }
+
+    @Test
+    void relationRemovalImmediatelyRevokesObjectAndBatchVisibility() {
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
+                PartnerOwnershipService.MANAGE_PERMISSION, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Reader"));
+        when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(22L));
+        when(leadAssignmentService.getActiveTargetUserIds("content_director_operator", 20L))
+                .thenReturn(Set.of(22L), Set.of());
+        assertTrue(service.canRead(20L, 10L));
+        assertFalse(service.canRead(20L, 10L));
+        assertTrue(service.filterReadablePartnerIds(20L, List.of(10L)).isEmpty());
+        verify(permissionApi, never()).getDeptDataPermission(anyLong());
     }
 
     private PartnerOwnershipDO ownership(Long userId) {

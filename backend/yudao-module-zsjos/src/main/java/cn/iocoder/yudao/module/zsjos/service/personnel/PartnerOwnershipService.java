@@ -30,6 +30,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class PartnerOwnershipService {
+    public static final String QUERY_ALL_PERMISSION = "zsjos:partner:query-all";
     public static final String QUERY_PERMISSION = "zsjos:partner:query";
     public static final String MANAGE_PERMISSION = "zsjos:partner:manage";
     public static final String MANAGE_ALL_PERMISSION = "zsjos:partner:manage-all";
@@ -40,7 +41,7 @@ public class PartnerOwnershipService {
     @Resource private PermissionApi permissionApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAssignmentService leadAssignmentService;
-    public static final String DIRECTOR_VISIBILITY_SCENE = "content_director_partner_visibility";
+    public static final String DIRECTOR_VISIBILITY_SCENE = "content_director_operator";
 
     public PartnerOwnershipDO getByPartnerId(Long partnerId) {
         return ownershipMapper.selectByPartnerId(partnerId);
@@ -65,38 +66,29 @@ public class PartnerOwnershipService {
                 && isEnabledUser(employeeUserId);
     }
 
+    /** Full read expands an existing query grant; it never grants account commands. */
+    public boolean canReadAll(Long employeeUserId) {
+        return canManageAll(employeeUserId) || employeeUserId != null
+                && permissionApi.hasAnyPermissions(employeeUserId, QUERY_ALL_PERMISSION)
+                && canQuery(employeeUserId);
+    }
+
     public boolean canRead(Long employeeUserId, Long partnerId) {
         if (employeeUserId == null || partnerId == null) return false;
-        if (canManageAll(employeeUserId)) return partnerMapper.selectById(partnerId) != null;
+        if (canReadAll(employeeUserId)) return partnerMapper.selectById(partnerId) != null;
         PartnerOwnershipDO ownership = getByPartnerId(partnerId);
         return ownership != null && getReadableEmployeeUserIds(employeeUserId).contains(ownership.getEmployeeUserId());
     }
 
-    /**
-     * 将 System 数据权限投影为可查看的当前员工集合。未分配兼职不会进入该集合。
-     */
+    /** Current ownership and the maintained director/operator relation are the only ordinary read scope. */
     public Set<Long> getReadableEmployeeUserIds(Long employeeUserId) {
-        if (!canQuery(employeeUserId) || canManageAll(employeeUserId)) return Set.of();
+        if (!canQuery(employeeUserId) || canReadAll(employeeUserId)) return Set.of();
         Set<Long> userIds = new HashSet<>();
-        if (permissionApi.hasAnyPermissions(employeeUserId, MANAGE_PERMISSION)) {
-            userIds.add(employeeUserId);
-        }
-        if (!permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION)) return userIds;
         userIds.add(employeeUserId);
-        userIds.addAll(leadAssignmentService.getActiveTargetUserIds(DIRECTOR_VISIBILITY_SCENE, employeeUserId));
-        var scope = permissionApi.getDeptDataPermission(employeeUserId);
-        if (scope == null) return userIds;
-        List<AdminUserRespDTO> scopedUsers;
-        if (Boolean.TRUE.equals(scope.getAll())) {
-            scopedUsers = adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
-        } else if (scope.getDeptIds() == null || scope.getDeptIds().isEmpty()) {
-            scopedUsers = List.of();
-        } else {
-            scopedUsers = adminUserApi.getUserListByDeptIds(scope.getDeptIds());
+        // Legacy manage remains strict-self; query adds the same active relation used by media business.
+        if (permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION)) {
+            userIds.addAll(leadAssignmentService.getActiveTargetUserIds(DIRECTOR_VISIBILITY_SCENE, employeeUserId));
         }
-        scopedUsers.stream()
-                .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
-                .map(AdminUserRespDTO::getId).forEach(userIds::add);
         return userIds;
     }
 
@@ -106,7 +98,7 @@ public class PartnerOwnershipService {
 
     public Set<Long> filterReadablePartnerIds(Long employeeUserId, java.util.Collection<Long> partnerIds) {
         if (employeeUserId == null || partnerIds.isEmpty() || !canQuery(employeeUserId)) return Set.of();
-        if (canManageAll(employeeUserId)) return partnerMapper.selectBatchIds(partnerIds).stream()
+        if (canReadAll(employeeUserId)) return partnerMapper.selectBatchIds(partnerIds).stream()
                 .map(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO::getId)
                 .collect(java.util.stream.Collectors.toSet());
         var employees = getReadableEmployeeUserIds(employeeUserId);

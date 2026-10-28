@@ -25,7 +25,7 @@ export const studentServiceAnnotationApi = {
     unwrap<StudentServiceAnnotation>(await http.put(path(id), { ...values, version })),
 }
 export function annotationValues(row: StudentAnnotationValues): StudentAnnotationValues {
-  return { proxyStudent: row.proxyStudent ?? null, agentName: row.proxyStudent === 'true' ? (row.agentName ?? '').trim() : null, serviceNeeded: row.serviceNeeded ?? null }
+  return { proxyStudent: row.proxyStudent ?? 'false', agentName: row.proxyStudent === 'true' ? (row.agentName ?? '').trim() : null, serviceNeeded: row.serviceNeeded ?? 'true' }
 }
 export function annotationChanged(a: StudentAnnotationValues, b: StudentAnnotationValues) {
   return JSON.stringify(annotationValues(a)) !== JSON.stringify(annotationValues(b))

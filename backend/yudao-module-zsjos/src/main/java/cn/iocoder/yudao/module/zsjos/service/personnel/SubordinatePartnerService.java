@@ -32,13 +32,13 @@ public class SubordinatePartnerService {
                 ? null : reqVO.getKeyword().trim();
         long offset = ((long) reqVO.getPageNo() - 1L) * reqVO.getPageSize();
         Long tenantId = TenantContextHolder.getRequiredTenantId();
-        boolean manageAll = ownershipService.canManageAll(userId);
-        Set<Long> readableEmployeeUserIds = manageAll ? Set.of() : ownershipService.getReadableEmployeeUserIds(userId);
-        long total = manageAll
+        boolean readAll = ownershipService.canReadAll(userId);
+        Set<Long> readableEmployeeUserIds = readAll ? Set.of() : ownershipService.getReadableEmployeeUserIds(userId);
+        long total = readAll
                 ? ownershipMapper.selectManagedCount(tenantId, reqVO.getStatus(), keyword)
                 : ownershipMapper.selectScopedCount(tenantId, readableEmployeeUserIds, reqVO.getStatus(), keyword);
         if (total == 0 || offset >= total) return new PageResult<>(List.of(), total);
-        List<SubordinatePartnerRow> page = manageAll
+        List<SubordinatePartnerRow> page = readAll
                 ? ownershipMapper.selectManagedPage(tenantId, reqVO.getStatus(), keyword, offset, reqVO.getPageSize())
                 : ownershipMapper.selectScopedPage(
                         tenantId, readableEmployeeUserIds, reqVO.getStatus(), keyword, offset, reqVO.getPageSize());

@@ -144,7 +144,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     @Override
     public PageResult<LeadManagementRespVO> getPartnerLeadPage(LeadManagementPageReqVO reqVO, Long partnerId) {
-        PageResult<LeadDO> page = leadMapper.selectPartnerPage(reqVO, partnerId);
+        LeadInboxFilterQuery inboxQuery = reqVO.getAudience() == null ? null
+                : inboxFilterConfigService.resolveQuery(
+                        inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_MANAGEMENT),
+                        reqVO.getInboxGroup(), reqVO.getInboxSectionOptions());
+        PageResult<LeadDO> page = leadMapper.selectPartnerPage(reqVO, partnerId, inboxQuery);
         if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
         Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(

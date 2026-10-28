@@ -53,14 +53,14 @@ with sync_playwright() as p:
         page = browser.new_page(viewport={'width': width, 'height': 960})
         class_name = '202701-06 人社健康管理师高级技能等级认定培训班（周末学习与考前辅导）'
         exam = '2027年1月6日 全国统一考试安排及补充说明'
-        label = class_name + ' · ' + exam
+        label = class_name + ' · 王老师 · ' + exam
         def fixture_classes(route):
             response = route.fetch()
             source = response.text()
             old = 'api.deliveryClasses.page = async () => ({ list: [], total: 0 });'
             assert old in source, 'Existing isolated class fixture changed'
             import json
-            payload = json.dumps({'list': [{'id': 901, 'className': class_name, 'examScheduleSnapshot': exam}], 'total': 1}, ensure_ascii=False)
+            payload = json.dumps({'list': [{'id': 901, 'className': class_name, 'homeroomUserNameSnapshot': '王老师', 'examScheduleSnapshot': exam}], 'total': 1}, ensure_ascii=False)
             # Only SERVING contributes the class, matching the two status requests.
             route.fulfill(response=response, body=source.replace(old, 'api.deliveryClasses.page = async (p) => p.status === "SERVING" ? (' + payload + ') : ({list: [], total: 0});'))
         page.route('**/test/student-table-completion.tsx*', fixture_classes)

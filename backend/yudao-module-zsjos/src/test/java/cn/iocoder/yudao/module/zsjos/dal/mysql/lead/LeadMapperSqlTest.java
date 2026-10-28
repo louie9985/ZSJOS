@@ -28,6 +28,27 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 class LeadMapperSqlTest {
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void partnerQuickFilterRetainsPartnerScope() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
+        LeadMapper mapper = mock(LeadMapper.class, CALLS_REAL_METHODS);
+        doReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty()).when(mapper)
+                .selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        mapper.selectPartnerPage(new LeadManagementPageReqVO(), 42L,
+                new cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery(
+                        java.util.Set.of("valid"), java.util.Set.of(), false,
+                        java.util.Map.of("status", java.util.Set.of("valid"))));
+        var capture = org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
+        verify(mapper).selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class), capture.capture());
+        var query = (LambdaQueryWrapperX<LeadDO>) capture.getValue();
+        String sql = query.getSqlSegment();
+        assertTrue(sql.contains("partner_id ="), sql);
+        assertTrue(sql.contains("status IN"), sql);
+        assertTrue(query.getParamNameValuePairs().containsValue(42L));
+        assertTrue(query.getParamNameValuePairs().containsValue("valid"));
+    }
+
 
     @Test
     @SuppressWarnings({"rawtypes", "unchecked"})

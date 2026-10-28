@@ -68,7 +68,7 @@ export default function StudentEntryForm({ type, classId, onSaved, onBusy }: { t
       <Form.Item name="directorUserId" label="责任编导" rules={[{ required: true, message: '请选择责任编导' }]}><Select styles={{ popup: { root: { maxWidth: 'calc(100vw - 24px)' } } }} showSearch optionFilterProp="label" options={options.directors.map(d => ({ value: d.id, label: d.name }))} notFoundContent="暂无有效编导，请联系管理员维护人员岗位" /></Form.Item>
       <Form.Item name="teachingDelivery" valuePropName="checked"><Checkbox>同时建立教学服务，加入待分班</Checkbox></Form.Item>
     </> : <>
-      <Form.Item name="classId" label="班级" rules={[{ required: true, message: '请选择班级或待分班' }]}><Select styles={{ popup: { root: { maxWidth: 'calc(100vw - 24px)' } } }} showSearch optionFilterProp="label" options={options.classes.map(c => ({ value: c.id, label: `${c.className}${c.homeroomUserName ? ` · ${c.homeroomUserName}` : ''}` }))} notFoundContent="暂无可入班班级，请联系管理员" /></Form.Item>
+      <Form.Item name="classId" label="班级" rules={[{ required: true, message: '请选择班级或待分班' }]}><Select styles={{ popup: { root: { maxWidth: 'calc(100vw - 24px)' } } }} showSearch optionFilterProp="label" options={options.classes.map(c => ({ value: c.id, label: `${c.className} · ${c.homeroomUserName || '班主任姓名未记录'}` }))} notFoundContent="暂无可入班班级，请联系管理员" /></Form.Item>
       <Typography.Paragraph>教学负责人：{selectedClass?.homeroomUserName || '未分配'}；正式班由班主任接收后开始首联。</Typography.Paragraph>
     </>}
     {check?.status === 'reuse' && <Alert type="info" showIcon message={`已有人员：${check.name || '姓名未提供'}（${check.personNo || '编号未提供'}）`} description={<>

@@ -16,6 +16,14 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @RestController @RequestMapping("/zsjos/partner")
 public class PartnerManagementController {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService leadManagementService;
+    @GetMapping("/leads/filter-profile")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:partner:query', 'zsjos:partner:manage', 'zsjos:partner:manage-all')")
+    public CommonResult<cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO> leadFilterProfile() {
+        return success(leadManagementService.getInboxFilterProfile(
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId(),
+                cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_AUDIENCE_MANAGEMENT));
+    }
     @Resource private PartnerManagementService service;
     @Resource private PartnerOwnershipService ownershipService;
     @Resource private SubordinatePartnerService subordinatePartnerService;

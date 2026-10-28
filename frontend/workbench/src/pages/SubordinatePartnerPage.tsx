@@ -1,6 +1,7 @@
+import LeadManagementPage from './LeadManagementPage'
 import BusinessTable from '../components/BusinessTable'
 import {
-  ArrowLeftOutlined, EditOutlined, HistoryOutlined, KeyOutlined, MobileOutlined,
+  EditOutlined, HistoryOutlined, KeyOutlined, MobileOutlined,
   PlusOutlined, ReloadOutlined, LeftOutlined, RightOutlined, StopOutlined
 } from '@ant-design/icons'
 import {
@@ -9,14 +10,11 @@ import {
 } from 'antd'
 import { type ProColumns } from '@ant-design/pro-components'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import LeadDetail from '../components/LeadDetail'
 import SubjectAvatar from '../components/SubjectAvatar'
 import DateTimeText from '../components/DateTimeText'
 import { InboxAvatarControls, InboxAvatarError, useInboxAvatarRail } from '../components/InboxAvatarRail'
-import { DICT_TYPE } from '../constants'
-import { api, type DictData, type ManagedLead, type SimpleUser } from '../services/api'
+import { type SimpleUser } from '../services/api'
 import { managementApi, type Partner, type PartnerCreate, type PartnerOwnershipLog } from '../services/managementApi'
-import { dictionaryDisplayLabel } from '../services/leadManagement'
 import { formatTimestamp } from '../services/time'
 import { hasPermission } from '../services/managementAccess'
 
@@ -26,22 +24,18 @@ const passwordRule = /^(?=.*[A-Za-z])(?=.*\d).{8,20}$/
 export default function SubordinatePartnerPage({ permissions }: { permissions: string[] }) {
   const { message } = App.useApp()
   const canManageAll = hasPermission(permissions, 'zsjos:partner:manage-all')
+  const canReadAll = canManageAll || hasPermission(permissions, 'zsjos:partner:query-all')
   const hasExpandedQuery = hasPermission(permissions, 'zsjos:partner:query')
   const rail = useInboxAvatarRail('zsjos.partner.inbox.collapsed')
   const [view, setView] = useState<'inbox' | 'table'>('inbox')
   const [activeTab, setActiveTab] = useState('overview')
   const [partners, setPartners] = useState<Partner[]>([])
   const [selected, setSelected] = useState<Partner>()
-  const [leads, setLeads] = useState<ManagedLead[]>([])
-  const [detail, setDetail] = useState<ManagedLead>()
   const [keyword, setKeyword] = useState(''), [appliedKeyword, setAppliedKeyword] = useState('')
   const [partnerPage, setPartnerPage] = useState(1), [partnerTotal, setPartnerTotal] = useState(0)
-  const [leadPage, setLeadPage] = useState(1), [leadTotal, setLeadTotal] = useState(0)
+  const [leadTotal, setLeadTotal] = useState(0)
   const [loading, setLoading] = useState(false), [leadLoading, setLeadLoading] = useState(false)
   const [error, setError] = useState(''), [leadError, setLeadError] = useState('')
-  const [detailId, setDetailId] = useState<number>()
-  const [detailLoading, setDetailLoading] = useState(false), [detailError, setDetailError] = useState('')
-  const [categories, setCategories] = useState<DictData[]>([]), [channels, setChannels] = useState<DictData[]>([])
   const [createOpen, setCreateOpen] = useState(false), [stateChange, setStateChange] = useState<{ row: Partner; enabled: boolean }>()
   const [mobilePartner, setMobilePartner] = useState<Partner>(), [passwordPartner, setPasswordPartner] = useState<Partner>()
   const [assignment, setAssignment] = useState<Partner>(), [assignmentUserId, setAssignmentUserId] = useState<number>()
@@ -51,7 +45,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
   const [logLoading, setLogLoading] = useState(false)
   const [createForm] = Form.useForm<PartnerCreate>(), [stateForm] = Form.useForm<{ reason: string }>()
   const [mobileForm] = Form.useForm<{ mobile: string }>(), [passwordForm] = Form.useForm<{ password: string }>()
-  const partnerRequestRef = useRef(0), leadRequestRef = useRef(0), detailRequestRef = useRef(0)
+  const partnerRequestRef = useRef(0), leadRequestRef = useRef(0)
 
   const loadPartners = useCallback(async () => {
     const requestId = ++partnerRequestRef.current
@@ -75,44 +69,26 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
     const requestId = ++leadRequestRef.current
     setLeadLoading(true); setLeadError('')
     try {
-      const result = await managementApi.partnerLeads(selected.id, { pageNo: leadPage, pageSize: 20 })
+      const result = await managementApi.partnerLeads(selected.id, { pageNo: 1, pageSize: 20 })
       if (requestId !== leadRequestRef.current) return
-      setLeads(result.list); setLeadTotal(result.total)
+      setLeadTotal(result.total)
     } catch (e) {
       if (requestId !== leadRequestRef.current) return
-      setLeads([]); setLeadTotal(0); setLeadError(e instanceof Error ? e.message : '兼职客资加载失败')
+      setLeadTotal(0); setLeadError(e instanceof Error ? e.message : '兼职客资加载失败')
     } finally {
       if (requestId === leadRequestRef.current) setLeadLoading(false)
     }
-  }, [leadPage, selected])
+  }, [selected])
 
   useEffect(() => { void loadPartners() }, [loadPartners])
   useEffect(() => {
-    ++leadRequestRef.current; ++detailRequestRef.current
-    setLeads([]); setLeadTotal(0); setLeadError(''); setLeadLoading(false)
-    setDetail(undefined); setDetailId(undefined); setDetailError(''); setDetailLoading(false)
+    ++leadRequestRef.current
+    setLeadTotal(0); setLeadError(''); setLeadLoading(false)
   }, [selected?.id])
   useEffect(() => { void loadLeads() }, [loadLeads])
-  useEffect(() => { void Promise.allSettled([
-    api.dictDataByType(DICT_TYPE.LEAD_CATEGORY).then(setCategories),
-    api.dictDataByType(DICT_TYPE.LEAD_SOURCE_CHANNEL).then(setChannels)
-  ]) }, [])
   useEffect(() => () => {
-    ++partnerRequestRef.current; ++leadRequestRef.current; ++detailRequestRef.current
+    ++partnerRequestRef.current; ++leadRequestRef.current
   }, [])
-
-  const openLead = async (id: number) => {
-    const requestId = ++detailRequestRef.current
-    setDetailId(id); setDetail(undefined); setDetailLoading(true); setDetailError('')
-    try {
-      const result = await managementApi.partnerLead(id)
-      if (requestId === detailRequestRef.current) setDetail(result)
-    } catch (e) {
-      if (requestId === detailRequestRef.current) setDetailError(e instanceof Error ? e.message : '客资详情加载失败')
-    } finally {
-      if (requestId === detailRequestRef.current) setDetailLoading(false)
-    }
-  }
 
   const mutate = async (action: () => Promise<unknown>, success: string) => {
     try { await action(); message.success(success); await loadPartners(); return true }
@@ -165,8 +141,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
   }
 
   const selectPartner = (partner: Partner) => {
-    setSelected(partner); setLeadPage(1); setActiveTab('overview'); setView('inbox')
-    setDetailId(undefined)
+    setSelected(partner); setActiveTab('overview'); setView('inbox')
   }
   const search = (value: string) => { setPartnerPage(1); setAppliedKeyword(value.trim()) }
   const searchBox = <Input.Search value={keyword} allowClear placeholder="搜索姓名、编号或手机号"
@@ -181,25 +156,11 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
     { title: '归属时间', dataIndex: 'assignedAt', width: 160, render: (_, row) => <DateTimeText value={row.assignedAt}/> },
     { title: '操作', key: 'action', width: 110, render: (_: unknown, row: Partner) => <Button type="link" onClick={() => selectPartner(row)}>查看概览</Button> }
   ]
-  const leadTable = <BusinessTable<ManagedLead> tableKey="subordinate-partner-page-1"
-    headerTitle="客资明细" onReload={() => void loadLeads()}
-    columnsState={{ persistenceKey: 'crm-partner-leads-table-columns', persistenceType: 'localStorage' }} rowKey="id" size="middle" loading={leadLoading} dataSource={leads}
-    scroll={{ x: 900 }} locale={{ emptyText: <Empty description="该兼职暂无客资"/> }}
-    pagination={{ current: leadPage, pageSize: 20, total: leadTotal, showSizeChanger: false, onChange: setLeadPage }}
-    columns={[
-      { title: '客资编号', dataIndex: 'leadNo', width: 170, render: (_, lead) => <Button type="link" onClick={() => void openLead(lead.id)}>{lead.leadNo || '未记录编号'}</Button> },
-      { title: '客户姓名', dataIndex: 'submittedName', width: 130 },
-      { title: '客资分类', dataIndex: 'leadCategoryLabelSnapshot', width: 130, render: (_, lead) => lead.leadCategoryLabelSnapshot || '未记录' },
-      { title: '提交时归属', key: 'partnerOwner', width: 140, render: (_: unknown, lead) => lead.partnerOwnerNameSnapshot || '未记录' },
-      { title: '当前销售', dataIndex: 'ownerUserName', width: 130, render: (_, lead) => lead.ownerUserName || '待分配销售' },
-      { title: '提交时间', dataIndex: 'submittedAt', width: 160, render: (_, lead) => <DateTimeText value={lead.submittedAt}/> },
-      { title: '操作', key: 'action', width: 110, render: (_: unknown, lead) => <Button type="link" onClick={() => void openLead(lead.id)}>查看详情</Button> }
-    ]}/>
   const leadFailure = leadError && <Alert type="error" showIcon message={leadError} action={<Button size="small" onClick={() => void loadLeads()}>重试</Button>}/>
 
   return <section className="workspace-page subordinate-partner-page">
     <div className="page-heading">
-      <div><Typography.Title level={4}>兼职管理</Typography.Title><Typography.Text type="secondary">{canManageAll ? '管理当前租户全部兼职账号及其提交客资' : hasExpandedQuery ? '查看当前授权范围内的兼职及其提交客资' : '查看直接归属给我的兼职及其提交客资'}</Typography.Text></div>
+      <div><Typography.Title level={4}>兼职管理</Typography.Title><Typography.Text type="secondary">{canManageAll ? '管理当前租户全部兼职账号及其提交客资' : canReadAll ? '查看全部兼职及其提交客资' : hasExpandedQuery ? '查看本人及关联运营名下的兼职及其提交客资' : '查看直接归属给我的兼职及其提交客资'}</Typography.Text></div>
       <Space wrap><Segmented value={view} onChange={setView} options={[{ label: '收件箱', value: 'inbox' }, { label: '表格', value: 'table' }]}/>
         <Button aria-label="刷新兼职列表" icon={<ReloadOutlined/>} onClick={() => void loadPartners()}/>
         {canManageAll && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setCreateOpen(true)}>新增兼职</Button>}</Space>
@@ -208,7 +169,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
       <div className="subordinate-partner-table-toolbar">{searchBox}<Typography.Text type="secondary">共 {partnerTotal} 位兼职</Typography.Text></div>
       {error ? <Alert type="error" showIcon message={error} action={<Button onClick={() => void loadPartners()}>重试</Button>}/> : <BusinessTable<Partner> tableKey="subordinate-partner-page-2"
         headerTitle="兼职列表" onReload={() => void loadPartners()}
-        columnsState={{ persistenceKey: 'crm-partner-table-columns', persistenceType: 'localStorage' }} rowKey="id" loading={loading} columns={partnerColumns} dataSource={partners} scroll={{ x: 1100 }} locale={{ emptyText: <Empty description="暂无可查看兼职"/> }} pagination={{ current: partnerPage, pageSize: 20, total: partnerTotal, showSizeChanger: false, onChange: setPartnerPage }}/>}
+        columnsState={{ persistenceKey: 'crm-partner-table-columns', persistenceType: 'localStorage' }} rowKey="id" loading={loading} columns={partnerColumns} dataSource={partners} scroll={{ x: 1100 }} locale={{ emptyText: <Empty description="暂无授权范围内的兼职"/> }} pagination={{ current: partnerPage, pageSize: 20, total: partnerTotal, showSizeChanger: false, onChange: setPartnerPage }}/>}
     </div> : <div className={`subordinate-partner-layout${rail.collapsed ? ' is-list-collapsed' : ''}`}>
       <aside className="subordinate-partner-list" aria-label="兼职列表">
         <div className="subordinate-partner-toolbar" ref={rail.filterRef}>
@@ -222,7 +183,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
               <SubjectAvatar seed={item.partnerNo} label={item.name} size={36}/>
               <span className="subordinate-partner-item-copy"><span className="subordinate-partner-item-title"><strong>{item.name}</strong><Tag>{statusLabel[item.status]}</Tag></span><span>{item.partnerNo}</span><span>{item.mobile || '无手机号'} · {item.assignedEmployeeName || '未分配'}</span></span>
             </button>
-          </Tooltip>) : !error && (rail.collapsed ? <span role="status" className="subordinate-partner-empty">暂无兼职</span> : <Empty description="暂无可查看兼职"/>)}
+          </Tooltip>) : !error && (rail.collapsed ? <span role="status" className="subordinate-partner-empty">暂无兼职</span> : <Empty description="暂无授权范围内的兼职"/>)}
         </div>
         {partnerTotal > 20 && (rail.collapsed ? <nav className="subordinate-partner-pagination" aria-label="兼职分页">
           <Button aria-label="上一页兼职" icon={<LeftOutlined/>} disabled={loading || partnerPage <= 1} onClick={() => setPartnerPage(partnerPage - 1)}/>
@@ -231,13 +192,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
         </nav> : <Pagination simple current={partnerPage} pageSize={20} total={partnerTotal} disabled={loading} showSizeChanger={false} onChange={setPartnerPage}/>)}
       </aside>
       <main className="subordinate-partner-leads">
-        {!selected ? <Empty description="请选择兼职查看概览与客资"/> : detailId !== undefined ? <>
-          <div className="subordinate-partner-detail-heading"><Button icon={<ArrowLeftOutlined/>} onClick={() => { ++detailRequestRef.current; setDetailId(undefined); setActiveTab('leads') }}>返回客资明细</Button>{detail && <Typography.Text>{detail.submittedName} · {detail.leadNo}</Typography.Text>}</div>
-          {detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => void openLead(detailId)}>重试</Button>}/>
-            : detailLoading || !detail ? <Skeleton active/> : <LeadDetail lead={detail} categories={categories}
-              categoryLabel={value => dictionaryDisplayLabel(categories, value, false)} channelLabel={value => dictionaryDisplayLabel(channels, value, false)}
-              mode="manager-readonly" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void openLead(detail.id)}/>}
-        </> : <>
+        {!selected ? <Empty description="请选择兼职查看概览与客资"/> : <>
           <div className="subordinate-partner-detail-heading">
             <div className="subordinate-partner-identity"><SubjectAvatar seed={selected.partnerNo} label={selected.name} size={48}/><div><Typography.Title level={4}>{selected.name} <Tag>{statusLabel[selected.status]}</Tag></Typography.Title><Typography.Text type="secondary">{selected.partnerNo} · {selected.mobile || '无手机号'}</Typography.Text></div></div>
             <Space wrap>
@@ -263,7 +218,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
                 { key: 'disabled', label: '停用时间', children: <DateTimeText value={selected.disabledAt}/> }
               ]}/></aside>
             </div> },
-            { key: 'leads', label: '客资明细', children: leadFailure || leadTable }
+            { key: 'leads', label: '客资明细', children: activeTab === 'leads' ? <LeadManagementPage key={selected.id} permissions={permissions} partnerId={selected.id}/> : null }
           ]}/>
         </>}
       </main>

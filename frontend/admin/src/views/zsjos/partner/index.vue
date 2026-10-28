@@ -352,7 +352,8 @@ const canManageAll = computed(
 )
 const scopeDescription = computed(() => {
   if (canManageAll.value) return '管理当前租户全部兼职账号及其提交客资'
-  if (userStore.getPermissions.has('zsjos:partner:query')) return '查看当前授权范围内的兼职及其提交客资'
+  if (userStore.getPermissions.has('zsjos:partner:query-all')) return '查看全部兼职及其提交客资'
+  if (userStore.getPermissions.has('zsjos:partner:query')) return '查看本人及关联运营名下的兼职及其提交客资'
   return '查看直接归属给我的兼职及其提交客资'
 })
 const loading = ref(false)
