@@ -2,7 +2,7 @@
   <ContentWrap>
     <el-alert title="每次申请生成一个兑换码。套餐修改只影响新申请。" type="info" :closable="false" />
     <el-button v-hasPermi="['zsjos:points-redemption:package-save']" type="primary" @click="edit()">新增套餐</el-button>
-    <el-button @click="load">刷新</el-button>
+
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <el-table v-loading="loading" :data="rows">
       <el-table-column prop="name" label="套餐名称" />

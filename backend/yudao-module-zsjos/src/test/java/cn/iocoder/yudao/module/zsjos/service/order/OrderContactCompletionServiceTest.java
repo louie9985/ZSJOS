@@ -46,6 +46,15 @@ class OrderContactCompletionServiceTest {
         service.complete(order,null,99L);verifyNoInteractions(leads);
         verify(writer).update(10L,"测试客户","13800138000","new-wx");
     }
+    @Test void repurchasePreservesSnapshotWithoutChangingIdentityOrClaims() {
+        order.setOrderType("repurchase");
+        service.complete(order,20L,99L);
+        assertEquals("new-wx", order.getStudentWechatId());
+        assertNull(person.getWechatId());
+        assertNull(lead.getSubmittedWechatId());
+        verifyNoInteractions(writer,events);
+        verify(leads,never()).updateById(any(LeadDO.class));
+    }
     @Test void existingContactsAreNeverOverwrittenAndReplayDoesNothing() {
         person.setWechatId("existing");lead.setSubmittedWechatId("existing");
         service.complete(order,20L,99L);service.complete(order,20L,99L);

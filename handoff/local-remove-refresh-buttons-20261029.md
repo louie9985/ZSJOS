@@ -1,0 +1,56 @@
+# Registration — local-remove-refresh-buttons-20261029
+- Environment local; owner Codex /root; current branch main; worktree D:/ZSJ-OS; integration None; base ba3e687e678ce92b67f16615244e47007d0892d4.
+- Goal: remove standalone text refresh buttons. Preserve global/table refresh and business-specific recovery/actions.
+- Scope: frontend/workbench/src, frontend/admin/src affected files listed below; directly affected UI docs and this record. Verification: AST rescan, typechecks, browser fixture.
+- frontend\workbench\src\components\LeadSubmitterAssistHistoryPanel.tsx
+- frontend\workbench\src\components\LeadSubmitterFeedbackPanel.tsx
+- frontend\workbench\src\components\NoticeReadStatistics.tsx
+- frontend\workbench\src\components\SalesOrderSupervisorInbox.tsx
+- frontend\workbench\src\components\StudentArchiveExtraPanel.tsx
+- frontend\workbench\src\components\StudentArchivePanel.tsx
+- frontend\workbench\src\components\StudentInfoPanel.tsx
+- frontend\workbench\src\components\ViralDecomposeWorkspace.tsx
+- frontend\workbench\src\features\zsjkqt\ZsjkqtPage.tsx
+- frontend\workbench\src\pages\AnnouncementCenterPage.tsx
+- frontend\workbench\src\pages\BpmApprovalCenterPage.tsx
+- frontend\workbench\src\pages\ConfigurationPages.tsx
+- frontend\workbench\src\pages\deliveryPerformance\PerformanceShared.tsx
+- frontend\workbench\src\pages\EamAssetPage.tsx
+- frontend\workbench\src\pages\EducationTeamPage.tsx
+- frontend\workbench\src\pages\ExportTaskPage.tsx
+- frontend\workbench\src\pages\LeadFollowUpCalendarPage.tsx
+- frontend\workbench\src\pages\LeadManagementPage.tsx
+- frontend\workbench\src\pages\MaterialApprovalPage.tsx
+- frontend\workbench\src\pages\MediaLeadAnalysisPage.tsx
+- frontend\workbench\src\pages\MediaLeadTargetPage.tsx
+- frontend\workbench\src\pages\MessageInboxPage.tsx
+- frontend\workbench\src\pages\MySalesOrderPage.tsx
+- frontend\workbench\src\pages\performance\PerformanceShared.tsx
+- frontend\workbench\src\pages\PointsPackagePage.tsx
+- frontend\workbench\src\pages\PointsRedemptionPage.tsx
+- frontend\workbench\src\pages\RegistrationPages.tsx
+- frontend\workbench\src\pages\SalesOrderApprovalPage.tsx
+- frontend\workbench\src\pages\WorkPlanPage.tsx
+- frontend\admin\src\views\mes\pro\task\edit\index.vue
+- frontend\admin\src\views\system\notice\NoticeReadStatistics.vue
+- frontend\admin\src\views\zsjos\components\WorkbenchListPage.vue
+- frontend\admin\src\views\zsjos\courseCalendar\index.vue
+- frontend\admin\src\views\zsjos\gift\index.vue
+- frontend\admin\src\views\zsjos\leadQualification\index.vue
+- frontend\admin\src\views\zsjos\materialType\index.vue
+- frontend\admin\src\views\zsjos\mediaCalendar\index.vue
+- frontend\admin\src\views\zsjos\personalCalendar\index.vue
+- frontend\admin\src\views\zsjos\personnel\index.vue
+- frontend\admin\src\views\zsjos\pointsPackages\index.vue
+- frontend\admin\src\views\zsjos\salesOrderSupervisorConfirmation\index.vue
+- frontend\admin\src\views\zsjos\studentContactExceptions\index.vue
+- frontend\admin\src\views\zsjos\studentInfoFormConfig\index.vue
+- frontend\admin\src\views\zsjos\todayTask\index.vue
+- frontend\admin\src\views\zsjos\workOrderTemplate\index.vue
+
+- Scope update: remove Refresh wrapper usages in SalesPerformancePage/TargetPage and DeliveryPerformancePage/TargetPage; update frontend/workbench/docs/ui-guidelines.md. Shared components mean definition count differs from rendered page count.
+
+## Delivery
+- Removed 47 standalone text-refresh button definitions (31 Workbench, 16 Admin); shared Header/WorkbenchListPage consumers inherit removal, and four performance pages no longer render Refresh wrappers. Preserved global/table refresh and specialized recovery/business operations. H5 has no matching plain refresh button.
+- Passed Workbench typecheck, source rescan (zero matching Workbench definitions), scoped diff check, Chrome order fixture checks at 1440/390 widths (no standalone refresh, list visible, no horizontal overflow). Screenshots in current visualization folder.
+- Admin template compilation blocked: @vue/compiler-sfc not available at project dependency path. Admin runtime and exhaustive page-by-page browser checks remain unverified. No deployment, commits or database changes. Ownership released.

@@ -28,7 +28,7 @@
         <el-form-item><el-select v-model="deptId" clearable filterable placeholder="筛选部门" style="width: 180px" @change="search">
           <el-option v-for="dept in departments" :key="dept.id" :value="dept.id" :label="dept.name || '部门名称未记录'" />
         </el-select></el-form-item>
-        <el-form-item><el-button native-type="submit">查询</el-button><el-button @click="load">刷新</el-button></el-form-item>
+        <el-form-item><el-button native-type="submit">查询</el-button></el-form-item>
       </el-form>
       <el-table :data="rows" row-key="userId" empty-text="暂无人员">
         <el-table-column label="姓名" min-width="130"><template #default="{ row }">{{ row.userName || (row.accountDeleted ? '账号已删除' : '姓名未记录') }}</template></el-table-column>

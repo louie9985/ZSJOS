@@ -1661,6 +1661,11 @@ export type LeadSimpleStatus =
   | "closed"
   | "suspended";
 export type LeadSortField =
+  | "createTime"
+  | "ownershipStartedAt"
+  | "lastFollowUpAt"
+  | "noProgressWarnedAt"
+  | "pendingExpiresAt"
   | "leadNo"
   | "submittedName"
   | "submittedMobile"

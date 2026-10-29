@@ -348,7 +348,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
         if (!queryAll) {
-            if (!operationsOnly && isFollowUpView(reqVO, inboxFilter) && !"submitted".equals(reqVO.getRelationScope())
+            // Management filters refine the service-resolved visibility; only legacy inboxes switch to task responsibility.
+            if (!operationsOnly && !"management".equals(reqVO.getAudience()) && isFollowUpView(reqVO, inboxFilter) && !"submitted".equals(reqVO.getRelationScope())
                     && !"submitter".equals(reqVO.getAudience())) {
                 applyFollowUpScope(query, visibleOwnerUserIds);
             } else {
@@ -468,6 +469,11 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             case "qualifiedAt" -> LeadDO::getQualifiedAt;
             case "convertedAt" -> LeadDO::getConvertedAt;
             case "remark" -> LeadDO::getRemark;
+            case "createTime" -> LeadDO::getCreateTime;
+            case "ownershipStartedAt" -> LeadDO::getOwnershipStartedAt;
+            case "lastFollowUpAt" -> LeadDO::getLastFollowUpAt;
+            case "noProgressWarnedAt" -> LeadDO::getNoProgressWarnedAt;
+            case "pendingExpiresAt" -> LeadDO::getPendingExpiresAt;
             case "updateTime" -> LeadDO::getUpdateTime;
             default -> throw new IllegalArgumentException("Unsupported lead sort field");
         };
@@ -852,11 +858,15 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         return selectOne(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getPersonId, personId)
                 .orderByDesc(LeadDO::getSubmittedAt).last("LIMIT 1"));
     }
-    // 提交联系方式命中需提醒全部历史客资，包括已关闭客资；不改变编辑时的查重范围。
+    @Select("SELECT * FROM zsjos_lead WHERE tenant_id=#{tenantId} AND person_id=#{personId} "
+            + "AND deleted=b'0' AND status<>'closed' ORDER BY id FOR UPDATE")
+    List<LeadDO> selectNonClosedByPersonForUpdate(@Param("personId") Long personId,
+                                               @Param("tenantId") Long tenantId);
+    // 已关闭客资保留历史，但不阻止同一客户重新提交；多个未关闭命中仍全部提醒。
     default List<LeadDO> selectContactActivationLeads(List<Long> personIds) {
         if (personIds == null || personIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<LeadDO>()
-                .in(LeadDO::getPersonId, personIds).orderByAsc(LeadDO::getId));
+                .in(LeadDO::getPersonId, personIds).ne(LeadDO::getStatus, "closed").orderByAsc(LeadDO::getId));
     }
 
     default List<LeadDO> selectByPersonIds(List<Long> personIds) {

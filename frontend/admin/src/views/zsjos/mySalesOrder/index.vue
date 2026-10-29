@@ -20,7 +20,7 @@
       />
       <el-select v-model="queryParams.status" placeholder="全部状态" clearable class="!w-160px">
         <el-option label="待审核" value="pending_approval" />
-        <el-option label="已驳回待修改" value="revision_required" />
+        <el-option label="已终止" value="revision_required" />
         <el-option label="已通过" value="effective" />
         <el-option label="已被重提" value="superseded" />
         <el-option label="已终止" value="terminated" />

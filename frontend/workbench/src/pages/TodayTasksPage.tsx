@@ -1,3 +1,4 @@
+import { useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
 import HomeCalendarPanel from '../components/HomeCalendarPanel'
 import HomeAnnouncementPanel from '../components/HomeAnnouncementPanel'
 import { diagnosisApi, diagnosisTaskUrl } from "../services/mediaAccountProfile";
@@ -12,7 +13,7 @@ import { formatTimestamp } from '../services/time'
 import BusinessReadScope, { type BusinessReadScopeValue } from '../components/BusinessReadScope'
 
 const PAGE_SIZE = 6
-type TaskView = 'pending' | 'done'
+
 
 export const canQueryBpmTasks = (permissions: readonly string[]) => permissions.includes('bpm:task:query')
 export const canReadAnnouncements = (permissions: readonly string[]) => permissions.includes('system:notice:read')
@@ -24,10 +25,10 @@ const bucketLabels: Record<BusinessTaskBucket, string> = {
   overdue: '逾期',
   today: '今日',
   future: '未来',
-  unscheduled: '无截止'
+  unscheduled: '其他待办'
 }
 
-const bucketOrder: BusinessTaskBucket[] = ['overdue', 'today', 'future', 'unscheduled']
+const bucketOrder: BusinessTaskBucket[] = ['overdue', 'today', 'future']
 const workPlanActions = new Set(['OPEN_WORK_TASK', 'CONFIRM_WORK_TASK', 'SUMMARIZE_WORK_PLAN'])
 const emptySummary: BusinessTaskSummary = {
   overdue: 0,
@@ -35,7 +36,7 @@ const emptySummary: BusinessTaskSummary = {
   future: 0,
   unscheduled: 0
 }
-const placeholderStatCards = Array.from({ length: 10 }, (_, index) => `待配置指标 ${index + 1}`)
+const placeholderStatCards = Array.from({ length: 9 }, (_, index) => `待配置指标 ${index + 1}`)
 
 function PlaceholderStatCard({ label }: { label: string }) {
   return <Card className="home-stat-card placeholder" bordered={false}>
@@ -82,6 +83,12 @@ function SummaryRegion({
           ))}
         </div>
       </Card>
+      <Card className="home-stat-card" bordered={false}>
+        <Typography.Text type="secondary">其他待办</Typography.Text>
+        {loading && !businessSummary ? <Skeleton active paragraph={false} /> : <Statistic value={businessSummary?.unscheduled ?? 0} suffix="项" />}
+        {businessError && <Typography.Text type="danger">{businessError}</Typography.Text>}
+        <Typography.Text type="secondary">待处理的其他任务</Typography.Text>
+      </Card>
       {showBpmTasks && (
         <Card
           className="home-stat-card approval"
@@ -112,20 +119,23 @@ function BusinessTaskPanel({
   summary,
   onOpenAssignment,
   onRefreshSummary,
-  tenantReadAll
+  tenantReadAll,
+  other = false
 }: {
   summary?: BusinessTaskSummary
+  other?: boolean
   tenantReadAll: boolean
   onOpenAssignment: () => void
   onRefreshSummary: () => Promise<void>
 }) {
   const navigate = useNavigate()
+  const navigation = useWorkbenchPageNavigation()
   const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' })
   const [scopeSummary, setScopeSummary] = useState<BusinessTaskSummary>()
   const sequence = useRef(0)
   const readOnly = readScope.readScope !== 'SELF'
-  const [view, setView] = useState<TaskView>('pending')
-  const [bucket, setBucket] = useState<BusinessTaskBucket>('today')
+  const title = other ? '其他待办' : '业务待办'
+  const [bucket, setBucket] = useState<BusinessTaskBucket>(other ? 'unscheduled' : 'today')
   const [pageNo, setPageNo] = useState(1)
   const [page, setPage] = useState<PageResult<BusinessTask>>({
     list: [],
@@ -141,15 +151,15 @@ function BusinessTaskPanel({
     setLoading(true)
     try {
       const [result, counts] = await Promise.all([
-        api.businessTaskList({ ...(tenantReadAll ? readScope : {}), status: view,
-          ...(view === 'pending' ? { bucket } : {}), pageNo, pageSize: PAGE_SIZE }),
+        api.businessTaskList({ ...(tenantReadAll ? readScope : {}), status: 'pending',
+          bucket, pageNo, pageSize: PAGE_SIZE }),
         api.businessTaskSummary(tenantReadAll ? readScope : undefined)
       ])
       if (current === sequence.current) { setPage(result); setScopeSummary(counts) }
     } catch (loadError) {
       if (current === sequence.current) setError(errorText(loadError, '业务任务加载失败'))
     } finally { if (current === sequence.current) setLoading(false) }
-  }, [bucket, pageNo, view, readScope, tenantReadAll])
+  }, [bucket, pageNo, readScope, tenantReadAll])
 
   useEffect(() => {
     void load()
@@ -159,7 +169,7 @@ function BusinessTaskPanel({
     await Promise.all([load(), onRefreshSummary()])
   }
 
-  const open = (task: BusinessTask) => {
+  const open = async (task: BusinessTask) => {
     if (readOnly || !task.actionable) return
     if (task.actionCode === 'MEDIA_ACCOUNT_DIAGNOSIS') {
       void diagnosisApi.tasks(task.bizId).then(items => { const item = items.find(x => x.taskId === task.id); if (item) navigate(diagnosisTaskUrl(item)); else setError("该诊断任务已处理或不再可用"); }).catch(e => setError(errorText(e, "诊断任务加载失败")))
@@ -191,6 +201,7 @@ function BusinessTaskPanel({
       return
     }
     if (task.actionCode === 'OPEN_LEAD_SUBMITTER_ASSIST') {
+      if (navigation && !await navigation.validate(APP_ROUTES.LEAD_MANAGEMENT, APP_ROUTES.LEAD_MANAGEMENT)) return
       navigate(APP_ROUTES.LEAD_MANAGEMENT, { state: { leadId: task.bizId, tab: 'assist-history', assistRequestId: task.targetRecordId ?? task.bizId } })
       return
     }
@@ -239,28 +250,17 @@ function BusinessTaskPanel({
   const pendingSummary = useMemo(() => scopeSummary ?? (readOnly ? emptySummary : summary ?? emptySummary), [scopeSummary, readOnly, summary])
 
   return (
-    <section className="home-panel home-business-panel" aria-label="业务待办">
+    <section className={`home-panel home-business-panel${other ? " home-other-panel" : ""}`} aria-label={title}>
       <header className="home-panel-header">
         <div>
-          <Typography.Title level={4}>业务待办</Typography.Title>
-          <Typography.Text type="secondary">按截止时间查看和处理任务</Typography.Text>
+          <Typography.Title level={4}>{title}{other ? ` ${pendingSummary.unscheduled}` : ""}</Typography.Title>
+          <Typography.Text type="secondary">{other ? '查看和处理其他任务' : '按截止时间查看和处理任务'}</Typography.Text>
         </div>
-        <Button icon={<ReloadOutlined />} aria-label="刷新业务任务" onClick={() => void refresh()} />
+        <Button icon={<ReloadOutlined />} aria-label={`刷新${title}`} onClick={() => void refresh()} />
       </header>
       {tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setPageNo(1); setReadScope(value) }} />}
       <div className="home-task-controls">
-        <Segmented
-          value={view}
-          onChange={(value) => {
-            setView(value as TaskView)
-            setPageNo(1)
-          }}
-          options={[
-            { label: '待办', value: 'pending' },
-            { label: '已办', value: 'done' }
-          ]}
-        />
-        {view === 'pending' && (
+        {!other && (
           <Segmented
             className="task-bucket-control"
             value={bucket}
@@ -296,7 +296,7 @@ function BusinessTaskPanel({
             {page.list.length ? (
               page.list.map((task) => (
                 <div className="task-panel-item" role="listitem" key={task.id}>
-                  <span className="task-panel-item-icon">{view === 'pending' ? <ClockCircleOutlined /> : <CheckCircleOutlined />}</span>
+                  <span className="task-panel-item-icon"><ClockCircleOutlined /></span>
                   <div className="task-panel-item-copy">
                     <Space wrap>
                       <Typography.Text strong>{task.title}</Typography.Text>
@@ -306,20 +306,20 @@ function BusinessTaskPanel({
                     </Space>
                     <Space wrap>
                       <Typography.Text type="secondary">{task.summary || '业务任务'}</Typography.Text>
-                      <Typography.Text type="secondary">{formatTimestamp(task.dueAt || task.completedAt || task.cancelledAt, '无时间')}</Typography.Text>
+                      {task.dueAt && <Typography.Text type="secondary">{formatTimestamp(task.dueAt)}</Typography.Text>}
                     </Space>
                   </div>
-                  {!readOnly && task.actionCode && workPlanActions.has(task.actionCode) && view === 'pending' ? (
+                  {!readOnly && task.actionCode && workPlanActions.has(task.actionCode) ? (
                     <Tag>已搁置</Tag>
-                  ) : !readOnly && task.actionCode && ['COMPLETE_BIRTHDAY_CARE', 'COMPLETE_EMPLOYEE_CONTRACT_EXPIRY', 'COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY'].includes(task.actionCode) && view === 'pending' ? (
+                  ) : !readOnly && task.actionCode && ['COMPLETE_BIRTHDAY_CARE', 'COMPLETE_EMPLOYEE_CONTRACT_EXPIRY', 'COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY'].includes(task.actionCode) ? (
                     <Button type="text" icon={<CheckCircleOutlined />} aria-label="完成员工提醒" onClick={() => void completeEmployeeReminder(task)} />
-                  ) : !readOnly && task.actionable && view === 'pending' ? (
+                  ) : !readOnly && task.actionable ? (
                     <Button type="text" icon={<RightOutlined />} aria-label="处理业务任务" onClick={() => open(task)} />
                   ) : null}
                 </div>
               ))
             ) : (
-              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={view === 'pending' ? '暂无业务待办' : '暂无业务已办'} />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`暂无${title}`} />
             )}
           </div>
           {page.total > PAGE_SIZE && (
@@ -332,6 +332,18 @@ function BusinessTaskPanel({
 }
 
 export default function TodayTasksPage({ permissions, onOpenAssignment, tenantReadAll = false }: { permissions: string[]; onOpenAssignment: () => void; tenantReadAll?: boolean }) {
+  const pageRef = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const page = pageRef.current
+    const content = page?.closest('.ant-layout-content')
+    if (!page || !content) return
+    // Measure the shell's remaining space, including tabs and optional status banners.
+    const resize = () => page.style.setProperty('--home-content-height', `${content.clientHeight}px`)
+    const observer = new ResizeObserver(resize)
+    observer.observe(content)
+    resize()
+    return () => observer.disconnect()
+  }, [])
   const showBpmTasks = canQueryBpmTasks(permissions)
   const [businessSummary, setBusinessSummary] = useState<BusinessTaskSummary>()
   const [bpmCount, setBpmCount] = useState<number>()
@@ -363,7 +375,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
   }, [loadSummary])
 
   return (
-    <section className="workspace-page today-tasks-page">
+    <section ref={pageRef} className="workspace-page today-tasks-page">
       <div className="home-dashboard-grid">
         <SummaryRegion
           businessSummary={businessSummary}
@@ -376,6 +388,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
         />
         <HomeCalendarPanel permissions={permissions} />
         <BusinessTaskPanel tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
+        <BusinessTaskPanel other tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <HomeAnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>
     </section>

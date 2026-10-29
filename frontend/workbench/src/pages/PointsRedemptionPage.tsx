@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Descriptions, Empty, Form, Input, Modal, Pagination, Popconfirm, Result, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
-import { PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { PlusOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
 import BusinessTable from '../components/BusinessTable'
 import SubjectAvatar from '../components/SubjectAvatar'
@@ -113,7 +113,7 @@ export default function PointsRedemptionPage({ permissions }: { permissions: str
   </>
   return <section className="workspace-page points-redemption-page">
     <div className="page-heading"><Typography.Title level={4}>积分兑换码</Typography.Title><Space wrap>
-      <Button icon={<ReloadOutlined />} onClick={() => void (activeTab === 'packages' ? loadPackages() : load())}>刷新</Button>
+
       {activeTab !== 'packages' && can('create') && <Button type="primary" icon={<PlusOutlined />} onClick={() => openCreate()}>申请兑换码</Button>}
     </Space></div>
     <Tabs activeKey={activeTab} onChange={key => { setTab(key); setPage(1); setRows([]); setTotal(0); setLoading(true); setError('') }} items={[

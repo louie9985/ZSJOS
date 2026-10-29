@@ -79,7 +79,7 @@
 
 .home-stat-breakdown {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--crm-sp-2);
   color: var(--crm-text-secondary);
   font-size: var(--crm-font-sm);
@@ -108,8 +108,12 @@
 }
 
 .home-business-panel {
-  grid-column: 1 / span 12;
+  grid-column: 1 / span 6;
   grid-row: 4 / span 6;
+}
+
+.home-other-panel {
+  grid-column: 7 / span 6;
 }
 
 .home-announcement-panel {
@@ -148,7 +152,8 @@
 }
 
 .home-task-controls .task-bucket-control {
-  min-width: 420px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .task-panel-alert {
@@ -369,3 +374,11 @@
   box-shadow: 4px 4px 0 var(--crm-border);
 }
 [data-crm-preset="cartoon"] .home-announcement-panel { border-width: 2px; }
+
+/* Fit the actual shell content height; list scrolling must not hide pagination. */
+@media (min-width: 901px) {
+  .crm-shell .today-tasks-page .home-dashboard-grid {
+    aspect-ratio: auto;
+    height: calc(var(--home-content-height, 100dvh) - var(--crm-page-pad) * 2);
+  }
+}

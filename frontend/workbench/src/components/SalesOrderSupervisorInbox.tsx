@@ -7,25 +7,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  Alert,
-  Avatar,
-  Button,
-  Empty,
-  Input,
-  Modal,
-  Segmented,
-  Skeleton,
-  Space,
-  Tag,
-  Typography,
-  message,
-} from "antd";
-import {
-  CheckOutlined,
-  CloseOutlined,
-  ReloadOutlined,
-} from "@ant-design/icons";
+import { Alert, Button, Empty, Input, Modal, Segmented, Skeleton, Space, Tag, Typography, message } from "antd";
+import { CheckOutlined, CloseOutlined } from "@ant-design/icons";
 import {
   api,
   type AdvancedFilterGroup,
@@ -333,9 +316,7 @@ export default function SalesOrderSupervisorInbox({
               { label: "全部", value: "all" },
             ]}
           />
-          <Button icon={<ReloadOutlined />} onClick={() => void load()}>
-            刷新
-          </Button>
+
         </div>
       </header>
       {useTableLayout ? (

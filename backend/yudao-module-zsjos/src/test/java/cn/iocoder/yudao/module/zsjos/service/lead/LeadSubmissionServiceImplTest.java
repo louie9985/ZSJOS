@@ -64,6 +64,10 @@ import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class LeadSubmissionServiceImplTest {
+    @org.junit.jupiter.api.AfterEach
+    void clearTenant() {
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+    }
     @InjectMocks private LeadSubmissionServiceImpl service;
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private PersonMapper personMapper;
@@ -99,6 +103,7 @@ class LeadSubmissionServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUpIdentity() {
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
         org.mockito.Mockito.lenient().doAnswer(call -> {
             LeadDO lead=call.getArgument(0); Long selected=call.getArgument(2);
             if(selected!=null){lead.setProviderOwnerType("system_user");lead.setProviderOwnerId(selected);lead.setContributionUserIdSnapshot(selected);}
@@ -462,7 +467,7 @@ class LeadSubmissionServiceImplTest {
     void salesDirectCreateRunsAutomationOnceAndReturnsServerState() {
         LeadCreateReqVO req=validDuplicateRequest();req.setRemark("已联系，有意向");prepareDuplicateValidation(req);
         when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
-        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        when(personIdentityWriteService.resolveForLead(any(),any(),any())).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
         when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
@@ -492,7 +497,7 @@ class LeadSubmissionServiceImplTest {
     void linkedProviderAndDuplicateReviewKeepExistingFlow(boolean education) {
         LeadCreateReqVO req=validDuplicateRequest();req.setNewMediaProviderUserId(2L);prepareDuplicateValidation(req);
         when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
-        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        when(personIdentityWriteService.resolveForLead(any(),any(),any())).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
         when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
@@ -613,7 +618,7 @@ class LeadSubmissionServiceImplTest {
         prepareDuplicateValidation(req);
         when(identityService.resolveHistoricalSubmission(1L, SOURCE_EDUCATION_SELF, null)).thenReturn(
                 new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.EDUCATION, null));
-        when(personIdentityWriteService.createNew(any(), any(), any(), any())).thenReturn(new PersonDO().setId(50L));
+        when(personIdentityWriteService.resolveForLead(any(), any(), any())).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved = new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call -> { LeadDO lead = call.getArgument(0); lead.setId(90L); saved.set(lead); return 1; })
                 .when(leadMapper).insert(any(LeadDO.class));
@@ -634,7 +639,7 @@ class LeadSubmissionServiceImplTest {
         var identity=new LeadSubmissionIdentityService.Resolution(SOURCE_EDUCATION_SELF.equals(entry)
                 ? LeadSubmissionIdentityService.Identity.EDUCATION : LeadSubmissionIdentityService.Identity.SALES,null);
         when(identityService.resolveHistoricalSubmission(1L,entry,null)).thenReturn(identity);
-        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        when(personIdentityWriteService.resolveForLead(any(),any(),any())).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
         when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
@@ -653,7 +658,7 @@ class LeadSubmissionServiceImplTest {
         org.mockito.Mockito.reset(attachmentService);
         when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L).setStatus(0));
         when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
-        when(personIdentityWriteService.createNew(any(),any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        when(personIdentityWriteService.resolveForLead(any(),any(),any())).thenReturn(new PersonDO().setId(50L));
         if(hasOwnership){
             when(partnerOwnershipService.getByPartnerId(10L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipDO()
                 .setPartnerId(10L).setEmployeeUserId(30L).setEmployeeNameSnapshot("归属员工"));

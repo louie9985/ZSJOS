@@ -1,6 +1,6 @@
 import { usePerformanceModule } from './PerformanceModule'
 import { Alert, Button, Drawer, Empty, Input, Select, Space, Spin, Tree, Typography } from 'antd'
-import { MenuFoldOutlined, MenuUnfoldOutlined, ReloadOutlined } from '@ant-design/icons'
+import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { DataNode } from 'antd/es/tree'
 import { money, periodRange, type Group, type OrgNode, type Scope } from '../../services/deliveryPerformance'
@@ -49,6 +49,5 @@ export function GroupChart({rows,amount=true,onOpen}:{rows:Group[];tableKey:stri
  </>
 
 }
-export function Refresh({onClick}:{onClick:()=>void}){return <Button icon={<ReloadOutlined/>} onClick={onClick}>刷新</Button>}
 
 export function scopeTitle(node:OrgNode,nodes:OrgNode[]){const names=[node.title];const seen=new Set([node.key]);let current=nodes.find(x=>x.key===node.parentKey);while(current&&!seen.has(current.key)){seen.add(current.key);names.unshift(current.title);current=nodes.find(x=>x.key===current?.parentKey)}return names.join(' / ')}

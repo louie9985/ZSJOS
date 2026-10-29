@@ -106,6 +106,54 @@ class PersonIdentityWriteServiceTest {
         verify(claimMapper).deleteStale(1L, 10L, java.util.List.of("new-mobile"));
     }
 
+    @Test
+    void missingClaimDoesNotAllowDuplicatePerson() {
+        PersonDO existing = new PersonDO(); existing.setId(10L); existing.setTenantId(1L);
+        when(personMapper.selectDuplicateCandidatesForUpdate("13800138000", null, 1L)).thenReturn(java.util.List.of(existing));
+        assertThrows(ServiceException.class, () -> service.createNew("客户", "13800138000", null, "lead"));
+        verify(personMapper, never()).insert(any(PersonDO.class));
+    }
+    @Test
+    void verifiedOldMobileReusesPersonWithoutReplacingPrimary() {
+        claims.put("13800138000", claim("13800138000",10L,null));
+        PersonDO existing=new PersonDO();existing.setId(10L);existing.setName("客户");existing.setMobile("13900139000");existing.setTenantId(1L);
+        when(personMapper.selectByIdForUpdate(10L,1L)).thenReturn(existing);
+        when(personMapper.countVerifiedContactAlias(1L,10L,"mobile","13800138000")).thenReturn(1L);
+        assertSame(existing,service.resolveForLead("客户","13800138000",null));
+        assertEquals("13900139000",existing.getMobile());
+        verify(personMapper,never()).updateById(any(PersonDO.class));
+    }
+
+    @Test
+    void changingPrimaryContactDoesNotReleaseVerifiedHistoricalClaim() {
+        PersonDO person=new PersonDO();person.setId(10L);person.setName("客户");person.setMobile("old-mobile");
+        when(personMapper.selectByIdForUpdate(10L,1L)).thenReturn(person);
+        when(personMapper.selectVerifiedContactValues(1L,10L)).thenReturn(java.util.List.of("old-mobile"));
+        service.update(10L,"客户","new-mobile",null);
+        verify(claimMapper).deleteStale(1L,10L,java.util.List.of("new-mobile","old-mobile"));
+    }
+
+    @Test
+    void existingStudentWithoutClaimCanBeReusedWithoutOverwritingIdentity() {
+        PersonDO existing = new PersonDO(); existing.setId(10L); existing.setTenantId(1L);
+        existing.setName("客户"); existing.setMobile("13800138000"); existing.setIdentityStatus("student");
+        when(personMapper.selectDuplicateCandidatesForUpdate("13800138000", null, 1L)).thenReturn(java.util.List.of(existing));
+        when(personMapper.selectByIdForUpdate(10L, 1L)).thenReturn(existing);
+        assertSame(existing, service.resolveForLead("客户", "13800138000", null));
+        assertEquals("student", existing.getIdentityStatus());
+        verify(personMapper, never()).insert(any(PersonDO.class));
+        verify(personMapper, never()).updateById(any(PersonDO.class));
+    }
+
+    @Test
+    void conflictingLegacyPersonAndClaimAreRejected() {
+        claims.put("13800138000", claim("13800138000", 11L, null));
+        PersonDO existing = new PersonDO(); existing.setId(10L); existing.setTenantId(1L);
+        when(personMapper.selectDuplicateCandidatesForUpdate("13800138000", null, 1L)).thenReturn(java.util.List.of(existing));
+        assertThrows(ServiceException.class, () -> service.resolveForLead("客户", "13800138000", null));
+        verify(personMapper, never()).insert(any(PersonDO.class));
+    }
+
     private static PersonContactClaimDO claim(String value, Long personId, String key) {
         PersonContactClaimDO claim = new PersonContactClaimDO(); claim.setContactValue(value);
         claim.setPersonId(personId); claim.setReservationKey(key); return claim;

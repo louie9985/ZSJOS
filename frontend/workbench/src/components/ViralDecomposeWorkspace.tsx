@@ -142,7 +142,7 @@ export default function ViralDecomposeWorkspace({ code }: { code: 'viral_account
       <BusinessTable<Material> tableKey="viral-decompose-drafts" mode="compact" rowKey="id"
         loading={managerLoading} dataSource={managerError ? [] : drafts} error={managerError} unauthorized={managerUnauthorized}
         onReload={refreshManager} emptyText="暂无草稿" pagination={{ defaultPageSize: 10, showSizeChanger: false }}
-        actions={<Button disabled={managerLoading || deletingId !== undefined} onClick={() => void refreshManager()}>刷新</Button>}
+        actions={undefined}
         columns={[
           { title: '草稿标题', dataIndex: 'title', width: 280, ellipsis: false },
           { title: '素材编号', dataIndex: 'materialNo', width: 190 },

@@ -34,7 +34,7 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant, appealReview, readOnly: forcedReadOnly = false }: {
+export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, navigationKey, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant, appealReview, readOnly: forcedReadOnly = false }: {
   lead: ManagedLead
   refreshVersion?: number
   categories: DictData[]
@@ -44,6 +44,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   readOnly?: boolean
   autoExpandFollowUp: boolean
   initialTab?: LeadDetailTab
+  navigationKey?: string
   activeTab?: string
   onTabChange?: (key: string) => void
   onDirtyChange: (dirty: boolean) => void
@@ -173,6 +174,15 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   // visibleTabKey tracks server projection changes without resetting on every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id, readOnly, requestedInitialTab, visibleTabKey])
+
+  useEffect(() => {
+    // Repeated deep links may target the same lead and tab in a retained page.
+    if (navigationKey && !controlledActiveTab) {
+      setInternalActiveTab(resolveLeadDetailTab(visibleTabs, requestedInitialTab))
+    }
+    // Other projection changes are handled by the initialization effect above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigationKey])
 
   const handleStandaloneFollowUpSuccess = () => {
     setFollowUpRefreshVersion(current => current + 1)

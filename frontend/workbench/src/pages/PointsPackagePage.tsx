@@ -14,7 +14,7 @@ export default function PointsPackagePage({ permissions }: { permissions: string
   const save = async () => { try { const values = await form.validateFields(); setSaving(true); await pointsApi.savePackage({ ...values, validDays: values.validDays || null }); setOpen(false); await load() }
     catch (e) { if (e instanceof Error) message.error(e.message) } finally { setSaving(false) } }
   if (!allowed) return <Result status="403" title="无套餐管理权限" />
-  return <section className="workspace-page"><div className="page-heading"><Typography.Title level={4}>积分套餐</Typography.Title><Space><Button onClick={() => void load()}>刷新</Button>{canSave && <Button type="primary" onClick={() => edit()}>新增套餐</Button>}</Space></div>
+  return <section className="workspace-page"><div className="page-heading"><Typography.Title level={4}>积分套餐</Typography.Title><Space>{canSave && <Button type="primary" onClick={() => edit()}>新增套餐</Button>}</Space></div>
     <Typography.Paragraph type="secondary">每次申请生成一个兑换码。套餐修改只影响新申请，已提交申请保留原积分和有效期。</Typography.Paragraph>
     {error && <Alert type="error" message={error} action={<Button onClick={() => void load()}>重试</Button>} />}
     <BusinessTable tableKey="points-packages" columnMode="native" rowKey="id" loading={loading} dataSource={rows} pagination={false} columns={[

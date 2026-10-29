@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, App, Avatar, Button, Empty, Form, Input, Modal, Pagination, Space, Spin, Tag, Typography } from 'antd'
-import { ReloadOutlined, UserOutlined } from '@ant-design/icons'
+import { UserOutlined } from '@ant-design/icons'
 import { api, type ManagedLead, type LeadAttachment } from '../services/api'
 import { leadAssistApi, type AssistHistory, type AssistAttachment } from '../services/leadSubmitterAssist'
 import { formatTimestamp } from '../services/time'
@@ -66,7 +66,7 @@ export default function LeadSubmitterAssistHistoryPanel({ lead, canReply, onChan
     </div>
   )
   return <section className="lead-detail-tab-content lead-assist-panel">
-    <div className="lead-assist-toolbar"><Typography.Text type="secondary">申请与回复 · 共 {total} 次协助</Typography.Text><Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>刷新</Button></div>
+    <div className="lead-assist-toolbar"><Typography.Text type="secondary">申请与回复 · 共 {total} 次协助</Typography.Text></div>
     {loading ? <div className="lead-assist-loading"><Spin /></div> : error ? <Alert type="error" title={error} showIcon action={<Button onClick={() => void load()}>重试</Button>} /> : rows.length === 0 ? <Empty description="暂无协助历史" /> : <div className="lead-assist-conversations" aria-label="协助对话">
       {rows.map(row => <article key={row.id} className="lead-assist-conversation">
         <div className="lead-assist-round"><Tag color={row.status === 'completed' ? 'green' : 'gold'}>{row.status === 'completed' ? '已回复' : '待回复'}</Tag><Typography.Text type="secondary">提交人：{row.submitterName || '未记录'}{row.assigneeName && ` · 协助处理人：${row.assigneeName}`}</Typography.Text></div>

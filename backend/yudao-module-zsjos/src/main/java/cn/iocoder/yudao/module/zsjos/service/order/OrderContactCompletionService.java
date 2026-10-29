@@ -42,6 +42,9 @@ public class OrderContactCompletionService {
         String mobile = StrUtil.trimToNull(order.getStudentMobile());
         String wechat = StrUtil.trimToNull(order.getStudentWechatId());
         if (mobile == null || wechat == null) throw exception(SALES_ORDER_CONTACT_REQUIRED);
+        // Repurchases already carry an authorized Person and their own contact snapshot.
+        // Repairing historical identity claims is not a prerequisite for recording a purchase.
+        if ("repurchase".equals(order.getOrderType())) return;
         var changed = new ArrayList<String>();
         boolean personMobile = StrUtil.isBlank(person.getMobile());
         boolean personWechat = StrUtil.isBlank(person.getWechatId());

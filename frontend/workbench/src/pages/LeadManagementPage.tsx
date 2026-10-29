@@ -235,7 +235,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
 
   useEffect(() => { onDirtyChange?.(followUpDirty) }, [followUpDirty, onDirtyChange])
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
-  useWorkbenchPageGuard(location.pathname, async () => !followUpDirty || window.confirm('当前表单尚未提交，离开将丢失已填写内容。确定继续吗？'), salesUserId !== undefined)
+  useWorkbenchPageGuard(location.pathname, async () => !followUpDirty || window.confirm('当前表单尚未提交，离开将丢失已填写内容。确定继续吗？'), !embedded || salesUserId !== undefined)
 
   // 路由复用当前页面时仍以新的深链接为准，不让旧列表选择或详情响应覆盖接单目标。
   useEffect(() => {
@@ -243,7 +243,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     if (!requestedLeadId) return
     setSelectedId(requestedLeadId)
     setFollowUpDirty(false)
-  }, [requestedLeadId])
+  }, [requestedLeadId, location.key])
 
   const clearLeadSelection = useCallback(() => {
     setSelectedRowKeys([])
@@ -385,7 +385,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
   // 深链接直达某客资时，移动端直接把详情抽屉弹出来，避免用户以为列表为空
   useEffect(() => {
     if (requestedLeadId && (useTableLayout || window.matchMedia('(max-width: 768px)').matches)) setDrawerOpen(true)
-  }, [requestedLeadId, useTableLayout])
+  }, [requestedLeadId, useTableLayout, location.key])
   // 视口拉宽回到桌面端时，关闭移动端详情抽屉、回到双栏布局
   useEffect(() => { if (screens.md && !useTableLayout) setDrawerOpen(false) }, [screens.md, useTableLayout])
 
@@ -580,6 +580,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
         ? <LeadDetail lead={detail} refreshVersion={detailRefreshVersion} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           readOnly={operationsReadOnly} mode={partnerId !== undefined || operationsReadOnly ? "manager-readonly" : audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
+          navigationKey={requestedLeadId === detail.id && requestedTab ? location.key : undefined}
           onDirtyChange={setFollowUpDirty} onChanged={() => { void refreshAfterLeadChange(detail.id); onScopeChanged?.() }} profileVariant="contact-rows"/>
         : <Empty description="从左侧选择一条客资"/>
 
@@ -765,9 +766,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
           >{option.label}</button>)}
         </div>)}
       </div>
-      <div className="lead-filter-actions">
-        <Button icon={<ReloadOutlined/>} onClick={refreshPage}>刷新</Button>
-      </div>
+
     </>}
     <div className={useTableLayout ? 'lead-management-table-shell' : `lead-inbox-layout inbox-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
       {useTableLayout ? <>

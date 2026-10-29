@@ -188,7 +188,7 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
     <main className="performance-main"><div className="performance-mobile-tree"><Button icon={<MenuUnfoldOutlined />} onClick={() => setDrawerOpen(true)}>{scope?.title ?? '选择组织或人员'}</Button></div>
     <Drawer title="统计范围" placement="left" open={drawerOpen} onClose={() => setDrawerOpen(false)}>{scopeTree}</Drawer>
     <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <div className="performance-heading"><div><Typography.Title level={3} style={{ margin: 0 }}>新媒体客资分析大盘</Typography.Title><Typography.Text type="secondary">按冻结引流贡献人统计，数据使用北京时间</Typography.Text></div><Button onClick={() => void load(scope)}>刷新</Button></div>
+      <div className="performance-heading"><div><Typography.Title level={3} style={{ margin: 0 }}>新媒体客资分析大盘</Typography.Title><Typography.Text type="secondary">按冻结引流贡献人统计，数据使用北京时间</Typography.Text></div></div>
       {error && <Alert type="error" showIcon title={error} action={<Button size="small" onClick={() => void load(scope)}>重试</Button>} />}
       {loading ? <Card><Spin /></Card> : !data ? <Empty description="暂无数据" /> : <>
         <Card title="团队大盘" className="media-lead-overview"><MonthlySummary target={data.target} />

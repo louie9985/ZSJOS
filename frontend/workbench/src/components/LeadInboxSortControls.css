@@ -3,3 +3,5 @@
 .lead-inbox-sort-fields label { display: flex; flex-direction: column; min-width: 0; gap: var(--crm-sp-2); }
 .lead-inbox-sort-fields .ant-select { width: 100%; min-width: 0; }
 .lead-inbox-sort-hint { display: block; margin-top: var(--crm-sp-2); font-size: var(--crm-font-sm); }
+
+.business-inbox-result-count { display: flex; justify-content: space-between; gap: var(--crm-sp-3); margin-top: var(--crm-sp-3); font-size: var(--crm-font-sm); }

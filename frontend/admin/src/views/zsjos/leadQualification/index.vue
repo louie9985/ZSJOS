@@ -5,7 +5,7 @@
         <el-tab-pane label="挂起客资" name="suspended" />
         <el-tab-pane label="回收待处理" name="recycle_pending" />
       </el-tabs>
-      <el-button :icon="Refresh" @click="loadList">刷新</el-button>
+
     </div>
     <el-alert v-if="error" type="error" :title="error" show-icon :closable="false" class="mb-12px">
       <template #default

@@ -160,6 +160,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
         order.setLeadId(leadId); order.setOpportunityId(opportunity.getId()); order.setPersonId(lead.getPersonId());
+        order.setIdentityOriginPersonId(lead.getIdentityOriginPersonId() == null ? lead.getPersonId() : lead.getIdentityOriginPersonId());
         order.setPurchaseIntentId(reqVO.getPurchaseIntentId());
         order.setSourcePaymentOrderId(paymentIntent == null ? null : paymentIntent.getId());
         order.setOrderType(ORDER_TYPE_FIRST_PURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
@@ -290,6 +291,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
         order.setPersonId(personId); order.setLeadId(null); order.setOpportunityId(null);
+        LeadDO contactLead = contactLeadId == null ? null : leadMapper.selectById(contactLeadId);
+        order.setIdentityOriginPersonId(contactLead != null && contactLead.getIdentityOriginPersonId() != null
+                ? contactLead.getIdentityOriginPersonId() : personId);
         order.setOrderType(ORDER_TYPE_REPURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
         order.setSubmitterUserId(userId); order.setFormalSalesUserId(formalSalesUserId);
         order.setFormalOwnerIdentity(formalOwnerIdentity);
@@ -415,6 +419,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private SalesOrderDO copyForSuccessor(SalesOrderDO source, Long userId, LocalDateTime now) {
         SalesOrderDO target = new SalesOrderDO();
         target.setLeadId(source.getLeadId()); target.setOpportunityId(source.getOpportunityId()); target.setPersonId(source.getPersonId());
+        target.setIdentityOriginPersonId(source.getIdentityOriginPersonId());
         target.setPurchaseIntentId(source.getPurchaseIntentId()); target.setSourcePaymentOrderId(source.getSourcePaymentOrderId());
         target.setOrderType(source.getOrderType()); target.setStatus(STATUS_PENDING_APPROVAL);
         target.setSubmitterUserId(userId); target.setFormalSalesUserId(source.getFormalSalesUserId()); target.setFormalOwnerIdentity(source.getFormalOwnerIdentity());
@@ -804,7 +809,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO("all", "全部", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(FILTER_CENTER_PENDING, "当前中心待审核", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_PENDING_APPROVAL, "待审核", null),
-                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_REVISION_REQUIRED, "待重提", null),
+                new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_REVISION_REQUIRED, "已终止", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_EFFECTIVE, "已通过", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_TERMINATED, "已终止", null),
                 new SalesOrderApprovalFilterProfileRespVO.OptionVO(STATUS_SUPERSEDED, "历史旧单（已重提）", null)));
@@ -1044,7 +1049,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     public List<SalesOrderListItemRespVO> getCustomerOrders(Long leadId, Long userId) {
         LeadDO lead = leadMapper.selectById(leadId);
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        List<SalesOrderDO> orders = orderMapper.selectByPersonId(lead.getPersonId());
+        List<SalesOrderDO> orders = orderMapper.selectByPersonId(lead.getPersonId()).stream()
+                .filter(order -> canReadCustomerHistory(lead, order, userId)).toList();
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(orders);
         Map<Long, List<SalesOrderItemDO>> items = getOrderItems(orders);
         return orders.stream().map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null,
@@ -1058,10 +1064,17 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         SalesOrderDO order = orderMapper.selectById(orderId);
         if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
-        if (!Objects.equals(lead.getPersonId(), order.getPersonId())) {
+        if (!Objects.equals(lead.getPersonId(), order.getPersonId())
+                || !canReadCustomerHistory(lead, order, userId)) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
         }
         return convert(order, roundMapper.selectLatestByOrderId(orderId), null, userId);
+    }
+
+    private boolean canReadCustomerHistory(LeadDO lead, SalesOrderDO order, Long userId) {
+        Long leadOrigin = lead.getIdentityOriginPersonId() == null ? lead.getPersonId() : lead.getIdentityOriginPersonId();
+        Long orderOrigin = order.getIdentityOriginPersonId() == null ? order.getPersonId() : order.getIdentityOriginPersonId();
+        return Objects.equals(leadOrigin, orderOrigin) || permissionService.canRead(order, userId);
     }
 
     @Override

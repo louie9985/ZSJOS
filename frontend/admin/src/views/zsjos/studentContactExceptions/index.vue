@@ -6,7 +6,7 @@
         <el-radio-button value="history">处理记录</el-radio-button>
         <el-radio-button value="all">全部</el-radio-button>
       </el-radio-group>
-      <el-button :loading="loading" @click="load">刷新</el-button>
+
     </div>
   </ContentWrap>
   <ContentWrap v-loading="loading">

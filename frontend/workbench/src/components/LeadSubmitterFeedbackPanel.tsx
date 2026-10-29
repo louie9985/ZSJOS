@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Empty, Form, Image, Input, Modal, Pagination, Space, Spin, Tag, Typography } from 'antd'
-import { MessageOutlined, ReloadOutlined } from '@ant-design/icons'
+import { MessageOutlined } from '@ant-design/icons'
 import type { ManagedLead } from '../services/api'
 import { leadFeedbackApi, type LeadFeedbackAttachment, type LeadSubmitterFeedback } from '../services/leadSubmitterFeedback'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
@@ -63,7 +63,7 @@ export default function LeadSubmitterFeedbackPanel({ lead, canCreate, onChanged,
   }
   return <section className="lead-detail-tab-content">
     <Space wrap>
-      <Button icon={<ReloadOutlined/>} loading={loading} onClick={() => void load()}>刷新</Button>
+
       {canCreate && <Button type="primary" icon={<MessageOutlined/>} onClick={() => {
         resetIntent(); setSendVersion(lead.version); setOpen(true)
       }}>回复提交人</Button>}

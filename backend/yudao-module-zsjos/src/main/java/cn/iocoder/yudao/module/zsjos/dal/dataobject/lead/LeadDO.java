@@ -17,6 +17,8 @@ public class LeadDO extends TenantBaseDO {
     @TableId private Long id;
     private String leadNo;
     private Long personId;
+    /** Original identity scope, populated before merging; null means the current Person. */
+    private Long identityOriginPersonId;
     private String submittedName;
     private String submittedMobile;
     private String submittedWechatId;

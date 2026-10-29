@@ -37,7 +37,7 @@ class LeadContactActivationServiceTest {
         verifyNoInteractions(activationMapper, notifyEventPublisher, dispatchService);
     }
 
-    @Test void allMatchesIncludeClosedOwnerlessAndEducationAndRetryOnlyOnce() {
+    @Test void allNonClosedMatchesNotifyOnceAndClosedMatchesAreSkipped() {
         PersonDO first = new PersonDO(); first.setId(1L);
         PersonDO second = new PersonDO(); second.setId(2L);
         when(personMapper.selectDuplicateCandidates("13800000000", "wx_test")).thenReturn(List.of(first, second));
@@ -53,11 +53,12 @@ class LeadContactActivationServiceTest {
 
         assertTrue(activate("13800000000", "WX_Test", "one"));
         assertTrue(activate("13800000000", "wx_test", "one"));
-        assertEquals(3, saved.size());
-        for (LeadDO lead : List.of(a,b,c)) {
+        assertEquals(2, saved.size());
+        for (LeadDO lead : List.of(b,c)) {
             verify(dispatchService).notifyActivation(lead);
             verify(notifyEventPublisher).publish(eq("zsjos.lead.activated"), eq(lead.getId()), anyString(), eq(5L), any(), anyMap());
         }
+        verify(dispatchService, never()).notifyActivation(a);
         assertEquals("closed", a.getStatus());
         assertEquals("won", b.getStatus());
         verify(leadMapper, never()).updateById(any(LeadDO.class));

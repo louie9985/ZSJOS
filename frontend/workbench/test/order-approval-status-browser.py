@@ -13,9 +13,9 @@ with sync_playwright() as p:
         page.goto(url,wait_until='domcontentloaded')
         tabs=page.locator('.lead-inbox-group-tabs')
         expect(tabs.get_by_role('tab')).to_have_count(7)
-        assert [t.strip() for t in tabs.get_by_role('tab').all_text_contents()]==['全部','当前中心待审核','待审核','待重提','已通过','已终止','历史旧单（已重提）']
-        for label,key in [('待重提','revision_required'),('已通过','effective'),('已终止','terminated'),('历史旧单（已重提）','superseded'),('待审核','pending_approval')]:
-            tab=tabs.get_by_role('tab',name=label,exact=True)
+        assert [t.strip() for t in tabs.get_by_role('tab').all_text_contents()]==['全部','当前中心待审核','待审核','已终止','已通过','已终止','历史旧单（已重提）']
+        for label,key in [('已终止','revision_required'),('已通过','effective'),('已终止','terminated'),('历史旧单（已重提）','superseded'),('待审核','pending_approval')]:
+            tab=tabs.locator(f'[data-node-key="{key}"] [role="tab"]')
             tab.evaluate('(el)=>el.click()')
             page.wait_for_function('(key)=>window.approvalRequests.at(-1)?.orderState===key',arg=key)
             expect(page.locator('.business-inbox-item').first).to_be_visible()
@@ -47,7 +47,7 @@ with sync_playwright() as p:
         # Resolved request order survives rapid state changes.
         page.goto(url+'?state=slow')
         expect(tabs.get_by_role('tab',name='全部',exact=True)).to_be_visible()
-        tabs.get_by_role('tab',name='待重提',exact=True).evaluate('(el)=>el.click()')
+        tabs.locator('[data-node-key="revision_required"] [role="tab"]').evaluate('(el)=>el.click()')
         tabs.get_by_role('tab',name='已通过',exact=True).evaluate('(el)=>el.click()')
         expect(page.locator('.business-inbox-item').first).to_contain_text('OD-effective')
         page.wait_for_timeout(400)
@@ -61,7 +61,7 @@ with sync_playwright() as p:
     page.wait_for_function('window.approvalRequests.at(-1)?.pageNo===1')
     page.locator('.ant-pagination-item-2').click()
     page.wait_for_function('window.approvalRequests.at(-1)?.pageNo===2')
-    page.locator('.lead-inbox-group-tabs').get_by_role('tab',name='待重提',exact=True).click()
+    page.locator('.lead-inbox-group-tabs').locator('[data-node-key="revision_required"] [role="tab"]').click()
     page.wait_for_function("window.approvalRequests.at(-1)?.pageNo===1 && window.approvalRequests.at(-1)?.orderState==='revision_required'")
     expect(page.locator('.ant-table-tbody')).to_contain_text('OD-revision_required')
     page.get_by_role('tab',name='财务中心',exact=True).click()

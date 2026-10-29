@@ -1,6 +1,6 @@
 import type { EmbeddedApproval } from '../components/bpm/embeddedApproval'
 import BusinessTable from '../components/BusinessTable'
-import { Alert, App, Button, Empty, Form, Image, Input, Modal, Result, Skeleton, Space, Spin, Tabs, Tag, Typography } from 'antd'
+import { Alert, App, Button, Empty, Form, Image, Input, Modal, Result, Skeleton, Space, Tabs, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DateTimeText from '../components/DateTimeText'
@@ -123,7 +123,7 @@ export default function MaterialApprovalPage({ permissions, embedded }: { permis
     {!embedded && <>
     <Typography.Title level={4}>素材审批</Typography.Title>
     {typesError && <Alert type="error" showIcon title={typesError} action={<Button onClick={() => void loadTypes()}>重试</Button>}/>}
-    <Space wrap className="material-approval-toolbar"><Typography.Text type="secondary">爆款账号审批与爆款内容审批</Typography.Text><Button onClick={() => void load()} loading={loading}>刷新</Button></Space>
+    <Space wrap className="material-approval-toolbar"><Typography.Text type="secondary">爆款账号审批与爆款内容审批</Typography.Text></Space>
     <Tabs activeKey={done ? 'done' : 'todo'} items={[{key:'todo',label:'待我审批'},{key:'done',label:'我已审批'}]}
       onChange={value => {setPage(1); setParams({...(typeCode ? {typeCode} : {}),done:String(value === 'done')})}}/>
     {error ? <Alert type="error" showIcon title={error} action={<Button onClick={() => void load()}>重试</Button>}/> :

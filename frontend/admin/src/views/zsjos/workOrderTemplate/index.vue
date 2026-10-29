@@ -4,7 +4,7 @@
       <el-button type="primary" v-hasPermi="['zsjos:work-order-scene:create']" @click="openForm()"
         >新建模板</el-button
       >
-      <el-button @click="load">刷新</el-button>
+
     </div>
     <el-alert v-if="error" :title="error" type="error" show-icon class="mb-12px"
       ><template #default><el-button link @click="load">重试</el-button></template></el-alert

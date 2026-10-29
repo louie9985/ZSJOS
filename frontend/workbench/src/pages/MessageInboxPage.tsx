@@ -4,7 +4,7 @@ import { CheckOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useInboxTableLayout } from '../services/inboxLayout'
-import { api, AuthenticationError, type NotifyMessage, type NotifyMessageCategoryOption } from '../services/api'
+import { api, AuthenticationError, type NotifyMessage } from '../services/api'
 import {
   applyReadStatus,
   buildNotifyMessagePageParams,
@@ -346,12 +346,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
           <Typography.Text type="secondary">未读总数 {unreadCount} 条</Typography.Text>
         </Space>
         <Space className="message-inbox-scope-actions">
-          <Button icon={<ReloadOutlined/>} onClick={() => {
-            setLeadActions({})
-            setLeadProbeAttempt(value => value + 1)
-            reload()
-            void refreshUnreadCount()
-          }}>刷新</Button>
+
           <IrreversiblePopconfirm
             action="全部标记已读"
             disabled={unreadCount === 0}

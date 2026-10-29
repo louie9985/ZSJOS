@@ -20,12 +20,7 @@ import {
   Tag,
   Typography
 } from 'antd'
-import {
-  CheckCircleOutlined,
-  ClockCircleOutlined,
-  FileSearchOutlined,
-  ReloadOutlined
-} from '@ant-design/icons'
+import { CheckCircleOutlined, ClockCircleOutlined, FileSearchOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { APP_ROUTES, FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 import DateTimeText from '../components/DateTimeText'
@@ -457,7 +452,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
           <span>已办</span>
           <strong>{countLoading ? '-' : counts.done}</strong>
         </div>
-        <Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
+
       </Space>
       {countError && <Alert
         className="bpm-approval-count-error"

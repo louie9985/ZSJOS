@@ -21,6 +21,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/student")
 public class MyStudentController {
     @Resource private MyStudentService studentService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.PersonMergeIdentityService mergedIdentity;
     @Resource private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceReadService serviceReads;
 
     @GetMapping("/my-service-page")
@@ -60,7 +61,7 @@ public class MyStudentController {
     @GetMapping("/my/{personId}")
     @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
     public CommonResult<MyStudentRespVO> getMyStudent(@PathVariable Long personId) {
-        return success(studentService.getMyStudent(SecurityFrameworkUtils.getLoginUserId(), personId));
+        return success(studentService.getMyStudent(SecurityFrameworkUtils.getLoginUserId(), mergedIdentity.resolve(personId)));
     }
 
     @GetMapping("/my/by-service/{relationId}")

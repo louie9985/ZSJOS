@@ -2,7 +2,7 @@
   <ContentWrap>
     <div class="page-head">
       <div><h3>主管确认</h3><p>处理成交审批人发起的直属主管确认事项</p></div>
-      <el-button :loading="loading" @click="load">刷新</el-button>
+
     </div>
     <el-tabs v-model="tab" @tab-change="changeTab">
       <el-tab-pane label="待处理" name="todo" />

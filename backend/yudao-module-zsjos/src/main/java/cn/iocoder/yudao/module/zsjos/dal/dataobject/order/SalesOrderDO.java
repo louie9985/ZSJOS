@@ -22,6 +22,8 @@ public class SalesOrderDO extends TenantBaseDO {
     private Long leadId;
     private Long opportunityId;
     private Long personId;
+    /** Preserves pre-merge Lead-history visibility independently of canonical identity. */
+    private Long identityOriginPersonId;
     private String orderType;
     private String status;
     private Long submitterUserId;

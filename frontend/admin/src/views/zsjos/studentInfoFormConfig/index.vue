@@ -8,7 +8,7 @@
         }}</span>
       </div>
       <div class="config-actions">
-        <el-button :disabled="busy" @click="load">刷新</el-button>
+
         <el-button
           v-hasPermi="['zsjos:student-info-form:config:update']"
           :disabled="busy || !!error"

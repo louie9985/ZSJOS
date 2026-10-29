@@ -597,3 +597,23 @@
   justify-content: flex-end;
   margin-bottom: var(--crm-sp-4);
 }
+
+.sales-order-approval-actions .ant-space-item:has(.sales-order-revise-button) {
+  grid-column: 1 / -1;
+}
+
+.sales-order-approval-actions .sales-order-revise-button {
+  white-space: nowrap;
+}
+
+.sales-order-inbox-layout.is-order-collapsed { grid-template-columns: 64px minmax(0, 1fr); }
+.is-order-collapsed .inbox-avatar-toolbar { display: flex; justify-content: center; padding-right: 0; }
+.is-order-collapsed .sales-order-list-copy { display: none; }
+.is-order-collapsed .sales-order-list-item { min-height: 52px; padding: var(--crm-sp-2); }
+.is-order-collapsed .sales-order-list-main { justify-content: center; }
+.is-order-collapsed .sales-order-list-end { font-size: var(--crm-font-sm); }
+@media (max-width: 768px) {
+  .is-order-collapsed .inbox-avatar-toolbar { justify-content: flex-start; }
+  .is-order-collapsed .sales-order-list-scroll { flex-direction: row; flex: none; overflow-x: auto; }
+  .is-order-collapsed .sales-order-list-item { width: 52px; flex: 0 0 52px; }
+}

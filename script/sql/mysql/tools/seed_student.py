@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import random
 import sys
+import uuid
 from datetime import datetime
 
 import bcrypt
@@ -125,7 +126,20 @@ def active_relation(cur, person_id: int, tenant_id: int, teaching_delivery: bool
 
 
 def ensure_person(cur, name, mobile, tenant_id, now, seq_ts) -> tuple[int, bool]:
-    existing = find_person(cur, name, mobile, tenant_id)
+    reservation = str(uuid.uuid4())
+    cur.execute("INSERT IGNORE INTO zsjos_person_contact_claim(contact_value,person_id,reservation_key,tenant_id,creator,updater) VALUES(%s,NULL,%s,%s,'seed-student','seed-student')",
+                (mobile, reservation, tenant_id))
+    cur.execute("SELECT person_id,reservation_key,deleted+0 AS retired FROM zsjos_person_contact_claim WHERE tenant_id=%s AND contact_value=%s FOR UPDATE", (tenant_id,mobile))
+    claim = cur.fetchone()
+    if claim is None or claim['retired'] or (claim['person_id'] is None and claim['reservation_key'] != reservation):
+        raise SeedError("联系方式占用异常，需先核实客户身份")
+    cur.execute("SELECT id,name,mobile FROM zsjos_person WHERE tenant_id=%s AND deleted=b'0' AND (mobile=%s OR LOWER(wechat_id)=LOWER(%s)) ORDER BY id FOR UPDATE", (tenant_id,mobile,mobile))
+    matches = cur.fetchall()
+    if len(matches)>1 or (matches and (matches[0]['name'].strip()!=name.strip() or matches[0]['mobile']!=mobile)):
+        raise SeedError("联系方式对应重复或不一致的客户，禁止自动建档")
+    if claim['person_id'] is not None and (not matches or claim['person_id']!=matches[0]['id']):
+        raise SeedError("客户主档与联系方式占用不一致")
+    existing = matches[0] if matches else None
     if existing:
         pid = existing["id"]
         if conflicting := mobile_taken_by_other(cur, pid, mobile, tenant_id):
@@ -137,6 +151,7 @@ def ensure_person(cur, name, mobile, tenant_id, now, seq_ts) -> tuple[int, bool]
             "version=version+1 WHERE id=%s",
             (mobile, now, pid),
         )
+        cur.execute("UPDATE zsjos_person_contact_claim SET person_id=%s,reservation_key=NULL WHERE tenant_id=%s AND contact_value=%s", (pid,tenant_id,mobile))
         return pid, True
 
     seq = next_daily_number(cur, tenant_id, "zsjos_person_no_daily_counter", now)
@@ -147,7 +162,9 @@ def ensure_person(cur, name, mobile, tenant_id, now, seq_ts) -> tuple[int, bool]
         "VALUES (%s,%s,%s,'student',%s,%s,0,'seed-student',%s,'seed-student',%s,b'0',%s)",
         (person_no, name, mobile, now, now, now, now, tenant_id),
     )
-    return cur.lastrowid, False
+    pid = cur.lastrowid
+    cur.execute("UPDATE zsjos_person_contact_claim SET person_id=%s,reservation_key=NULL WHERE tenant_id=%s AND contact_value=%s", (pid,tenant_id,mobile))
+    return pid, False
 
 
 def ensure_claim(cur, person_id, mobile, tenant_id, now):

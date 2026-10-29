@@ -207,7 +207,7 @@ function MyAnnouncements() {
   return <section className={`announcement-page${useTableLayout ? ' announcement-table-page' : ''}`}>
     <div className="page-heading">
       <Typography.Title level={4}>通知公告</Typography.Title>
-      <Space wrap><Input.Search allowClear value={searchText} placeholder="搜索标题、来源部门或发布人" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { setSearchText(event.target.value); if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/><Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button></Space>
+      <Space wrap><Input.Search allowClear value={searchText} placeholder="搜索标题、来源部门或发布人" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { setSearchText(event.target.value); if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/></Space>
     </div>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
     {useTableLayout ? <>

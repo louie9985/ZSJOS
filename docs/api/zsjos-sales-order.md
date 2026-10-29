@@ -27,7 +27,7 @@
 - `GET /zsjos/sales-order/management-cursor`、`POST /zsjos/sales-order/management-search-cursor`：订单管理游标查询，与分页接口使用相同可见范围。
 - `GET /zsjos/sales-order/management-status-counts`：订单管理状态统计，与订单列表使用相同可见范围。
 - `POST /zsjos/sales-order/my-search-page`：在本人订单固定范围内组合关键词与高级条件树；高级条件与用户选择的可选状态分组同时生效（管理员全量读取仅解除权限范围，不解除用户筛选）。
-- `GET /zsjos/sales-order/my-status-counts`：本人订单的全部、待审核、待重提、已通过及历史旧单（已重提）数量。
+- `GET /zsjos/sales-order/my-status-counts`：本人订单的全部、待审核、已终止、已通过及历史旧单（已重提）数量。
 - `GET /zsjos/sales-order/my/{id}`：本人订单完整详情；已驳回订单包含最新轮次 `decisionReason` 和 `canRevise`。
 - `GET /zsjos/sales-order/team-page`、`POST /zsjos/sales-order/team-search-page`：团队订单分页查询，支持状态、关键词和高级条件；团队成员提交范围始终作为固定边界。
 - `GET /zsjos/sales-order/team-cursor`、`POST /zsjos/sales-order/team-search-cursor`：团队订单游标查询，筛选条件与分页接口一致。
@@ -35,7 +35,7 @@
 - Workbench `/zsjos/sales-orders` consumes the management cursor/search/count contracts.
   Workbench and Admin both use the management detail contract and server-projected command eligibility.
   Read-all is resolved server-side, so neither frontend needs a local data-scope override.
-- `GET /zsjos/sales-order/approval/filter-profile`：保留当前租户已发布的待处理/已处理方案 `groups`，另返回订单状态页签 `orderStates`（全部、当前中心待审核、待审核、待重提、已通过、已终止、历史旧单（已重提）），以及当前用户按审批配置部门解析出的 `centers`。单中心用户只返回本中心；同时落入两个配置部门范围的用户返回报名履约和财务两个中心。
+- `GET /zsjos/sales-order/approval/filter-profile`：保留当前租户已发布的待处理/已处理方案 `groups`，另返回订单状态页签 `orderStates`（全部、当前中心待审核、待审核、已终止、已通过、已终止、历史旧单（已重提）），以及当前用户按审批配置部门解析出的 `centers`。单中心用户只返回本中心；同时落入两个配置部门范围的用户返回报名履约和财务两个中心。
 - `GET /zsjos/sales-order/approval/task-target?taskId=&view=todo|done`：成交订单专用的历史兼容定位接口，校验当前用户对 BPM 普通任务或主管加签任务的关系后，返回 `workType`、`orderId`、`taskId`、`taskDefinitionKey`、`center`、`confirmationId` 和处理状态，用于成交订单审批页的精确跳转。审批中心改用统一的 `/zsjos/bpm/business-task-target`。
 - `GET /zsjos/sales-order/approval/notification-target?orderId=&sceneCode=&sourceEventKey=`：仅接受主管申请和主管决定两个通知场景，分别要求当前用户是指定主管或加签申请人；服务端使用消息既有的事件幂等键精确恢复确认记录和固化任务定位，并执行订单对象权限检查。兼容缺少事件键的旧消息时才回退该订单最新确认记录；前端不得提交用户 ID 或任意目标 URL。
 - `GET /zsjos/sales-order/approval/inbox-page?center=registration|finance&groupKey=pending&optionKey=all&keyword=`：按当前用户审批任务、处理状态和中心分页查询订单列表，支持订单号、学员姓名和手机号搜索，并返回与本人/团队订单表格一致的可见业务字段及当前任务上下文；`handled` 仍可作为兼容参数。服务端将筛选条件与当前用户允许的 BPM 任务节点取交集，伪造无权中心返回权限错误，前端隐藏筛选项不是授权边界。
@@ -75,7 +75,7 @@
 
 新增“当前中心待审核”（`center_pending`），放在“待审核”之前：仅查询整体仍为 `pending_approval` 的订单当前审批轮次，按所选中心及原有本人 BPM 任务权限取普通待办，要求 BPM 任务状态为 `RUNNING`。本中心已通过、仅等待另一中心或主管加签的任务不进入此分类；主管子任务也不进入。筛选在分页和计数前执行，分页、游标、关键词和高级筛选共用；空匹配不扩大范围。无需数据迁移，工作台直接渲染后端新增分类；Vue 原 `handled=false` 请求语义保持不变。
 
-原“待审核”包括本中心已处理但另一中心尚未完成的订单，动作仍由当前 BPM 任务和节点状态决定。已完成任务以只读方式展示。待重提对应 `revision_required`（包括既有流程取消兼容状态）；已终止单列，虽然符合条件时也可重提。重提创建新订单，旧单转为 `superseded`，新单从待审核开始，二者不是同一记录。最后一项“历史旧单（已重提）”用于查历史；全部包含历史旧单。订单状态不表示“我是否已处理”。
+原“待审核”包括本中心已处理但另一中心尚未完成的订单，动作仍由当前 BPM 任务和节点状态决定。已完成任务以只读方式展示。`revision_required`（包括既有流程取消兼容状态）按用户确认显示为“已终止”；`terminated` 也保持“已终止”显示。两个内部状态及各自筛选范围保留，符合条件时仍可重提。重提创建新订单，旧单转为 `superseded`，新单从待审核开始，二者不是同一记录。最后一项“历史旧单（已重提）”用于查历史；全部包含历史旧单。订单状态不表示“我是否已处理”。
 
 切换状态或中心会重置分页、游标和详情选择。状态查询沿用任务创建时间及任务 ID 的稳定排序，游标绑定状态、中心、用户与筛选条件。旧 `groups`、`groupKey`、`handled` 契约保留，Vue 管理端继续提交 `handled=false`；本次不改变其待办流程，也不改主管确认分类。无需修改数据库筛选方案或发布配置；先部署支持 `orderStates/orderState` 的后端，再部署工作台。
 
@@ -220,3 +220,14 @@ Admin 订单补正显示可编辑的礼品及邮寄地址。未修改的选择�
 对象缺失或 null 表示历史未记录；存在但 employeeUserId 为空表示提交时未分配；有员工 ID 但无姓名时展示姓名未记录。历史订单不补数据，读取不查询当前关系。兼职后续转归属、员工改名不改变原订单；新后继订单重新采集，原审批轮次不重写。
 
 详情通过 `leadProfile.partnerOwnerSnapshot` 返回，列表通过 `partnerOwnerSnapshot` 返回同一快照，并补充 `leadSourceType` 供客户端按来源判断。Workbench 列表卡片、订单表格、详情及 Admin 既有订单表格和详情显示“兼职归属新媒体员工”；非兼职来源列表显示“—”，详情隐藏。仅复用既有 JSON 存储，无数据库列、迁移、回填或权限变更。
+
+
+## 客户身份归一与复购联系方式（2026-10-29，本地开发）
+
+本地实际应用补充：已确认125组客户归一后，历史客户统一复购与客资详情复购均通过真实HTTP创建订单、启动审批和幂等重放测试，零金额测试订单随后通过正式终止接口结束。旧学员复购链接先解析已归档Person的归一映射，再调用原服务对象权限边界；映射本身不授予权限。详见[本地实际应用记录](../operations/person-lead-unification.md)。
+
+后续本地补充：经归一工具核实保留的历史联系方式存入 `zsjos_person_contact_alias`，记录原客户及 mobile/wechat 技术字段。预检与提交均可按对应字段识别这些别名；不能只因占用表存在记录就绕过身份匹配。既有主档联系方式、姓名校验、租户和录单权限继续生效，不向用户返回别名全集。别名表及配套后端必须先完成升级再提交归一数据。
+
+复购沿用已授权 Person 关联和订单联系方式快照，不再通过 OrderContactCompletionService 强制补写 Person/Lead；首购和其他既有非复购路径保持原校验。此规则覆盖前述复购空项补齐的自动副作用，不改变两项联系方式必填、唯一客户核验、重复缴费和待处理复购检查。
+
+客户归一不扩大客资订单历史权限。V355 增加 Lead/Order 的 identity_origin_person_id；修复前必须固化原身份范围。空值表示当前 Person。原范围内保留既有 Lead 对象授权，跨原范围还需既有订单读取权限；列表和详情使用同一判断。复购继续只关联 Person，不新增 Lead/商机关联。尚未执行存量归一，生产不可直接运行当前开发脚本。

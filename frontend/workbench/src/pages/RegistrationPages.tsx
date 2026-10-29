@@ -11,40 +11,17 @@ import { STUDENT_ANNOTATION_READ, STUDENT_ANNOTATION_UPDATE } from '../services/
 import RegistrationStudentInfo from '../components/RegistrationStudentInfo'
 import { studentServiceColumnDefinitions, studentServiceColumns, studentColumnDefaults, StudentServiceSummaryDetail, assignedName, acceptanceLabel, type ServiceStudent } from '../components/StudentServiceColumns'
 import BusinessSortMenu from '../components/BusinessSortMenu'
-import { sortableColumns, readTableSort, sortChoices, type BusinessSort } from '../services/businessListSort'
+import { readTableSort, sortChoices, type BusinessSort } from '../services/businessListSort'
 import BusinessTable from '../components/BusinessTable'
 import { InboxAvatarControls, InboxAvatarError, InboxAvatarPagination, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import ProductSpecs from '../components/ProductSpecs'
 import { createIdempotencyKey } from '../services/idempotency'
-import { productSpecText } from '../services/productSpecs'
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type ClipboardEvent as ReactClipboardEvent } from "react";
-import {
-  Alert,
-  Badge,
-  Button,
-  Checkbox,
-  DatePicker,
-  Empty,
-  Form,
-  Input,
-  Modal,
-  Pagination,
-  Radio,
-  Select,
-  Skeleton,
-  Space,
-  Spin,
-  Switch,
-  Tag,
-  Tabs,
-  Tooltip,
-  Typography,
-  Upload,
-  message,
-} from "antd";
+import {  } from '../services/productSpecs'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Alert, Badge, Button, Checkbox, DatePicker, Empty, Form, Input, Modal, Pagination, Radio, Select, Skeleton, Space, Spin, Switch, Tag, Tooltip, Typography, Upload, message } from "antd";
 import { CheckOutlined, DeleteOutlined, DownOutlined, EditOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, UpOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
-import { type ProColumns } from "@ant-design/pro-components";
+import {  } from "@ant-design/pro-components";
 import dayjs from "dayjs";
 import { ClipboardUploadButtons } from "../components/ClipboardPasteTarget";
 import LeadDetailOverview, { NameAvatar } from "../components/LeadDetailOverview";
@@ -646,9 +623,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           ))}
         </div>}
       </div>
-      <div className="lead-filter-actions">
-        <Button icon={<ReloadOutlined />} onClick={() => confirmLeave(() => void load(1))}>刷新</Button>
-      </div>
+
       <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
           <div className="lead-inbox-toolbar">
@@ -1073,7 +1048,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
   const studentTableColumnSource = studentServiceColumnDefinitions();
   const studentTableColumns = studentServiceColumns(studentSort);
   const changeStudentSort = (sort: BusinessSort) => { if (!resetSelection()) return; ++listGeneration.current; setPageNo(1); setRows([]); setStudentSort(sort); };
-  const studentSortMenu = <BusinessSortMenu label="学员" value={studentSort} fields={sortChoices(studentTableColumnSource.filter(column => column.sorter))} onChange={changeStudentSort} />;
+  const studentSortMenu = <BusinessSortMenu total={total} loaded={rows.length} loading={loading} error={!!error} label="学员" value={studentSort} fields={sortChoices(studentTableColumnSource.filter(column => column.sorter))} onChange={changeStudentSort} />;
   const classFilterOptions = classOptions.map(item => ({ value: item.id, label: `${item.className || item.classNo} · ${item.homeroomUserNameSnapshot || "班主任姓名未记录"}${item.examScheduleSnapshot ? ` · ${item.examScheduleSnapshot}` : ''}` }));
   const studentFilterControls = <div className="student-filter-controls">
     <StudentServiceFilters canReadAnnotation={hasPermission(permissions, "zsjos:student-service-annotation:read")} value={quickFilters} onChange={value => { if (!resetSelection()) return; setPageNo(1); setQuickFilters(value); }} />
@@ -1101,7 +1076,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
             查看有权限的学员及课程权益
           </Typography.Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={() => { void refreshCurrentStudent(); void loadDictionaries(); }}>刷新</Button>
+
       </header>
       {classOptionsError && <Alert type="error" showIcon message="班级筛选加载失败" description={classOptionsError} action={<Button size="small" onClick={() => void loadClassOptions()}>重试</Button>} />}
       {useTableLayout ? <BusinessTable<ServiceStudent> tableKey="registration-pages-1" widthPersistenceKey="crm-student-management-table-widths" unauthorized={listUnauthorized} error={error} onReload={() => { void load(1, { force: true }); void loadDictionaries() }}
@@ -1121,10 +1096,11 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
         onChange={(_, __, sorter, extra) => { if (extra.action === "sort") changeStudentSort(readTableSort(sorter)); }}
       /> : <div className={`lead-inbox-layout inbox-avatar-layout student-avatar-layout${avatarRail.collapsed ? ' is-avatar-collapsed' : ''}`}>
         <aside className="lead-inbox-list-pane">
-          <div className="inbox-avatar-toolbar">{studentSortMenu}<InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || Object.values(quickFilters).some(value => value !== undefined) || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
+          <div className="inbox-avatar-toolbar lead-inbox-controls"><InboxAvatarControls label="学员" listId="student-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || classId || Object.values(quickFilters).some(value => value !== undefined) || advancedFilter?.conditions.length || advancedFilter?.groups.length)} onChange={avatarRail.change} />
           <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}><div className="lead-inbox-toolbar">
             {studentSearchToolbar}
             <div className="inbox-avatar-secondary-filters">{studentFilterControls}</div>
+            {studentSortMenu}
           </div>
           </div></div>
           {error && (avatarRail.collapsed ? <InboxAvatarError message={error} expand={() => avatarRail.change(false)} retry={() => void load(pageNo)} /> : <LoadState error={error} retry={() => void load(pageNo)} />)}

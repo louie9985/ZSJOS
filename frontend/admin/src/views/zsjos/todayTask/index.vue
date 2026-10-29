@@ -2,7 +2,7 @@
   <ContentWrap>
     <div class="flex items-center justify-between mb-16px">
       <div><h3>今日待办</h3><p class="text-gray-500">业务待办与流程审批任务</p></div>
-      <el-button @click="loadAll">刷新</el-button>
+
     </div>
     <el-tabs v-model="activeTab">
       <el-tab-pane label="业务待办" name="business">

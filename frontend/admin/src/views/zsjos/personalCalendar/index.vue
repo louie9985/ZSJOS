@@ -1,6 +1,6 @@
 <template>
   <ContentWrap>
-    <div class="heading"><div><h2>我的日历</h2><span>{{ readScope === 'SELF' ? '本人的个人日程' : '管理员只读查看' }}</span></div><div><el-button @click="load">刷新</el-button><el-button v-if="readScope === 'SELF'" v-hasPermi="['zsjos:personal-calendar:create']" type="primary" @click="openCreate">新增日程</el-button></div></div>
+    <div class="heading"><div><h2>我的日历</h2><span>{{ readScope === 'SELF' ? '本人的个人日程' : '管理员只读查看' }}</span></div><div><el-button v-if="readScope === 'SELF'" v-hasPermi="['zsjos:personal-calendar:create']" type="primary" @click="openCreate">新增日程</el-button></div></div>
     <el-space v-if="userStore.dataAccess.tenantReadAll" wrap>
       <el-select v-model="readScope" aria-label="查看范围" style="width: 180px"><el-option label="本人" value="SELF"/><el-option label="全部（只读）" value="ALL"/><el-option label="指定人员（只读）" value="USER"/></el-select>
       <el-select v-if="readScope === 'USER'" v-model="targetUserId" placeholder="请选择人员" filterable :loading="usersLoading" style="width: 180px"><el-option v-for="user in users" :key="user.id" :label="user.nickname" :value="user.id"/></el-select>

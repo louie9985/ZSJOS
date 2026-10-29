@@ -71,14 +71,33 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
 
     @Select("SELECT * FROM zsjos_person WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     PersonDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+    @Select("SELECT e.to_person_id FROM zsjos_person_merge_event e JOIN zsjos_person p ON p.id=e.from_person_id AND p.tenant_id=e.tenant_id AND p.deleted=b'1' WHERE e.tenant_id=#{tenantId} AND e.from_person_id=#{id} AND e.event_type='identity_unification' AND e.deleted=b'0' ORDER BY e.id DESC LIMIT 1")
+    Long selectMergedTarget(@Param("id") Long id,@Param("tenantId") Long tenantId);
+    String VERIFIED_ALIAS_CANDIDATE = " OR EXISTS (SELECT 1 FROM zsjos_person_contact_alias ca WHERE ca.tenant_id=zsjos_person.tenant_id AND ca.person_id=zsjos_person.id AND ca.deleted=b'0' AND ((#{mobile} IS NOT NULL AND LOWER(ca.contact_value)=LOWER(#{mobile})) OR (#{wechatId} IS NOT NULL AND LOWER(ca.contact_value)=LOWER(#{wechatId}))))";
     @Select("<script>SELECT * FROM zsjos_person WHERE deleted=b'0' AND ("
             + "<if test='mobile != null'>(CAST(mobile AS BINARY)=CAST(#{mobile} AS BINARY) "
             + "OR LOWER(wechat_id)=LOWER(#{mobile}))</if>"
             + "<if test='mobile != null and wechatId != null'> OR </if>"
             + "<if test='wechatId != null'>(LOWER(wechat_id)=LOWER(#{wechatId}) "
             + "OR CAST(mobile AS BINARY)=CAST(#{wechatId} AS BINARY))</if>"
-            + ")</script>")
+            + VERIFIED_ALIAS_CANDIDATE + ")</script>")
     List<PersonDO> selectDuplicateCandidates(@Param("mobile") String mobile, @Param("wechatId") String wechatId);
+
+    // Current read after reservation: a repeatable-read snapshot from precheck may be stale.
+    @Select("<script>SELECT * FROM zsjos_person WHERE tenant_id=#{tenantId} AND deleted=b'0' AND ("
+            + "<if test='mobile != null'>(CAST(mobile AS BINARY)=CAST(#{mobile} AS BINARY) OR LOWER(wechat_id)=LOWER(#{mobile}))</if>"
+            + "<if test='mobile != null and wechatId != null'> OR </if>"
+            + "<if test='wechatId != null'>(LOWER(wechat_id)=LOWER(#{wechatId}) OR CAST(mobile AS BINARY)=CAST(#{wechatId} AS BINARY))</if>"
+            + VERIFIED_ALIAS_CANDIDATE + ") ORDER BY id FOR UPDATE</script>")
+    List<PersonDO> selectDuplicateCandidatesForUpdate(@Param("mobile") String mobile,
+            @Param("wechatId") String wechatId, @Param("tenantId") Long tenantId);
+
+    @Select("SELECT COUNT(*) FROM zsjos_person_contact_alias WHERE tenant_id=#{tenantId} AND person_id=#{personId} AND deleted=b'0' AND contact_type=#{type} AND CAST(contact_value AS BINARY)=CAST(#{value} AS BINARY)")
+    long countVerifiedContactAlias(@Param("tenantId") Long tenantId,@Param("personId") Long personId,
+                                  @Param("type") String type,@Param("value") String value);
+
+    @Select("SELECT DISTINCT contact_value FROM zsjos_person_contact_alias WHERE tenant_id=#{tenantId} AND person_id=#{personId} AND deleted=b'0'")
+    List<String> selectVerifiedContactValues(@Param("tenantId") Long tenantId,@Param("personId") Long personId);
 
     default PageResult<PersonDO> selectStudentPage(MyStudentPageReqVO reqVO, java.util.Collection<Long> visibleIds,
                                                    java.util.Collection<Long> matchedIds) {

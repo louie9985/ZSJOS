@@ -21,7 +21,7 @@
             批量保存
           </el-button>
         </el-badge>
-        <el-button @click="handleRefresh">刷新</el-button>
+
       </div>
     </div>
     <GanttChart

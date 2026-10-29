@@ -5,7 +5,7 @@ import { LinkedText } from '../components/ResourceLink'
 import CalendarSideNavigation, { moveCalendarMonth } from '../components/CalendarSideNavigation'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, App, Button, Calendar, DatePicker, Empty, Modal, Pagination, Select, Space, Spin, Tag, Typography } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import {  } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, type DictData, type ManagedLead } from '../services/api'
 import { leadCalendarApi, type CalendarCard, type CalendarDay, type CalendarDirection, type CalendarSort } from '../services/leadCalendar'
@@ -89,7 +89,7 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
       const item = searchPresentation.lead(row); const date = dayjs(item.start)
       const fresh = await findCalendarPage(pageNo => leadCalendarApi.cards({ start: item.start, end: date.add(1, 'day').format('YYYY-MM-DD'), pageNo, pageSize: 24, sort, direction }, signal), card => card.lead.id === row.lead.id, signal)
       setHighlightedId(row.lead.id); setAnchor(date); setDay(date); setPage(fresh.pageNo); setCards(fresh.list); setTotal(fresh.total); setRevision(value => value + 1)
-    }} /><Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button></Space></div>
+    }} /></Space></div>
     <CalendarSideNavigation onNavigate={direction => { setDay(undefined); setAnchor(value => moveCalendarMonth(value, direction)) }}>
     {error ? <Alert type="error" showIcon title={error} action={<Button onClick={refresh}>重试</Button>} /> : <Spin spinning={loading}>
       <Calendar value={anchor} mode="month" onPanelChange={setAnchor}
@@ -111,7 +111,7 @@ export default function LeadFollowUpCalendarPage({ permissions }: { permissions:
       <div className="lead-calendar-toolbar"><Typography.Text type="secondary">共 {total} 个客资</Typography.Text><Space wrap>
         <Select aria-label="客资排序字段" value={sort} options={[{ value: 'submittedAt', label: '客资提交时间' }, { value: 'deadline', label: '跟进截止时间' }, { value: 'category', label: '客资分类等级' }, { value: 'ownershipStartedAt', label: '归属开始时间' }]} onChange={value => { setSort(value); setPage(1) }} />
         <Select aria-label="排序方向" value={direction} options={[{ value: 'asc', label: sort === 'category' ? 'S级优先' : '最早优先' }, { value: 'desc', label: (sort === 'ownershipStartedAt' || sort === 'submittedAt') ? '最新优先' : '倒序' }]} onChange={value => { setDirection(value); setPage(1) }} />
-        <Button icon={<ReloadOutlined />} onClick={refresh}>刷新</Button>
+
       </Space></div>
       {cardError ? <Alert type="error" showIcon title={cardError} action={<Button onClick={refresh}>重试</Button>} /> : <Spin spinning={cardLoading}>
         <div className="lead-calendar-grid">{cards.map(card => {

@@ -44,7 +44,8 @@ function detail(id: number, consumer: string): SalesOrder {
   return { ...value, paymentVouchers: vouchers }
 }
 Object.assign(api, {
-  managementSalesOrderCursor: async () => ({ list: [base, profile], hasMore: false }),
+  managementSalesOrderCursor: async (request: unknown) => { Object.assign(window, { lastOrderSortRequest: request }); return { list: [base, profile], hasMore: false } },
+  managementSalesOrderPage: async () => ({ list: [base, profile], total: 2 }),
   managementSalesOrderStatusCounts: async () => ({ total: 2, effective: 2, pendingApproval: 0, revisionRequired: 0, superseded: 0 }),
   managementSalesOrder: async (id: number) => detail(id, 'management'),
   salesOrder: async (id: number) => detail(id, 'approval'),
@@ -53,7 +54,8 @@ Object.assign(api, {
   advancedFilterCatalog: async () => ({ scene: 'order', fields: [] }),
   advancedFilterTemplates: async () => []
 })
+if (params.has('terminated')) Object.assign(base, { status: 'terminated', terminationReason: '测试撤销原因', canRevise: true })
 const shared = new URLSearchParams(location.search).has('shared')
 createRoot(document.getElementById('root')!).render(<ThemeProvider><App><BrowserRouter>
-  {shared ? <SalesOrderDetailCards order={base} mode="team"/> : params.has('approval') ? <SalesOrderApprovalPage permissions={['zsjos:sales-order:review']}/> : <MySalesOrderPage/>}
+  {params.has('terminated') ? <SalesOrderDetailCards order={base} mode="mine" onRevise={() => { document.body.dataset.revised = 'true' }}/> : shared ? <SalesOrderDetailCards order={base} mode="team"/> : params.has('approval') ? <SalesOrderApprovalPage permissions={['zsjos:sales-order:review']}/> : <MySalesOrderPage/>}
 </BrowserRouter></App></ThemeProvider>)

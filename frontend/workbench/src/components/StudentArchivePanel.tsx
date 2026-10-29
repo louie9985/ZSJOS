@@ -306,7 +306,7 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
   }
   return (
     <section className="lead-detail-tab-content student-archive-section">
-      <Card className="student-archive-card" title={<div className="archive-card-title"><span><small>01 · 报名资料</small><strong>报名收集资料</strong><em>提交快照保留，字段可逐项维护</em></span><Button size="small" loading={busy} disabled={busy || !!editor} onClick={() => void load()}>刷新</Button></div>}>
+      <Card className="student-archive-card" title={<div className="archive-card-title"><span><small>01 · 报名资料</small><strong>报名收集资料</strong><em>提交快照保留，字段可逐项维护</em></span></div>}>
       {data?.information.canExport && <Space wrap>
           <Button
             disabled={busy || !!editor}

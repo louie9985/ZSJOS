@@ -6,7 +6,7 @@
         <span>类型控制创建、导入、收录和推荐能力；已发布模板保持不可变</span>
       </div>
       <el-space>
-        <el-button :loading="loading" @click="load">刷新</el-button>
+
         <el-button v-hasPermi="['zsjos:material-type:create']" type="primary" @click="openType()">
           <Icon icon="ep:plus" class="mr-4px" />新增类型
         </el-button>

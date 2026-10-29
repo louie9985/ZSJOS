@@ -5,7 +5,7 @@
         ><h3>{{ title }}</h3
         ><p class="text-gray-500">{{ description }}</p></div
       ><div class="flex gap-8px"
-        ><slot name="actions" :reload="load"></slot><el-button @click="load">刷新</el-button></div
+        ><slot name="actions" :reload="load"></slot></div
       ></div
     >
     <ZsjosAdvancedFilter

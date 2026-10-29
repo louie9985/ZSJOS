@@ -29,6 +29,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class SalesOrderController {
     @Resource private SalesOrderService orderService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseCustomerService repurchaseCustomers;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.PersonMergeIdentityService mergedIdentity;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseSubmissionService repurchaseSubmission;
 
     @PostMapping("/repurchase/check-customer")
@@ -81,7 +82,7 @@ public class SalesOrderController {
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:student-repurchase')")
     public CommonResult<Long> createStudentRepurchase(@PathVariable Long personId,
                                                        @Valid @RequestBody SalesOrderRepurchaseReqVO reqVO) {
-        return success(orderService.createStudentRepurchase(personId, WebFrameworkUtils.getLoginUserId(), reqVO));
+        return success(orderService.createStudentRepurchase(mergedIdentity.resolve(personId), WebFrameworkUtils.getLoginUserId(), reqVO));
     }
 
     @GetMapping("/lead/{leadId}/customer-orders")

@@ -66,7 +66,7 @@ export default function NoticeReadStatistics({ id }: { id: number }) {
       filters={<Space wrap><Input.Search allowClear placeholder="搜索姓名" onSearch={value => { setName(value); setPageNo(1) }} />
         <Select allowClear showSearch optionFilterProp="label" aria-label="筛选部门" placeholder="筛选部门" style={{ minWidth: 150 }} value={deptId}
           options={(departments || []).map(dept => ({ value: dept.id, label: dept.name || '部门名称未记录' }))}
-          onChange={value => { setDeptId(value); setPageNo(1) }}  {...filterSelectDisplayProps}/><Button onClick={() => void load(true)}>刷新</Button></Space>}
+          onChange={value => { setDeptId(value); setPageNo(1) }}  {...filterSelectDisplayProps}/></Space>}
       pagination={{ current: pageNo, pageSize, total, showSizeChanger: true, onChange: (page, size) => { setPageNo(size !== pageSize ? 1 : page); setPageSize(size) } }}
       columns={[
         { title: '姓名', dataIndex: 'userName', render: (_, row) => row.userName || (row.accountDeleted ? '账号已删除' : '姓名未记录') },

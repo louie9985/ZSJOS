@@ -17,7 +17,7 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item><el-button :loading="loading" @click="loadState">刷新</el-button></el-form-item>
+
     </el-form>
     <el-alert v-if="usersError" :title="usersError" type="error" show-icon>
       <template #default><el-button link @click="loadUsers">重试</el-button></template>

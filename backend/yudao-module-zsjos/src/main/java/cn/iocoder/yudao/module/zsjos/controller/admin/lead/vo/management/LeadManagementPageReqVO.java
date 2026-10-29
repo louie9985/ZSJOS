@@ -27,7 +27,7 @@ public class LeadManagementPageReqVO extends PageParam {
             + "countedAt|currentAssignmentFirstFollowUpAt|currentAssignmentFirstFollowUpDeadlineAt|"
             + "qualificationStartedAt|qualificationDeadlineAt|suspendedAt|validDescription|invalidDescription|"
             + "appealDeadlineAt|closedAt|closeReason|nextFollowUpAt|submittedAt|lastActivityAt|qualifiedAt|"
-            + "convertedAt|remark|updateTime";
+            + "convertedAt|remark|updateTime|createTime|ownershipStartedAt|lastFollowUpAt|noProgressWarnedAt|pendingExpiresAt";
 
     private String keyword;
     private String status;

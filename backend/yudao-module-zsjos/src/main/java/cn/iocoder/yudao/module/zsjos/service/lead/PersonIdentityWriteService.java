@@ -49,6 +49,37 @@ public class PersonIdentityWriteService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public PersonDO resolveForLead(String name, String mobile, String wechatId) {
+        PersonDO person = resolveOrCreate(name, mobile, wechatId, "lead");
+        boolean knownMobile = knownContact(person, mobile, person.getMobile(), "mobile");
+        boolean knownWechat = knownContact(person, wechatId, person.getWechatId(), "wechat");
+        if (!Objects.equals(normalize(name), normalize(person.getName()))
+                || conflictingContact(mobile, person.getMobile()) && !knownMobile
+                || conflictingContact(wechatId, person.getWechatId()) && !knownWechat
+                || !(knownMobile || knownWechat)) {
+            throw exception(LEAD_CONTACT_CONFLICT);
+        }
+        // Reusing an identity must not overwrite established contacts or its student status.
+        if (normalize(person.getMobile()) == null && normalize(mobile) != null
+                || normalize(person.getWechatId()) == null && normalize(wechatId) != null) {
+            return update(person.getId(), person.getName(),
+                    normalize(person.getMobile()) == null ? mobile : person.getMobile(),
+                    normalize(person.getWechatId()) == null ? wechatId : person.getWechatId());
+        }
+        return person;
+    }
+
+    private boolean conflictingContact(String incoming, String stored) {
+        return normalize(incoming) != null && normalize(stored) != null
+                && !normalize(incoming).equals(normalize(stored));
+    }
+
+    private boolean knownContact(PersonDO person, String incoming, String stored, String type) {
+        return normalize(incoming) != null && (Objects.equals(normalize(incoming), normalize(stored))
+                || personMapper.countVerifiedContactAlias(tenantId(),person.getId(),type,normalize(incoming))>0);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public PersonDO update(Long personId, String name, String mobile, String wechatId) {
         PersonDO person = personMapper.selectByIdForUpdate(personId, tenantId());
         if (person == null) throw exception(LEAD_CONTACT_CONFLICT);
@@ -59,7 +90,9 @@ public class PersonIdentityWriteService {
         person.setName(name); person.setMobile(normalize(mobile)); person.setWechatId(normalize(wechatId));
         person.setLastSeenAt(LocalDateTime.now()); personMapper.updateById(person);
         claimMapper.bindReservations(tenantId(), reservation.key(), personId);
-        claimMapper.deleteStale(tenantId(), personId, reservation.values());
+        Set<String> retained = new LinkedHashSet<>(reservation.values());
+        retained.addAll(personMapper.selectVerifiedContactValues(tenantId(),personId));
+        claimMapper.deleteStale(tenantId(), personId, new ArrayList<>(retained));
         return person;
     }
 
@@ -87,6 +120,13 @@ public class PersonIdentityWriteService {
             if (claim == null) throw exception(LEAD_CONTACT_CONFLICT);
             if (claim.getPersonId() != null) personIds.add(claim.getPersonId());
             else if (!Objects.equals(claim.getReservationKey(), key)) throw exception(LEAD_CONTACT_CONFLICT);
+        }
+        // Legacy imports can contain real identities without claims. Missing claims must never
+        // authorize a second Person, including callers that bypass the submission precheck.
+        if (!values.isEmpty()) {
+            personMapper.selectDuplicateCandidatesForUpdate(normalize(mobile), normalize(wechatId), tenantId()).stream()
+                    .filter(person -> Objects.equals(person.getTenantId(), tenantId()))
+                    .map(PersonDO::getId).forEach(personIds::add);
         }
         return new Reservation(key, values, personIds);
     }

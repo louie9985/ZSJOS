@@ -266,6 +266,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
   const [keyword, setKeyword] = useState(''), [pageNo, setPageNo] = useState(1)
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [operatorFilter, setOperatorFilter] = useState<StudentOperator>()
+  const [resultTotal, setResultTotal] = useState<number>()
   const [studentSort, setStudentSort] = useState<BusinessSort>({})
   const [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState(''), [detailError, setDetailError] = useState('')
   const [interviewSummary, setInterviewSummary] = useState<InterviewContext>(), [summaryError, setSummaryError] = useState('')
@@ -452,7 +453,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
       firstListLoad.current = false
       if (!append) loadedKeyword.current = keyword
       setRows(current => append ? [...current, ...result.list.filter(row => !current.some(existing => existing.personId === row.personId))] : result.list)
-      setPageNo(targetPage); setHasMore(result.list.length > 0 && targetPage * PAGE_SIZE < result.total)
+      setResultTotal(result.total); setPageNo(targetPage); setHasMore(result.list.length > 0 && targetPage * PAGE_SIZE < result.total)
       // Appending students must not reload the selected detail or discard its editor state.
       if (!append && !keepDetail) {
         listScrollRef.current?.scrollTo({ top: 0, left: 0 })
@@ -1248,24 +1249,25 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
         { key: 'in', label: '服务期', disabled: servicePeriodSaving },
         { key: 'out', label: '非服务期', disabled: servicePeriodSaving },
         { key: 'all', label: '全部', disabled: servicePeriodSaving },
-      ]} /><BusinessSortMenu label="学员" value={studentSort} onChange={next => void changeStudentSort(next)} fields={[
-        { field: 'name', label: '学员姓名' }, { field: 'personNo', label: '学员编号' },
-        { field: 'operators', label: '当前运营' }, { field: 'accounts', label: '账号名称' },
-        { field: 'platforms', label: '平台' }, { field: 'activatedAt', label: '激活时间' },
-      ]} /><Tooltip title="刷新"><Button aria-label="刷新学员" disabled={servicePeriodSaving} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)} /></Tooltip></header>
+      ]} />{hasPermission(permissions, 'zsjos:student:create') && <Button icon={<PlusOutlined />} onClick={() => setEntryOpen(true)}>添加学员</Button>}<Tooltip title="刷新"><Button aria-label="刷新学员" disabled={servicePeriodSaving} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)} /></Tooltip></header>
     <div className={`media-students-inbox-layout${listCollapsed ? ' is-list-collapsed' : ''}`}>
       <aside className="media-students-list-pane" aria-label="学员列表">
         <div className="media-students-toolbar" style={{ paddingRight: listCollapsed ? 0 : listScrollbarWidth }}>
           <AdvancedFilterToolbar scene="media_student" pageKey="media_students" placeholder="搜索姓名或手机号"
             keyword={keyword} value={advancedFilter} onKeyword={value => void searchStudents(value)} onChange={changeAdvancedFilter}
             collapsed={listCollapsed} disabled={servicePeriodSaving} inputRef={searchRef}
-            leading={<Space>{hasPermission(permissions, 'zsjos:student:create') && <Button icon={<PlusOutlined />} onClick={() => setEntryOpen(true)}>添加学员</Button>}<Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip></Space>} />
+            leading={<Space><Tooltip title={listCollapsed ? '展开学员列表' : '收起学员列表'}><Button size={listCollapsed ? 'small' : 'middle'} type={listCollapsed ? 'text' : 'default'} aria-label={listCollapsed ? '展开学员列表' : '收起学员列表'} aria-expanded={!listCollapsed} aria-controls="media-students-list" icon={listCollapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} onClick={() => changeListCollapsed(!listCollapsed)} /></Tooltip></Space>} />
         </div>
         {error && (listCollapsed ? <Tooltip title={error}><Button aria-label="查看学员列表错误" danger icon={<ExclamationCircleOutlined />} onClick={() => changeListCollapsed(false)} /></Tooltip> : <Alert type="error" showIcon message={error} />)}
         {error && <Tooltip title="重试加载学员"><Button aria-label="重试加载学员" loading={loading} icon={<ReloadOutlined />} onClick={() => void loadPage(1, selectedId)}>{!listCollapsed && '重试'}</Button></Tooltip>}
         {operatorFilter && <div className="media-students-operator-filter"><Tag closable={!servicePeriodSaving}
           onClose={event => { event.preventDefault(); void changeOperatorFilter() }}
           title={`当前运营：${operatorFilter.name}`}>{listCollapsed ? '运营' : `当前运营：${operatorFilter.name}`}</Tag></div>}
+        {!listCollapsed && <BusinessSortMenu total={resultTotal} loaded={rows.length} loading={loading} error={!!error} label="学员" value={studentSort} onChange={next => void changeStudentSort(next)} fields={[
+        { field: 'name', label: '学员姓名' }, { field: 'personNo', label: '学员编号' },
+        { field: 'operators', label: '当前运营' }, { field: 'accounts', label: '账号名称' },
+        { field: 'platforms', label: '平台' }, { field: 'activatedAt', label: '激活时间' },
+      ]} />}
         <div id="media-students-list" className="media-students-scroll" ref={listScrollRef} aria-busy={loading}>
           {loading && !rows.length ? (listCollapsed ? <Skeleton.Avatar active size={36} /> : <Skeleton active />) : rows.length ? rows.map(x => <MediaStudentInboxCard key={x.personId} student={x} selected={selectedId === x.personId} collapsed={listCollapsed}
             canOpenAccount={hasPermission(permissions, 'zsjos:media-account:query')} operatorFilterId={operatorFilter?.id}

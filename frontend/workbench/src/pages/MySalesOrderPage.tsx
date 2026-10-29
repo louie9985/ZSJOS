@@ -2,8 +2,8 @@ import BusinessSortMenu from '../components/BusinessSortMenu'
 import { sortableColumns, readTableSort, sortChoices, type BusinessSort } from '../services/businessListSort'
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, Empty, Form, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { Alert, Button, Empty, Form, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { InboxAvatarControls, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderListItem, type SalesOrderStatusCounts } from '../services/api'
 import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS } from '../components/SalesOrderDetailCards'
@@ -13,7 +13,7 @@ import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems, salesOrderDetailToListItem, orderPartnerOwnerText } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import { useNavigate } from 'react-router-dom'
-import { APP_ROUTES } from '../constants'
+import {  } from '../constants'
 import { useInboxTableLayout } from '../services/inboxLayout'
 
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
@@ -49,6 +49,7 @@ export default function MySalesOrderPage() {
   const [revisionOpen, setRevisionOpen] = useState(false)
   const [terminateOpen, setTerminateOpen] = useState(false)
   const [terminationReason, setTerminationReason] = useState('')
+  const avatarRail = useInboxAvatarRail('zsjos.orders.list-collapsed')
   const { useTableLayout } = useInboxTableLayout()
   const { submitting: terminating, run: runTermination, resetIntent: resetTerminationIntent } = useSubmissionGuard()
   const [leadDetailModalOpen, setLeadDetailModalOpen] = useState(false)
@@ -71,6 +72,11 @@ export default function MySalesOrderPage() {
       const result = useTableLayout
         ? await api.managementSalesOrderPage({ ...sort, pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
         : await api.managementSalesOrderCursor({ ...sort, cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+      if (!useTableLayout && replace) {
+        const countPage = await api.managementSalesOrderPage({ pageNo: 1, pageSize: 1, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+        if (version !== listVersion.current) return
+        setTableTotal(countPage.total)
+      }
       if (version !== listVersion.current) return
       let nextItems = result.list
       const requestedId = replace ? requestedOrderId.current : undefined
@@ -137,19 +143,19 @@ export default function MySalesOrderPage() {
 
   const orderColumns = buildSalesOrderTableColumns(item => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) })
   const changeSort = (next: BusinessSort) => { ++listVersion.current; setTablePage(1); setItems([]); setCursor(undefined); setSort(next) }
-  const sortingMenu = <BusinessSortMenu label="订单" value={sort} fields={sortChoices(orderColumns)} onChange={changeSort} />
+  const sortingMenu = <BusinessSortMenu total={tableTotal} loaded={items.length} loading={loading} error={!!error} label="订单" value={sort} fields={sortChoices(orderColumns)} onChange={changeSort} />
   return <section className={`workspace-page sales-order-inbox-page${useTableLayout ? ' sales-order-table-page' : ''}`}>
     <div className="sales-order-inbox-actions">
       {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => { setTablePage(1); setStatus(key as StatusTab) }} items={[
         { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
-        { key: 'revision_required', label: `待重提 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `历史旧单（已重提） ${counts.superseded}` }
-      ]}/>}<Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
+        { key: 'revision_required', label: `已终止 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `历史旧单（已重提） ${counts.superseded}` }
+      ]}/>}
     </div>
     {countsError && <Alert
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    {useTableLayout ? <div className="sales-order-table-area"><BusinessTable<SalesOrderListItem> filters={<>{sortingMenu}<AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="my-sales-order-page-1" error={error} onReload={reload}
+    {useTableLayout ? <div className="sales-order-table-area"><BusinessTable<SalesOrderListItem> filters={<><AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="my-sales-order-page-1" error={error} onReload={reload}
       className="sales-order-inbox-table"
       rowKey="id"
 
@@ -161,16 +167,21 @@ export default function MySalesOrderPage() {
       locale={{ emptyText: <Empty description="暂无订单" /> }}
       columns={sortableColumns(orderColumns, sort)}
       onChange={(_, __, sorter, extra) => { if (extra.action === 'sort') changeSort(readTableSort(sorter)) }}
-    /></div> : <div className="sales-order-inbox-layout">
+    /></div> : <div className={`sales-order-inbox-layout${avatarRail.collapsed ? ' is-order-collapsed' : ''}`}>
       <aside className="sales-order-list-pane">
-        {sortingMenu}
-        <AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+        <div className="inbox-avatar-toolbar lead-inbox-controls">
+          <InboxAvatarControls label="订单" listId="order-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || filterCount(advancedFilter))} onChange={avatarRail.change}/>
+          <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}>
+            <AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+            {sortingMenu}
+          </div>
+        </div>
         {error && <Alert
           className="sales-order-inbox-error" type="error" showIcon message={error}
           action={<Button size="small" onClick={reload}>重试</Button>}/>
         }
-        <div className="sales-order-list-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false, listVersion.current) }}>
-          {!loading && !items.length && !error ? <Empty description="暂无订单"/> : items.map(item => <button key={item.id} type="button" className={`sales-order-list-item${item.id === selectedId ? ' active' : ''}`} onClick={() => { setSelectedId(item.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
+        <div id="order-avatar-list" ref={avatarRail.scrollRef} className="sales-order-list-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false, listVersion.current) }}>
+          {!loading && !items.length && !error ? <Empty description="暂无订单"/> : items.map(item => <button key={item.id} type="button" title={item.studentName} aria-label={`查看订单 ${item.orderNo}`} className={`sales-order-list-item${item.id === selectedId ? ' active' : ''}`} onClick={() => { setSelectedId(item.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
             <div className="sales-order-list-main"><SubjectAvatar seed={item.leadNo} label="" /><div className="sales-order-list-copy"><div><strong>{item.studentName}</strong><Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · 第 {item.approvalRoundNo || 1} 轮</span><span>兼职归属新媒体员工：{orderPartnerOwnerText(item.leadSourceType, item.partnerOwnerSnapshot)}</span></div></div>
             <div className="sales-order-list-meta">{formatTimestamp(item.submittedAt)}</div>
           </button>)}

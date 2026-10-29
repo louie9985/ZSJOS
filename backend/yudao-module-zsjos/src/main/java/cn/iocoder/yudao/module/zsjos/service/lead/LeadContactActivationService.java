@@ -56,7 +56,8 @@ public class LeadContactActivationService {
         // 所有调用按客资 ID 排序加锁；事务内去重使并发重试不会重复写激活或发送通知。
         for (Long id : leads.stream().map(LeadDO::getId).distinct().sorted().toList()) {
             LeadDO lead = leadMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
-            if (lead == null) continue;
+            // The record may have closed after candidate lookup but before acquiring its lock.
+            if (lead == null || "closed".equals(lead.getStatus())) continue;
             matched = true;
             String key = "contact:" + operation + ":" + id;
             if (activationMapper.selectByIdempotencyKey(key) != null) continue;

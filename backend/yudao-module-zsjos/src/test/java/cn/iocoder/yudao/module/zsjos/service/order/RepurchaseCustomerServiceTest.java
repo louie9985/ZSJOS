@@ -39,6 +39,20 @@ class RepurchaseCustomerServiceTest {
         var r = service.checkCustomer(20L, req()); assertTrue(r.isCanRepurchase()); assertEquals("NO_MATCH",r.getMatchStatus());
         verifyNoInteractions(leadMapper, orderMapper);
     }
+    @Test void verifiedHistoricalMobileAcceptsCanonicalPersonWithoutOverwritingPrimary() {
+        PersonDO canonical=person().setMobile("13900139000");
+        when(personMapper.selectDuplicateCandidates("13800138000",null)).thenReturn(List.of(canonical));
+        when(personMapper.countVerifiedContactAlias(1L,10L,"mobile","13800138000")).thenReturn(1L);
+        var result=service.checkCustomer(20L,req());
+        assertTrue(result.isCanRepurchase());assertEquals(10L,result.getPersonId());
+        assertEquals("13900139000",canonical.getMobile());
+        verify(personMapper,never()).updateById(any(PersonDO.class));
+    }
+    @Test void unverifiedHistoricalContactDoesNotBypassIdentityCheck() {
+        when(personMapper.selectDuplicateCandidates("13800138000",null)).thenReturn(List.of(person().setMobile("13900139000")));
+        var result=service.checkCustomer(20L,req());
+        assertFalse(result.isCanRepurchase());assertNull(result.getPersonId());
+    }
     @Test void blankContactDoesNotQuery() { var r=req();r.setCustomerMobile(" ");assertFalse(service.checkCustomer(20L,r).isCanRepurchase());verifyNoInteractions(personMapper); }
     @Test void existingWonCustomerIgnoresOriginalOwnerAndMasksContact() {
         match(); var lead = new LeadDO(); lead.setOwnerUserId(77L);

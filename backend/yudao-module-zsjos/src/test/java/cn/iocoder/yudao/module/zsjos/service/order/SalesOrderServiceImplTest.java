@@ -854,7 +854,7 @@ class SalesOrderServiceImplTest {
         var result = service.getApprovalFilterProfile(20L);
         assertEquals(List.of("all", FILTER_CENTER_PENDING, STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
                 STATUS_TERMINATED, STATUS_SUPERSEDED), result.getOrderStates().stream().map(it -> it.getKey()).toList());
-        assertEquals(List.of("全部", "当前中心待审核", "待审核", "待重提", "已通过", "已终止", "历史旧单（已重提）"),
+        assertEquals(List.of("全部", "当前中心待审核", "待审核", "已终止", "已通过", "已终止", "历史旧单（已重提）"),
                 result.getOrderStates().stream().map(it -> it.getLabel()).toList());
         assertEquals(List.of(CENTER_REGISTRATION), result.getCenters().stream().map(it -> it.getKey()).toList());
         assertTrue(result.getGroups().isEmpty());
@@ -1291,6 +1291,48 @@ class SalesOrderServiceImplTest {
         assertNotNull(detailPermission);
         assertEquals("sales-history-read", listPermission.action());
         assertEquals("sales-history-read", detailPermission.action());
+    }
+
+    @Test
+    void mergedIdentityDoesNotExposeOtherOriginOrderDetail() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setIdentityOriginPersonId(11L);
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setPersonId(10L); order.setIdentityOriginPersonId(12L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        ServiceException error = assertThrows(ServiceException.class, () -> service.getCustomerOrder(1L, 100L, 20L));
+        assertEquals(SALES_ORDER_PERMISSION_DENIED.getCode(), error.getCode());
+        verify(permissionService).canRead(order, 20L);
+        verifyNoInteractions(itemMapper, processTaskApi);
+    }
+
+    @Test
+    void mergedIdentityFiltersOtherOriginOrdersBeforeProjection() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setIdentityOriginPersonId(11L);
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setPersonId(10L); order.setIdentityOriginPersonId(12L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(orderMapper.selectByPersonId(10L)).thenReturn(List.of(order));
+        assertTrue(service.getCustomerOrders(1L,20L).isEmpty());
+        verify(permissionService).canRead(order,20L);
+    }
+
+    @Test
+    void originalHistoryScopeStillAllowsOrdersAfterMerge() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setIdentityOriginPersonId(11L);
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setPersonId(10L); order.setIdentityOriginPersonId(11L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(orderMapper.selectByPersonId(10L)).thenReturn(List.of(order));
+        assertEquals(100L, service.getCustomerOrders(1L,20L).getFirst().getId());
+        verify(permissionService,never()).canRead(any(),any());
+    }
+
+    @Test
+    void independentOrderPermissionAllowsOtherOriginHistory() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setIdentityOriginPersonId(11L);
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setPersonId(10L); order.setIdentityOriginPersonId(12L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(orderMapper.selectByPersonId(10L)).thenReturn(List.of(order));
+        when(permissionService.canRead(order,20L)).thenReturn(true);
+        assertEquals(100L, service.getCustomerOrders(1L,20L).getFirst().getId());
     }
 
     @Test

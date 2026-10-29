@@ -1,6 +1,6 @@
 <template>
   <ContentWrap>
-    <div class="heading"><div><h2>账号日历</h2><span>仅展示当前账号责任范围内的维护排期</span></div><el-button :loading="loading" @click="load">刷新</el-button></div>
+    <div class="heading"><div><h2>账号日历</h2><span>仅展示当前账号责任范围内的维护排期</span></div></div>
     <el-form :inline="true" :model="query" class="mt-16px">
       <el-form-item label="日期"><el-date-picker v-model="dates" type="daterange" value-format="YYYY-MM-DD" @change="load" /></el-form-item>
       <el-form-item label="关键字"><el-input v-model="query.keyword" clearable @keyup.enter="load" /></el-form-item>

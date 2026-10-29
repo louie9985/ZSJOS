@@ -26,6 +26,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/media-students")
 public class MediaStudentController {
     @Resource private MyStudentService studentService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.PersonMergeIdentityService mergedIdentity;
     @Resource private MediaStudentService mediaStudentService;
     @Resource private MediaStudentPartnerContextService partnerContextService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.registration.MediaStudentServicePeriodService servicePeriodService;
@@ -34,13 +35,13 @@ public class MediaStudentController {
     @PreAuthorize("@ss.hasPermission('zsjos:media-student:update-service-period')")
     public CommonResult<Boolean> updateServicePeriod(@PathVariable Long personId,
             @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServicePeriodUpdateReqVO req) {
-        return success(servicePeriodService.update(SecurityFrameworkUtils.getLoginUserId(), personId, req.getInServicePeriod()));
+        return success(servicePeriodService.update(SecurityFrameworkUtils.getLoginUserId(), mergedIdentity.resolve(personId), req.getInServicePeriod()));
     }
 
     @GetMapping("/{personId}/partner-context")
     @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
     public CommonResult<MediaStudentPartnerContextRespVO> partnerContext(@PathVariable Long personId) {
-        return success(partnerContextService.getContext(SecurityFrameworkUtils.getLoginUserId(), personId));
+        return success(partnerContextService.getContext(SecurityFrameworkUtils.getLoginUserId(), mergedIdentity.resolve(personId)));
     }
 
     @PostMapping("/search-page")
@@ -59,7 +60,7 @@ public class MediaStudentController {
     @GetMapping("/{personId}")
     @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
     public CommonResult<MediaStudentDetailRespVO> get(@PathVariable Long personId) {
-        return success(mediaStudentService.getDetail(SecurityFrameworkUtils.getLoginUserId(), personId));
+        return success(mediaStudentService.getDetail(SecurityFrameworkUtils.getLoginUserId(), mergedIdentity.resolve(personId)));
     }
 
     @GetMapping("/target")
@@ -71,13 +72,13 @@ public class MediaStudentController {
     @GetMapping("/{personId}/talk-records")
     @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
     public CommonResult<List<MediaStudentTalkRespVO>> talkRecords(@PathVariable Long personId) {
-        return success(mediaStudentService.getTalkRecords(SecurityFrameworkUtils.getLoginUserId(), personId));
+        return success(mediaStudentService.getTalkRecords(SecurityFrameworkUtils.getLoginUserId(), mergedIdentity.resolve(personId)));
     }
 
     @PostMapping("/{personId}/talk-records")
     @PreAuthorize("@ss.hasPermission('zsjos:media-student:query-my')")
     public CommonResult<Long> createTalkRecord(@PathVariable Long personId,
                                                 @Valid @RequestBody MediaStudentTalkSaveReqVO request) {
-        return success(mediaStudentService.createTalkRecord(SecurityFrameworkUtils.getLoginUserId(), personId, request));
+        return success(mediaStudentService.createTalkRecord(SecurityFrameworkUtils.getLoginUserId(), mergedIdentity.resolve(personId), request));
     }
 }

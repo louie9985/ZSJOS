@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { DownloadOutlined } from '@ant-design/icons'
 import { studentInfoApi, studentInfoError, studentInfoStatus, type StudentInfoDetail, type StudentInfoField, type StudentInfoImage } from '../services/studentInfo'
 import { formatTimestamp } from '../services/time'
 import AttachmentCard, { type AttachmentResource } from './AttachmentCard'
@@ -76,7 +76,7 @@ function StudentInfoPanelContent({ caseId }: { caseId: number }) {
   return <section className="student-info-panel">
     <div className="student-info-toolbar">
       {data && <Tag color={data.status === 'SUBMITTED' ? 'success' : undefined}>{studentInfoStatus[data.status] || data.status}</Tag>}
-      <Button icon={<ReloadOutlined />} loading={busy} onClick={() => void load()}>刷新</Button>
+
       {data?.status === 'SUBMITTED' && data.canExport && <Button icon={<DownloadOutlined />} loading={exporting} disabled={busy} onClick={() => void download()}>导出</Button>}
     </div>
     {error && <Alert type="error" showIcon title={error} action={<Button onClick={() => void load()}>重试</Button>} />}

@@ -1,7 +1,7 @@
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Badge, Button, Empty, Form, Input, Modal, Result, Segmented, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Alert, Badge, Button, Empty, Form, Input, Modal, Result, Segmented, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderApprovalFilterProfile, type SalesOrderListItem } from '../services/api'
@@ -244,7 +244,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     requestedConfirmationId={requestedConfirmationId} requestedOrderId={requestedOrderId}/>
   return <section className={`workspace-page business-inbox-page sales-order-approval-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar">
-      <div className="business-inbox-scope-row">{workTypeSwitch}<Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button></div>
+      <div className="business-inbox-scope-row">{workTypeSwitch}</div>
       <div className="business-inbox-scope-tabs">
         {profileError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={profileError} action={<Button type="link" size="small" onClick={() => void loadProfile()}>重试</Button>}/>}
         {profileLoading ? <Skeleton active title={false} paragraph={{ rows: 2 }}/> : profile.orderStates?.length > 0 ? <>

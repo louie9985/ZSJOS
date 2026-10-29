@@ -69,7 +69,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 管理、抢单池和判定异常列表的 `keyword` 规则一致：以 `KZ` 开头时按大写标准化后精确匹配 `leadNo`，纯数字精确匹配内部 Lead ID，其他值继续模糊匹配姓名、手机号和微信号。
 
-统一客资管理页不再使用 `simpleStatus`，改由 `audience=management` 的已发布筛选方案解析 `inboxGroup`（一级业务归类）、`inboxStage`（二级当前环节）与 `inboxQuick`（三级快捷条件）三个互斥选中项，各行条件与一级条件取交集，且不改变 `relationScope=all` 已计算的对象可见范围。一级归类为 `all`、`pending_qualification`、`valid`、`invalid`、`closed`、`manual`；`manual` 复用自拓语义（`source_type in (sales_self_sourced, education_self_sourced)`）。二级“当前环节”的待首跟与待判定按当前归属周期首次跟进事实区分，判定截止时间不作为已完成首跟的证据；“正常推进”表示已判有效且 Opportunity 尚未进入成交审批或成交。三级“快捷条件”的 `today`/`overdue` 以 `zsjos_business_task.due_at` 为准（待办 `pending` 且 `task_type in (lead_first_follow_up, lead_follow_up_reminder)`），`transferred_pending` 表示当前归属周期由主管转派产生且本周期尚未首跟。`simpleStatus` 参数保留给兼职端 H5 等既有调用方，语义不变。
+统一客资管理页不再使用 `simpleStatus`，改由 `audience=management` 的已发布筛选方案解析 `inboxGroup`（一级业务归类）、`inboxStage`（二级当前环节）与 `inboxQuick`（三级快捷条件）三个互斥选中项，各行条件与一级条件取交集，且不改变 `relationScope=all` 已计算的对象可见范围。管理视角的“正常推进”“今日待跟进”“跟进已逾期”均保留 Service 计算的来源/归属可见范围，不切换为当前跟进责任人范围；既有非 management 跟进收件箱保留责任人语义。一级归类为 `all`、`pending_qualification`、`valid`、`invalid`、`closed`、`manual`；`manual` 复用自拓语义（`source_type in (sales_self_sourced, education_self_sourced)`）。二级“当前环节”的待首跟与待判定按当前归属周期首次跟进事实区分，判定截止时间不作为已完成首跟的证据；“正常推进”表示已判有效且 Opportunity 尚未进入成交审批或成交。三级“快捷条件”的 `today`/`overdue` 以 `zsjos_business_task.due_at` 为准（待办 `pending` 且 `task_type in (lead_first_follow_up, lead_follow_up_reminder)`），`transferred_pending` 表示当前归属周期由主管转派产生且本周期尚未首跟。`simpleStatus` 参数保留给兼职端 H5 等既有调用方，语义不变。
 
 统一客资分页接口支持成对提交 `sortField` 与 `sortOrder=ascend|descend`，排序作用于完整筛选结果后再分页。`sortField` 只接受 Lead 根表的持久化字段白名单：`leadNo`、`submittedName`、`submittedMobile`、`submittedWechatId`、`sourceType`、`leadCategory`、`sourceChannelId`、`assignmentStatus`、`dispatchMode`、`assignmentAttemptCount`、`publicPoolAt`、`countedAt`、`currentAssignmentFirstFollowUpAt`、`currentAssignmentFirstFollowUpDeadlineAt`、`qualificationStartedAt`、`qualificationDeadlineAt`、`suspendedAt`、`validDescription`、`invalidDescription`、`appealDeadlineAt`、`closedAt`、`closeReason`、`nextFollowUpAt`、`submittedAt`、`lastActivityAt`、`qualifiedAt`、`convertedAt`、`remark`、`updateTime`。每种显式排序均追加 `id DESC` 作为并列值的稳定次序；未提交完整排序参数时使用 `submittedAt DESC, id DESC`（客资提交时间从新到旧）。提交人、所属销售、产品等关联投影名称不在排序白名单中，前端不得将当前页投影值伪装为全量排序。游标接口的令牌固定编码 `submittedAt + id`，上下文带 `submitted-v1` 协议标记以拒绝旧活动时间令牌，即使请求携带排序参数也继续使用默认游标顺序；自定义排序只适用于普通分页接口。
 
@@ -361,3 +361,12 @@ Admin LeadCreateDialog 与 Workbench LeadSubmissionPage 继续传相同的选择
 详细生命周期与历史兼容规则见 [公海池 API](zsjos-lead-public-sea-pool.md#公海跟进责任与待办)。
 
 工作台客资管理（含全部、我的、我提交的关系范围）默认先将当前登录用户符合提醒时机的待办客资置顶，再按提交时间倒序、ID 倒序排列，服务端排序后分页；显式列排序仍保持待办优先，组内使用所选字段与方向。不按未读状态重排，打开详情或静默刷新保留该顺序，完成待办后回到普通组的提交时间位置。下属销售内嵌客资列表、Vue Admin、合作方 H5 保留原有服务端提交时间默认排序。
+
+
+## 客户档案与历史客资归一（2026-10-29，本地开发）
+
+核实归一后的历史联系方式作为受控别名参与候选查找及身份复用。别名保留原字段和来源，不作为公开客户信息查询能力；主档联系方式修改不得释放仍有效的历史别名占用。没有别名核实记录的其他号码不能因此被认定属于当前客户。所有未关闭客资仍分别提醒，已关闭客资仍退出提交查重。
+
+本节覆盖早期“包含已关闭客资”的提交提醒范围。联系方式命中仅提醒未关闭且未删除的客资，多条命中分别记录与通知。锁定客资后再次检查关闭状态，避免查询后关闭仍被提醒。只存在已关闭客资或只有客户档案时，复用经身份核验的客户创建新客资，不覆盖原客户身份、不删除历史客资。暂停、公海、已成交等非 closed 状态仍参与原查重；不增加当前承接客资或自动转派。
+
+V355 移除一档一条未删除客资的数据库约束；提交在 Person 锁下重新读取非关闭客资。身份写入同时检查占用和实际主档，避免旧导入缺少占用时重复建档。前端请求及 activated/created/review_pending 响应契约保持，适用于管理端、工作台及合作方入口。当前部署和真实账号验收尚未完成，见 [归一验证记录](../operations/person-lead-unification.md)。

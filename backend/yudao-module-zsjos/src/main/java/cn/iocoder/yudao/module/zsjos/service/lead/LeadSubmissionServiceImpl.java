@@ -353,10 +353,11 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
         PersonDO person = reusePersonId == null
-                ? personIdentityWriteService.createNew(reqVO.getName().trim(), mobile, wechatId, "lead")
+                ? personIdentityWriteService.resolveForLead(reqVO.getName().trim(), mobile, wechatId)
                 : personIdentityWriteService.update(reusePersonId, reqVO.getName().trim(), mobile, wechatId);
         if (person == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
-        if (leadMapper.selectLatestByPersonId(person.getId()) != null) {
+        if (!leadMapper.selectNonClosedByPersonForUpdate(person.getId(),
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()).isEmpty()) {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
         LocalDateTime submittedAt = LocalDateTime.now(BEIJING);

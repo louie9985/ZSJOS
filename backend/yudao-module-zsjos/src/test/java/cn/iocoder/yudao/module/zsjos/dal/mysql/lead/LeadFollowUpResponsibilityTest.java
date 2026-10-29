@@ -114,14 +114,21 @@ class LeadFollowUpResponsibilityTest {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private long leadCount(long user, String simpleStatus, String relationScope) throws Exception {
+        return leadCount(user, simpleStatus, relationScope, null, null, List.of(user), List.of(user), false);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private long leadCount(long user, String simpleStatus, String relationScope, String audience,
+            cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery filter,
+            List<Long> sources, List<Long> owners, boolean queryAll) throws Exception {
         com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(
                 new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""), cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO.class);
         var mapper=org.mockito.Mockito.mock(LeadMapper.class,org.mockito.Mockito.CALLS_REAL_METHODS);
         var req=new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO();
-        req.setSimpleStatus(simpleStatus); req.setRelationScope(relationScope);
+        req.setSimpleStatus(simpleStatus); req.setRelationScope(relationScope); req.setAudience(audience);
         org.mockito.Mockito.doReturn(new cn.iocoder.yudao.framework.common.pojo.PageResult<>(List.of(),0L)).when(mapper)
                 .selectPage(org.mockito.ArgumentMatchers.eq(req),org.mockito.ArgumentMatchers.any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
-        mapper.selectManagementPageByScope(req,List.of(user),List.of(user),false,null,null);
+        mapper.selectManagementPageByScope(req,sources,owners,queryAll,filter,null);
         var captor=org.mockito.ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.Wrapper.class);
         org.mockito.Mockito.verify(mapper).selectPage(org.mockito.ArgumentMatchers.eq(req),captor.capture());
         var query=(cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<?>)captor.getValue();
@@ -132,6 +139,25 @@ class LeadFollowUpResponsibilityTest {
         }
         // H2 does not implement MySQL bit literals used by the existing opportunity predicate.
         return scalar("SELECT COUNT(*) FROM zsjos_lead WHERE tenant_id=1 AND deleted=0 AND "+where.replace("b'0'", "0"));
+    }
+
+    @Test void managementFiltersPreserveSourceAndOwnerVisibility() throws Exception {
+        exec("UPDATE zsjos_lead SET provider_owner_id=30");
+        pool("assigned", "20");
+        for (var condition : List.of(Map.of("sales_progress", Set.of("following")),
+                Map.of("follow_up_condition", Set.of("today")),
+                Map.of("follow_up_condition", Set.of("overdue")))) {
+            var due = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai")).atTime(12, 0);
+            if (condition.getOrDefault("follow_up_condition", Set.of()).contains("overdue")) due = due.minusDays(1);
+            exec("UPDATE zsjos_business_task SET due_at='" + due + "'");
+            var filter = new cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery(
+                    Set.of(), Set.of(), false, condition);
+            assertEquals(1L, leadCount(30, null, null, "management", filter, List.of(30L), List.of(), false));
+            assertEquals(1L, leadCount(10, null, "all", "management", filter, List.of(), List.of(10L), false));
+            assertEquals(0L, leadCount(20, null, null, "management", filter, List.of(20L), List.of(20L), false));
+            assertEquals(0L, leadCount(30, null, null, "management", filter, List.of(), List.of(), false));
+            assertEquals(1L, leadCount(30, null, null, "management", filter, List.of(), List.of(), true));
+        }
     }
 
     @Test void providerBindsIdsAndTenantAndReturnsCurrentAssignee() throws Exception {

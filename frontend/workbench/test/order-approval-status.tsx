@@ -7,7 +7,7 @@ import SalesOrderApprovalPage from '../src/pages/SalesOrderApprovalPage'
 import { api, http, type SalesOrder, type SalesOrderListItem } from '../src/services/api'
 const state = new URLSearchParams(location.search).get('state')
 http.defaults.adapter = async () => { throw new Error('Isolated fixture: no live API') }
-const orderStates = [ ['all','全部'],['center_pending','当前中心待审核'],['pending_approval','待审核'],['revision_required','待重提'],['effective','已通过'],['terminated','已终止'],['superseded','历史旧单（已重提）'] ].map(([key,label]) => ({key,label}))
+const orderStates = [ ['all','全部'],['center_pending','当前中心待审核'],['pending_approval','待审核'],['revision_required','已终止'],['effective','已通过'],['terminated','已终止'],['superseded','历史旧单（已重提）'] ].map(([key,label]) => ({key,label}))
 let profileAttempts = 0, attempts = 0
 const requests: unknown[] = []
 Object.assign(window, { approvalRequests: requests })
