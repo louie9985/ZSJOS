@@ -311,7 +311,18 @@ def prepare(records=None, initial=None, *, sync=True, missing_sku_count=7, extra
                    (r['mobile']==p['mobile'] if plan.get('mobile_only') else r['mobile'] in (p['mobile'],p['wechat_id']))}
         claims = {a['person_id'] for a in state[CLAIM] if live(a) and a['contact_value']==r['mobile'] and a['person_id']}
         h.require(not claims-matched, 'Contact claim belongs to another identity')
-        h.require(matched == ({r['person_id']} if r.get('person_id') else set()), 'Identity changed during preflight')
+        if r.get('confirmed_claim_person_id'):
+            # Only an explicit source-row confirmation can select a claimed identity
+            # amid duplicate contact fields; ordinary imports remain unique-match only.
+            pid = r['confirmed_claim_person_id']
+            claim_rows = [a for a in state[CLAIM] if live(a) and a['contact_value']==r['mobile']]
+            person = [p for p in state[P] if live(p) and p['id']==pid]
+            h.require(pid==r.get('person_id') and claims=={pid} and len(claim_rows)==1
+                      and claim_rows[0]['reservation_key'] is None and len(person)==1
+                      and person[0]['name']==r['name'] and person[0]['mobile']==r['mobile']
+                      and matched==set(r['confirmed_contact_candidate_ids']), 'Confirmed claim identity changed')
+        else:
+            h.require(matched == ({r['person_id']} if r.get('person_id') else set()), 'Identity changed during preflight')
     configs = [f for f in state[CONFIG] if live(f) and f['status']=='published']
     h.require(len(configs)==1, 'Published contact configuration ambiguous')
     plan['config_id'], plan['checklist'] = configs[0]['id'], checklist(configs[0])

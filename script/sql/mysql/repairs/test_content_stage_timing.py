@@ -5,9 +5,11 @@ import copy
 import datetime as dt
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 import pymysql
@@ -16,6 +18,7 @@ spec = importlib.util.spec_from_file_location('timing', Path(__file__).with_name
 t = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(t)
 START = dt.datetime(2026, 10, 18, 23, 59)
+TEST_ENVIRONMENT = None
 
 
 def entry(eid, day, stage, initial=False):
@@ -35,7 +38,70 @@ def state():
                                                              'account': {'id': 1, 'sStage': 'S1'}})}]}
 
 
+def weekly_state(same_second=False):
+    s = state()
+    primary = s['entries'][-1]
+    primary.update(operated_by_user_id=1, idempotency_key='weekly-test')
+    node = {'key': 'node-test', 'parts': [
+        {'templateType': 'diagnosis_7d', 'days': 7, 'cycle': 1},
+        {'templateType': 'diagnosis_14d', 'days': 14, 'cycle': 1}]}
+    content = {'currentStage': 'S1', 'weeklyNode': node, 'nodeKey': node['key'],
+               'weeklyFingerprint': 'a' * 64, 'templateType': 'diagnosis_7d', 'cycle': 1}
+    primary['content'] = json.dumps(content)
+    extra = copy.deepcopy(primary)
+    extra.update(id=5, field_key='diagnosis_14d', fingerprint='a' * 64,
+                 idempotency_key=t.hashlib.sha256(b'weekly-test:14').hexdigest(),
+                 create_time=primary['create_time'] + dt.timedelta(seconds=0 if same_second else 1))
+    content['templateType'] = 'diagnosis_14d'
+    extra['content'] = json.dumps(content)
+    s['entries'].append(extra)
+    s['batches'][0]['submitted_at'] = START + dt.timedelta(days=4)
+    ctx = json.loads(s['batches'][0]['context_snapshot_json'])
+    for snapshot in [ctx['accountSnapshots'][0], ctx['account']]:
+        snapshot['sStageDurationAsOf'] = t.millis(s['batches'][0]['submitted_at'])
+    s['batches'][0]['context_snapshot_json'] = json.dumps(ctx)
+    return s
+
+
 class EvidenceTests(unittest.TestCase):
+    def test_linked_weekly_templates_are_one_stage_event(self):
+        for same_second in (True, False):
+            s = weekly_state(same_second)
+            plan = t.build(s, START + dt.timedelta(days=5))
+            self.assertEqual(2, len(plan['changes']))
+            self.assertEqual([4, 5], plan['changes'][0]['evidenceIds'])
+            ctx = json.loads(plan['changes'][1]['set']['context_snapshot_json'])
+            for snapshot in [ctx['accountSnapshots'][0], ctx['account']]:
+                self.assertEqual(t.millis(START + dt.timedelta(days=3)), snapshot['sStageEnteredAt'])
+                self.assertEqual(1, snapshot['sStageDurationDays'])
+                self.assertEqual(t.millis(s['batches'][0]['submitted_at']), snapshot['sStageDurationAsOf'])
+
+    def test_weekly_evidence_must_be_complete_and_consistent(self):
+        mutations = [lambda s: s['entries'].pop(),
+                     lambda s: s['entries'][-1].update(idempotency_key='wrong'),
+                     lambda s: s['entries'][-1].update(fingerprint='b' * 64),
+                     lambda s: s['entries'][-1].update(operated_by_user_id=2),
+                     lambda s: s['entries'][-1].update(deleted=1),
+                     lambda s: s['entries'][-1].update(snapshot_json='[]')]
+        for mutate in mutations:
+            s = weekly_state(); mutate(s)
+            self.assertEqual([], t.build(s, START + dt.timedelta(days=5))['changes'])
+        for field, value in [('currentStage', 'S2'), ('weeklyFingerprint', 'b' * 64),
+                             ('nodeKey', 'other'), ('cycle', 2), ('templateType', 'diagnosis_7d')]:
+            s = weekly_state(); content = json.loads(s['entries'][-1]['content'])
+            content[field] = value; s['entries'][-1]['content'] = json.dumps(content)
+            self.assertEqual([], t.build(s, START + dt.timedelta(days=5))['changes'])
+
+    def test_cutoff_only_requires_exact_submission_time_in_both_projections(self):
+        for projection in ('account', 'accountSnapshots'):
+            for value in (1, 'invalid', None):
+                s = weekly_state(); ctx = json.loads(s['batches'][0]['context_snapshot_json'])
+                snapshot = ctx['account'] if projection == 'account' else ctx['accountSnapshots'][0]
+                if value is None: snapshot['sStageDurationDays'] = 99
+                else: snapshot['sStageDurationAsOf'] = value
+                s['batches'][0]['context_snapshot_json'] = json.dumps(ctx)
+                self.assertEqual(['accounts'], [c['kind'] for c in t.build(s, START + dt.timedelta(days=5))['changes']])
+
     def test_repeated_stage_and_return_have_independent_origins(self):
         plan = t.build(state(), START + dt.timedelta(days=5))
         self.assertEqual(2, len(plan['changes']))
@@ -86,39 +152,47 @@ class EvidenceTests(unittest.TestCase):
 
 
 def local_connection(database):
-    meta = json.loads(subprocess.check_output(['docker', 'inspect', 'yudao-mysql']))[0]
+    container = 'yudao-mysql'
+    if TEST_ENVIRONMENT == 'test':
+        marker = Path('/etc/zsjos/agent-environment')
+        environment = os.getenv('ZSJOS_AGENT_ENV', marker.read_text().strip() if marker.exists() else 'local')
+        assert environment == 'test'
+        container = 'zsjos-mysql-1'
+        assert database == 'zsjos' or database.startswith('stage_timing_verify_')
+    meta = json.loads(subprocess.check_output(['docker', 'inspect', container]))[0]
     env = dict(item.split('=', 1) for item in meta['Config']['Env'] if '=' in item)
     password = env.get('MYSQL_ROOT_PASSWORD')
     if password is None:
-        password = subprocess.check_output(['docker', 'exec', 'yudao-mysql', 'cat', env['MYSQL_ROOT_PASSWORD_FILE']]).decode().strip()
+        password = subprocess.check_output(['docker', 'exec', container, 'cat', env['MYSQL_ROOT_PASSWORD_FILE']]).decode().strip()
     port = meta['NetworkSettings']['Ports']['3306/tcp'][0]
+    assert port['HostIp'] in ('127.0.0.1', '0.0.0.0')
     return pymysql.connect(host='127.0.0.1', port=int(port['HostPort']), user='root', password=password,
                            database=database, charset='utf8mb4', autocommit=False, cursorclass=pymysql.cursors.DictCursor)
 
 
 def mysql_verification():
     database = 'stage_timing_verify_' + dt.datetime.now().strftime('%Y%m%d_%H%M%S')
-    conn = local_connection('ruoyi-vue-pro')
+    source_database = 'zsjos' if TEST_ENVIRONMENT == 'test' else 'ruoyi-vue-pro'
+    conn = local_connection(source_database)
     with conn.cursor() as q:
         q.execute(f'CREATE DATABASE `{database}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
         for table in t.TABLES.values():
-            q.execute(f'CREATE TABLE `{database}`.{table} LIKE `ruoyi-vue-pro`.{table}')
+            q.execute(f'CREATE TABLE `{database}`.{table} LIKE `{source_database}`.{table}')
     conn.close()
     conn = local_connection(database)
-    root = Path(__file__).resolve().parents[4]
-    evidence = root / 'frontend/workbench/tmp' / database
-    evidence.mkdir(mode=0o700)
+    evidence = Path(tempfile.mkdtemp(prefix=database + '-'))
     try:
         with conn.cursor() as q:
             q.execute('SET NAMES utf8mb4')
             q.execute("SET time_zone='+08:00'")
             q.execute("INSERT INTO zsjos_media_account(id,account_no,ownership_type,student_person_id,s_stage,detail_values_json,tenant_id,version) VALUES (1,'fixture','STUDENT',10,'S1','{}',1,3),(2,'fixture-deleted','STUDENT',10,'S1','{}',1,3),(3,'fixture-other-tenant','STUDENT',10,'S1','{}',2,3)")
             q.execute('UPDATE zsjos_media_account SET deleted=1 WHERE id=2')
-            for row in state()['entries']:
+            fixture = weekly_state(True)
+            for row in fixture['entries']:
                 q.execute('INSERT INTO zsjos_media_account_profile_entry(id,account_id,operated_by_user_id,kind,field_key,title,content,snapshot_json,idempotency_key,fingerprint,result_version,create_time,tenant_id) VALUES(%s,1,1,\'DIAGNOSIS\',%s,\'fixture\',%s,%s,%s,%s,%s,%s,1)',
-                          (row['id'], row['field_key'], row['content'], row['snapshot_json'], str(row['id']), 'a'*64, row['result_version'], row['create_time']))
+                          (row['id'], row['field_key'], row['content'], row['snapshot_json'], row.get('idempotency_key', str(row['id'])), row.get('fingerprint', 'a'*64), row['result_version'], row['create_time']))
             q.execute('INSERT INTO zsjos_content_review_batch(id,batch_no,account_id,student_person_id,account_ids_json,operator_user_id,director_user_id,status,current_stage,version,tenant_id,submitted_at,context_snapshot_json) VALUES(1,\'fixture\',1,10,\'[1]\',1,2,\'COMPLETED\',\'FINAL\',1,1,%s,%s)',
-                      (state()['batches'][0]['submitted_at'], state()['batches'][0]['context_snapshot_json']))
+                      (fixture['batches'][0]['submitted_at'], fixture['batches'][0]['context_snapshot_json']))
         conn.commit()
         with conn.cursor() as q:
             before = t.capture(q)
@@ -191,6 +265,9 @@ def mysql_verification():
 
 
 if __name__ == '__main__':
+    if '--test-environment' in sys.argv:
+        sys.argv.remove('--test-environment')
+        TEST_ENVIRONMENT = 'test'
     mysql = '--mysql' in sys.argv
     if mysql: sys.argv.remove('--mysql')
     result = unittest.main(exit=False).result

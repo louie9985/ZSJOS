@@ -52,6 +52,53 @@ def missing(value):
     return value is None or value == ''
 
 
+def diagnosis_events(rows):
+    """WeeklyDiagnosisService writes one state change plus linked template copies."""
+    versions = {}
+    for row in rows:
+        require(row.get('deleted', 0) in (0, False, b'\x00'), 'DELETED_DIAGNOSIS_IN_CHAIN')
+        versions.setdefault(row.get('result_version'), []).append(row)
+    events = []
+    for group in versions.values():
+        primary = group[0]
+        content = json_value(primary['content'])
+        if len(group) > 1 or content.get('weeklyNode') is not None:
+            node = content.get('weeklyNode')
+            fingerprint = content.get('weeklyFingerprint')
+            require(isinstance(node, dict) and isinstance(fingerprint, str)
+                    and re.fullmatch(r'[0-9a-f]{64}', fingerprint), 'CONFLICTING_VERSION')
+            parts = node.get('parts')
+            require(isinstance(parts, list) and len(parts) == len(group)
+                    and bool(node.get('key')) and node['key'] == content.get('nodeKey'), 'INCOMPLETE_WEEKLY_GROUP')
+            require(len({p['templateType'] for p in parts}) == len(parts), 'INVALID_WEEKLY_GROUP')
+            for i, (row, part) in enumerate(zip(group, parts)):
+                saved = json_value(row['content'])
+                require(row['field_key'] == part['templateType'] == saved.get('templateType')
+                        and part['templateType'] in ('diagnosis_7d', 'diagnosis_14d', 'diagnosis_28d')
+                        and saved.get('cycle') == part['cycle'], 'INVALID_WEEKLY_GROUP')
+                require(all(row.get(k) == primary.get(k) for k in ('account_id', 'tenant_id', 'operated_by_user_id'))
+                        and saved.get('weeklyNode') == node and saved.get('nodeKey') == node['key']
+                        and saved.get('weeklyFingerprint') == fingerprint
+                        and saved.get('currentStage') == content.get('currentStage')
+                        and json_value(row.get('snapshot_json')) == json_value(primary.get('snapshot_json')),
+                        'CONFLICTING_WEEKLY_EVIDENCE')
+                require(i == 0 or row['id'] > group[i - 1]['id'], 'CONFLICTING_ORDER')
+                if i:
+                    expected_key = hashlib.sha256((primary['idempotency_key'] + ':' + str(part['days'])).encode('utf-8')).hexdigest()
+                    require(row.get('idempotency_key') == expected_key and row.get('fingerprint') == fingerprint,
+                            'CONFLICTING_WEEKLY_IDENTITY')
+        events.append((primary, [row['id'] for row in group], group[-1]['create_time'], group[-1]['id']))
+    return events
+
+
+def timing_fillable(snapshot, submitted_at):
+    present = {field for field in FIELDS if not missing(snapshot.get(field))}
+    # A cutoff alone is the backend's normal unknown-origin projection, not a measured duration.
+    return not present or (present == {'sStageDurationAsOf'}
+                           and type(snapshot['sStageDurationAsOf']) is int
+                           and snapshot['sStageDurationAsOf'] == millis(submitted_at))
+
+
 def chronology(entries):
     """Reject incomplete/ambiguous chains rather than inventing an earlier start."""
     if not entries:
@@ -61,7 +108,7 @@ def chronology(entries):
     rows = sorted(entries, key=lambda r: (r['create_time'], r['id']))
     segments, previous_time, previous_id, previous_version = [], None, None, None
     try:
-        for i, row in enumerate(rows):
+        for i, (row, evidence, last_time, last_id) in enumerate(diagnosis_events(rows)):
             require(row.get('deleted', 0) in (0, False, b'\x00'), 'DELETED_DIAGNOSIS_IN_CHAIN')
             when = row['create_time']
             content = json_value(row['content'])
@@ -70,7 +117,7 @@ def chronology(entries):
             require(isinstance(when, dt.datetime), 'INVALID_TIME')
             require((i == 0) == (row['field_key'] == 'diagnosis_initial'), 'INCOMPLETE_INITIAL_CHAIN')
             require(row['field_key'] in ('diagnosis_initial', 'diagnosis_7d', 'diagnosis_14d', 'diagnosis_28d', 'adjustment_28d'), 'INVALID_DIAGNOSIS_TYPE')
-            require(previous_time != when, 'AMBIGUOUS_SAME_TIME')
+            require(previous_time is None or previous_time < when, 'AMBIGUOUS_SAME_TIME')
             require(previous_id is None or row['id'] > previous_id, 'CONFLICTING_ORDER')
             version = row.get('result_version')
             require(isinstance(version, int) and (previous_version is None or version > previous_version), 'CONFLICTING_VERSION')
@@ -80,8 +127,8 @@ def chronology(entries):
             require(len(saved) == 1 and saved[0].get('value') == stage, 'CONFLICTING_STAGE_EVIDENCE')
             if not segments or segments[-1]['stage'] != stage:
                 segments.append({'stage': stage, 'start': when, 'evidence': []})
-            segments[-1]['evidence'].append(row['id'])
-            previous_time, previous_id, previous_version = when, row['id'], version
+            segments[-1]['evidence'].extend(evidence)
+            previous_time, previous_id, previous_version = last_time, last_id, version
     except (ValueError, TypeError, AttributeError, KeyError, RuntimeError) as error:
         return [], str(error) if isinstance(error, RuntimeError) else 'INVALID_DIAGNOSIS'
     return segments, None
@@ -162,7 +209,7 @@ def build(state, cutoff):
             targets = targets if isinstance(targets, list) and targets else [after.get('account')]
             for snapshot in targets:
                 aid = snapshot.get('id')
-                if any(not missing(snapshot.get(f)) for f in FIELDS):
+                if not timing_fillable(snapshot, batch['submitted_at']):
                     skipped.append({'kind': 'batch', 'id': batch['id'], 'accountId': aid, 'reason': 'EXISTING_TIMING_FIELDS'})
                     continue
                 account = accounts.get(aid)
@@ -174,7 +221,8 @@ def build(state, cutoff):
                     reason = 'FUTURE_SUBMISSION'
                 stage = snapshot.get('sStage') or snapshot.get('stageValue')
                 if reason or segment is None or segment['stage'] != stage:
-                    skipped.append({'kind': 'batch', 'id': batch['id'], 'accountId': aid, 'reason': reason or 'SNAPSHOT_STAGE_MISMATCH'})
+                    skipped.append({'kind': 'batch', 'id': batch['id'], 'accountId': aid,
+                                    'reason': reason or ('NO_PRIOR_DIAGNOSIS' if segment is None else 'SNAPSHOT_STAGE_MISMATCH')})
                     continue
                 # A diagnosis at the same DB-second as submission has no reliable cross-table ordering.
                 if any(e['create_time'] == batch['submitted_at'] for e in grouped.get(aid, [])):
@@ -186,7 +234,7 @@ def build(state, cutoff):
                 primary = after.get('account')
                 if isinstance(primary, dict) and primary is not snapshot and primary.get('id') == aid:
                     require((primary.get('sStage') or primary.get('stageValue')) == stage, 'PRIMARY_STAGE_MISMATCH')
-                    require(all(missing(primary.get(f)) for f in FIELDS), 'PRIMARY_TIMING_EXISTS')
+                    require(timing_fillable(primary, batch['submitted_at']), 'PRIMARY_TIMING_EXISTS')
                     primary.update(fields)
             if after != context:
                 changes.append({'kind': 'batches', 'id': batch['id'], 'before': batch,

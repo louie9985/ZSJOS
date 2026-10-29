@@ -253,3 +253,92 @@
 - Files: new script/sql/mysql/repairs/archive_claim_matched_students_20261028.py; current exceptions; new output/教务学员_三条已有服务清理记录_20261028.xlsx; operation doc/handoff. Master/pending/classcomparison unchanged.
 - Verification PASS: live matching twice, exact3source refs,17remaining rows unchanged, history unchanged,3full21-column original exceptions,44master values/types/formats,protected hashes,ZIP/AST/replay.2master rows already blank before this turn and retained backups also blank; original-source check initially refused without output replacement. Final guard accepts only those2explicitly identified empty rows, archives available full exception evidence and labels missing master data without reconstruction.
 - Evidence/recovery: /opt/zsjos-runtime/backups/education-claim-matched-20261028/0700/0600 backups/snapshot/matches/deliveryhashes. Restore exception workbook from scoped backup if needed; no DB rollback. PII confined to requested workbook/private artifacts. No dependency/schema/permissions/service/branch/commit/push/messages. Remaining17await other decisions; ownership released.
+
+
+## Registration update — 2026-10-28 13:07 北京时间
+
+- Owner /root; test/main /opt/zsjos; HEAD now0628f72f2c6208a6cc553f3f29b893de8f4ec697 from intervening user/environment work, no branch/commit operation by this turn; integration None. User authorizes assigning中医营养配餐17/18/22 existing services and clearing their exception rows.
+- Scope:3unique claimed identities with exactname/mobile/SKU, currentUNSCHEDULED accepted/supervision; all target same-source planner unchanged, target NORMAL class exists. Update onlyclass_id/version/audit metadata plus3system_data_repair events; preserve owner/tasks/contact history/acceptance/stage. No duplicate service/class or person merge/delete. All3master rows already blank; retain blank master, archive complete21-column exception evidence without reconstructing unavailable original44fields.
+- Ownership: new script/sql/mysql/repairs/assign_three_education_students_20261028.py; exception workbook17→14 and linked comparison removal; new output/教务学员_三条分班处理结果_20261028.xlsx; operation doc and this handoff. Evidence /opt/zsjos-runtime/backups/education-three-assignment-20261028/. Preserve unrelated registration-close work and dirty default handoff.
+- Verification: fresh read-only claim/person/product/SKU/class/planner/config, source hashes, full protected preimages; actual MySQL temporary first/failure/recovery/partial/replay, atomic live6writes and0write replay; independent field/state/UTF8HEX/3API checks; exact3file removals/14remaining rows, complete exception archive, source/master/pending/review unchanged, ZIP/AST/file replay. No dependencies/permissions/schema/service/branch/commit/push/messages. Restore file backups; later DB compensation requires reviewed scoped reversal.
+
+
+## Delivery — 2026-10-28 13:09 北京时间
+
+- Context: /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged this turn; integration None. User authorizes3specified existing course assignments and exception cleanup.
+- Result: atomic6writes changed3service class_ids and added3repair audits with10.27remark. All remainaccepted/supervision; sameowner,0newservices/classes/persons,0task/contact changes. Uniqueclaim person and exact source course verified. No identity merge/delete or notifications.
+- Files: new script/sql/mysql/repairs/assign_three_education_students_20261028.py; exception workbook17→14,0comparison removals; new output/教务学员_三条分班处理结果_20261028.xlsx; operation doc/handoff. Master/pending/previousclassreview unchanged;3master source rows already blank, report retains complete3x21exception fields and explicitly notes unavailable full master values. Unrelated registration-close/default-handoff changes preserved.
+- Verification PASS: actualMySQL fixture6writes/5fault rollbacks/recovery/partial-audit refusal/replay0; live commit+apply replay0; independent exact assignment and unchanged protected fields/owners/acceptance/stages/tasks/contacts/people/claims/classes;ChineseHEX;3APIcontexts;exact3removals/14remaining rows,original exception archive,history/hash protection,ZIP/AST/whitespace and finish no-op.
+- Evidence: /opt/zsjos-runtime/backups/education-three-assignment-20261028/0700/0600; planSHA256b5404de1c5402d23df868d1ff5d111bb42ff5d561c38b437295b6ecc11e38924. File recovery from originals; anyDB reversal requires review of later business. PII only in requested report/private evidence.
+- Remaining:14exceptions,2no-target-course/11SKUdifferences/1owner-difference. No schema/permission/dependency/service lifecycle/branch/commit/push/messages. Authorized scope complete; ownership released.
+
+
+## Registration update — 2026-10-28 13:12 北京时间
+
+- Owner /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. User explicitly confirms新增中医营养配餐3/20 while preserving all prior services.
+- Ownership: new script/sql/mysql/repairs/import_two_claimed_courses_20261028.py; optional explicitly-confirmed claim identity guard in import_education_exceptions_20261027.py; exception workbook; new output/教务学员_两条新增课程处理结果_20261028.xlsx; operation doc/handoff. Private evidence /opt/zsjos-runtime/backups/education-two-claimed-courses-20261028/. Preserve unrelated work.
+- Scope: reuse2unique nonreserved contact-claim owners, matching name/mobile; create2distinct targetcourse services with4completed first/study tasks and4completion records,2groups/2audits, supervision and exact10.27remark. Existing3media services (including1cancelled) immutable. Multiple other contact matches remain untouched. No new identity/class/SKU or profile merge. Remove verified2exception rows14→12; master already blank source rows preserved; archive available full21exception fields without fabricating44master fields.
+- Verification: authoritative claim/name/mobile and exact catalog/class/planner, no targetcourse, frozen full candidate identity/old service/task/history preimages, explicit candidate set/claim check default remains strict; actual-engine first/fault/replay/partial recovery, live atomic commit/replay, independent protected existing services/HEX/API contexts/history, exact file partition12retained, archive/source hashes/ZIP/AST/replay. No permission/schema/dependency/service/branch/commit/push/messages. Recovery files from backup; DB compensation requires later-business review.
+
+- Registration correction from current source inspection: unlike the previous3assignment rows, these2master rows are populated. Preserve both full44-field master rows unchanged and include them in the result archive. Earlier registration's assumed blank-source wording does not apply; all other scope/authorization remains unchanged.
+
+
+## Delivery — 2026-10-28 13:15 北京时间
+
+- Context: /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. User explicitly confirms2new distinct中医营养配餐courses without affecting existing services.
+- Result: atomic16writes added2accepted/supervision services,2groups,4completed first/study tasks,4successful records,2audits with exact10.27remark. Reused2confirmed claim-owner student profiles.0newpeople/classes/SKUs/claims. Existing3media services including1cancelled and all prior service histories unchanged.
+- Files: new script/sql/mysql/repairs/import_two_claimed_courses_20261028.py; common executor opt-in pinned claim-person/candidate precheck preserving default uniqueness; exceptions14→12; new output/教务学员_两条新增课程处理结果_20261028.xlsx; operation doc/handoff. Master/independentpending/classcomparison unchanged, full2x44source fields and2x21exception fields archived. Prior registration blank-source assumption corrected before implementation; actual2master rows populated.
+- Verification PASS: authoritative explicit claim/name/mobile/candidate set and catalog/class/planner, no-target-course preflight; actualMySQL fixture16writes/5fault rollbacks/recovery/partial-audit refusal/replay0; live commit+apply replay0; independent2new servicegraph/UTF8HEX/3oldservices and prior tasks/records/groups preserved;0person/claim edits;2context+2history APIs;exact2removals/12retained rows,2x44archive types/formats,source hashes,ZIP/AST/whitespace and finish no-op.
+- Evidence/recovery: /opt/zsjos-runtime/backups/education-two-claimed-courses-20261028/0700/0600; planSHA256b95e76e2386bb2876dfbe53646b0f1d6989cafb8a52f0496e0e0b39cea229ae9. Files recoverable from originals; DB compensation requires later-business review. PII only in authorized report/private evidence; unrelated work preserved.
+- Remaining:12exceptions (11SKUdifferences,1owner-difference). No ordinary API/auth contract, schema, permission, dependency, externalservice, branch, commit, push or message changes. Authorized scope complete; ownership released.
+
+
+## Registration update — 2026-10-28 13:25 北京时间
+
+- Owner /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. User requests combined review Excel of11SKU differences plus1held teacher difference, original/system consecutive row pairs.
+- Ownership: new script/sql/mysql/repairs/export_remaining_education_comparison_20261028.py; new output/教务学员_12条规格及班主任差异对比_20261028.xlsx; this handoff. Private readonly evidence /opt/zsjos-runtime/backups/education-remaining-comparison-20261028/.
+- Scope: fresh snapshot of12exception rows and12same-product services, claim/person identity check, paired24rows with full names/contacts/SKU/class/currenthomeroom/serviceowner, highlighted differences, blank decision/comment cells; explicitly retain teacher item on hold. Preserve all12x44original fields and all21exception fields in separate sheets. No DB mutations or source workbook edits.
+- Verification: authoritative per-field mappings and exact12refs/24pairs,11SKU/1teacher distinction, full44values/types/formats, blank decisions, input hashes, ZIP/AST/replay. No new dependency, branch, service, permission, commit or messaging. PII only in user-requested workbook/private evidence.
+
+
+## Delivery — 2026-10-28 13:26 北京时间
+
+- Context: /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. Combined11SKU and1teacher-difference review requested.
+- Result: output/教务学员_12条规格及班主任差异对比_20261028.xlsx opens逐行对比 with12pairs/24rows, original row then system row;same fields aligned, yellow differences, green blank decision/comment cells.11SKU groups first, teacher178group last marked暂缓. Separate说明与汇总、原表完整信息(all44fields)、原异常记录(all21fields). Current homeroom and service owner distinct columns; comparison covers matching product services only.
+- Files: new script/sql/mysql/repairs/export_remaining_education_comparison_20261028.py; new workbook; this handoff. Source master/exception/pending/previousreview unchanged,12exceptions remain. Database writes0; no decisions executed.
+- Verification PASS: live authoritative claim/person/product/service/class/user mapping; exact12source refs/12services,11SKU differences+1sameSKUteacher hold; independent24row values/order,highlight andblank decisions,12x44source values/types/formats,original exception rows,source hashes,ZIP/AST/whitespace andno-change replay. Private selection/delivery hashes /opt/zsjos-runtime/backups/education-remaining-comparison-20261028/0700/0600;PII onlyin requestedworkbook/private evidence.
+- Dependencies/integration None; no behavior or operational-doc change required for review-only export. No DB/permissions/schema/service/branch/commit/push/messages. Await user decisions; ownership released.
+
+
+## Registration update — 2026-10-28 13:35 北京时间
+
+- Owner /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. User confirms all12remaining review entries follow system, including previously held teacher entry. Latest explicit decision also retains systemUNSCHEDULED for2SKU-difference entries, superseding former assignment preference for this scope.
+- Ownership: new script/sql/mysql/repairs/accept_system_education_records_20261028.py; master/exception/current12comparison/previous22comparison workbooks; new output/教务学员_最后12条确认处理结果_20261028.xlsx; operation doc/handoff. Private evidence /opt/zsjos-runtime/backups/education-final-system-20261028/.
+- Scope: read-only recheck reviewed12current services; synchronize14master cells (11SKU,2class,1planner), keep all other original fields; remove12exception and3linkedcomparison records to header-only tables, update current counts0; record decisions in both affected review workbooks with full historical rows preserved.0DBwrites, no new service or existing lifecycle/ownership edits. Preserve prior independent pending workbook0rows.
+- Verification: source hashes, claim/person/product/service/class/owner facts match reviewed snapshot, backup every changed workbook, exact14master differences and source44-field preservation, exception0/header/filter integrity, currentreview12confirmed/previousreview0pending, fresh DB readback unchanged scoped rows, ZIP/AST/replay. No dependencies/branch/commit/service/messages. Files recoverable from private backups.
+
+
+## Delivery — 2026-10-28 13:38 北京时间
+
+- Context: /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. All12reviewed records follow system, including heldteacher and2UNSCHEDULED assignments.
+- Result:12exceptions resolved, main12→0; master14cells synced (11SKU/2class/1planner); current12review decisions recorded, previous22review lastteacher pair archived and pending0. System data writes0. Reviewed执业中西药师70wasalreadycancelled, stayscancelled and explicitly labelled, not activeimport.
+- Files: new script/sql/mysql/repairs/accept_system_education_records_20261028.py; master,exception,current12review,previous22review; new output/教务学员_最后12条确认处理结果_20261028.xlsx; operationdoc/handoff. Report24x44before/after sourcefields +12originalexceptions+confirmedpairs. Pending workbook unchanged.
+- Scope correction: initial registration assumed3linked rows were in12targets; actual source refs differ. All3unrelated comparison-history rows preserved. Initial active-service/linked-scope guards each stopped before output replacement; adjusted only to preserve reviewedcancelledstate and non-targethistory, then final allchecks passed. No business or source data overwritten by failed attempts.
+- Verification PASS: exact live claim/person/SKU/class/owner/lifecycle against review, second whole scoped row read identical;14exact master cell changes,0exception header/table integrity,12decision cells,2cancelled paired labels,oldreview0pending/22archivedpairs,24x44values/types/formats,12originalexceptions,unrelatedhistory/claimreview retained,protected source hashes,ZIP/AST/no-change replay.
+- Evidence/recovery: /opt/zsjos-runtime/backups/education-final-system-20261028/0700/0600 originals/resolved/masteredits/deliveryhashes. File-only restoration possible; noDBrollback. PII only in user-requestedworkbooks/private evidence. No API mutation,permission/schema/dependency/service/branch/commit/push/messages. No remaining exceptions in this batch; ownership released.
+
+
+## Registration update — 2026-10-28 14:07 北京时间
+
+- Owner /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. User explicitly authorizes removing intermediate files, retaining master workbook as backup.
+- Ownership/scope: delete exactly20output XLSX files:18教务学员_ prefixed source splits/intermediate review/result workbooks and异常学员(1)1111.xlsx plus its核对更新结果; retain output/教务学员导入总表.xlsx and5unrelated lead-export files. Append cleanup note to existing operation doc/handoff. Scripts and existing private evidence untouched.
+- Recovery: first write private verified ZIP and filename/hash manifest under /opt/zsjos-runtime/backups/education-output-cleanup-20261028/, then unlink only frozen manifest paths. No database operations. Repeat removal is naturally absent-file no-op; output changes after manifest freeze rejected before deletion.
+- Verification: exact20target set, ZIP contents/hash verification before delete, current master valid XLSX and original SHA256 retained, all5unrelated files unchanged, final output6files, scoped diff. No dependencies/services/permissions/branches/commits/messages.
+
+
+## Delivery — 2026-10-28 14:07 北京时间
+
+- Context: /root; test/main /opt/zsjos; HEAD0628f72f2c6208a6cc553f3f29b893de8f4ec697 unchanged; integration None. User explicitly requested intermediate cleanup retaining only master for this import.
+- Result: removed20scoped XLSX files fromoutput; preserved教务学员导入总表.xlsx unchanged and5unrelated lead-export files. Output now6files; this import has only master remaining. No database access/mutations; scripts/private prior evidence retained.
+- Files:20output deletions, operationdoc and thishandoff. Private recoverable ZIP and hashmanifest under /opt/zsjos-runtime/backups/education-output-cleanup-20261028/0700/0600. Prior historical artifact links are documented as unavailable after authorized cleanup.
+- Verification PASS: frozen exact20file set, verified ZIP listing/integrity/all per-file SHA256 before unlink, unchanged source checks predelete, exact final6files, master unchanged hash/valid ZIP/openpyxl readability, all5unrelatedfile hashes unchanged. No dependencies,permissions,service lifecycle,branch,commit,push,messaging. All requested cleanup complete; ownership released.
