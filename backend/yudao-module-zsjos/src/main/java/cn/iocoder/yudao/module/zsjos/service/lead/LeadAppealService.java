@@ -19,6 +19,7 @@ public interface LeadAppealService {
     List<LeadAppealRespVO> getPartnerLeadAppeals(Long leadId, Long partnerId);
     Long submit(Long leadId, Long userId, LeadAppealSubmitReqVO reqVO);
     Long submitForPartner(Long leadId, Long accountId, Long partnerId, LeadAppealSubmitReqVO reqVO);
+    PageResult<LeadAppealRespVO> getMetricInboxPage(LeadAppealPageReqVO reqVO, Long userId);
     PageResult<LeadAppealRespVO> getInboxPage(LeadAppealPageReqVO reqVO, Long userId);
     CursorPageResult<LeadAppealRespVO> getInboxCursor(LeadAppealPageReqVO reqVO, Long userId);
     void overturn(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO);

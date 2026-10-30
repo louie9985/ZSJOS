@@ -3,6 +3,7 @@
 """Batch preflight and fail-fast regression. --mysql retains an isolated MySQL schema."""
 import contextlib
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -118,6 +119,76 @@ class MigrationExecutionTest(unittest.TestCase):
                 db.migrate_database('local')
         self.client.backup.assert_not_called()
         self.client.execute_file.assert_not_called()
+
+    def fresh_fixture(self, fail_second, diagnostics=False):
+        migrations = []
+        for number in (1, 2):
+            item = self.migration(number, 'CREATE TABLE fixture(id INT);\n')
+            migrations.append(db.Migration('pms', item.version, item.number, item.description, item.path, item.checksum))
+        events = []
+        client = Mock(spec=db.DockerTestClient)
+
+        def query(statement):
+            match = re.search(r"VALUES \('pms','(V\d+)'", statement)
+            if match:
+                self.assertIn("'test-fresh'", statement)
+                events.append('record:' + match.group(1))
+                return ''
+            if diagnostics and 'SELECT permission FROM system_menu WHERE id=79920' in statement:
+                return 'zsjos:partner:manage-all\n'
+            if diagnostics and 'SELECT permission,HEX(name)' in statement:
+                return '\n'.join([f'fixture:{i}\t00' for i in range(7)] + [
+                    'zsjos:sales-performance-target:configure\t' + '配置销售统计组织'.encode().hex().upper()])
+            raise RuntimeError('reached post-chain verification')
+
+        def execute(container, path, **kwargs):
+            self.assertEqual('owned-fixture', container)
+            if path.name == 'bootstrap.sql':
+                return Mock()
+            if diagnostics and path.name == 'core.sql' and path.parent.name == 'verify':
+                return Mock(stdout=b'fixture_data\tFAIL\n')
+            item = next(item for item in migrations if item.path == path)
+            if item.version == 'V002':
+                self.assertEqual(['execute:V001', 'record:V001'], events)
+            events.append('execute:' + item.version)
+            if fail_second and item.version == 'V002':
+                raise db.CommandError('synthetic migration failure')
+            return Mock()
+
+        client.query.side_effect = query
+        stack = contextlib.ExitStack()
+        stack.enter_context(patch.object(db, 'static_check'))
+        stack.enter_context(patch.object(db, 'with_test_mysql', side_effect=lambda callback: callback('owned-fixture')))
+        stack.enter_context(patch.object(db, 'DockerTestClient', return_value=client))
+        stack.enter_context(patch.object(db, 'docker_mysql_file', side_effect=execute))
+        stack.enter_context(patch.object(db, 'docker_mysql_query'))
+        stack.enter_context(patch.object(db, 'load_manifests', return_value={}))
+        stack.enter_context(patch.object(db, 'reconcile_checksums'))
+        stack.enter_context(patch.object(db, 'installed_versions', return_value={}))
+        stack.enter_context(patch.object(db, 'pending_migrations', return_value=migrations))
+        return stack, events
+
+    def test_fresh_records_pure_ddl_success_before_next_migration(self):
+        stack, events = self.fresh_fixture(False)
+        with stack, self.assertRaisesRegex(RuntimeError, 'post-chain verification'):
+            db.test_fresh()
+        self.assertEqual(['execute:V001', 'record:V001', 'execute:V002', 'record:V002'], events)
+
+    def test_fresh_does_not_record_failed_migration(self):
+        stack, events = self.fresh_fixture(True)
+        with stack, self.assertRaisesRegex(db.CommandError, 'synthetic migration failure'):
+            db.test_fresh()
+        self.assertEqual(['execute:V001', 'record:V001', 'execute:V002'], events)
+
+    def test_fresh_data_failure_still_checks_and_reports_schema_drift(self):
+        stack, events = self.fresh_fixture(False, diagnostics=True)
+        with stack, patch.object(db, 'schema_drift', return_value=['fixture.id column differs']) as drift:
+            with self.assertRaises(db.CommandError) as failure:
+                db.test_fresh()
+            drift.assert_called_once()
+        self.assertIn('fixture_data\tFAIL', str(failure.exception))
+        self.assertIn('schema drift: fixture.id column differs', str(failure.exception))
+        self.assertEqual(['execute:V001', 'record:V001', 'execute:V002', 'record:V002'], events)
 
 
 def mysql_regression():

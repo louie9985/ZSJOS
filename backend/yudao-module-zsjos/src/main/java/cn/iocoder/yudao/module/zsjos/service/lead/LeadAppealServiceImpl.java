@@ -286,7 +286,16 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     }
 
     @Override
+    public PageResult<LeadAppealRespVO> getMetricInboxPage(LeadAppealPageReqVO reqVO, Long userId) {
+        if (!permissionApi.hasAnyPermissions(userId, "zsjos:lead:appeal:query")) throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        if (Boolean.TRUE.equals(reqVO.getHandled())) throw new IllegalArgumentException("指标来源仅包含待处理申诉");
+        return inboxPage(reqVO,userId,true);
+    }
+    @Override
     public PageResult<LeadAppealRespVO> getInboxPage(LeadAppealPageReqVO reqVO, Long userId) {
+        return inboxPage(reqVO,userId,false);
+    }
+    private PageResult<LeadAppealRespVO> inboxPage(LeadAppealPageReqVO reqVO, Long userId, boolean metric) {
         Set<String> reviewPermissions = Set.of(PERMISSION_APPEAL_REVIEW_SALES_MANAGER,
                         PERMISSION_APPEAL_REVIEW_QUALITY, PERMISSION_APPEAL_REVIEW_CHAIRMAN).stream()
                 .filter(permission -> permissionApi.hasAnyPermissions(userId, permission))
@@ -303,27 +312,11 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         taskReq.setProcessVariableName(APPEAL_REVIEW_STAGE_VARIABLE);
         taskReq.setProcessVariableValues(new ArrayList<>(reviewStages(reviewPermissions)));
         List<Long> matchedAppealIds = advancedFilterService.matchAppealIds(reqVO.getKeyword(), reqVO.getAdvancedFilter());
-        PageResult<BpmTaskRespDTO> taskPage;
-        if (matchedAppealIds == null) {
-            taskPage = Boolean.TRUE.equals(reqVO.getHandled())
-                    ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
-        } else {
-            Set<Long> matched = new HashSet<>(matchedAppealIds);
-            List<BpmTaskRespDTO> eligible = new ArrayList<>();
-            int requestedPageNo = reqVO.getPageNo(), requestedPageSize = reqVO.getPageSize(), scanPage = 1;
-            long total;
-            do {
-                taskReq.setPageNo(scanPage++); taskReq.setPageSize(100);
-                PageResult<BpmTaskRespDTO> scanned = Boolean.TRUE.equals(reqVO.getHandled())
-                        ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
-                scanned.getList().stream().filter(task -> matched.contains(parseAppealId(task.getBusinessKey())))
-                        .forEach(eligible::add);
-                total = scanned.getTotal();
-            } while ((long) (scanPage - 1) * 100 < total);
-            int from = Math.min((requestedPageNo - 1) * requestedPageSize, eligible.size());
-            int to = Math.min(from + requestedPageSize, eligible.size());
-            taskPage = new PageResult<>(eligible.subList(from, to), (long) eligible.size());
-        }
+        // Filter within BPM's existing actor/tenant/stage query before count and pagination.
+        // An explicitly empty business match remains empty at the public API boundary.
+        if (matchedAppealIds != null) taskReq.setProcessInstanceIds(appealMapper.selectProcessInstanceIdsByAppealIds(matchedAppealIds));
+        PageResult<BpmTaskRespDTO> taskPage = metric ? processTaskApi.getMetricTodoTaskPage(userId, taskReq) : Boolean.TRUE.equals(reqVO.getHandled())
+                ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
         Set<Long> appealIds = taskPage.getList().stream().map(BpmTaskRespDTO::getBusinessKey)
                 .map(this::parseAppealId).filter(Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new));

@@ -55,6 +55,7 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 @Service
 @Validated
 public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
+    @Resource private BpmMetricQueryTransaction metricQueryTransaction;
 
     @Resource
     private BpmTaskService bpmTaskService;
@@ -173,6 +174,24 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     }
 
     @Override
+    public PageResult<BpmTaskRespDTO> getMetricTodoTaskPage(Long userId, BpmTaskPageReqDTO request) {
+        metricQueryTransaction.check();
+        return getTodoTaskPage(userId,request);
+    }
+    @Override
+    public PageResult<BpmTaskRespDTO> getMetricAllTodoTaskPage(Long userId, int pageNo, int pageSize) {
+        metricQueryTransaction.check();
+        return getAllTodoTaskPage(userId,pageNo,pageSize);
+    }
+
+    @Override
+    public PageResult<BpmTaskRespDTO> getAllTodoTaskPage(Long userId, int pageNo, int pageSize) {
+        if (userId == null || pageNo < 1 || pageSize < 1 || pageSize > 100) throw new IllegalArgumentException("Invalid todo pagination");
+        var request = new BpmTaskPageReqDTO(); request.setPageNo(pageNo); request.setPageSize(pageSize);
+        return getTodoTaskPage(userId, request);
+    }
+
+    @Override
     public PageResult<BpmTaskRespDTO> getTodoTaskPage(Long userId, BpmTaskPageReqDTO reqDTO) {
         if (reqDTO.getProcessInstanceIds() != null && reqDTO.getProcessInstanceIds().isEmpty()) {
             return PageResult.empty();
@@ -188,7 +207,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         java.util.List<BpmTaskRespDTO> list = page.getList().stream().map(task -> {
             ProcessInstance process = processes.get(task.getProcessInstanceId());
             BpmTaskRespDTO result = new BpmTaskRespDTO();
-            result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+            result.setId(task.getId()); result.setName(task.getName()); result.setProcessInstanceId(task.getProcessInstanceId());
             result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
@@ -216,7 +235,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         java.util.List<BpmTaskRespDTO> list = page.getList().stream().map(task -> {
             HistoricProcessInstance process = processes.get(task.getProcessInstanceId());
             BpmTaskRespDTO result = new BpmTaskRespDTO();
-            result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+            result.setId(task.getId()); result.setName(task.getName()); result.setProcessInstanceId(task.getProcessInstanceId());
             result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey());
@@ -236,7 +255,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         Task task = bpmTaskService.validateTask(userId, taskId);
         ProcessInstance process = processInstanceService.getProcessInstance(task.getProcessInstanceId());
         BpmTaskRespDTO result = new BpmTaskRespDTO();
-        result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+        result.setId(task.getId()); result.setName(task.getName()); result.setProcessInstanceId(task.getProcessInstanceId());
         result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
@@ -253,7 +272,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         }
         HistoricProcessInstance process = processInstanceService.getHistoricProcessInstance(task.getProcessInstanceId());
         BpmTaskRespDTO result = new BpmTaskRespDTO();
-        result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+        result.setId(task.getId()); result.setName(task.getName()); result.setProcessInstanceId(task.getProcessInstanceId());
         result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));

@@ -12,6 +12,14 @@ import java.util.Set;
  */
 public interface PermissionApi extends PermissionCommonApi {
 
+    /** Whether an enabled configured permission exists in the current tenant's menu catalogue. Not a user grant. */
+    boolean isPermissionDefined(String permission);
+
+    record PermissionDefinition(String permission, String label) {}
+
+    /** Current-tenant enabled metadata only; does not grant any permission. */
+    java.util.List<PermissionDefinition> getDefinedPermissions();
+
     /** Current-tenant business read capability; never grants feature or command permission. */
     boolean hasTenantReadAllAccess(Long userId);
 

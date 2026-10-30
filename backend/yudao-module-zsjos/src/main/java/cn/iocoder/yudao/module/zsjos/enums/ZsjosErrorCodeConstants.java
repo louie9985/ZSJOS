@@ -637,4 +637,15 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode POSITIONING_ATTACHMENT_TOTAL_EXCEEDED = new ErrorCode(1_900_158_000, "附件总大小不能超过 1GB，请移除部分文件后重试");
     ErrorCode POSITIONING_INTERVIEW_REPLAY = new ErrorCode(1_900_090_006, "该定位访谈请求标识已用于其他内容");
 
+    ErrorCode HOME_METRIC_INVALID = new ErrorCode(1_900_159_001, "指标配置无效，请检查来源、公式和可见范围");
+    ErrorCode HOME_METRIC_NOT_FOUND = new ErrorCode(1_900_159_002, "指标或发布版本不存在");
+    ErrorCode HOME_METRIC_CONFLICT = new ErrorCode(1_900_159_003, "指标已被修改，请刷新后重试");
+    ErrorCode HOME_METRIC_DENIED = new ErrorCode(1_900_159_004, "无权查看或操作该指标");
+    ErrorCode HOME_METRIC_CONTEXT_EXPIRED = new ErrorCode(1_900_159_005, "指标链接已过期或版本已失效，请刷新首页");
+    ErrorCode HOME_METRIC_DISABLED = new ErrorCode(1_900_159_006, "指标已停用或尚未发布");
+    ErrorCode HOME_METRIC_OPERAND_NOT_FOUND = new ErrorCode(1_900_159_007, "指标操作数不存在或尚无可用明细");
+    ErrorCode HOME_METRIC_ROLLBACK_INVALID = new ErrorCode(1_900_159_008, "请选择有效的回退版本");
+    ErrorCode HOME_METRIC_ENABLED_LIMIT = new ErrorCode(1_900_159_009, "最多启用12个首页指标，请先停用其他指标");
+    ErrorCode HOME_METRIC_QUERY_FAILED = new ErrorCode(1_900_159_010, "指标数据查询失败，请稍后重试");
+    ErrorCode HOME_METRIC_QUERY_TIMEOUT = new ErrorCode(1_900_159_011, "指标数据查询超时，请缩小范围后重试");
 }

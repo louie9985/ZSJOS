@@ -8407,3 +8407,21 @@ CREATE TABLE IF NOT EXISTS `zsjos_person_contact_alias` (
   UNIQUE KEY uk_contact_alias(tenant_id,source_person_id,contact_type,contact_value),
   KEY idx_contact_alias_person(tenant_id,person_id,deleted)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客户归一核实联系方式';
+
+-- V358 empty home-metric structures; migration owns menus and both version ledgers.
+CREATE TABLE IF NOT EXISTS zsjos_home_metric (
+ id BIGINT NOT NULL AUTO_INCREMENT, code VARCHAR(64) NOT NULL, draft_json LONGTEXT NOT NULL,
+ version INT NOT NULL DEFAULT 0, published_version INT NULL, enabled BIT(1) NOT NULL DEFAULT b'0',
+ creator VARCHAR(64) NOT NULL DEFAULT '',create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater VARCHAR(64) NOT NULL DEFAULT '',update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted BIT(1) NOT NULL DEFAULT b'0',tenant_id BIGINT NOT NULL DEFAULT 1,
+ PRIMARY KEY(id),UNIQUE KEY uk_home_metric_code(tenant_id,code,deleted)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='首页指标配置';
+
+CREATE TABLE IF NOT EXISTS zsjos_home_metric_version (
+ id BIGINT NOT NULL AUTO_INCREMENT,metric_id BIGINT NOT NULL,version INT NOT NULL,spec_json LONGTEXT NOT NULL,
+ creator VARCHAR(64) NOT NULL DEFAULT '',create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater VARCHAR(64) NOT NULL DEFAULT '',update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted BIT(1) NOT NULL DEFAULT b'0',tenant_id BIGINT NOT NULL DEFAULT 1,
+ PRIMARY KEY(id),UNIQUE KEY uk_home_metric_version(tenant_id,metric_id,version)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='首页指标发布快照';

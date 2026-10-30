@@ -14,6 +14,7 @@ public final class StudentServicePageSql {
         + " LEFT JOIN zsjos_delivery_class dc ON dc.id=sr.class_id AND dc.tenant_id=sr.tenant_id AND dc.deleted=0"
         + " WHERE sr.teaching_delivery=1 AND sr.deleted=0 AND sr.tenant_id=#{query.parameters.tenantId} AND (${query.whereSql})";
     public static String count(Map<String,Object> args) { return "SELECT COUNT(*)" + FROM; }
+    public static String countPeople(Map<String,Object> args) { return "SELECT COUNT(DISTINCT sr.person_id)" + FROM; }
     public static String matchingOrders(Map<String,Object> args) { return "SELECT DISTINCT ro.*" + FROM + " AND ro.id IS NOT NULL"; }
     public static String page(Map<String,Object> args) {
         var q = (AdvancedFilterQuery) args.get("query");

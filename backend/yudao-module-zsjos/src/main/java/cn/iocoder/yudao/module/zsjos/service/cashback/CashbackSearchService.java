@@ -36,6 +36,17 @@ public class CashbackSearchService {
     @Resource private LeadObjectPermissionService leadAccess;
     @Resource private SalesOrderObjectPermissionService orderAccess;
 
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi metricPermissions;
+    public AdvancedFilterQuery metricQuery(cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO filter, Long actor) {
+        boolean finance = metricPermissions.hasAnyPermissions(actor, "zsjos:cashback:finance-query");
+        if (!finance && !metricPermissions.hasAnyPermissions(actor, "zsjos:cashback:my-query"))
+            throw new org.springframework.security.access.AccessDeniedException("无权读取返现指标");
+        var request = new CashbackPageReqVO(); request.setAdvancedFilter(filter);
+        var query = new CashbackSearchQuery(request, finance ? null : actor, TenantContextHolder.getRequiredTenantId());
+        query.advanced(filters.buildCashbackQuery(filter, new Resolver(query.build(), actor, System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(5))));
+        return query.build();
+    }
+
     public PageResult<CashbackDO> search(CashbackPageReqVO request, Long beneficiary) {
         long start = System.nanoTime();
         var query = new CashbackSearchQuery(request, beneficiary, TenantContextHolder.getRequiredTenantId());
@@ -70,14 +81,23 @@ public class CashbackSearchService {
         private final Long operator;
         private final Map<String, Set<Long>> visible = new HashMap<>();
         private int candidateCount;
+        private long deadlineNanos;
         Resolver(AdvancedFilterQuery base, Long operator) { this.base = base; this.operator = operator; }
 
+        Resolver(AdvancedFilterQuery base, Long operator, long deadlineNanos) {
+            this(base, operator); this.deadlineNanos = deadlineNanos;
+        }
+        private void checkBudget() {
+            if (deadlineNanos != 0 && System.nanoTime() > deadlineNanos)
+                throw new org.springframework.dao.QueryTimeoutException("返现指标筛选超过查询预算");
+        }
         private void scan(AdvancedFilterQuery query, Consumer<List<CashbackDO>> consumer) {
             long after = 0;
             while (true) {
+                checkBudget();
                 var batch = mapper.candidates(query, after, BATCH_SIZE);
                 if (batch.isEmpty()) return;
-                candidateCount += batch.size(); consumer.accept(batch);
+                candidateCount += batch.size(); consumer.accept(batch); checkBudget();
                 after = batch.getLast().getId();
                 if (batch.size() < BATCH_SIZE) return;
             }

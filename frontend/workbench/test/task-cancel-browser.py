@@ -1,3 +1,5 @@
+import os
+BASE=os.environ.get('TASK_TEST_BASE_URL','http://localhost:5174')
 from playwright.sync_api import sync_playwright, expect
 from pathlib import Path
 import re
@@ -5,8 +7,9 @@ out=Path('frontend/workbench/tmp/task-cancel');out.mkdir(parents=True,exist_ok=T
 with sync_playwright() as p:
  browser=p.chromium.launch()
  page=browser.new_page(viewport={'width':1440,'height':1000})
- page.goto('http://localhost:5174/test/task-cancel-fixture.html')
+ page.goto(BASE+'/test/task-cancel-fixture.html')
  expect(page.get_by_role('button',name='取消待办',exact=True)).to_have_count(2)
+ expect(page.locator('.home-summary-region').get_by_role('button',name='2项',exact=True)).to_be_visible()
  page.get_by_role('button',name='取消待办',exact=True).first.click()
  dialog=page.get_by_role('dialog')
  dialog.get_by_role('button',name='确认取消待办').click()
@@ -21,6 +24,8 @@ with sync_playwright() as p:
  dialog.get_by_role('button',name='确认取消待办').click()
  expect(page.get_by_role('button',name='取消待办',exact=True)).to_have_count(1)
  assert page.evaluate('cancellationFixture.cancelled[0].reason')=='不再需要提醒'
+ expect(page.locator('.home-summary-region').get_by_role('button',name='1项',exact=True)).to_be_visible()
+ assert page.evaluate('cancellationFixture.metricEvaluations')>=2
  page.screenshot(path=str(out/'desktop.png'),full_page=True)
  page.set_viewport_size({'width':390,'height':844})
  page.get_by_role('button',name='取消待办',exact=True).click()
@@ -29,7 +34,8 @@ with sync_playwright() as p:
  dialog.get_by_label('取消原因').fill('协助提醒取消')
  dialog.get_by_role('button',name='确认取消待办').click()
  expect(page.get_by_role('button',name='取消待办',exact=True)).to_have_count(0)
- page.goto('http://localhost:5174/test/task-cancel-fixture.html?denied')
+ expect(page.locator('.home-summary-region').get_by_role('button',name='0项',exact=True)).to_be_visible()
+ page.goto(BASE+'/test/task-cancel-fixture.html?denied')
  expect(page.get_by_text('新媒体协助测试',exact=True)).to_be_visible()
  expect(page.get_by_role('button',name='取消待办',exact=True)).to_have_count(0)
  browser.close()

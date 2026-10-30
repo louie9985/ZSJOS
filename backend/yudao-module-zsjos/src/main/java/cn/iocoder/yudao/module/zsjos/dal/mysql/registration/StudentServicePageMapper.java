@@ -7,6 +7,9 @@ import java.util.List;
 
 @Mapper
 public interface StudentServicePageMapper {
+    @SelectProvider(type = StudentServicePageSql.class, method = "countPeople")
+    @Options(timeout = 5)
+    long countPeople(@Param("query") AdvancedFilterQuery query);
     @SelectProvider(type = StudentServicePageSql.class, method = "matchingOrders")
     List<cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO> matchingOrders(@Param("query") AdvancedFilterQuery query);
     @SelectProvider(type = StudentServicePageSql.class, method = "count")

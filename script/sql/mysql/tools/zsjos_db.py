@@ -1303,6 +1303,7 @@ def test_fresh() -> None:
 
         manifests = load_manifests()
         client = DockerTestClient(container)
+        client.config = argparse.Namespace(release="test-fresh")
         # `migrate` realigns the runner-recorded checksums to the file-bytes hash after the
         # baseline; mirror that here so the guard sees the same terminal ledger state.
         reconcile_checksums(client, manifests, apply=True, include_seed_rows=False)
@@ -1315,6 +1316,8 @@ def test_fresh() -> None:
         info(f"Fresh database: applying {len(pending)} unregistered migration(s) after the baseline")
         for migration in pending:
             docker_mysql_file(container, migration.path)
+            # Pure-DDL module baselines rely on the runner's ledger before their next migration.
+            record_migration(client, migration)
 
         # V276 must run after V150/V185 have established the fixed Partner identities.
         partner_identity = client.query(
@@ -1338,12 +1341,13 @@ def test_fresh() -> None:
 
         output = docker_mysql_file(container, SQL_ROOT / "verify" / "core.sql").stdout.decode(errors="replace")
         failure_lines = [line for line in output.splitlines() if re.search(r"(?:^|\t)(FAIL|MISSING)$", line)]
-        if failure_lines:
-            fail("Fresh database verification failed:\n" + "\n".join(failure_lines))
         # Data snapshots cannot detect a migration missing from the desired schema.
+        # Collect both grades before failing so stale data assertions cannot hide schema drift.
         drift = schema_drift(client, manifests)
-        if drift:
-            fail("Fresh schema drift:\n" + "\n".join(drift))
+        info(f"Fresh schema drift checks: {len(drift)} difference(s)")
+        if failure_lines or drift:
+            fail("Fresh database verification failed:\n" + "\n".join(
+                failure_lines + ["schema drift: " + item for item in drift]))
         second = docker_mysql_file(container, SQL_ROOT / "bootstrap.sql", expect_success=False)
         if second.returncode == 0:
             fail("Fresh bootstrap unexpectedly allowed execution against a non-empty database")

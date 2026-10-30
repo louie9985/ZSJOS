@@ -580,6 +580,15 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         }
     }
 
+    public LeadVisibilityScope metricVisibilityScope(Long actor) {
+        if (!securityFrameworkService.hasPermission("zsjos:lead:query")
+                || !(leadObjectPermissionService.hasTenantReadAll(actor)
+                || securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)
+                || securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)
+                || securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION))) throw exception(LEAD_PERMISSION_DENIED);
+        return resolveVisibilityScope("all", actor);
+    }
+
     private LeadVisibilityScope resolveVisibilityScope(String relationScope, Long userId) {
         if ("all".equals(relationScope) && (leadObjectPermissionService.hasTenantReadAll(userId)
                 || leadObjectPermissionService.hasQueryAll())) {
@@ -594,7 +603,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 owned ? relatedUserIds : List.of(), false);
     }
 
-    private record LeadVisibilityScope(List<Long> sourceUserIds, List<Long> ownerUserIds, boolean queryAll) {}
+    public record LeadVisibilityScope(List<Long> sourceUserIds, List<Long> ownerUserIds, boolean queryAll) {}
 
     @Override
     public LeadManagementRespVO getPartnerLead(Long id, Long partnerId) {
