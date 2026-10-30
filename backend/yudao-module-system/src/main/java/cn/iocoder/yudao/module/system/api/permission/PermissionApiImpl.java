@@ -19,6 +19,26 @@ public class PermissionApiImpl implements PermissionApi {
     @Resource
     private PermissionService permissionService;
 
+    @Resource
+    private cn.iocoder.yudao.module.system.service.permission.MenuService menuService;
+
+    @Override
+    public boolean isPermissionDefined(String permission) {
+        if (permission == null || permission.isBlank() || permission.length() > 100 || "*:*:*".equals(permission)) return false;
+        return getDefinedPermissions().stream().anyMatch(item -> permission.equals(item.permission()));
+    }
+
+    @Override
+    public java.util.List<PermissionDefinition> getDefinedPermissions() {
+        var request = new cn.iocoder.yudao.module.system.controller.admin.permission.vo.menu.MenuListReqVO();
+        // Keep disabled ancestors in the candidate tree so the standard hierarchy filter can reject descendants.
+        var unique = new java.util.LinkedHashMap<String, PermissionDefinition>();
+        menuService.filterDisableMenus(menuService.getMenuListByTenant(request)).stream()
+                .filter(menu -> menu.getPermission()!=null && !menu.getPermission().isBlank() && !"*:*:*".equals(menu.getPermission()))
+                .forEach(menu -> unique.putIfAbsent(menu.getPermission(),new PermissionDefinition(menu.getPermission(),menu.getName())));
+        return java.util.List.copyOf(unique.values());
+    }
+
     @Override
     public boolean hasTenantReadAllAccess(Long userId) {
         return permissionService.hasTenantReadAllAccess(userId);

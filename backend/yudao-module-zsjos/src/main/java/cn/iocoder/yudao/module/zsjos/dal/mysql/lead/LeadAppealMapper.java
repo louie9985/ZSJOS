@@ -12,6 +12,14 @@ import java.util.List;
 @Mapper
 public interface LeadAppealMapper extends BaseMapperX<LeadAppealDO> {
 
+    default List<String> selectProcessInstanceIdsByAppealIds(List<Long> appealIds) {
+        if (appealIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadAppealDO>()
+                .select(LeadAppealDO::getProcessInstanceId).in(LeadAppealDO::getId, appealIds)
+                .isNotNull(LeadAppealDO::getProcessInstanceId)).stream()
+                .map(LeadAppealDO::getProcessInstanceId).filter(id -> !id.isBlank()).distinct().toList();
+    }
+
     default List<LeadAppealDO> selectListByLeadIds(List<Long> leadIds) {
         if (leadIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<LeadAppealDO>()

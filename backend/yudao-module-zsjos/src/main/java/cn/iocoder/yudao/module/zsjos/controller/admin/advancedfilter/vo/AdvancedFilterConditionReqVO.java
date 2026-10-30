@@ -10,6 +10,8 @@ public class AdvancedFilterConditionReqVO {
     private String startFieldKey;
     private String endFieldKey;
     private String unit;
+    /** Frozen business date for metric query contexts; absent on ordinary live filters. */
+    private java.time.LocalDate relativeBaseDate;
     private Object value;
     private Object valueFrom;
     private Object valueTo;

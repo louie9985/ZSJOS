@@ -1,8 +1,9 @@
+import HomeMetricCards from '../components/HomeMetricCards'
 import HomeCalendarPanel from '../components/HomeCalendarPanel'
 import HomeAnnouncementPanel from '../components/HomeAnnouncementPanel'
 import { diagnosisApi, diagnosisTaskUrl } from "../services/mediaAccountProfile";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
+import { Alert, Button, Empty, Pagination, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type BusinessTask, type BusinessTaskBucket, type BusinessTaskSummary, type PageResult } from '../services/api'
@@ -35,85 +36,16 @@ const emptySummary: BusinessTaskSummary = {
   future: 0,
   unscheduled: 0
 }
-const placeholderStatCards = Array.from({ length: 10 }, (_, index) => `待配置指标 ${index + 1}`)
 
-function PlaceholderStatCard({ label }: { label: string }) {
-  return <Card className="home-stat-card placeholder" bordered={false}>
-    <Typography.Text type="secondary">{label}</Typography.Text>
-    <Statistic value="--" />
-    <Typography.Text type="secondary">暂未接入数据</Typography.Text>
-  </Card>
-}
-
-function SummaryRegion({
-  businessSummary,
-  bpmCount,
-  showBpmTasks,
-  loading,
-  businessError,
-  bpmError,
-  onRefresh
-}: {
-  businessSummary?: BusinessTaskSummary
-  bpmCount?: number
-  showBpmTasks: boolean
-  loading: boolean
-  businessError: string
-  bpmError: string
-  onRefresh: () => Promise<void>
-}) {
-  const navigate = useNavigate()
-  const businessCount = bucketOrder.reduce((total, bucket) => total + (businessSummary?.[bucket] ?? 0), 0)
-
-  return (
-    <section className="home-summary-region" aria-label="待办概览">
-      <Card className="home-stat-card business" bordered={false}>
-        <div className="home-stat-card-head">
-          <Typography.Text type="secondary">业务待办</Typography.Text>
-          <Button type="text" icon={<ReloadOutlined />} aria-label="刷新待办计数" onClick={() => void onRefresh()} />
-        </div>
-        {loading && !businessSummary ? <Skeleton active paragraph={false} /> : <Statistic value={businessCount} suffix="项" />}
-        {businessError && <Typography.Text type="danger">{businessError}</Typography.Text>}
-        <div className="home-stat-breakdown">
-          {bucketOrder.map((bucket) => (
-            <span key={bucket}>
-              {bucketLabels[bucket]} {businessSummary?.[bucket] ?? 0}
-            </span>
-          ))}
-        </div>
-      </Card>
-      {showBpmTasks && (
-        <Card
-          className="home-stat-card approval"
-          bordered={false}
-          role="button"
-          tabIndex={0}
-          onClick={() => navigate(APP_ROUTES.BPM_TODO)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') navigate(APP_ROUTES.BPM_TODO)
-          }}
-        >
-          <div className="home-stat-card-head">
-            <Typography.Text type="secondary">审批待办</Typography.Text>
-            <RightOutlined aria-hidden />
-          </div>
-          {loading && bpmCount === undefined ? <Skeleton active paragraph={false} /> : <Statistic value={bpmCount ?? 0} suffix="项" />}
-          {bpmError && <Typography.Text type="danger">{bpmError}</Typography.Text>}
-          <Typography.Text type="secondary">工作流程待办任务</Typography.Text>
-        </Card>
-      )}
-      {!showBpmTasks && <PlaceholderStatCard label="审批待办" />}
-      {placeholderStatCards.map(label => <PlaceholderStatCard key={label} label={label} />)}
-    </section>
-  )
-}
 
 function BusinessTaskPanel({
+  summaryError,
   summary,
   onOpenAssignment,
   onRefreshSummary,
   tenantReadAll
 }: {
+  summaryError?: string
   summary?: BusinessTaskSummary
   tenantReadAll: boolean
   onOpenAssignment: () => void
@@ -247,6 +179,7 @@ function BusinessTaskPanel({
         </div>
         <Button icon={<ReloadOutlined />} aria-label="刷新业务任务" onClick={() => void refresh()} />
       </header>
+      {summaryError && <Alert type="error" title={summaryError} action={<Button onClick={() => void onRefreshSummary()}>重试</Button>} />}
       {tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setPageNo(1); setReadScope(value) }} />}
       <div className="home-task-controls">
         <Segmented
@@ -332,31 +265,13 @@ function BusinessTaskPanel({
 }
 
 export default function TodayTasksPage({ permissions, onOpenAssignment, tenantReadAll = false }: { permissions: string[]; onOpenAssignment: () => void; tenantReadAll?: boolean }) {
-  const showBpmTasks = canQueryBpmTasks(permissions)
   const [businessSummary, setBusinessSummary] = useState<BusinessTaskSummary>()
-  const [bpmCount, setBpmCount] = useState<number>()
-  const [summaryLoading, setSummaryLoading] = useState(true)
   const [businessError, setBusinessError] = useState('')
-  const [bpmError, setBpmError] = useState('')
-
   const loadSummary = useCallback(async () => {
-    setSummaryLoading(true)
     setBusinessError('')
-    setBpmError('')
-    await Promise.all([
-      api
-        .businessTaskSummary()
-        .then(setBusinessSummary)
-        .catch((error) => setBusinessError(errorText(error, '业务待办计数加载失败'))),
-      showBpmTasks
-        ? api
-            .bpmTaskPage('todo', { pageNo: 1, pageSize: 1 })
-            .then((page) => setBpmCount(page.total))
-            .catch((error) => setBpmError(errorText(error, '审批待办计数加载失败')))
-        : Promise.resolve()
-    ])
-    setSummaryLoading(false)
-  }, [showBpmTasks])
+    try { setBusinessSummary(await api.businessTaskSummary()) }
+    catch (error) { setBusinessError(errorText(error, '业务待办计数加载失败')) }
+  }, [])
 
   useEffect(() => {
     void loadSummary()
@@ -365,17 +280,9 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
   return (
     <section className="workspace-page today-tasks-page">
       <div className="home-dashboard-grid">
-        <SummaryRegion
-          businessSummary={businessSummary}
-          bpmCount={bpmCount}
-          showBpmTasks={showBpmTasks}
-          loading={summaryLoading}
-          businessError={businessError}
-          bpmError={bpmError}
-          onRefresh={loadSummary}
-        />
-        <HomeCalendarPanel permissions={permissions} />
-        <BusinessTaskPanel tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
+        <section className="home-summary-region" aria-label="首页指标"><HomeMetricCards /></section>
+                <HomeCalendarPanel permissions={permissions} />
+        <BusinessTaskPanel summaryError={businessError} tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <HomeAnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>
     </section>

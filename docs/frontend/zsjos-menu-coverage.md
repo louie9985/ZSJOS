@@ -1,5 +1,7 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
+首页动态指标：`/system/home-metric` / `zsjos/homeMetric/index` 为 Vue 管理配置，菜单明确 `admin_only`；React 首页 `/zsjos/tasks/today` 原统计卡层改为消费已发布指标，业务/BPM待办作为内置可选来源，下方业务任务不变。`metricContext` 深链进入同首页受控明细视图，不能增加菜单权限。见[配置与数据契约](../api/home-metrics.md)。
+
 学员直接新增：`/zsjos/student-entry` 在两端使用 `zsjos:student:create` 页面/操作权限，服务端组件
 `zsjos/studentEntry/index` 分别映射 React `StudentEntryPage` 和 Vue 原生录入页。
 编导运营和班级管理添加按钮复用此权限；候选跨部门选择不增加历史学员读取权。

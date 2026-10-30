@@ -18,8 +18,6 @@ describe('today task permissions', () => {
   })
 
   it('keeps BPM approval handling in the workflow todo route', () => {
-    expect(source).toContain('审批待办')
-    expect(source).toContain('APP_ROUTES.BPM_TODO')
     expect(source).not.toContain('approveBpmTask')
     expect(source).not.toContain('rejectBpmTask')
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.BPM_TODO)).toBe(true)
@@ -40,8 +38,9 @@ describe('today task permissions', () => {
     expect(source).toContain('const bucketOrder: BusinessTaskBucket[]')
     expect(source).toContain("'overdue'")
     expect(source).toContain("'unscheduled'")
-    expect(source).toContain('Array.from({ length: 10 }')
-    expect(source).toContain('home-stat-card placeholder')
+    expect(source).toContain('HomeMetricCards')
+    expect(source).not.toContain('PlaceholderStatCard')
+    expect(source).not.toContain('SummaryRegion')
   })
 
   it('opens submitter-assistance tasks in the Lead detail route', () => {

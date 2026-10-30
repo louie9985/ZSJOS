@@ -26,5 +26,6 @@ public interface CashbackSearchMapper {
     @com.baomidou.mybatisplus.annotation.InterceptorIgnore(tenantLine = "true")
     @Select("SELECT c.id,c.lead_id,c.order_id,c.partner_id,c.beneficiary_user_id FROM zsjos_cashback c "
             + "WHERE ${query.whereSql} AND c.id > #{after} ORDER BY c.id LIMIT #{limit}")
+    @Options(timeout = 5)
     List<CashbackDO> candidates(@Param("query") AdvancedFilterQuery query, @Param("after") long after, @Param("limit") int limit);
 }

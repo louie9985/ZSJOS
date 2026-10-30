@@ -32,6 +32,12 @@ public interface BpmProcessTaskApi {
     void triggerTask(@NotEmpty(message = "流程实例的编号不能为空") String processInstanceId,
                      @NotEmpty(message = "任务 Key 不能为空") String taskDefineKey);
 
+    /** Authenticated caller must supply the effective user; returns all definitions within that user's todo scope. */
+    PageResult<BpmTaskRespDTO> getMetricTodoTaskPage(Long userId, BpmTaskPageReqDTO reqDTO);
+    PageResult<BpmTaskRespDTO> getMetricAllTodoTaskPage(Long userId, int pageNo, int pageSize);
+
+    PageResult<BpmTaskRespDTO> getAllTodoTaskPage(Long userId, int pageNo, int pageSize);
+
     PageResult<BpmTaskRespDTO> getTodoTaskPage(Long userId, BpmTaskPageReqDTO reqDTO);
 
     PageResult<BpmTaskRespDTO> getDoneTaskPage(Long userId, BpmTaskPageReqDTO reqDTO);

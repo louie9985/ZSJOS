@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## Configurable home metrics
+
+Home metric configuration belongs to ZSJOS and is managed in Vue Admin; Workbench consumes published, authorized metric projections. System permission metadata remains authoritative, and config access never grants source data access. Each source reuses its business scope; formula inputs are checked before and after evaluation. Frozen, user/tenant/version-bound Redis contexts revalidate grants and configuration on drill-down. See [the API and integration contract](../api/home-metrics.md).
+
 ## Student delivery strict read scope (2026-10-19)
 
 Delivery-class and student reads consume System's merged all/dept grants without converting SELF into the current department. Existing `delivery-class:query` / `query-managed` entry compatibility is retained; feature permissions alone never grant department data. Personal ownership and existing collaboration remain independent grants. Class lists/filter contexts/object reads, service lists/search/detail, legacy student reads and contact subresources enforce the same service boundary; a readable sibling service does not expose another course. Only configured `query-managed` (or an already approved tenant-wide reader) gets the existing real system pending-class exception; explicit SELF/USER does not append it. Read-scope resolution is separate from existing command department/ownership checks. No role grants or business ownership are rewritten.

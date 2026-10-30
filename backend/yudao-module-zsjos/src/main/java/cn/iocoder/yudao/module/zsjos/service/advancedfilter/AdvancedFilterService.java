@@ -120,6 +120,8 @@ public class AdvancedFilterService {
         return buildIfPresent(group, "cashback", Map.of("cashbackResolver", resolver));
     }
 
+    public AdvancedFilterQuery buildLeadQuery(AdvancedFilterGroupReqVO group) { return buildIfPresent(group, "lead", Map.of()); }
+
     public List<Long> matchLeadIds(AdvancedFilterGroupReqVO group) {
         AdvancedFilterQuery query = buildIfPresent(group, "lead", Map.of());
         return query == null ? null : mapper.selectLeadIds(query);
@@ -128,6 +130,7 @@ public class AdvancedFilterService {
         AdvancedFilterQuery query = buildOrderQuery(group);
         return query == null ? null : mapper.selectOrderIds(query);
     }
+    public AdvancedFilterQuery buildWithdrawalQuery(AdvancedFilterGroupReqVO group) { return buildIfPresent(group, "withdrawal", Map.of()); }
     public AdvancedFilterQuery buildOrderQuery(AdvancedFilterGroupReqVO group) { return buildIfPresent(group, "order", Map.of()); }
     public List<Long> matchAppealIds(AdvancedFilterGroupReqVO group) {
         AdvancedFilterQuery query = buildIfPresent(group, "lead_appeal", Map.of());
@@ -272,7 +275,7 @@ public class AdvancedFilterService {
             Object from = typed(field.type(), condition.getValueFrom()), to = typed(field.type(), condition.getValueTo());
             predicate = expression + " BETWEEN " + ref(params, from) + " AND " + ref(params, to);
         } else if ("relative".equals(operator)) {
-            LocalDateTime[] range = relativeRange(String.valueOf(condition.getValue()));
+            LocalDateTime[] range = relativeRange(String.valueOf(condition.getValue()), condition.getRelativeBaseDate() == null ? LocalDate.now(BEIJING) : condition.getRelativeBaseDate());
             predicate = expression + " >= " + ref(params, range[0]) + " AND " + expression + " < " + ref(params, range[1]);
         } else if ("in".equals(operator) || "not_in".equals(operator)) {
             List<?> values = condition.getValue() instanceof Collection<?> collection ? collection.stream().toList() : List.of();
@@ -395,7 +398,7 @@ public class AdvancedFilterService {
         }
         if ("relative".equals(operator)) {
             LocalDateTime value = (LocalDateTime) typed("date", actual);
-            LocalDateTime[] range = relativeRange(String.valueOf(condition.getValue()));
+            LocalDateTime[] range = relativeRange(String.valueOf(condition.getValue()), condition.getRelativeBaseDate() == null ? LocalDate.now(BEIJING) : condition.getRelativeBaseDate());
             return !value.isBefore(range[0]) && value.isBefore(range[1]);
         }
         Object expected = typed(field.type(), condition.getValue());
@@ -445,7 +448,7 @@ public class AdvancedFilterService {
         }
         if ("relative".equals(operator)) {
             if (typed("text", condition.getValue()) == null) throw exception(ADVANCED_FILTER_INVALID);
-            relativeRange(String.valueOf(condition.getValue()));
+            relativeRange(String.valueOf(condition.getValue()), condition.getRelativeBaseDate() == null ? LocalDate.now(BEIJING) : condition.getRelativeBaseDate());
             return;
         }
         if (typed(field.type(), condition.getValue()) == null) throw exception(ADVANCED_FILTER_INVALID);
@@ -470,7 +473,10 @@ public class AdvancedFilterService {
         catch (DateTimeParseException ignored) { return OffsetDateTime.parse(value).atZoneSameInstant(BEIJING).toLocalDateTime(); }
     }
     private LocalDateTime[] relativeRange(String value) {
-        LocalDate today = LocalDate.now(BEIJING), start, end;
+        return relativeRange(value, LocalDate.now(BEIJING));
+    }
+    private LocalDateTime[] relativeRange(String value, LocalDate today) {
+        LocalDate start, end;
         switch (value) {
             case "today" -> { start = today; end = today.plusDays(1); }
             case "yesterday" -> { start = today.minusDays(1); end = today; }
@@ -483,6 +489,19 @@ public class AdvancedFilterService {
             default -> throw exception(ADVANCED_FILTER_INVALID);
         }
         return new LocalDateTime[]{start.atStartOfDay(), end.atStartOfDay()};
+    }
+    /** Freeze relative filters once so a deep link crossing midnight retains its original population. */
+    public AdvancedFilterGroupReqVO freezeRelativeDates(AdvancedFilterGroupReqVO group, Instant asOf) {
+        if (group == null || asOf == null) throw exception(ADVANCED_FILTER_INVALID);
+        var copy = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(
+                cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(group), AdvancedFilterGroupReqVO.class);
+        freezeGroup(copy, asOf.atZone(BEIJING).toLocalDate());
+        return copy;
+    }
+    private void freezeGroup(AdvancedFilterGroupReqVO group, LocalDate date) {
+        for (var child : group.getGroups() == null ? List.<AdvancedFilterGroupReqVO>of() : group.getGroups()) freezeGroup(child, date);
+        for (var condition : group.getConditions() == null ? List.<AdvancedFilterConditionReqVO>of() : group.getConditions())
+            if ("relative".equals(condition.getOperator())) condition.setRelativeBaseDate(date);
     }
     private String ref(Map<String, Object> params, Object value) {
         if (value == null) throw exception(ADVANCED_FILTER_INVALID);

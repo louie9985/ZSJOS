@@ -21,6 +21,14 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDEN
 
 @Service
 public class StudentServiceReadService {
+    /** The metric counts people after service-level filtering, never the number of course services. */
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public long countMetricStudents(Long actor, StudentServicePageReqVO req) {
+        if (!permissionApi.hasAnyPermissions(actor, "zsjos:student:query-my"))
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED);
+        return pageMapper.countPeople(query(actor, req));
+    }
+
     @Resource private StudentServicePageMapper pageMapper;
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private MyStudentServiceImpl projection;
@@ -73,6 +81,12 @@ public class StudentServiceReadService {
         result.setLeadId(result.getService().getLeadId());
         result.setLeadNo(result.getService().getLeadNo());
         return result;
+    }
+
+    public AdvancedFilterQuery metricQuery(Long actor, StudentServicePageReqVO request) {
+        if (!permissionApi.hasAnyPermissions(actor, "zsjos:student:query-my"))
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED);
+        return query(actor, request);
     }
 
     AdvancedFilterQuery query(Long actor, StudentServicePageReqVO req) {

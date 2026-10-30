@@ -1,5 +1,7 @@
 # Ownership and Change Boundaries
 
+Homepage metrics are owned by ZSJOS: versioned configuration, bounded arithmetic, source adapters and expiring query contexts. System exposes enabled permission metadata through its public PermissionApi; BPM exposes all-current-user todo pagination through BpmProcessTaskApi. Neither API grants new access or permits cross-module DAL queries. Vue Admin owns configuration, React owns cards and drill-down. See [home metrics](../api/home-metrics.md).
+
 Lead sales-to-submitter feedback belongs to the ZSJOS Lead domain, with immutable reply
 records and tenant-owned file bindings. Infra stores files; System owns configurable
 notifications and their delivery/read state. Workbench composes replies; Partner H5 reads
