@@ -7,7 +7,6 @@ import {
   Input,
   Modal,
   Select,
-  Segmented,
   Space,
   Skeleton,
   Tag,
@@ -34,8 +33,6 @@ import BusinessTable from "../components/BusinessTable";
 import DateTimeText from "../components/DateTimeText";
 import ResizableDetailDrawer from "../components/ResizableDetailDrawer";
 import { useInboxTableLayout } from "../services/inboxLayout";
-import { useTheme } from "../components/Theme/ThemeContext";
-import { INBOX_LAYOUT_OPTIONS } from "../constants";
 import type { ProColumns } from "@ant-design/pro-components";
 
 const statusLabel: Record<LeadPublicSeaPoolStatus, string> = {
@@ -46,7 +43,6 @@ const statusLabel: Record<LeadPublicSeaPoolStatus, string> = {
 
 export default function LeadPublicSeaPoolPage() {
   const { isDesktop, useTableLayout } = useInboxTableLayout();
-  const { inboxLayoutMode, setInboxLayoutMode } = useTheme();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [pageSize, setPageSize] = useState(20);
   const pageRef = useRef(1);
@@ -311,7 +307,6 @@ export default function LeadPublicSeaPoolPage() {
       </header>
       <div className="public-sea-pool-toolbar">
         <Space wrap>
-        {isDesktop && <Segmented aria-label="公海池视图" options={INBOX_LAYOUT_OPTIONS} value={inboxLayoutMode} onChange={value => { setDrawerOpen(false); setInboxLayoutMode(value); }}/>}
         <Button onClick={() => void load({ pageNo: useTableLayout ? pageNo : 1 })}>刷新</Button>
         <Button onClick={() => { setKeyword(""); setAdvancedFilter(undefined); setInboxStage(undefined); setRelationScope(undefined); }}>重置筛选</Button>
         </Space>

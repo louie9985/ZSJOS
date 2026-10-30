@@ -2,7 +2,7 @@
 
 我的运营（2026-10-28）：`zsjos/myOperations/index` → Workbench `/zsjos/my-operations`；Vue Admin 过滤该组件。页面权限 `zsjos:my-operations:query`，运营名下客资复用 `LeadManagementPage`，范围含代录归属，不含合作方客资。见[我的运营契约](../api/my-operations.md)。
 
-首页动态指标：`/system/home-metric` / `zsjos/homeMetric/index` 为 Vue 管理配置，菜单明确 `admin_only`；React 首页 `/zsjos/tasks/today` 原统计卡层改为消费已发布指标，业务/BPM待办作为内置可选来源，下方业务任务不变。`metricContext` 深链进入同首页受控明细视图，不能增加菜单权限。见[配置与数据契约](../api/home-metrics.md)。
+首页指标：`/system/home-metric` / `zsjos/homeMetric/index` 为 Vue 管理配置，菜单明确 `admin_only`；React 首页 `/zsjos/tasks/today` 保留业务待办、其他待办、审批待办三张固定卡（2026-10-30用户明确例外），其他卡片消费已发布指标，下方业务任务不变。`metricContext` 深链进入同首页受控明细视图，不能增加菜单权限。见[配置与数据契约](../api/home-metrics.md)。
 
 学员直接新增：`/zsjos/student-entry` 在两端使用 `zsjos:student:create` 页面/操作权限，服务端组件
 `zsjos/studentEntry/index` 分别映射 React `StudentEntryPage` 和 Vue 原生录入页。

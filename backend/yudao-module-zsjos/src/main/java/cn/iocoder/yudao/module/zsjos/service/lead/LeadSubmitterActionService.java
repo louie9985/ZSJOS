@@ -54,16 +54,16 @@ public class LeadSubmitterActionService {
     @Transactional(rollbackFor = Exception.class)
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交人补充资料", target="lead", id=0, actor=1, actorType="ADMIN")
     public void supplement(Long leadId, Long userId, LeadSubmitterSupplementReqVO req) {
-        supplementInternal(leadId, userId, null, req);
+        supplementInternal(leadId, userId, null, userId, req);
     }
 
     @Transactional(rollbackFor = Exception.class)
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="提交人补充资料", target="lead", id=0, actor=1, actorType="PARTNER")
-    public void supplementForPartner(Long leadId, Long partnerId, LeadSubmitterSupplementReqVO req) {
-        supplementInternal(leadId, null, partnerId, req);
+    public void supplementForPartner(Long leadId, Long partnerId, Long accountId, LeadSubmitterSupplementReqVO req) {
+        supplementInternal(leadId, null, partnerId, accountId, req);
     }
 
-    private void supplementInternal(Long leadId, Long userId, Long partnerId, LeadSubmitterSupplementReqVO req) {
+    private void supplementInternal(Long leadId, Long userId, Long partnerId, Long attachmentOwnerId, LeadSubmitterSupplementReqVO req) {
         LeadDO lead = requireSubmitterLeadForUpdate(leadId, userId, partnerId);
         String digest = supplementDigest(req);
         String subjectType = partnerId == null ? PROVIDER_OWNER_SYSTEM_USER : PROVIDER_OWNER_PARTNER;
@@ -85,7 +85,7 @@ public class LeadSubmitterActionService {
         List<LeadAttachmentReqVO> attachments = req.getAttachments() == null ? List.of() : req.getAttachments();
         Map<Long, FileInfoRespDTO> files = attachments.isEmpty() ? Map.of() : partnerId == null
                 ? attachmentService.validateReferences(attachments, userId)
-                : attachmentService.validatePartnerReferences(attachments, partnerId);
+                : attachmentService.validatePartnerReferences(attachments, attachmentOwnerId);
         List<Map<String, Object>> attachmentSnapshots = files.values().stream().map(file -> {
             Map<String, Object> snapshot = new LinkedHashMap<>();
             snapshot.put("infraFileId", file.getId()); snapshot.put("name", file.getName());

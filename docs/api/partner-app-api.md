@@ -142,3 +142,7 @@ V072 在维护窗口执行账号迁移：预检通过后复制原 BCrypt 哈希�
 ## 兼职客资分配方式
 
 提交支持自动或指定分配，默认自动。分配能力使用 `/part-api/zsjos/lead/assignment-options`，只返回配置状态和安全原因，不返回接单人员。指定请求只提交 `dispatchMode=specified`，目标由服务器解析；配置失效报错并保留表单，不自动降级。配置、错误码和复核快照规则见 [兼职指定分配与教务接单](partner-specified-assignment.md)。
+
+### 补充资料附件归属
+
+`PUT /part-api/zsjos/lead/{id}/submitter-supplement` 使用服务端解析的 Partner ID 校验客资归属；附件目录及创建人使用当前登录 Partner Account ID 校验，与上传接口一致。两个 ID 无需相同，均不得由请求正文指定；其他账号的附件仍拒绝。无附件补充和 ADMIN 补充接口契约保持不变。

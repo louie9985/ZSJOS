@@ -102,6 +102,10 @@ class SchemaDriftTest(unittest.TestCase):
         self.client.query.side_effect = self.query
         self.client.table_count.return_value = 1
         self.client.execute_file.return_value = ''
+        # File/ledger integrity has its own strict read-only and wiring regression suite.
+        integrity = patch.object(db, 'verify_applied_migration_integrity', return_value=[])
+        integrity.start()
+        self.addCleanup(integrity.stop)
         schema = patch.object(db, 'desired_schema', return_value=(
             self.columns, self.indexes, self.foreign_keys))
         schema.start()

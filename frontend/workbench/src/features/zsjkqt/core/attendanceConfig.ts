@@ -10,7 +10,7 @@ export const ATTENDANCE_CONFIG = {
     morning: { start: "08:30", end: "12:00", hours: 3.5 },
     afternoon: { start: "13:30", end: "18:00", hours: 4.5 },
   },
-  actualAttendanceStatuses: ["出勤", "迟到", "早退", "病假", "工伤", "丧假", "婚假", "产假", "调休", "年假"] as AttendanceStatus[],
+  actualAttendanceStatuses: ["出勤", "迟到", "早退", "病假", "工伤", "丧假", "婚假", "产假", "产检假", "调休", "年假"] as AttendanceStatus[],
   overtime: {
     displayOverridesWorkStatus: true,
     countAsActualAttendanceWhenBaseWorked: true,

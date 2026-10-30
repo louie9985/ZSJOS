@@ -1,3 +1,4 @@
+import HomeTodoSummary from '../components/HomeTodoSummary'
 import HomeMetricCards from '../components/HomeMetricCards'
 import { useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
 import HomeCalendarPanel from '../components/HomeCalendarPanel'
@@ -309,19 +310,24 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
   }, [])
   const [businessSummary, setBusinessSummary] = useState<BusinessTaskSummary>()
   const [businessError, setBusinessError] = useState('')
+  const [summaryLoading, setSummaryLoading] = useState(true)
+  const summarySequence = useRef(0)
+  const canReadBusiness = permissions.includes('zsjos:business-task:query')
   const [metricRefreshVersion, setMetricRefreshVersion] = useState(0)
   const loadSummary = useCallback(async (refreshMetrics = true) => {
-    setBusinessError('')
-    try { setBusinessSummary(await api.businessTaskSummary()) }
-    catch (error) { setBusinessError(errorText(error, '业务待办计数加载失败')) }
-    finally { if (refreshMetrics) setMetricRefreshVersion(version => version + 1) }
-  }, [])
+    const request = ++summarySequence.current
+    setBusinessError(''); setBusinessSummary(undefined); setSummaryLoading(canReadBusiness)
+    if (!canReadBusiness) return
+    try { const data = await api.businessTaskSummary(); if (request === summarySequence.current) setBusinessSummary(data) }
+    catch (error) { if (request === summarySequence.current) setBusinessError(errorText(error, '业务待办计数加载失败')) }
+    finally { if (request === summarySequence.current) { setSummaryLoading(false); if (refreshMetrics) setMetricRefreshVersion(version => version + 1) } }
+  }, [canReadBusiness])
   useEffect(() => { void loadSummary(false) }, [loadSummary])
 
   return (
     <section ref={pageRef} className="workspace-page today-tasks-page">
       <div className="home-dashboard-grid">
-        <section className="home-summary-region" aria-label="首页指标"><HomeMetricCards refreshVersion={metricRefreshVersion} /></section>
+        <section className="home-summary-region" aria-label="首页指标"><HomeTodoSummary permissions={permissions} summary={businessSummary} loading={summaryLoading} error={businessError} refreshVersion={metricRefreshVersion} onRefresh={() => loadSummary()} /><HomeMetricCards refreshVersion={metricRefreshVersion} slots={9} /></section>
         <HomeCalendarPanel permissions={permissions} />
         <BusinessTaskPanel summaryError={businessError} canCancel={permissions.includes('zsjos:business-task:cancel')} tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <BusinessTaskPanel summaryError={businessError} canCancel={permissions.includes('zsjos:business-task:cancel')} other tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />

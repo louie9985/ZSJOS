@@ -10,6 +10,7 @@ import {
   ClockCircleOutlined,
   CloseCircleOutlined,
   ExclamationCircleOutlined,
+  GlobalOutlined,
   PauseCircleOutlined
 } from '@ant-design/icons'
 import { api, type LeadFollowUp, type ManagedLead, type ManagedLeadProduct, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
@@ -435,6 +436,14 @@ function AsideAlerts({ lead }: { lead: ManagedLead }) {
       icon: <CloseCircleOutlined />,
       title: '客资已判无效',
       detail: [lead.invalidReasonLabelSnapshot || (lead.invalidReason ? '标签未配置' : undefined), lead.invalidDescription].filter(Boolean).join('：')
+    })
+  }
+  if (lead.inPublicSeaPool === true) {
+    alerts.push({
+      tone: 'info',
+      icon: <GlobalOutlined />,
+      title: '客资已进入公海',
+      detail: '当前处于公海协作中。'
     })
   }
   if (lead.handlingStage === 'first_follow_pending' && lead.currentAssignmentFirstFollowUpDeadlineAt) {

@@ -16,6 +16,8 @@ Base path: `/admin-api/zsjos/lead/public-sea-pool`. All endpoints are tenant sco
 
 ### 常驻筛选
 
+客资详情在解析可用操作时返回可选布尔字段 `inPublicSeaPool`，复用活动公海周期或兼容公海记录的现有判断。未解析该投影时字段可为空，不能以历史 `publicPoolAt` 或抢单池分配状态推断。Workbench 概览仅在字段为 `true` 时展示蓝色「客资已进入公海」提示及「当前处于公海协作中。」；无效提示在其上方保留，退出公海后刷新详情即移除提示。沿用现有状态条样式和操作入口。Admin 使用相同详情接口，可忽略这一新增字段，原有交互不变。
+
 `GET /page` 与 `POST /search-page` 的 `keyword` 去除首尾空白后，对业务客资编号 `leadNo`、提交姓名、手机号和微信号进行 OR 模糊匹配；空白关键词不增加搜索条件，不使用内部 `leadId` 作为编号搜索。关键词与租户、逻辑删除、可见范围、公海状态及高级筛选取交集。Admin 与 Workbench 均沿用原有 `keyword` 请求字段和响应结构。
 
 Workbench 公海池复用客资管理 `lead-simple-status-shell` 样式，常驻展示全部、归属我的、我跟进的及服务端发布的状态选项；单选切换后重新从第一页加载。高级筛选不隐藏常驻栏，与选中的常驻条件取交集。

@@ -123,7 +123,7 @@ public class PartnerAppPortalController {
     @PutMapping("/lead/{id}/submitter-supplement")
     public CommonResult<Boolean> supplement(@PathVariable Long id,
                                              @Valid @RequestBody LeadSubmitterSupplementReqVO request) {
-        submitterActionService.supplementForPartner(id, partnerId(), request); return success(true);
+        submitterActionService.supplementForPartner(id, partnerId(), getLoginUserId(), request); return success(true);
     }
 
     @PostMapping("/lead/{id}/urge")

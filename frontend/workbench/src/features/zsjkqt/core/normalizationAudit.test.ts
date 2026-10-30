@@ -132,7 +132,26 @@ describe('异常转正常：已成立的回归契约', () => {
     expect(summary(corrected(before, { finalMorning: '出勤' }))[field]).toBe(0.56)
   })
 
-  it.each(['陪产假', '产检假', '带薪'] as const)('%s 当前不计入实出勤（口径疑点，不视为批准）', status => {
+  it.each([
+    '产检假8小时（08:30-18:00）',
+    '正常;产检假3.5小时（08:30-12:00）',
+    '正常;产检假4.5小时（13:30-18:00）',
+  ])('%s 计入当天出勤且保留独立假别', raw => {
+    const day = classified(raw)
+    expect([day.finalMorning, day.finalAfternoon]).toContain('产检假')
+    expect(summary(day).actualAttendanceDays).toBe(1)
+    expect(summary(day).maternityLeaveDays).toBeNull()
+    expect(summary(JSON.parse(JSON.stringify(day))).actualAttendanceDays).toBe(1)
+  })
+
+  it('人工将全天改为产检假计一天出勤，改回事假不保留出勤', () => {
+    const day = classified('')
+    const fixed = corrected(day, { finalMorning: '产检假', finalAfternoon: '产检假' })
+    expect(summary(fixed).actualAttendanceDays).toBe(1)
+    expect(summary(corrected(fixed, { finalMorning: '事假', finalAfternoon: '事假' })).actualAttendanceDays).toBeNull()
+  })
+
+  it.each(['陪产假', '带薪'] as const)('%s 当前不计入实出勤（口径疑点，不视为批准）', status => {
     const day = classified('')
     day.systemMorning = day.finalMorning = status
     day.systemAfternoon = day.finalAfternoon = status

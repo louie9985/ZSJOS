@@ -458,6 +458,7 @@ class MysqlClient:
             "--raw",
             "--unbuffered",
             "--skip-column-names",
+            "--skip-force",  # Fail closed even when mysql option files enable force.
         ]
 
     def query(self, sql: str) -> str:
@@ -465,6 +466,24 @@ class MysqlClient:
         return result.stdout or ""
 
     def execute_file(self, path: Path) -> str:
+        if path.resolve() == (SQL_ROOT / "bootstrap.sql").resolve():
+            # Independent of the installed client's nested SOURCE error semantics.
+            # Direct initialization still requires exclusive access; the SQL guard
+            # rechecks on the execution connection before its first SOURCE.
+            try:
+                empty = self.query(
+                    "SELECT (DATABASE() IS NOT NULL "
+                    "AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()) "
+                    "AND NOT EXISTS (SELECT 1 FROM information_schema.routines WHERE routine_schema=DATABASE()) "
+                    "AND NOT EXISTS (SELECT 1 FROM information_schema.events WHERE event_schema=DATABASE()))"
+                ).strip()
+            except (CommandError, OSError) as error:
+                raise CommandError("ZSJOS_BOOTSTRAP_REQUIRES_EMPTY_DATABASE: "
+                                   "could not verify an empty selected database") from error
+            if empty != "1":
+                fail("ZSJOS_BOOTSTRAP_REQUIRES_EMPTY_DATABASE: "
+                     "select an empty database without tables/views/routines/events; "
+                     "no bootstrap SQL was sent")
         result = run(self.base(self.mysql) + [self.config.database], env=self.env(), input_text=path.read_text(encoding="utf-8"), capture=True)
         return result.stdout or ""
 
@@ -556,10 +575,16 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
                             b"V295__notice_content_capacity.sql").hexdigest()):
                     fail("Core V295 identifies the old notice expansion, not newcomer dispatch; "
                          "use the reviewed notice-version recovery procedure before migration")
+                if ((code, migration.version) in REVIEWED_SEED_ARTIFACTS
+                        and release in ("legacy", "baseline")
+                        and not applied_artifact_matches(migration, recorded_checksum, release)):
+                    fail(f"Applied migration checksum changed: {code}/{migration.path.name}; "
+                         "reviewed seed artifact mismatch; preflight never rewrites the ledger")
                 skip_checksum = os.environ.get("ZSJOS_DB_SKIP_CHECKSUM", "false").lower() in ("1", "true", "yes")
                 # `zsjos_module_schema_version` rows the runner wrote are validated against
                 # the file-bytes hash, with the narrow CRLF checkout fallback above.
-                # Rows carrying release `legacy`/`baseline` are exempt:
+                # Other `legacy`/`baseline` rows retain their historical exemption;
+                # the seven reviewed seed versions are checked above before any writes.
                 # they are provenance records from the bootstrap and older migrations, whose
                 # seeds and verifiers agree on a filename or literal tag rather than the file
                 # bytes. `reconcile --include-seed-rows` rewrites them only on request.
@@ -572,6 +597,131 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
             else:
                 pending.append(migration)
     return pending
+
+
+# Narrow transfer of the eight old SQL checksum predicates for seven core versions.
+# Source: verify-bootstrap.sql at 208abf277065706cbee45164113903eded9e6303.
+# Current artifact pins were checked against that commit; the reviewed 2402fe0
+# permission-assignment cleanup explains five differing historical file hashes.
+# These compatibility hashes apply ONLY to legacy/baseline provenance rows, and
+# ONLY while the checkout still matches the pinned current artifact. They never
+# authorize a content change or a checksum rewrite on a normal runner record.
+@dataclasses.dataclass(frozen=True)
+class ReviewedSeedArtifact:
+    filename: str
+    lf_checksum: str
+    prior_checksums: tuple[str, ...]
+    verifier_lines: tuple[int, ...]
+
+
+REVIEWED_SEED_ARTIFACTS: dict[tuple[str, str], ReviewedSeedArtifact] = {
+    ("core", "V114"): ReviewedSeedArtifact(
+        "V114__student_delivery_stages.sql",
+        "ee63509c43d52a38fe04af29bd8338360311b49265fb7ed088f733b9191fc9b2",
+        (
+            "1fef9e871cde4bfd670367634d45cabc0c5683ce5a9edda1918d056c1b57952d",
+            "f580dcd93fc83911fe221850221f95479104fdfb1bf65566100a4534f65e4155",
+        ), (215,)),
+    ("core", "V116"): ReviewedSeedArtifact(
+        "V116__study_planner_repurchase_permissions.sql",
+        "8e6d2ec6dae1bf4a6d984410b2526b9ca733a5a7c2eb050fc7361e8db7312102",
+        (
+            "38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324",
+            "f48a2b0ac4701f4c03bbcbb4bf7b1137d552d4a503137c16bf6e7ce6334e6f1d",
+        ), (231, 1357)),
+    ("core", "V136"): ReviewedSeedArtifact(
+        "V136__sales_order_team_management.sql",
+        "9ff83a696da20ee9f67ae7f03cfc2a4d4528c1c8ebd174aa093cca55fad83c9e",
+        (
+            "7dc898a066f84acc51fd760148b2022bc4781e4eace275ba1220d583393e1abb",
+            "0b5ed110a146eb3fa43aee71598349e590e5934425d8d4458d310c44138c9c0e",
+        ), (246,)),
+    ("core", "V192"): ReviewedSeedArtifact(
+        "V192__unify_delivery_class_menu.sql",
+        "9f531b92a17ae67cb985b02eaf7eadd89e21ed0cb45c377ce0de0ac55e02993e",
+        (
+            "ec10b707345eba255d538ab8194fc3e2140bc597303d50884660b50964ac6ed5",
+            "f5c1f7acb6bef946eb012f588df16c37d94f585deaa883780fe5829f4900a001",
+            "470a704a3327062ad975b7c3ccd7460c704f78096d70f64b4fd83a3f0a4ebb5e",
+        ), (2320,)),
+    ("core", "V193"): ReviewedSeedArtifact(
+        "V193__delivery_class_access_repair.sql",
+        "d1e42303cef32bf929c16fb9b8aaa88d8d5b6d6055e10a8af5026d2440f171e2",
+        (
+            "fdef29a57e4bbc2a7ad8e09dd96213426cad5f2321a42aa248f11ea9860bb0b0",
+            "29d4df644df985d5d7d087497c931283c696e5f7ed6ede2e876d8d847ef8e56b",
+        ), (262,)),
+    ("core", "V196"): ReviewedSeedArtifact(
+        "V196__lead_qualification_from_ownership.sql",
+        "43674e8e3b8df395895bdf6bb530b86a594b9161af65ea9eee323d1e4482095c",
+        (
+            "43674e8e3b8df395895bdf6bb530b86a594b9161af65ea9eee323d1e4482095c",
+            "f706d7c9f0d08f85e62d185d8569e90247a4373179e5d47154fe05edab829784",
+            "cedb32fbe05423c1a4c45e4ba7bc30f4e02cd81af294a7cceccd5df7badc22be",
+        ), (2363,)),
+    ("core", "V208"): ReviewedSeedArtifact(
+        "V208__viral_account_template_v3.sql",
+        "26e50a71737465a96e3c48a24a7a0535089bfa46607dd04ca4799a7f67797dad",
+        (
+            "26e50a71737465a96e3c48a24a7a0535089bfa46607dd04ca4799a7f67797dad",
+            "9604d6a47b019f5a0fb01de38452b2ba616e1e91003159c6e3acdd8bca8b534c",
+        ), (2425,)),
+}
+
+
+def applied_artifact_matches(migration: Migration, recorded: str, release: str) -> bool:
+    """Shared strict artifact guard for completed verification and installed seed preflight."""
+    current = dataclasses.replace(migration, checksum=sha256(migration.path))
+    if applied_checksum_matches(current, recorded):
+        return True
+    artifact = REVIEWED_SEED_ARTIFACTS.get((migration.module, migration.version))
+    if release not in ("legacy", "baseline") or artifact is None:
+        return False
+    canonical = hashlib.sha256(migration.path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+    return (migration.path.name == artifact.filename
+            and canonical == artifact.lf_checksum and recorded in artifact.prior_checksums)
+
+
+def verify_applied_migration_integrity(
+    client: MysqlClient, manifests: dict[str, dict], *, require_complete: bool = True,
+) -> list[str]:
+    """Read-only file/ledger verification, independent of migration bypass flags.
+
+    Complete verification requires the module ledger and every expected migration row.
+    Partial callers can opt out only of completeness, never of installed-file checks.
+    All runner checksums and the seven transferred SQL predicates are checked.
+    Other historical seed rows retain their existing SQL provenance verifiers;
+    returning them explicitly avoids claiming their tags prove file integrity.
+    """
+    if require_complete and manifests and not client.table_exists("zsjos_module_schema_version"):
+        fail("Missing module migration integrity ledger table: zsjos_module_schema_version")
+    installed = installed_versions(client)
+    deferred: list[str] = []
+    verified = 0
+    for code in module_order(manifests):
+        for migration in migrations_for(code, manifests[code]):
+            key = (code, migration.version)
+            record = installed.get(key)
+            if record is None:
+                if require_complete:
+                    fail(f"Missing migration integrity ledger: {code}/{migration.version}")
+                continue
+            recorded, release = record
+            if applied_artifact_matches(migration, recorded, release):
+                verified += 1
+                continue
+            if release in ("legacy", "baseline") and key not in REVIEWED_SEED_ARTIFACTS:
+                deferred.append(f"{code}/{migration.version}")
+                continue
+            fail(f"Applied migration checksum changed: {code}/{migration.path.name}; "
+                 "restore the applied file or use a separately reviewed compatibility record; "
+                 "verification never rewrites the ledger")
+    if deferred:
+        info("Historical seed rows deferred to their existing SQL provenance checks "
+             "(not file-integrity verified): " + ", ".join(deferred))
+    info(f"PASS: {verified} applied migration file/ledger integrity checks; "
+         f"{len(deferred)} other seed provenance row(s) deferred.")
+    return deferred
 
 
 def migration_preflight(
@@ -1145,6 +1295,7 @@ class MigrationLock:
 def verify_database(environment: str, client: MysqlClient | None = None) -> None:
     manifests = enabled_manifests(environment)
     client = client or MysqlClient(db_config(environment))
+    verify_applied_migration_integrity(client, manifests)
     data_failures: list[str] = []
     for code in module_order(manifests):
         verify_path = resolve_sql_path(manifests[code]["verify"])
@@ -1238,7 +1389,7 @@ def docker_mysql_file(container: str, path: Path, *, expect_success: bool = True
     with path.open("rb") as stream:
         result = subprocess.run(
             ["docker", "exec", "-i", "-w", "/workspace", container,
-             "mysql", "--default-character-set=utf8mb4", "-uroot", "zsjos_test"],
+             "mysql", "--default-character-set=utf8mb4", "--skip-force", "-uroot", "zsjos_test"],
             stdin=stream,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -1304,9 +1455,8 @@ def test_fresh() -> None:
         manifests = load_manifests()
         client = DockerTestClient(container)
         client.config = argparse.Namespace(release="test-fresh")
-        # `migrate` realigns the runner-recorded checksums to the file-bytes hash after the
-        # baseline; mirror that here so the guard sees the same terminal ledger state.
-        reconcile_checksums(client, manifests, apply=True, include_seed_rows=False)
+        # Only record migrations that actually execute successfully below. Existing
+        # baseline provenance rows must never be reconciled by verification.
         pending = pending_migrations(manifests, installed_versions(client))
         if not pending:
             fail(
@@ -1318,6 +1468,8 @@ def test_fresh() -> None:
             docker_mysql_file(container, migration.path)
             # Pure-DDL module baselines rely on the runner's ledger before their next migration.
             record_migration(client, migration)
+
+        verify_applied_migration_integrity(client, manifests)
 
         # V276 must run after V150/V185 have established the fixed Partner identities.
         partner_identity = client.query(

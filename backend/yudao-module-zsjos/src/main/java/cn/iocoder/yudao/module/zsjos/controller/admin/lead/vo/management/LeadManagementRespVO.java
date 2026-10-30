@@ -9,6 +9,8 @@ import java.util.List;
 
 @Data
 public class LeadManagementRespVO {
+    /** Current public-sea membership; absent in projections that do not resolve detail actions. */
+    private Boolean inPublicSeaPool;
 
     /** Current viewer's pending tasks, using the same eligibility as the menu reminder. */
     private List<LeadTaskReminderRespVO> pendingTasks;

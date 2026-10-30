@@ -1,3 +1,6 @@
+-- File integrity for V114/V116/V136/V192/V193/V196/V208 is checked read-only by
+-- zsjos_db.verify_applied_migration_integrity. These SQL checks retain registry
+-- provenance and business postconditions; use the CLI for complete verification.
 -- Read-only verification. Every row should report PASS on a usable installation.
 SET NAMES utf8mb4;
 SOURCE script/sql/mysql/verify-lead-submitter-feedback.sql;
@@ -212,8 +215,7 @@ SELECT 'feedback_number_counter_repair' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'student_delivery_stages_checksums' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V114' AND checksum='student-delivery-stages-v6')
-          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V114'
-                     AND checksum IN ('1fef9e871cde4bfd670367634d45cabc0c5683ce5a9edda1918d056c1b57952d','f580dcd93fc83911fe221850221f95479104fdfb1bf65566100a4534f65e4155')), 'PASS','FAIL') AS result;
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V114'), 'PASS','FAIL') AS result;
 SELECT 'generic_work_order_idempotency_contract' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                   AND table_name='zsjos_work_order' AND column_name='idempotency_key'
@@ -228,8 +230,7 @@ SELECT 'generic_work_order_checksums' AS check_name,
 SELECT 'study_planner_repurchase_schema_gate' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V116'
                   AND checksum='study-planner-repurchase-permission-v5')
-          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V116'
-                     AND checksum IN ('38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324','f48a2b0ac4701f4c03bbcbb4bf7b1137d552d4a503137c16bf6e7ce6334e6f1d'))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V116')
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:sales-order:query-management' AND path='sales-orders'
@@ -243,8 +244,7 @@ SELECT 'study_planner_repurchase_schema_gate' AS check_name,
 SELECT 'sales_order_team_management_legacy' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V136'
                   AND checksum='V136__sales_order_team_management.sql')
-          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V136'
-                     AND checksum IN ('7dc898a066f84acc51fd760148b2022bc4781e4eace275ba1220d583393e1abb','0b5ed110a146eb3fa43aee71598349e590e5934425d8d4458d310c44138c9c0e'))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V136')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73510
                      AND permission='zsjos:sales-order:query-team' AND parent_id=6735
                      AND path='sales-orders/team' AND deleted=b'1'), 'PASS','FAIL') AS result;
@@ -259,8 +259,7 @@ SELECT 'delivery_class_access_repair' AS check_name,
                   WHERE version='V193'
                     AND checksum=SHA2('V193__delivery_class_access_repair.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-                      WHERE module_code='core' AND version='V193'
-                        AND checksum IN ('fdef29a57e4bbc2a7ad8e09dd96213426cad5f2321a42aa248f11ea9860bb0b0','29d4df644df985d5d7d087497c931283c696e5f7ed6ede2e876d8d847ef8e56b'))
+                      WHERE module_code='core' AND version='V193')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73020
                      AND name='学员管理' AND visible=b'1' AND deleted=b'0'),
           'PASS','FAIL') AS result;
@@ -1354,8 +1353,7 @@ SELECT 'study_planner_repurchase_permissions' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V116'
             AND checksum='study-planner-repurchase-permission-v5')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-            WHERE module_code='core' AND version='V116'
-              AND checksum IN ('38d7f9c146d41ec97f52f0f1e7cbe34f0c4216bf780c2e6440a2fdc3f3438324','f48a2b0ac4701f4c03bbcbb4bf7b1137d552d4a503137c16bf6e7ce6334e6f1d'))
+            WHERE module_code='core' AND version='V116')
           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
             AND table_name='zsjos_order' AND column_name='submission_request_fingerprint')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73511
@@ -1814,7 +1812,10 @@ SELECT 'V159 public sea terminology' AS check_name,
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V159')
           AND EXISTS (SELECT 1 FROM system_menu
-               WHERE id=6794 AND name='公海' AND permission='zsjos:lead-public-sea-pool:query'
+               WHERE id=6794
+                 AND name=IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V329'),'公海池','公海')
+                 AND (NOT EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V329') OR path='lead-public-sea-pool')
+                 AND permission='zsjos:lead-public-sea-pool:query'
                  AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu
                WHERE id=6795 AND name='管理部门公海' AND permission='zsjos:lead-public-sea-pool:manage'
@@ -2317,8 +2318,7 @@ SELECT 'V192/V193 delivery class menus and package coverage' AS check_name,
                   WHERE version='V192'
                     AND checksum=SHA2('V192__unify_delivery_class_menu.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-                      WHERE module_code='core' AND version='V192'
-                        AND checksum IN ('ec10b707345eba255d538ab8194fc3e2140bc597303d50884660b50964ac6ed5','f5c1f7acb6bef946eb012f588df16c37d94f585deaa883780fe5829f4900a001','470a704a3327062ad975b7c3ccd7460c704f78096d70f64b4fd83a3f0a4ebb5e'))
+                      WHERE module_code='core' AND version='V192')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73620 AND parent_id=(SELECT id FROM system_menu
                    WHERE path='/zsjos' AND parent_id=0 AND deleted=b'0' ORDER BY id LIMIT 1)
                    AND path='class-management' AND permission='zsjos:delivery-class:query'
@@ -2360,8 +2360,7 @@ SELECT 'V196 lead qualification ownership timing' AS check_name,
                   WHERE version='V196'
                     AND checksum=SHA2('V196__lead_qualification_from_ownership.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-                      WHERE module_code='core' AND version='V196'
-                        AND checksum IN ('43674e8e3b8df395895bdf6bb530b86a594b9161af65ea9eee323d1e4482095c','f706d7c9f0d08f85e62d185d8569e90247a4373179e5d47154fe05edab829784','cedb32fbe05423c1a4c45e4ba7bc30f4e02cd81af294a7cceccd5df7badc22be'))
+                      WHERE module_code='core' AND version='V196')
           AND NOT EXISTS (SELECT 1 FROM zsjos_lead
                           WHERE status='submitted' AND assignment_status='owned'
                             AND ownership_started_at IS NOT NULL
@@ -2422,8 +2421,7 @@ SELECT 'V208 viral account template V3 registries' AS check_name,
                   WHERE version='V208'
                     AND checksum=SHA2('V208__viral_account_template_v3.sql',256))
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
-                      WHERE module_code='core' AND version='V208'
-                        AND checksum IN ('26e50a71737465a96e3c48a24a7a0535089bfa46607dd04ca4799a7f67797dad','9604d6a47b019f5a0fb01de38452b2ba616e1e91003159c6e3acdd8bca8b534c')),
+                      WHERE module_code='core' AND version='V208'),
           'PASS','FAIL') AS result;
 SELECT 'V208 viral account template V3 layout' AS check_name,
        IF(EXISTS (

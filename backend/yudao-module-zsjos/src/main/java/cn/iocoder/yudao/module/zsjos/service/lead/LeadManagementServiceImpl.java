@@ -529,7 +529,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 result.setActiveSalesOrderId(activeOrder.getId());
                 result.setActiveSalesOrderStatus(activeOrder.getStatus());
             }
-            result.setAvailableActions(resolveActions(lead, opportunity, activeOrder, currentUserId));
+            result.setAvailableActions(resolveActions(lead, opportunity, activeOrder, currentUserId, result));
         }
         return result;
     }
@@ -691,9 +691,10 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,
                                                                 SalesOrderDO activeOrder,
-                                                                Long currentUserId) {
+                                                                Long currentUserId, LeadManagementRespVO result) {
         LeadPublicSeaPoolCycleDO publicSeaPoolCycle = publicSeaPoolService.getActiveCycle(lead.getId());
         boolean activePublicSea = publicSeaPoolCycle != null || publicSeaPoolService.hasCompatibilityPublicSeaPoolRecord(lead.getId());
+        result.setInPublicSeaPool(activePublicSea);
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
         if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.CREATE_PERMISSION)
                 && submitterFeedbackPermission.canCreate(lead, currentUserId)) {

@@ -249,6 +249,87 @@ performs only static checks and read-only target schema/version verification.
 schemas using installed menu/version metadata, then repeats the read-only target
 check. It does not imply that the complete historic fresh chain has passed.
 
+### Read-only verification separation (2026-10-30)
+
+The eight stale module-checksum predicates for Core V114/V116/V136/V192/V193/
+V196/V208 now run in `zsjos_db.verify_applied_migration_integrity`, separately
+from SQL registry and business-result predicates. V116 had two SQL predicates.
+The numbered migrations and installed database ledgers are not rewritten.
+See [the Git provenance audit](../development/fresh-verifier-history-20261030.md).
+
+Normal runner records require the actual file checksum or the existing narrow
+LF-ledger/CRLF-checkout equivalence. For these seven `baseline`/`legacy` versions,
+the old explicitly accepted checksum values are compatible only when version,
+filename and the current LF artifact hash match the reviewed artifact pins.
+This preserves the authorized 2026-09-17 removal of automatic role-menu writes
+without accepting unknown hashes, BOM/whitespace/body edits or arbitrary seed
+records. Their installed-artifact checks also run during migration preflight,
+before any upgrade writes. Other historical seed provenance checks retain their
+existing scope and are explicitly reported as deferred rather than file-verified.
+
+Complete `verify`/`test-fresh` requires every expected module version row. The
+integrity verifier is read-only and does not honor a checksum-skip flag; fresh
+verification no longer calls automatic checksum reconciliation. Do not rewrite
+an installed checksum to resolve a failure. Unknown differences still require a
+separate source/release compatibility review. The fresh harness records each
+successfully executed migration exactly as the production runner does.
+
+The V159 business check follows V329's final `公海池` name and relative path once
+V329 is registered; its permission, deletion-state and other semantic predicates
+remain enforced. Before V329, the original name expectation remains applicable.
+SQL alone cannot validate source-file integrity: use the CLI rather than treating
+standalone SQL PASS output as complete acceptance. `test-fresh` strictly fails
+on data-grade failures; the existing production `verify` warning policy for other
+historical data-grade audits is unchanged, and file/schema failures remain fatal.
+
+Run `python -B script/sql/mysql/tools/test_fresh_verification_contract.py --mysql`
+with `ZSJOS_MYSQL_IMAGE=mysql:8.4.11` for the full empty-database path plus negative
+tests. It creates its own isolated container, tests incorrect menu labels and
+permissions, missing version records, checksum tampering without auto-repair,
+and missing columns, then removes only that owned fixture. It never targets the
+application database. The Python checksum/execution/schema unit tests cover
+content tampering, EOL compatibility and fail-before-write behavior separately.
+
+### Fresh bootstrap entry guard (2026-10-30)
+
+`bootstrap.sql` checks the selected database before its first `SOURCE`. An absent
+database selection or any existing table/view, routine or event rejects the call
+using pure queries; it creates no permanent guard routine or table. Rejection
+must preserve schema objects, existing rows and version ledgers. This replaces
+the old late rejection that could recreate four obsolete empty tables.
+
+Use the migration account with visibility over all objects in the target schema
+and use the fail-fast MySQL client. Both the official executor and controlled
+fixture client explicitly pass `--skip-force`, overriding a client configuration
+that enables `force`. The native Python executor also checks emptiness through a
+separate read-only query before sending the canonical bootstrap file; only an
+unambiguous `1` admits execution. Probe failure or an unexpected result rejects
+the call without submitting DDL, independently of a distribution client's nested
+`SOURCE` behavior. Other numbered migrations do not use this fresh-only check.
+Direct invocation must follow the same contract:
+
+```text
+mysql --skip-force --default-character-set=utf8mb4 -u USER -p DATABASE < script/sql/mysql/bootstrap.sql
+```
+
+The diagnostic starts with `ZSJOS_BOOTSTRAP_REQUIRES_EMPTY_DATABASE` for non-empty
+targets. A deliberate fatal JSON expression stops execution without persistent
+DDL; this is preferable to installing a stored-procedure guard in the database
+being protected. Do not use `--force`, a GUI that continues after SQL errors, or
+individual baseline/seed files to bypass the entrypoint. SQL cannot stop a client
+that explicitly ignores its errors. Existing databases must use the normal
+pending-migration path, never bootstrap, even though accidental calls now reject
+before writes. Empty initialization still requires exclusive control and DDL
+after admission is not transactionally reversible.
+
+`test_bootstrap_entry_guard.py --mysql` verifies unchanged schema/data/ledgers,
+routine-only/view-only/event-only rejection, and a successful full fresh path.
+The fresh verification contract no longer tolerates obsolete-table drift after
+the non-empty probe: it requires zero drift before introducing a negative case.
+Rebuild the db-migrator image when deploying these entrypoint/tool changes; the
+image copies the SQL/tool sources at build time. This repair does not change an
+already running application or its database.
+
 ### Reviewed V306 fresh-install correction (2026-10-20)
 
 V306 now reads the manifest count into a local variable before its target query,

@@ -120,12 +120,13 @@ class MigrationExecutionTest(unittest.TestCase):
         self.client.backup.assert_not_called()
         self.client.execute_file.assert_not_called()
 
-    def fresh_fixture(self, fail_second, diagnostics=False):
+    def fresh_fixture(self, fail_second, diagnostics=False, tamper_after_record=False):
         migrations = []
         for number in (1, 2):
             item = self.migration(number, 'CREATE TABLE fixture(id INT);\n')
             migrations.append(db.Migration('pms', item.version, item.number, item.description, item.path, item.checksum))
         events = []
+        installed = {}
         client = Mock(spec=db.DockerTestClient)
 
         def query(statement):
@@ -133,6 +134,10 @@ class MigrationExecutionTest(unittest.TestCase):
             if match:
                 self.assertIn("'test-fresh'", statement)
                 events.append('record:' + match.group(1))
+                migration = next(item for item in migrations if item.version == match.group(1))
+                installed[('pms', migration.version)] = (migration.checksum, 'test-fresh')
+                if tamper_after_record and migration.version == 'V002':
+                    migration.path.write_bytes(migration.path.read_bytes() + b' ')
                 return ''
             if diagnostics and 'SELECT permission FROM system_menu WHERE id=79920' in statement:
                 return 'zsjos:partner:manage-all\n'
@@ -162,9 +167,10 @@ class MigrationExecutionTest(unittest.TestCase):
         stack.enter_context(patch.object(db, 'DockerTestClient', return_value=client))
         stack.enter_context(patch.object(db, 'docker_mysql_file', side_effect=execute))
         stack.enter_context(patch.object(db, 'docker_mysql_query'))
-        stack.enter_context(patch.object(db, 'load_manifests', return_value={}))
+        stack.enter_context(patch.object(db, 'load_manifests', return_value={
+            'pms': {'dependsOn': [], 'migrations': 'migrations'}}))
         stack.enter_context(patch.object(db, 'reconcile_checksums'))
-        stack.enter_context(patch.object(db, 'installed_versions', return_value={}))
+        stack.enter_context(patch.object(db, 'installed_versions', side_effect=lambda _: installed.copy()))
         stack.enter_context(patch.object(db, 'pending_migrations', return_value=migrations))
         return stack, events
 
@@ -179,6 +185,14 @@ class MigrationExecutionTest(unittest.TestCase):
         with stack, self.assertRaisesRegex(db.CommandError, 'synthetic migration failure'):
             db.test_fresh()
         self.assertEqual(['execute:V001', 'record:V001', 'execute:V002'], events)
+
+    def test_fresh_checks_recorded_file_bytes_and_never_reconciles_corruption(self):
+        stack, events = self.fresh_fixture(False, tamper_after_record=True)
+        with stack, patch.object(db, 'reconcile_checksums') as reconcile:
+            with self.assertRaisesRegex(db.CommandError, 'checksum changed: pms/V002'):
+                db.test_fresh()
+            reconcile.assert_not_called()
+        self.assertEqual(['execute:V001', 'record:V001', 'execute:V002', 'record:V002'], events)
 
     def test_fresh_data_failure_still_checks_and_reports_schema_drift(self):
         stack, events = self.fresh_fixture(False, diagnostics=True)

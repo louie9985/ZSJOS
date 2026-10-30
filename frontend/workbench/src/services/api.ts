@@ -1462,6 +1462,7 @@ export type ManagedLeadAttachment = {
 export type ManagedLeadRemarkAttachment = Omit<ManagedLeadAttachment, 'id'> & { infraFileId: number };
 export type ManagedLeadRemark = { id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string; attachments?: ManagedLeadRemarkAttachment[] };
 export type ManagedLead = {
+  inPublicSeaPool?: boolean;
   pendingTasks?: Array<{ id: number; taskType: string; title: string; dueAt?: Timestamp; overdue: boolean }>;
   appealSummary?: Pick<LeadAppeal, "id" | "roundNo" | "status" | "reviewStage" | "submittedAt"> & { canHandle: boolean };
   ownerIdentity?: string;

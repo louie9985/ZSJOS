@@ -72,3 +72,6 @@
 - 生产代码、SQL、依赖、归档、真实人员数据未修改；无发布/部署；不宣称穷尽所有业务输入或完成真实账号验收。
 
 入口：`npx vitest run src/features/zsjkqt`；`mvn -f backend/pom.xml -pl yudao-module-zsjos -am -Dtest=Zsjkqt*Test -Dsurefire.failIfNoSpecifiedTests=false test`。详见 [交付记录](../../../handoff/local-zsjkqt-business-audit-20261026.md)。
+
+
+2026-10-30 口径更新：用户确认产检假计入实际出勤，已将其纳入出勤状态；保留独立假别且不并入产假天数。上文第 3 项对产检假的描述为当时审计结果，现已被此确认取代；陪产假及带薪的结论不变。

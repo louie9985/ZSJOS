@@ -81,9 +81,32 @@ class LeadSupplementRemarkTest {
     }
     @Test void partnerAppendRetainsTypedSubject() {
         lead.setProviderOwnerType(PROVIDER_OWNER_PARTNER); lead.setProviderOwnerId(70L);
-        service.supplementForPartner(1L, 70L, request("partner", "B"));
+        service.supplementForPartner(1L, 70L, 700L, request("partner", "B"));
         assertEquals(PROVIDER_OWNER_PARTNER, LeadRemarkHistoryService.payload(events.get("partner")).get("submitterType"));
         assertEquals("A", lead.getRemark());
+    }
+
+    @Test void partnerAttachmentsUseAccountWhileLeadUsesPartnerIdentity() {
+        lead.setProviderOwnerType(PROVIDER_OWNER_PARTNER); lead.setProviderOwnerId(70L);
+        var req = request("attachment", "B");
+        var attachment = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentReqVO();
+        attachment.setInfraFileId(99L); req.setAttachments(List.of(attachment));
+        service.supplementForPartner(1L, 70L, 700L, req);
+        verify(attachmentService).validatePartnerReferences(req.getAttachments(), 700L);
+        verify(attachmentService, never()).validatePartnerReferences(anyList(), eq(70L));
+        assertEquals(1, events.size());
+    }
+
+    @Test void partnerAttachmentRejectionPreventsWrites() {
+        lead.setProviderOwnerType(PROVIDER_OWNER_PARTNER); lead.setProviderOwnerId(70L);
+        var req = request("denied", "B");
+        var attachment = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentReqVO();
+        attachment.setInfraFileId(99L); req.setAttachments(List.of(attachment));
+        when(attachmentService.validatePartnerReferences(req.getAttachments(), 700L))
+                .thenThrow(new IllegalArgumentException("wrong attachment owner"));
+        assertThrows(IllegalArgumentException.class, () -> service.supplementForPartner(1L, 70L, 700L, req));
+        verify(leadMapper, never()).updateById(any(LeadDO.class));
+        assertTrue(events.isEmpty());
     }
 
     @Test void remarkLengthValidationAndNormalizedDigest() {
