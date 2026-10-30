@@ -30,3 +30,31 @@
 - Evidence PASS: mysqldump exit 0 and empty stderr; full gzip CRC and strict UTF-8 read; exact database/table inventory, data statements and completion trailer; SHA-256 ff76bd5281ce4dee4ee5629397f9ffe09180d02d081711670b4e68f2117c69bb independently verified using sha256sum -c. Archive 0600 under private 0700 directory.
 - Files: new archive plus inventory/checksum/stderr/verification sidecars, latest pointer and this record. Previous backups and all unrelated work preserved. No database mutation, restore, service operation, commit or push.
 - Limits: restore rehearsal not performed; external uploaded objects and MySQL system accounts excluded. Remaining work None; latest backup delivered; ownership released.
+
+## Registration update — 2026-10-30T09:53:03.089461+08:00
+- Owner /root resumes backup workstream; environment test from /etc/zsjos/agent-environment; branch main; worktree /opt/zsjos; base/HEAD ba8c788f470eb96d22e8729a2d8f711d83c0c370; target branch/integration None.
+- Goal: user-requested latest configured zsjos database backup to backup/. Ownership: new timestamped archive and inventory/checksum/verification sidecars, pending/latest pointers and this record. Preserve existing backups and all unrelated concurrent work.
+- Non-goals: data cleanup/mutation, database restoration, services, application/SQL source changes, Git operations.
+- Dependencies: existing zsjos-mysql-1 MySQL 8.4.11 and secret mount; 574 InnoDB tables, zero views/routines/triggers/events; 53 GiB free. Stream single-transaction utf8mb4 dump through gzip.
+- Verification: dump exit/stderr, full gzip CRC/UTF-8, exact table inventory and database scope, completion/data markers, SHA-256 readback, permissions; no restore rehearsal. External uploaded files/system accounts excluded.
+
+## Delivery — 2026-10-30T09:55:16.617820+08:00
+- Context: registration update above; owner /root; test/main /opt/zsjos; HEAD unchanged ba8c788f470eb96d22e8729a2d8f711d83c0c370; dependency/integration impact None.
+- Latest backup: /opt/zsjos/backup/zsjos-test-20261030T015303Z.sql.gz; 307874103 compressed bytes / 4829517140 uncompressed bytes; 574 tables. Single-transaction utf8mb4 export with routines/events/triggers enabled (none present).
+- PASS: mysqldump exit 0/empty stderr; full gzip CRC and strict UTF-8; exact database/table inventory, data statements and completion marker; SHA-256 9735b2dfd3983513db5171280bece09e5a5b581bec448757d646df77b1d18f10 and independent sha256sum -c. Private directory 0700/archive 0600.
+- Files: new archive, inventory/checksum/stderr/verification sidecars, latest pointer and this record. Previous backups and unrelated work preserved. No database mutation, restore, service lifecycle, commit or push.
+- Limits: no restore rehearsal; external uploaded objects and MySQL system accounts excluded. Latest backup complete; remaining work None; ownership released.
+
+## Registration update — 2026-10-30T13:29:38.963227+08:00
+- Owner /root; environment test; main /opt/zsjos; HEAD unchanged ba8c788f470eb96d22e8729a2d8f711d83c0c370; target branch/integration None.
+- User explicitly requests latest database backup and cleanup of previous backups. Scope: new backup/ timestamped archive and sidecars, backup/refresh-20261030T052938Z private fixed cleanup manifest/result, latest pointer and this record; delete only three previous complete archives (20261026T015814Z, 20261026T100925Z, 20261030T015303Z) plus their four sidecars each, after new archive verification.
+- Exact impact: 15 regular files, 824255846 bytes permanently removed; no copy of old restore points created. Preserve repair/cleanup evidence, all other paths, concurrent work and database data. No services or Git operations.
+- Dependencies: configured zsjos on zsjos-mysql-1, MySQL 8.4.11; 574 InnoDB tables, no views/routines/triggers/events; 53 GiB available.
+- Verification: single-transaction utf8mb4 export exit/stderr; full gzip CRC/UTF-8, table/database inventory, completion/data markers, SHA256 readback, private permissions; recheck all frozen file stats before exact unlink; retained file comparison and deletion journal. No restore rehearsal; external files/system accounts excluded.
+
+## Delivery — 2026-10-30T13:31:44.201023+08:00
+- Context: registration update above; /root; test/main /opt/zsjos; HEAD unchanged ba8c788f470eb96d22e8729a2d8f711d83c0c370; integration/dependency impact None.
+- New archive /opt/zsjos/backup/zsjos-test-20261030T052938Z.sql.gz; 311213737 compressed / 4887868206 uncompressed bytes; 574 tables. Export exit 0, empty stderr, full gzip CRC/UTF-8, exact table/database inventory, data/completion marker, SHA256 477f9b4d1199780dbe88961a4e1599cc7f8a5907a11df671d3ea2d1d0c7dbb7a and independent checksum readback PASS; archive 0600/directory0700. Latest pointer updated.
+- Deleted precisely 3 old archives and 12 sidecars (15 files, 824255846 bytes); frozen metadata guards and flushed per-file journal; all 6 protected files unchanged. backup/ now has only the latest full archive. Other directories and repair evidence preserved.
+- Files: archive and sidecars, latest/pending-cleanup pointers, backup/refresh-20261030T052938Z manifest/journal/result, this record. All unrelated work preserved. No database writes, service lifecycle, commits or pushes.
+- Limits: no restore rehearsal; external uploaded objects and MySQL system accounts excluded. Removed historical restore points have no newly created copy. User-authorized backup/cleanup complete; ownership released.

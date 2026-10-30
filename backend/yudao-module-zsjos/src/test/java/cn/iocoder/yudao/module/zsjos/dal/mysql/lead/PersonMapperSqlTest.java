@@ -49,10 +49,10 @@ class PersonMapperSqlTest {
     }
 
     @Test
-    void duplicateCandidateSqlRemainsCaseSensitiveAndTenantParserCompatible() throws Exception {
-        assertDuplicateCandidateSql(Map.of("mobile", "13800000000"), 2);
-        assertDuplicateCandidateSql(Map.of("wechatId", "CaseSensitiveWechat"), 2);
-        assertDuplicateCandidateSql(Map.of("mobile", "13800000000", "wechatId", "CaseSensitiveWechat"), 4);
+    void duplicateCandidateSqlIncludesVerifiedAliasesAndRemainsParserCompatible() throws Exception {
+        assertDuplicateCandidateSql(Map.of("mobile", "13800000000"), 6);
+        assertDuplicateCandidateSql(Map.of("wechatId", "CaseSensitiveWechat"), 6);
+        assertDuplicateCandidateSql(Map.of("mobile", "13800000000", "wechatId", "CaseSensitiveWechat"), 8);
     }
 
     @Test
@@ -98,9 +98,25 @@ class PersonMapperSqlTest {
 
         assertTrue(sql.contains("CAST(mobile AS BINARY)=CAST(? AS BINARY)"));
         assertTrue(sql.contains("LOWER(wechat_id)=LOWER(?)"));
+        assertTrue(sql.contains("ca.tenant_id=zsjos_person.tenant_id"));
+        assertTrue(sql.contains("ca.person_id=zsjos_person.id"));
+        assertTrue(sql.contains("ca.deleted=b'0'"));
+        assertTrue(sql.contains("LOWER(ca.contact_value)=LOWER(?)"));
         assertFalse(sql.contains("BINARY mobile"));
         assertEquals(parameterCount, boundSql.getParameterMappings().size());
         assertDoesNotThrow(() -> CCJSqlParserUtil.parse(sql));
+
+        Method lockedMethod = PersonMapper.class.getMethod("selectDuplicateCandidatesForUpdate",
+                String.class, String.class, Long.class);
+        String lockedScript = String.join("", lockedMethod.getAnnotation(Select.class).value());
+        Map<String, Object> lockedParameters = new HashMap<>(parameters);
+        lockedParameters.put("tenantId", 1L);
+        BoundSql locked = new XMLLanguageDriver().createSqlSource(configuration, lockedScript, Map.class)
+                .getBoundSql(lockedParameters);
+        assertEquals(parameterCount + 1, locked.getParameterMappings().size());
+        assertTrue(locked.getSql().contains("tenant_id=?"));
+        assertTrue(locked.getSql().contains("FOR UPDATE"));
+        assertDoesNotThrow(() -> CCJSqlParserUtil.parse(locked.getSql()));
     }
 
     /**
@@ -108,6 +124,6 @@ class PersonMapperSqlTest {
      */
     @Test
     void wechatMatchIsCaseInsensitiveWhileMobileRemainsBinary() throws Exception {
-        assertDuplicateCandidateSql(Map.of("wechatId", "CaseSensitiveWechat"), 2);
+        assertDuplicateCandidateSql(Map.of("wechatId", "CaseSensitiveWechat"), 6);
     }
 }
