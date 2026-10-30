@@ -26,6 +26,22 @@ public class LeadCollaborationService {
     @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private LeadPublicSeaPoolCompatibilityRecordMapper publicSeaPoolCompatibilityRecordMapper;
     @Resource private LeadMapper leadMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCycleMapper cycleMapper;
+
+    public void requireCanWriteForUpdate(LeadDO lead, Long userId, boolean basicInfo) {
+        var cycle = cycleMapper.selectActiveByLeadIdForUpdate(lead.getId(), TenantContextHolder.getRequiredTenantId());
+        if (cycle != null) {
+            if (publicSeaPoolCompatibilityRecordMapper.selectByLeadIdForUpdate(lead.getId(),
+                    TenantContextHolder.getRequiredTenantId()) != null) throw exception(LEAD_COLLABORATION_POOL_CONFLICT);
+            if (!(basicInfo ? LeadPublicSeaWritePolicy.canEdit(cycle, userId)
+                    : LeadPublicSeaWritePolicy.canFollow(cycle, userId))) throw exception(LEAD_PERMISSION_DENIED);
+        } else if (basicInfo) {
+            if (userId == null || !Objects.equals(userId, lead.getOwnerUserId())) throw exception(LEAD_PERMISSION_DENIED);
+        } else {
+            requireCanOperateForUpdate(lead, userId);
+        }
+    }
+
 
     public OperationContext requireCanOperateForUpdate(LeadDO lead, Long operatorUserId) {
         if (operatorUserId == null) throw exception(LEAD_PERMISSION_DENIED);

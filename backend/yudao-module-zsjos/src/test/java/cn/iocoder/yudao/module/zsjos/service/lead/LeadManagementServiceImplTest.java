@@ -891,7 +891,7 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
-    void activePoolCollaboratorOnlyReceivesFollowUpAndDealActions() {
+    void activePoolCollaboratorReceivesFollowUpAndEditButNoDealActions() {
         LeadDO lead = actionLead("valid", "owned", true);
         OpportunityDO opportunity = new OpportunityDO();
         opportunity.setId(30L); opportunity.setStatus("following");
@@ -899,7 +899,6 @@ class LeadManagementServiceImplTest {
                 new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO();
         cycle.setStatus("assigned"); cycle.setCollaboratorUserId(30L);
         when(publicSeaPoolService.getActiveCycle(1L)).thenReturn(cycle);
-        when(publicSeaPoolService.canOperate(1L, 20L, 30L)).thenReturn(true);
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
@@ -908,10 +907,32 @@ class LeadManagementServiceImplTest {
         when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
         when(securityFrameworkService.hasPermission("zsjos:lead:update")).thenReturn(true);
         when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
-        when(securityFrameworkService.hasPermission("zsjos:lead:qualify")).thenReturn(true);
         LeadManagementRespVO result = service.getLead(1L, 30L);
 
-        assertEquals(List.of("ADD_FOLLOW_UP"), result.getAvailableActions().stream()
+        assertEquals(List.of("ADD_FOLLOW_UP", "EDIT_BASIC_INFO"), result.getAvailableActions().stream()
+                .map(LeadManagementRespVO.ActionVO::getCode).toList());
+    }
+
+    @Test
+    void waitingPoolOwnerReceivesFollowUpAndEditButNoDealActions() {
+        LeadDO lead = actionLead("valid", "owned", true);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("following");
+        cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO cycle =
+                new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO();
+        cycle.setStatus("waiting_assignment"); cycle.setOriginalOwnerUserId(20L);
+        when(publicSeaPoolService.getActiveCycle(1L)).thenReturn(cycle);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canReadDetail(lead, 20L)).thenReturn(true);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        when(securityFrameworkService.hasPermission("zsjos:lead:update")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
+        LeadManagementRespVO result = service.getLead(1L, 20L);
+
+        assertEquals(List.of("ADD_FOLLOW_UP", "EDIT_BASIC_INFO"), result.getAvailableActions().stream()
                 .map(LeadManagementRespVO.ActionVO::getCode).toList());
     }
 

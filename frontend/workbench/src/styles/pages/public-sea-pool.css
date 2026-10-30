@@ -34,3 +34,13 @@
     flex-direction: column;
   }
 }
+
+@media(max-width:768px) {
+  /* This page scrolls with its filters; it has no fixed-height inbox parent. */
+  .public-sea-pool-page .lead-inbox-layout,
+  .public-sea-pool-page .lead-inbox-list-pane {
+    height: auto;
+    min-height: auto;
+    flex: none;
+  }
+}

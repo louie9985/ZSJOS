@@ -28,6 +28,22 @@ public class GiftPurchaseController {
         return success(service.page(req));
     }
 
+    @GetMapping("/export-excel")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:export')")
+    public void exportExcel(@Valid GiftPurchasePageReqVO req, jakarta.servlet.http.HttpServletResponse response)
+            throws java.io.IOException {
+        byte[] workbook = service.exportExcel(req);
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment; filename=gift-purchases.xlsx");
+        response.getOutputStream().write(workbook);
+    }
+
+    @PutMapping("/batch-purchase")
+    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:batch-purchase')")
+    public CommonResult<GiftPurchaseBatchRespVO> batchPurchase(@Valid @RequestBody GiftPurchaseBatchReqVO req) {
+        return success(service.batchPurchase(req));
+    }
+
     @GetMapping("/get")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:gift-purchase:detail','zsjos:gift-purchase:update')")
     public CommonResult<GiftPurchaseRespVO> get(@RequestParam Long id) { return success(service.get(id)); }

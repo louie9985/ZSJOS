@@ -7,6 +7,8 @@ import {
   Input,
   Modal,
   Select,
+  Segmented,
+  Space,
   Skeleton,
   Tag,
   Typography,
@@ -28,6 +30,14 @@ import { formatTimestamp } from "../services/time";
 import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
 import { isLeadInboxUnauthorized } from "../services/leadManagement";
 
+import BusinessTable from "../components/BusinessTable";
+import DateTimeText from "../components/DateTimeText";
+import ResizableDetailDrawer from "../components/ResizableDetailDrawer";
+import { useInboxTableLayout } from "../services/inboxLayout";
+import { useTheme } from "../components/Theme/ThemeContext";
+import { INBOX_LAYOUT_OPTIONS } from "../constants";
+import type { ProColumns } from "@ant-design/pro-components";
+
 const statusLabel: Record<LeadPublicSeaPoolStatus, string> = {
   waiting_assignment: "待指派",
   assigned: "协同跟进中",
@@ -35,6 +45,11 @@ const statusLabel: Record<LeadPublicSeaPoolStatus, string> = {
 };
 
 export default function LeadPublicSeaPoolPage() {
+  const { isDesktop, useTableLayout } = useInboxTableLayout();
+  const { inboxLayoutMode, setInboxLayoutMode } = useTheme();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [pageSize, setPageSize] = useState(20);
+  const pageRef = useRef(1);
   const [items, setItems] = useState<LeadPublicSeaPoolItem[]>([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -102,7 +117,7 @@ export default function LeadPublicSeaPoolPage() {
         const [page, nextCounts, nextProfile] = await Promise.all([
           api.publicSeaPoolPage({
             pageNo: nextPageNo,
-            pageSize: 20,
+            pageSize,
             keyword: nextKeyword || undefined,
             inboxGroup: publicSeaPoolGroup?.key || "all",
             inboxStage: inboxStage || "all",
@@ -118,9 +133,14 @@ export default function LeadPublicSeaPoolPage() {
           : page.list || []);
         setTotal(page.total || 0);
         setPageNo(nextPageNo);
+        pageRef.current = nextPageNo;
         setCounts(nextCounts);
         setFilterProfile(nextProfile);
         if (!overrides?.append) {
+          if (useTableLayout && nextPageNo > 1 && !page.list.length && page.total > 0) {
+            void load({ pageNo: Math.max(1, Math.ceil(page.total / pageSize)) });
+            return;
+          }
           const nextSelected = page.list.find((item) => item.cycleId === selectedCycleRef.current) || page.list[0];
           setSelected(nextSelected);
           selectedCycleRef.current = nextSelected?.cycleId;
@@ -128,6 +148,13 @@ export default function LeadPublicSeaPoolPage() {
         }
       } catch (loadError) {
         if (requestId === listRequestRef.current) {
+          if (isLeadInboxUnauthorized(loadError instanceof Error ? loadError.message : "")) {
+            setItems([]);
+            setSelected(undefined);
+            setDetail(undefined);
+            setDrawerOpen(false);
+            ++detailRequestRef.current;
+          }
           setError(
             loadError instanceof Error ? loadError.message : "公海池加载失败",
           );
@@ -136,22 +163,24 @@ export default function LeadPublicSeaPoolPage() {
         if (requestId === listRequestRef.current) setLoading(false);
       }
     },
-    [advancedFilter, publicSeaPoolGroup?.key, inboxStage, keyword, loadDetail, relationScope],
+    [pageSize, useTableLayout, advancedFilter, publicSeaPoolGroup?.key, inboxStage, keyword, loadDetail, relationScope],
   );
 
   useEffect(() => {
     void load();
   }, [load]);
   const selectItem = async (item: LeadPublicSeaPoolItem) => {
+    setDrawerOpen(true);
     setSelected(item);
     selectedCycleRef.current = item.cycleId;
     await loadDetail(item);
   };
-  const openAssign = async () => {
-    if (!selected) return;
+  const openAssign = async (item = selected) => {
+    if (!item) return;
+    void selectItem(item);
     try {
-      setCandidates(await api.publicSeaPoolCandidates(selected.cycleId));
-      setCandidateId(selected.collaboratorUserId);
+      setCandidates(await api.publicSeaPoolCandidates(item.cycleId));
+      setCandidateId(item.collaboratorUserId);
       setAssignOpen(true);
     } catch (candidateError) {
       message.error(
@@ -171,7 +200,7 @@ export default function LeadPublicSeaPoolPage() {
       await api.assignPublicSeaPool(selected.cycleId, candidateId);
       message.success("协同销售已更新");
       setAssignOpen(false);
-      await load();
+      await load({ pageNo: useTableLayout ? pageRef.current : 1 });
     } catch (assignError) {
       message.error(
         assignError instanceof Error ? assignError.message : "协同销售更新失败",
@@ -191,7 +220,7 @@ export default function LeadPublicSeaPoolPage() {
       message.success("商机已退出公海池");
       setExitOpen(false);
       setExitReason("");
-      await load();
+      await load({ pageNo: useTableLayout ? pageRef.current : 1 });
     } catch (exitError) {
       message.error(
         exitError instanceof Error ? exitError.message : "退出公海池失败",
@@ -209,10 +238,50 @@ export default function LeadPublicSeaPoolPage() {
       message.success("正式转派申请已提交主管审批");
       setTransferOpen(false);
       setTransferReason("");
+      await load({ pageNo: useTableLayout ? pageRef.current : 1 });
+    } catch (transferError) {
+      message.error(transferError instanceof Error ? transferError.message : "转派申请失败");
     } finally {
       setSaving(false);
     }
   };
+
+  const detailContent = (<>
+          {detailError ? <Alert type={isLeadInboxUnauthorized(detailError) ? "warning" : "error"} showIcon
+              message={isLeadInboxUnauthorized(detailError) ? "无权查看该客资" : "客资详情加载失败"}
+              description={detailError}
+              action={!isLeadInboxUnauthorized(detailError) ? <Button size="small" onClick={() => void loadDetail(selected)}>重试</Button> : undefined}/>
+            : !selected ? <Empty description="选择一条客资查看详情" />
+            : !detail ? <Skeleton active paragraph={{ rows: 10 }} />
+            : <><div className="public-sea-pool-business-bar"><div><Typography.Text strong>公海协作</Typography.Text><Typography.Text type="secondary">A：{selected.originalOwnerUserName || `#${selected.originalOwnerUserId}`} · B：{selected.collaboratorUserName || "待指派"} · 到期 {formatTimestamp(selected.dueAt)}</Typography.Text></div></div>
+              <LeadDetail lead={detail} categories={[]} categoryLabel={value => value || "未记录"} channelLabel={value => value || "未记录"}
+                mode="owner" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void load({ pageNo: useTableLayout ? pageRef.current : 1 })}
+                contextToolbarActions={[
+                  selected.availableActions.includes("ASSIGN") && { key: "public-sea-pool-assign", icon: <UserSwitchOutlined/>, label: selected.collaboratorUserId ? "换派B" : "指派B", onClick: () => void openAssign() },
+                  selected.availableActions.includes("EXIT") && { key: "public-sea-pool-exit", icon: <ExportOutlined/>, label: "退出公海", danger: true, onClick: () => setExitOpen(true) },
+                  selected.availableActions.includes("REQUEST_TRANSFER") && { key: "public-sea-pool-transfer-request", icon: <MessageOutlined/>, label: "申请转给我", onClick: () => setTransferOpen(true) },
+                ].filter(Boolean) as ToolbarAction[]}/></>}</>);
+  const columns: ProColumns<LeadPublicSeaPoolItem>[] = [
+    { title: "客资编号", dataIndex: "leadNo", width: 180, render: (_, row) => <Button type="link" onClick={() => void selectItem(row)}>{row.leadNo || "未记录"}</Button> },
+    { title: "姓名", dataIndex: "submittedName", width: 140 },
+    { title: "手机号", dataIndex: "submittedMobile", width: 150 },
+    { title: "微信号", dataIndex: "submittedWechatId", width: 160 },
+    { title: "公海状态", dataIndex: "status", width: 130, render: (_, row) => <Tag>{statusLabel[row.status] || row.status}</Tag> },
+    { title: "原负责人 A", dataIndex: "originalOwnerUserName", width: 140 },
+    { title: "协同销售 B", dataIndex: "collaboratorUserName", width: 140, render: (_, row) => row.collaboratorUserName || "待指派" },
+    { title: "归属部门", dataIndex: "frozenDeptName", width: 160 },
+    { title: "客资分类（记录值）", dataIndex: "leadCategory", width: 160 },
+    { title: "来源渠道（记录值）", dataIndex: "sourceChannel", width: 160 },
+    { title: "成交订单状态", dataIndex: "activeSalesOrderStatus", width: 150, render: (_, row) => row.activeSalesOrderStatus === "pending_approval" ? "审批中" : row.activeSalesOrderStatus === "revision_required" ? "待修订" : "-" },
+    { title: "公海轮次", dataIndex: "cycleNo", width: 100 },
+    ...([['ownershipStartedAt', '归属开始时间'], ['enteredAt', '进入公海时间'], ['assignedAt', '协同指派时间'], ['dueAt', '到期时间'], ['lastFollowUpAt', '最近跟进时间'], ['nextFollowUpAt', '下次跟进时间']] as const).map(([key, title]) => ({ title, dataIndex: key, width: 180, render: (_: unknown, row: LeadPublicSeaPoolItem) => <DateTimeText value={row[key]}/> })),
+    { title: "操作", key: "action", valueType: "option", width: 330, render: (_, row) => <Space>
+      <Button type="link" onClick={() => void selectItem(row)}>查看</Button>
+      {row.availableActions.includes("ASSIGN") && <Button type="link" onClick={() => void openAssign(row)}>{row.collaboratorUserId ? "换派B" : "指派B"}</Button>}
+      {row.availableActions.includes("EXIT") && <Button type="link" danger onClick={() => { void selectItem(row); setExitReason(""); setExitOpen(true); }}>退出公海</Button>}
+      {row.availableActions.includes("REQUEST_TRANSFER") && <Button type="link" onClick={() => { void selectItem(row); setTransferReason(""); setTransferOpen(true); }}>申请转给我</Button>}
+    </Space> },
+  ];
 
   return (
     <section className="workspace-page public-sea-pool-page">
@@ -241,9 +310,14 @@ export default function LeadPublicSeaPoolPage() {
         ))}
       </header>
       <div className="public-sea-pool-toolbar">
+        <Space wrap>
+        {isDesktop && <Segmented aria-label="公海池视图" options={INBOX_LAYOUT_OPTIONS} value={inboxLayoutMode} onChange={value => { setDrawerOpen(false); setInboxLayoutMode(value); }}/>}
+        <Button onClick={() => void load({ pageNo: useTableLayout ? pageNo : 1 })}>刷新</Button>
+        <Button onClick={() => { setKeyword(""); setAdvancedFilter(undefined); setInboxStage(undefined); setRelationScope(undefined); }}>重置筛选</Button>
+        </Space>
         <AdvancedFilterToolbar scene="lead" pageKey="lead_public_sea_pool" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={(value) => { setKeyword(value); setPageNo(1) }} onChange={setAdvancedFilter}/>
       </div>
-      {error && (
+      {error && !useTableLayout && (
         <Alert
           type={isLeadInboxUnauthorized(error) ? "warning" : "error"}
           showIcon
@@ -256,7 +330,12 @@ export default function LeadPublicSeaPoolPage() {
           ) : undefined}
         />
       )}
-      <div className="lead-inbox-layout">
+      {useTableLayout ? <BusinessTable<LeadPublicSeaPoolItem>
+        tableKey="lead-public-sea-pool" rowKey="cycleId" columns={columns}
+        dataSource={items} loading={loading} error={error} unauthorized={isLeadInboxUnauthorized(error)}
+        onReload={() => void load({ pageNo })}
+        pagination={{ current: pageNo, pageSize, total, showSizeChanger: true, onChange: (page, size) => { if (size !== pageSize) setPageSize(size); else void load({ pageNo: page }); } }}
+      /> : <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
           <div className="lead-inbox-toolbar"><Typography.Text type="secondary">共 {total} 条</Typography.Text></div>
           <div className="lead-inbox-scroll">
@@ -277,22 +356,12 @@ export default function LeadPublicSeaPoolPage() {
           </div>
         </aside>
         <main className="lead-inbox-detail-pane">
-          {detailError ? <Alert type={isLeadInboxUnauthorized(detailError) ? "warning" : "error"} showIcon
-              message={isLeadInboxUnauthorized(detailError) ? "无权查看该客资" : "客资详情加载失败"}
-              description={detailError}
-              action={!isLeadInboxUnauthorized(detailError) ? <Button size="small" onClick={() => void loadDetail(selected)}>重试</Button> : undefined}/>
-            : !selected ? <Empty description="选择一条客资查看详情" />
-            : !detail ? <Skeleton active paragraph={{ rows: 10 }} />
-            : <><div className="public-sea-pool-business-bar"><div><Typography.Text strong>公海协作</Typography.Text><Typography.Text type="secondary">A：{selected.originalOwnerUserName || `#${selected.originalOwnerUserId}`} · B：{selected.collaboratorUserName || "待指派"} · 到期 {formatTimestamp(selected.dueAt)}</Typography.Text></div></div>
-              <LeadDetail lead={detail} categories={[]} categoryLabel={value => value || "未记录"} channelLabel={value => value || "未记录"}
-                mode="owner" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void load()}
-                contextToolbarActions={[
-                  selected.availableActions.includes("ASSIGN") && { key: "public-sea-pool-assign", icon: <UserSwitchOutlined/>, label: selected.collaboratorUserId ? "换派B" : "指派B", onClick: () => void openAssign() },
-                  selected.availableActions.includes("EXIT") && { key: "public-sea-pool-exit", icon: <ExportOutlined/>, label: "退出公海", danger: true, onClick: () => setExitOpen(true) },
-                  selected.availableActions.includes("REQUEST_TRANSFER") && { key: "public-sea-pool-transfer-request", icon: <MessageOutlined/>, label: "申请转给我", onClick: () => setTransferOpen(true) },
-                ].filter(Boolean) as ToolbarAction[]}/></>}
+          {detailContent}
         </main>
-      </div>
+      </div>}
+      <ResizableDetailDrawer title={selected?.submittedName || "客资详情"} open={drawerOpen && (useTableLayout || !isDesktop)} onClose={() => setDrawerOpen(false)} desktopResizable={isDesktop} width={isDesktop ? undefined : "100%"}>
+        {detailContent}
+      </ResizableDetailDrawer>
       <Modal
         title={selected?.collaboratorUserId ? "更换协同销售B" : "指派协同销售B"}
         open={assignOpen}

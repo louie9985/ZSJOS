@@ -2284,6 +2284,8 @@ export type BpmBusinessTaskTarget =
 export type BusinessTaskBucket = "unscheduled" | "overdue" | "today" | "future";
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>;
 export type BusinessTask = {
+  cancellable?: boolean;
+  cancelReason?: string;
   assigneeId?: number;
   assigneeName?: string;
   id: number;
@@ -5186,6 +5188,8 @@ export const api = {
       await http.post("/zsjos/sales-order/voucher/upload", data),
     );
   },
+  cancelBusinessTask: async (id: number, reason: string) =>
+    invalidateMenuTasks(unwrap<boolean>(await http.post(`/zsjos/business-task/${id}/cancel`, { reason }))),
   businessTaskSummary: async (params?: { readScope?: "SELF" | "ALL" | "USER"; targetUserId?: number }) =>
     unwrap<BusinessTaskSummary>(
       await http.get("/zsjos/business-task/my-summary", { params }),

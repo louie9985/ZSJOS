@@ -64,3 +64,16 @@ python -B script/sql/mysql/tools/test_gift_purchase_management.py
 
 
 采购候选及新选择校验统一展平服务端礼品树，保留全部父子关系；只允许启用的叶子节点，历史未变选择仍保留快照。
+
+## 采购导出与批量采购（2026-10-30）
+
+Admin 列表提供独立按钮“导出”“批量采购”；Workbench 继续沿用既有页面覆盖方式，不增加原生采购实现。租户内 Admin 管理范围保持不变，不按来源销售或操作人推断对象范围。
+
+- `GET /export-excel`：`zsjos:gift-purchase:export`，使用列表同一筛选及排序，忽略分页范围。默认未采购；选择全部状态后导出全部状态。返回 XLSX，包含采购清单和对应操作记录两个工作表，以本次导出序号关联。主表含状态、姓名、手机、微信、礼品历史名称、完整地址、来源、订单号、来源人、生成时间、当前采购标记人和时间。手机号、订单号和用户文本按字符串写入；不将用户文本作为公式。缺少历史证据不回查当前目录或姓名补造。
+- `PUT /batch-purchase`：`zsjos:gift-purchase:batch-purchase`，请求 `{ids: number[]}`，1–200 个正整数，后端去重。按 ID 升序锁定全部有效记录，经独立 `@ZsjosPermission` 代理边界逐条检查租户对象范围及配置权限，再统一更新。任一不存在、已删除或未授权记录使整批失败；状态与 PURCHASE 历史同事务提交。已采购对象跳过，不覆盖原采购人。返回 `{purchased, skipped}`。
+- UI 只勾选本页未采购记录；翻页、刷新或修改筛选清空选择。确认后执行，成功回到第一页刷新；失败保留选择并展示后端错误。现有单条采购与编辑的 update 权限保持不变。
+- 新错误 `1900157003` 表示对象操作无权限。批量输入校验沿用 Jakarta Validation。
+
+升级顺序为 V355 → `V356__gift_purchase_export_batch_permissions.sql` → 对应后端/Admin。V356 仅为原采购页追加 export、batch-purchase 按钮元数据和两个版本账本；保留管理员设置，不写角色授权，不修改业务记录。管理员在系统角色管理中独立授予两个按钮权限。迁移检查前置版本和菜单身份，DML/后置检查/双账本共用失败回滚路径；重复执行可恢复缺失元数据，冲突时拒绝执行。回滚应用时可在菜单管理停用按钮，不删除历史账本。
+
+定向迁移验证：`python -B script/sql/mysql/tools/test_gift_purchase_export_batch.py`。测试使用保留的独立 MySQL 验证库，不写真实业务记录或角色授权。

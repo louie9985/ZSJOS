@@ -744,6 +744,21 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_COMPLAINT, true));
             }
         }
+        if (publicSeaPoolCycle != null && !publicSeaPoolService.hasCompatibilityPublicSeaPoolRecord(lead.getId())
+                && !OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) {
+            if (LeadPublicSeaWritePolicy.canFollow(publicSeaPoolCycle, currentUserId)
+                    && securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
+            }
+            if (LeadPublicSeaWritePolicy.canEdit(publicSeaPoolCycle, currentUserId)
+                    && STATUS_VALID.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                    && (opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING,
+                    OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL).contains(opportunity.getStatus()))
+                    && securityFrameworkService.hasPermission("zsjos:lead:update")) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
+            }
+            return actions;
+        }
         if (!publicSeaPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
                 || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return actions;
         boolean canUpdate = securityFrameworkService.hasPermission("zsjos:lead:update");

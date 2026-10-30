@@ -102,6 +102,9 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
         return new PageResult<>(page.getList().stream()
                 .map(task -> {
                     var result = convert(task, displays.get(task.getId()), now);
+                    result.setCancellable(!readOnly && BusinessTaskCancellationService.owns(task, userId)
+                            && BusinessTaskCancellationService.supports(task) && "pending".equals(task.getStatus()));
+                    result.setCancelReason(task.getCancelReason());
                     result.setAssigneeId(task.getAssigneeId());
                     var assignee = task.getAssigneeId() == null ? null : users.get(task.getAssigneeId());
                     result.setAssigneeName(assignee == null ? null : assignee.getNickname());

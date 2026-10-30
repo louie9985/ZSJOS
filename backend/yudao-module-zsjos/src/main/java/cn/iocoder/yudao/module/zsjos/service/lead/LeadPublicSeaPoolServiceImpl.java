@@ -532,7 +532,8 @@ public class LeadPublicSeaPoolServiceImpl implements LeadPublicSeaPoolService {
         if (order != null) { result.setActiveSalesOrderId(order.getId()); result.setActiveSalesOrderStatus(order.getStatus()); }
         List<String> actions = new ArrayList<>();
         if (canManage(cycle, userId) && !hasActiveApproval(cycle.getLeadId())) { actions.add("ASSIGN"); actions.add("EXIT"); }
-        if (canOperate(lead.getId(), lead.getOwnerUserId(), userId)
+        if (LeadPublicSeaWritePolicy.canFollow(cycle, userId)
+                && publicSeaPoolCompatibilityRecordMapper.selectByLeadId(lead.getId()) == null
                 && securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")) {
             actions.add(ACTION_ADD_FOLLOW_UP);
         }

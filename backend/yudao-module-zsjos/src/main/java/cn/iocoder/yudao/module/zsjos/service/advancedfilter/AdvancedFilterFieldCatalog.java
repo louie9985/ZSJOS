@@ -14,6 +14,7 @@ final class AdvancedFilterFieldCatalog {
         Map<String, Field> result = new LinkedHashMap<>();
         CommonFilterFields.register(result);
         LeadFilterFields.register(result);
+        PublicSeaFilterFields.register(result);
         OpportunityFilterFields.register(result);
         OrderFilterFields.register(result);
         AppealFilterFields.register(result);

@@ -34,15 +34,57 @@ public class GiftPurchaseService {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SalesOrderApprovalRoundMapper roundMapper;
 
+    private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<GiftPurchaseDO> filter(GiftPurchasePageReqVO req) {
+        return Wrappers.lambdaQuery(GiftPurchaseDO.class)
+                .like(StrUtil.isNotBlank(req.getStudentName()), GiftPurchaseDO::getStudentName, req.getStudentName())
+                .like(StrUtil.isNotBlank(req.getOrderNo()), GiftPurchaseDO::getOrderNo, req.getOrderNo())
+                .like(StrUtil.isNotBlank(req.getGiftKeyword()), GiftPurchaseDO::getGiftItemsJson, req.getGiftKeyword())
+                .eq(req.getPurchased() != null, GiftPurchaseDO::getPurchased, req.getPurchased())
+                .orderByDesc(GiftPurchaseDO::getGeneratedAt).orderByDesc(GiftPurchaseDO::getId);
+    }
+
     public PageResult<GiftPurchaseRespVO> page(GiftPurchasePageReqVO req) {
-        var page = mapper.selectPage(new Page<GiftPurchaseDO>(req.getPageNo(), req.getPageSize()),
-                Wrappers.lambdaQuery(GiftPurchaseDO.class)
-                        .like(StrUtil.isNotBlank(req.getStudentName()), GiftPurchaseDO::getStudentName, req.getStudentName())
-                        .like(StrUtil.isNotBlank(req.getOrderNo()), GiftPurchaseDO::getOrderNo, req.getOrderNo())
-                        .like(StrUtil.isNotBlank(req.getGiftKeyword()), GiftPurchaseDO::getGiftItemsJson, req.getGiftKeyword())
-                        .eq(req.getPurchased() != null, GiftPurchaseDO::getPurchased, req.getPurchased())
-                        .orderByDesc(GiftPurchaseDO::getGeneratedAt).orderByDesc(GiftPurchaseDO::getId));
+        var page = mapper.selectPage(new Page<GiftPurchaseDO>(req.getPageNo(), req.getPageSize()), filter(req));
         return new PageResult<>(project(page.getRecords()), page.getTotal());
+    }
+
+    @Resource private GiftPurchaseBatchItemService batchItemService;
+
+    @Transactional(rollbackFor = Exception.class)
+    public GiftPurchaseBatchRespVO batchPurchase(GiftPurchaseBatchReqVO req) {
+        // Fixed lock order prevents two overlapping batches from acquiring opposite row orders.
+        var ids = req.getIds().stream().distinct().sorted().toList();
+        var rows = ids.stream().map(id -> require(id, true)).toList();
+        // Validate every object before the first write, including already-purchased objects.
+        for (var row : rows) batchItemService.check(row.getId());
+        int changed = 0;
+        for (var row : rows) {
+            if (Boolean.TRUE.equals(row.getPurchased())) continue;
+            mapper.update(null, Wrappers.lambdaUpdate(GiftPurchaseDO.class).eq(GiftPurchaseDO::getId, row.getId())
+                    .set(GiftPurchaseDO::getPurchased, true));
+            record(row.getId(), "PURCHASE");
+            changed++;
+        }
+        return new GiftPurchaseBatchRespVO(changed, ids.size() - changed);
+    }
+
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public byte[] exportExcel(GiftPurchasePageReqVO req) {
+        var records = mapper.selectList(filter(req));
+        var rows = new ArrayList<GiftPurchaseRespVO>();
+        var history = new LinkedHashMap<Long, List<GiftPurchaseOperationRespVO>>();
+        // Bound IN clauses and history queries while keeping the entire export in one read snapshot.
+        for (int offset = 0; offset < records.size(); offset += 500) {
+            var chunk = records.subList(offset, Math.min(offset + 500, records.size()));
+            rows.addAll(project(chunk));
+            for (var op : operationMapper.selectList(Wrappers.lambdaQuery(GiftPurchaseOperationDO.class)
+                    .in(GiftPurchaseOperationDO::getPurchaseId, chunk.stream().map(GiftPurchaseDO::getId).toList())
+                    .orderByDesc(GiftPurchaseOperationDO::getId))) {
+                history.computeIfAbsent(op.getPurchaseId(), key -> new ArrayList<>())
+                        .add(BeanUtils.toBean(op, GiftPurchaseOperationRespVO.class));
+            }
+        }
+        return GiftPurchaseWorkbook.write(rows, history);
     }
 
     public GiftPurchaseRespVO get(Long id) { return project(List.of(require(id, false))).getFirst(); }

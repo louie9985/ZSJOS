@@ -58,6 +58,8 @@ public class PointsRedemptionController {
     public CommonResult<List<PointsPackageRespVO>> packages() { return success(service.packages(false)); }
     @GetMapping("/package-list") @PreAuthorize("@ss.hasPermission('zsjos:points-redemption:package')")
     public CommonResult<List<PointsPackageRespVO>> packageList() { return success(service.packages(true)); }
+    @DeleteMapping("/package-delete") @PreAuthorize("@ss.hasPermission('zsjos:points-redemption:package-delete')")
+    public CommonResult<Boolean> deletePackage(@RequestParam Long id) { service.deletePackage(id); return success(true); }
     @PostMapping("/package-save") @PreAuthorize("@ss.hasPermission('zsjos:points-redemption:package-save')")
     public CommonResult<Long> savePackage(@Valid @RequestBody PointsPackageSaveReqVO req) {
         return success(req.getId() == null ? service.createPackage(req) : service.updatePackage(req));

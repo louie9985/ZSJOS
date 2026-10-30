@@ -3,7 +3,7 @@ import HomeCalendarPanel from '../components/HomeCalendarPanel'
 import HomeAnnouncementPanel from '../components/HomeAnnouncementPanel'
 import { diagnosisApi, diagnosisTaskUrl } from "../services/mediaAccountProfile";
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Empty, Form, Input, Modal, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type BusinessTask, type BusinessTaskBucket, type BusinessTaskSummary, type PageResult } from '../services/api'
@@ -120,9 +120,11 @@ function BusinessTaskPanel({
   onOpenAssignment,
   onRefreshSummary,
   tenantReadAll,
+  canCancel,
   other = false
 }: {
   summary?: BusinessTaskSummary
+  canCancel: boolean
   other?: boolean
   tenantReadAll: boolean
   onOpenAssignment: () => void
@@ -143,6 +145,23 @@ function BusinessTaskPanel({
   })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cancelTask, setCancelTask] = useState<BusinessTask>()
+  const [cancelling, setCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState('')
+  const [cancelForm] = Form.useForm<{ reason: string }>()
+  const submitCancel = async () => {
+    if (!cancelTask || cancelling) return
+    let values: { reason: string }
+    try { values = await cancelForm.validateFields() } catch { return }
+    setCancelling(true); setCancelError('')
+    try {
+      await api.cancelBusinessTask(cancelTask.id, values.reason.trim())
+      setCancelTask(undefined); cancelForm.resetFields()
+      await refresh()
+    } catch (e) { setCancelError(errorText(e, '取消待办失败，请重试')) }
+    finally { setCancelling(false) }
+  }
+
 
   const load = useCallback(async () => {
     const current = ++sequence.current
@@ -251,6 +270,22 @@ function BusinessTaskPanel({
 
   return (
     <section className={`home-panel home-business-panel${other ? " home-other-panel" : ""}`} aria-label={title}>
+      <Modal title="取消待办" open={!!cancelTask} okText="确认取消待办" cancelText="返回"
+        confirmLoading={cancelling} closable={!cancelling} maskClosable={!cancelling}
+        cancelButtonProps={{ disabled: cancelling }} onOk={() => void submitCancel()}
+        onCancel={() => { if (!cancelling) setCancelTask(undefined) }}>
+        <Typography.Paragraph>{cancelTask?.title}</Typography.Paragraph>
+        <Alert type="info" showIcon title="仅从待办中移除，不终止相关业务；原记录及取消原因会保留。" />
+        <Form form={cancelForm} layout="vertical">
+          <Form.Item name="reason" label="取消原因" rules={[
+            { required: true, whitespace: true, message: '请填写取消原因' },
+            { max: 500, message: '取消原因最多500字' }
+          ]}>
+            <Input.TextArea rows={3} maxLength={500} showCount disabled={cancelling} />
+          </Form.Item>
+        </Form>
+        {cancelError && <Alert type="error" showIcon title={cancelError} />}
+      </Modal>
       <header className="home-panel-header">
         <div>
           <Typography.Title level={4}>{title}{other ? ` ${pendingSummary.unscheduled}` : ""}</Typography.Title>
@@ -309,6 +344,9 @@ function BusinessTaskPanel({
                       {task.dueAt && <Typography.Text type="secondary">{formatTimestamp(task.dueAt)}</Typography.Text>}
                     </Space>
                   </div>
+                  {!readOnly && canCancel && task.cancellable && <Button type="text" onClick={() => {
+                    cancelForm.resetFields(); setCancelError(''); setCancelTask(task)
+                  }}>取消待办</Button>}
                   {!readOnly && task.actionCode && workPlanActions.has(task.actionCode) ? (
                     <Tag>已搁置</Tag>
                   ) : !readOnly && task.actionCode && ['COMPLETE_BIRTHDAY_CARE', 'COMPLETE_EMPLOYEE_CONTRACT_EXPIRY', 'COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY'].includes(task.actionCode) ? (
@@ -387,8 +425,8 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
           onRefresh={loadSummary}
         />
         <HomeCalendarPanel permissions={permissions} />
-        <BusinessTaskPanel tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
-        <BusinessTaskPanel other tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
+        <BusinessTaskPanel canCancel={permissions.includes('zsjos:business-task:cancel')} tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
+        <BusinessTaskPanel canCancel={permissions.includes('zsjos:business-task:cancel')} other tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <HomeAnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>
     </section>

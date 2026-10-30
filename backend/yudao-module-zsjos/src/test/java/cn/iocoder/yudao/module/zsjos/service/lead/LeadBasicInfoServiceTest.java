@@ -30,6 +30,8 @@ import static org.mockito.Mockito.when;
 class LeadBasicInfoServiceTest {
     @InjectMocks private LeadBasicInfoService service;
     @Mock private LeadMapper leadMapper;
+    @Mock private LeadCollaborationService collaborationService;
+    @Mock private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock private PersonMapper personMapper;
     @Mock private LeadIntendedProductMapper productMapper;
     @Mock private OpportunityMapper opportunityMapper;
@@ -46,6 +48,8 @@ class LeadBasicInfoServiceTest {
         LeadDO lead = editableLead();
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
 
+        org.mockito.Mockito.doThrow(new ServiceException(LEAD_PERMISSION_DENIED))
+                .when(collaborationService).requireCanWriteForUpdate(lead, 99L, true);
         ServiceException error = withTenantError(() -> service.update(1L, 99L, request()));
 
         assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());

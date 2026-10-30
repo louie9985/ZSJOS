@@ -62,6 +62,7 @@ class LeadFollowUpServiceImplTest {
     @Mock private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Mock private OpportunityFollowUpImageMapper opportunityImageMapper;
     @Mock private LeadCollaborationService collaborationService;
+    @Mock private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock private LeadPublicSeaTaskCleanupService taskCleanupService;
 
     @Test
@@ -260,6 +261,23 @@ class LeadFollowUpServiceImplTest {
         order.verify(taskCleanupService).cancelObsolete(eq(1L), any(LocalDateTime.class));
         order.verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L),
                 eq(FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY), eq(50L), any(LocalDateTime.class), any(LocalDateTime.class));
+    }
+
+    @Test
+    void ownerPoolFollowUpRecordsActualActorWithoutReplacingCollaboratorReminder() {
+        LeadDO lead = validLead(); lead.setStatus("valid");
+        stubSuccessfulCreate(lead);
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(new OpportunityDO().setId(30L).setStatus("open"));
+        var cycle = new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaPoolCycleDO();
+        cycle.setStatus("assigned"); cycle.setOriginalOwnerUserId(20L); cycle.setCollaboratorUserId(21L);
+        when(publicSeaPoolService.getActiveCycle(1L)).thenReturn(cycle);
+        doAnswer(inv -> {
+            var record = inv.<OpportunityFollowUpRecordDO>getArgument(0);
+            assertEquals(20L, record.getOperatorUserId()); record.setId(50L); return 1;
+        }).when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+        verify(collaborationService).requireCanWriteForUpdate(lead, 20L, false);
+        verify(lifecycleTaskService, never()).replaceFollowUpReminder(any(), any(), any(), any(), any(), any());
     }
 
     @Test

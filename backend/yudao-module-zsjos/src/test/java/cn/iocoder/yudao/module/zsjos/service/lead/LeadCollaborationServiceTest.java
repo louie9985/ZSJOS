@@ -25,6 +25,7 @@ import static org.mockito.Mockito.when;
 class LeadCollaborationServiceTest {
     @InjectMocks private LeadCollaborationService service;
     @Mock private LeadPublicSeaPoolService publicSeaPoolService;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCycleMapper cycleMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaPoolCompatibilityRecordMapper publicSeaPoolCompatibilityRecordMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper leadMapper;
 
@@ -56,6 +57,27 @@ class LeadCollaborationServiceTest {
                 () -> service.requireCanOperateForUpdate(lead, 30L));
         assertEquals(LEAD_COLLABORATION_POOL_CONFLICT.getCode(), error.getCode());
         verify(publicSeaPoolService, never()).requireCanOperateForUpdate(any(), any(), any());
+    }
+
+    @Test
+    void lockedPoolAllowsBothWritersButRejectsUnrelatedUsers() {
+        var cycle = new LeadPublicSeaPoolCycleDO();
+        cycle.setOriginalOwnerUserId(20L); cycle.setCollaboratorUserId(30L);
+        when(cycleMapper.selectActiveByLeadIdForUpdate(1L, 1L)).thenReturn(cycle);
+        for (String status : java.util.List.of("waiting_assignment", "assigned", "deal_pending")) {
+            cycle.setStatus(status);
+            service.requireCanWriteForUpdate(lead(), 20L, true);
+            service.requireCanWriteForUpdate(lead(), 30L, true);
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.requireCanWriteForUpdate(lead(), 40L, true));
+            if (!"deal_pending".equals(status)) service.requireCanWriteForUpdate(lead(), 20L, false);
+            else assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.requireCanWriteForUpdate(lead(), 20L, false));
+        }
+        cycle.setStatus("assigned");
+        service.requireCanWriteForUpdate(lead(), 30L, false);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.requireCanWriteForUpdate(lead(), 40L, false));
     }
 
     private static LeadDO lead() {

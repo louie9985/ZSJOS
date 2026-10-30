@@ -83,3 +83,14 @@ export const formatGiftPurchaseSourcePerson = (row: GiftPurchaseVO): string =>
   row.sourceUserName || (giftPurchaseSourceType(row) === 'ORDER' ? row.submitterUserName : undefined) || '历史未记录'
 export const formatGiftPurchaseMarker = (row: GiftPurchaseVO): string =>
   row.purchased ? row.purchasedByName || '历史未记录' : '-'
+
+export const exportGiftPurchases = (params: Record<string, unknown>): Promise<Blob> =>
+  request.download({ url: '/zsjos/gift-purchase/export-excel', params })
+export const batchPurchaseGifts = (
+  ids: number[]
+): Promise<{ purchased: number; skipped: number }> =>
+  request.put({
+    preserveBusinessError: true,
+    url: '/zsjos/gift-purchase/batch-purchase',
+    data: { ids }
+  })

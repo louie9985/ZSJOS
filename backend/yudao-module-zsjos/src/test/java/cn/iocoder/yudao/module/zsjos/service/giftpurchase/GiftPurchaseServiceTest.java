@@ -62,6 +62,84 @@ class GiftPurchaseServiceTest {
         row.setGeneratedAt(LocalDateTime.of(2026, 1, 1, 12, 0)); return row;
     }
 
+    @Test void objectScopeRequiresTenantMatchAndConfiguredBatchPermission() {
+        var provider = new GiftPurchasePermissionProvider();
+        var permissions = mock(cn.iocoder.yudao.module.system.api.permission.PermissionApi.class);
+        ReflectionTestUtils.setField(provider, "mapper", mapper);
+        ReflectionTestUtils.setField(provider, "permissions", permissions);
+        var row = row(); row.setTenantId(1L); when(mapper.selectById(12L)).thenReturn(row);
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            assertFalse(provider.hasPermission(12L, "batch-purchase", 44L));
+            when(permissions.hasAnyPermissions(44L, "zsjos:gift-purchase:batch-purchase")).thenReturn(true);
+            assertTrue(provider.hasPermission(12L, "batch-purchase", 44L));
+            assertFalse(provider.hasPermission(12L, "batch-purchase", null));
+            assertFalse(provider.hasPermission(12L, "unsupported", 44L));
+            row.setTenantId(2L);
+            assertFalse(provider.hasPermission(12L, "batch-purchase", 44L));
+            assertThrows(ServiceException.class, () -> provider.check(12L, "batch-purchase", 44L));
+        } finally { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
+    }
+
+    @Test void missingBatchRowPreventsWritesAndBatchInputIsBounded() {
+        when(mapper.selectOne(any())).thenReturn(row(), null);
+        var req = new GiftPurchaseBatchReqVO(); req.setIds(List.of(12L,13L));
+        assertThrows(ServiceException.class, () -> service.batchPurchase(req));
+        verify(mapper, never()).update(isNull(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        verifyNoInteractions(operations);
+        try(var factory=jakarta.validation.Validation.buildDefaultValidatorFactory()) {
+            var validator=factory.getValidator();
+            req.setIds(List.of()); assertFalse(validator.validate(req).isEmpty());
+            req.setIds(List.of(-1L)); assertFalse(validator.validate(req).isEmpty());
+            req.setIds(java.util.Collections.nCopies(201,1L)); assertFalse(validator.validate(req).isEmpty());
+        }
+    }
+
+    @Test void batchDeduplicatesSkipsPurchasedAndChecksAllBeforeWrites() {
+        var access = mock(GiftPurchaseBatchItemService.class);
+        ReflectionTestUtils.setField(service, "batchItemService", access);
+        var a = row(); var b = row(); b.setId(13L); b.setPurchased(true);
+        when(mapper.selectOne(any())).thenReturn(a, b);
+        var req = new GiftPurchaseBatchReqVO(); req.setIds(List.of(13L, 12L, 12L));
+        var result = service.batchPurchase(req);
+        assertEquals(1, result.purchased()); assertEquals(1, result.skipped());
+        var order = inOrder(access, mapper, operations);
+        order.verify(access).check(12L); order.verify(access).check(13L);
+        order.verify(mapper).update(isNull(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        order.verify(operations).insert(any(GiftPurchaseOperationDO.class));
+    }
+
+    @Test void batchDeniedObjectPreventsEveryWrite() {
+        var access = mock(GiftPurchaseBatchItemService.class);
+        ReflectionTestUtils.setField(service, "batchItemService", access);
+        var a = row(); var b = row(); b.setId(13L);
+        when(mapper.selectOne(any())).thenReturn(a,b);
+        doThrow(new IllegalArgumentException("denied")).when(access).check(13L);
+        var req = new GiftPurchaseBatchReqVO(); req.setIds(List.of(12L,13L));
+        assertThrows(IllegalArgumentException.class, () -> service.batchPurchase(req));
+        verify(mapper, never()).update(isNull(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+        verifyNoInteractions(operations);
+    }
+
+    @Test void workbookIncludesHistoryAndPreservesStringsAndSnapshots() throws Exception {
+        var row = new GiftPurchaseRespVO(); row.setId(7L); row.setStudentName("=1+1");
+        row.setStudentMobile("0013800000000"); row.setShippingAddress("完整地址".repeat(100));
+        row.setGiftItemSnapshots(List.of(new SalesOrderGiftSnapshot("old","历史礼品",List.of("原分类"),"2026-01-01")));
+        var op = new GiftPurchaseOperationRespVO(); op.setAction("PURCHASE"); op.setOperatorName("历史操作人");
+        byte[] bytes = GiftPurchaseWorkbook.write(List.of(row), java.util.Map.of(7L,List.of(op)));
+        try(var book = new org.apache.poi.xssf.usermodel.XSSFWorkbook(new java.io.ByteArrayInputStream(bytes))) {
+            assertEquals(2,book.getNumberOfSheets());
+            var data=book.getSheetAt(0).getRow(1);
+            assertEquals(org.apache.poi.ss.usermodel.CellType.STRING,data.getCell(2).getCellType());
+            assertEquals("=1+1",data.getCell(2).getStringCellValue());
+            assertEquals("0013800000000",data.getCell(3).getStringCellValue());
+            assertEquals("历史礼品",data.getCell(5).getStringCellValue());
+            assertEquals(row.getShippingAddress(),data.getCell(6).getStringCellValue());
+            assertEquals("历史未记录",data.getCell(9).getStringCellValue());
+            assertEquals("历史操作人",book.getSheetAt(1).getRow(1).getCell(4).getStringCellValue());
+        }
+    }
+
     @Test void manualCreateHasNoOrderAndCapturesActualCreator() {
         var gift = new GiftConfigDO(); gift.setId(1L); gift.setCode("gift"); gift.setName("新礼品"); gift.setStatus(0);
         when(gifts.listFlat(null)).thenReturn(List.of(gift));

@@ -260,6 +260,14 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
                 .set(BusinessTaskDO::getCompletedAt, completedAt));
     }
 
+    default int cancelMyPendingById(Long id, Long tenantId, Long userId, LocalDateTime at, String reason) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getId, id).eq(BusinessTaskDO::getTenantId, tenantId)
+                .eq(BusinessTaskDO::getAssigneeId, userId).eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .set(BusinessTaskDO::getStatus, "cancelled")
+                .set(BusinessTaskDO::getCancelledAt, at).set(BusinessTaskDO::getCancelReason, reason));
+    }
+
     default int cancelPending(String taskType, Long bizId, Long assigneeId,
                               LocalDateTime cancelledAt, String reason) {
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()

@@ -32,6 +32,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class LeadBasicInfoService {
     @Resource private LeadMapper leadMapper;
+    @Resource private LeadCollaborationService collaborationService;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private PersonMapper personMapper;
     @Resource private LeadIntendedProductMapper productMapper;
     @Resource private OpportunityMapper opportunityMapper;
@@ -48,9 +50,7 @@ public class LeadBasicInfoService {
     public void update(Long leadId, Long userId, LeadBasicInfoUpdateReqVO req) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (!Objects.equals(userId, lead.getOwnerUserId())) {
-            throw exception(LEAD_PERMISSION_DENIED);
-        }
+        collaborationService.requireCanWriteForUpdate(lead, userId, true);
         if (!canEdit(lead)) {
             throw exception(LEAD_BASIC_INFO_STATE_INVALID);
         }
@@ -109,7 +109,9 @@ public class LeadBasicInfoService {
         if (STATUS_SUBMITTED.equals(lead.getStatus())) return ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
         if (!STATUS_VALID.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) return false;
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
-        return opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING).contains(opportunity.getStatus());
+        return opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING).contains(opportunity.getStatus())
+                || OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL.equals(opportunity.getStatus())
+                && publicSeaPoolService.getActiveCycle(lead.getId()) != null;
     }
 
     private void checkIdentityConflict(LeadDO lead, LeadBasicInfoUpdateReqVO req, String mobile, String wechat) {

@@ -71,7 +71,7 @@ public class LeadObjectPermissionService {
             case "owner-read" -> hasTenantReadAll(userId) || Objects.equals(userId, lead.getOwnerUserId());
             case "owner-or-manager-read" -> hasTenantReadAll(userId) || canReadAsOwnerOrManager(lead, userId);
             case "sales-history-read" -> canReadDetail(lead, userId);
-            case "follow-up-create" -> canOperateAsSales(lead, userId)
+            case "follow-up-create" -> canWritePublicSea(lead, userId, false)
                     && (STATUS_INVALID.equals(lead.getStatus())
                     || STATUS_WON.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
@@ -81,8 +81,7 @@ public class LeadObjectPermissionService {
                     && (ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                     || STATUS_VALID.equals(lead.getStatus()));
             case "enter-deal" -> canOperateAsSales(lead, userId);
-            case "basic-info-update" -> publicSeaPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
-                    && Objects.equals(userId, lead.getOwnerUserId());
+            case "basic-info-update" -> canWritePublicSea(lead, userId, true);
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
             case "admin-transfer" -> true; // Controller feature permission remains mandatory.
             case "owner-transfer", "owner-release-public-sea" -> Objects.equals(userId, lead.getOwnerUserId());
@@ -203,6 +202,13 @@ public class LeadObjectPermissionService {
 
     public boolean canViewUnmaskedIdentity(Long userId, LeadDO lead) {
         return canViewUnmaskedIdentity(userId, lead.getOwnerUserId());
+    }
+
+    private boolean canWritePublicSea(LeadDO lead, Long userId, boolean basicInfo) {
+        var cycle = publicSeaPoolCycleMapper.selectActiveByLeadId(lead.getId());
+        if (cycle != null) return publicSeaPoolCompatibilityRecordMapper.selectByLeadId(lead.getId()) == null
+                && (basicInfo ? LeadPublicSeaWritePolicy.canEdit(cycle, userId) : LeadPublicSeaWritePolicy.canFollow(cycle, userId));
+        return basicInfo ? userId != null && Objects.equals(userId, lead.getOwnerUserId()) : canOperateAsSales(lead, userId);
     }
 
     private boolean canOperateAsSales(LeadDO lead, Long userId) {

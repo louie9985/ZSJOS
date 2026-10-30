@@ -26,12 +26,36 @@ class GiftPurchaseControllerPermissionTest {
         @Bean cn.iocoder.yudao.module.system.api.user.AdminUserApi userApi() { return mock(cn.iocoder.yudao.module.system.api.user.AdminUserApi.class); }
         @Bean cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper orderMapper() { return mock(cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper.class); }
         @Bean cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper roundMapper() { return mock(cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalRoundMapper.class); }
+        @Bean cn.iocoder.yudao.module.zsjos.service.giftpurchase.GiftPurchaseBatchItemService batchItemService() { return mock(cn.iocoder.yudao.module.zsjos.service.giftpurchase.GiftPurchaseBatchItemService.class); }
         @Bean(name="ss") Gate gate() { return new Gate(); }
         @Bean GiftPurchaseService service() { return mock(GiftPurchaseService.class); }
         @Bean GiftPurchaseController controller(GiftPurchaseService service) {
             var controller = new GiftPurchaseController();
             org.springframework.test.util.ReflectionTestUtils.setField(controller,"service", service); return controller;
         }
+    }
+    @Test void exportAndBatchRequireTheirOwnPermissions() throws Exception {
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("fixture", "", "ROLE_FIXTURE"));
+        try (var context = new AnnotationConfigApplicationContext(Config.class)) {
+            var controller=context.getBean(GiftPurchaseController.class); var gate=context.getBean(Gate.class);
+            var service=context.getBean(GiftPurchaseService.class);
+            var batch=new GiftPurchaseBatchReqVO(); batch.setIds(List.of(1L));
+            var response=new org.springframework.mock.web.MockHttpServletResponse();
+            for(String permission:List.of("query","detail","update")) {
+                gate.permissions.clear(); gate.permissions.add("zsjos:gift-purchase:"+permission);
+                assertThrows(AccessDeniedException.class,()->controller.batchPurchase(batch));
+                assertThrows(AccessDeniedException.class,()->controller.exportExcel(new GiftPurchasePageReqVO(),response));
+            }
+            verifyNoInteractions(service);
+            gate.permissions.clear();gate.permissions.add("zsjos:gift-purchase:export");
+            when(service.exportExcel(any())).thenReturn(new byte[]{1,2});
+            controller.exportExcel(new GiftPurchasePageReqVO(),response);
+            assertArrayEquals(new byte[]{1,2},response.getContentAsByteArray());
+            assertThrows(AccessDeniedException.class,()->controller.batchPurchase(batch));
+            gate.permissions.clear();gate.permissions.add("zsjos:gift-purchase:batch-purchase");
+            assertDoesNotThrow(()->controller.batchPurchase(batch));
+            assertThrows(AccessDeniedException.class,()->controller.exportExcel(new GiftPurchasePageReqVO(),response));
+        } finally { SecurityContextHolder.clearContext(); }
     }
     @Test void realMethodSecurityEnforcesSeparateCrudPermissionsAndUpdateAlsoAllowsLoadingEditor() {
         SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("fixture", "", "ROLE_FIXTURE"));

@@ -19,6 +19,21 @@
         <el-button v-hasPermi="['zsjos:gift-purchase:create']" type="success" @click="open()"
           >新增采购</el-button
         >
+        <el-button
+          v-hasPermi="['zsjos:gift-purchase:export']"
+          :loading="exporting"
+          :disabled="loading || !!loadError || batchBusy"
+          @click="exportRows"
+          >导出</el-button
+        >
+        <el-button
+          v-hasPermi="['zsjos:gift-purchase:batch-purchase']"
+          type="primary"
+          :loading="batchBusy"
+          :disabled="!selected.length || loading || busyId !== undefined"
+          @click="batchPurchase"
+          >批量采购（{{ selected.length }}）</el-button
+        >
       </el-form-item>
     </el-form>
     <el-alert
@@ -31,7 +46,17 @@
     >
       <el-button link type="primary" @click="load">重试</el-button>
     </el-alert>
-    <el-table v-loading="loading" :data="rows" border empty-text="暂无采购记录">
+    <div v-if="canBatch" class="mb-8px">仅选择本页未采购记录；翻页或修改筛选会清空选择。</div>
+    <el-table
+      ref="purchaseTable"
+      v-loading="loading || batchBusy"
+      :data="rows"
+      row-key="id"
+      border
+      empty-text="暂无采购记录"
+      @selection-change="selected = $event"
+    >
+      <el-table-column v-if="canBatch" type="selection" width="48" :selectable="canSelect" />
       <el-table-column label="采购状态" width="100">
         <template #default="{ row }"
           ><el-tag :type="row.purchased ? 'success' : 'warning'">{{
@@ -215,10 +240,14 @@
   </ContentWrap>
 </template>
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import download from '@/utils/download'
+import { checkPermi } from '@/utils/permission'
 import { formatDate } from '@/utils/formatTime'
 import {
+  exportGiftPurchases,
+  batchPurchaseGifts,
   getGiftPurchasePage,
   getGiftPurchase,
   getGiftPurchaseOperations,
@@ -249,6 +278,52 @@ const query = reactive({
   giftKeyword: '',
   purchased: false as boolean | 'all'
 })
+const canBatch = computed(() => checkPermi(['zsjos:gift-purchase:batch-purchase']))
+const selected = ref<GiftPurchaseVO[]>([])
+const purchaseTable = ref<{ clearSelection: () => void }>()
+const batchBusy = ref(false),
+  exporting = ref(false)
+const canSelect = (row: GiftPurchaseVO) => !row.purchased && !batchBusy.value && !loading.value
+const clearSelection = () => {
+  selected.value = []
+  purchaseTable.value?.clearSelection()
+}
+watch(() => [query.studentName, query.orderNo, query.giftKeyword, query.purchased], clearSelection)
+const exportRows = async () => {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const data = await exportGiftPurchases({
+      ...query,
+      purchased: query.purchased === 'all' ? undefined : query.purchased
+    })
+    download.excel(data, `礼品采购清单_${formatDate(new Date(), 'YYYYMMDD_HHmmss')}.xlsx`)
+  } catch {
+    /* Shared download adapter displays errors. */
+  } finally {
+    exporting.value = false
+  }
+}
+const batchPurchase = async () => {
+  if (batchBusy.value || !selected.value.length) return
+  const ids = selected.value.map((row) => row.id)
+  batchBusy.value = true
+  try {
+    await ElMessageBox.confirm(`将选中的 ${ids.length} 条记录标记为已采购？`, '批量采购', {
+      type: 'warning',
+      confirmButtonText: '确认采购'
+    })
+    const result = await batchPurchaseGifts(ids)
+    ElMessage.success(`本次成功 ${result.purchased} 条，已采购跳过 ${result.skipped} 条`)
+    clearSelection()
+    query.pageNo = 1
+    await load()
+  } catch {
+    /* Cancellation is silent; the HTTP adapter displays actionable failures. */
+  } finally {
+    batchBusy.value = false
+  }
+}
 const dialog = ref(false),
   dialogLoading = ref(false),
   dialogError = ref(''),
@@ -305,6 +380,7 @@ const giftOptions = computed(() => {
 })
 let loadSequence = 0
 const load = async () => {
+  clearSelection()
   const sequence = ++loadSequence
   loading.value = true
   loadError.value = ''
@@ -399,7 +475,7 @@ const save = async () => {
   }
 }
 const changeStatus = async (row: GiftPurchaseVO) => {
-  if (busyId.value !== undefined) return
+  if (busyId.value !== undefined || batchBusy.value) return
   busyId.value = row.id
   try {
     await setGiftPurchased(row.id, !row.purchased)

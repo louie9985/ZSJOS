@@ -162,6 +162,13 @@ public class PointsRequestService {
                 .set(PointsPackageDO::getValidDays, req.getValidDays()));
         return req.getId();
     }
+    @ZsjosPermission(bizType="points-package", bizId="#id", action="delete")
+    @Transactional(rollbackFor=Exception.class)
+    public void deletePackage(Long id) {
+        if (packages.lock(id, TenantContextHolder.getRequiredTenantId()) == null) throw PointsErrors.invalid("积分套餐不存在");
+        // Requests retain their immutable snapshots; only the catalog entry is logically deleted.
+        packages.deleteById(id);
+    }
     public FileInfoRespDTO upload(byte[] content, String name, String type, Long userId) {
         if (content.length == 0 || content.length > 20 * 1024 * 1024 || name == null
                 || !name.toLowerCase(Locale.ROOT).matches(".*\\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|png|jpg|jpeg|webp|zip)$"))

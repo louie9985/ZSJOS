@@ -25,6 +25,16 @@ public class BusinessTaskController {
     @Resource private BusinessTaskService taskService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService menuTaskSummaryService;
 
+    @Resource private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCancellationService cancellationService;
+
+    @PostMapping("/{id}/cancel")
+    @Operation(summary = "取消本人业务待办（不终止相关业务）")
+    @PreAuthorize("@ss.hasPermission('zsjos:business-task:cancel')")
+    public CommonResult<Boolean> cancel(@PathVariable("id") Long id,
+            @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskCancelReqVO reqVO) {
+        return success(cancellationService.cancel(id, getLoginUserId(), reqVO.getReason()));
+    }
+
     @GetMapping("/menu-task-summary")
     @Operation(summary = "获得工作台菜单待办摘要")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:business-task:query','bpm:task:query')")

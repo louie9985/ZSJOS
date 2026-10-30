@@ -13,8 +13,8 @@ public class PointsPackagePermissionProvider implements ZsjosObjectPermissionPro
 
     public String getBizType() { return "points-package"; }
     public boolean hasPermission(Long id, String action, Long userId) {
-        return id != null && userId != null && "save".equals(action)
-                && permissions.hasAnyPermissions(userId, PointsRequestService.PERM + "package-save")
+        return id != null && userId != null && ("save".equals(action) || "delete".equals(action))
+                && permissions.hasAnyPermissions(userId, PointsRequestService.PERM + ("delete".equals(action) ? "package-delete" : "package-save"))
                 && packages.selectById(id) != null;
     }
     public void check(Long id, String action, Long userId) {

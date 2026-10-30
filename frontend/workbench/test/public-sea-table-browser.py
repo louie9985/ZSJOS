@@ -1,0 +1,40 @@
+from playwright.sync_api import sync_playwright, expect
+from pathlib import Path
+import re
+out=Path('frontend/workbench/tmp/public-sea-table');out.mkdir(parents=True,exist_ok=True)
+with sync_playwright() as p:
+ browser=p.chromium.launch()
+ page=browser.new_page(viewport={'width':1440,'height':1000})
+ errors=[];page.on('pageerror',lambda e: errors.append(str(e)))
+ page.goto('http://localhost:5174/test/public-sea-table.html')
+ page.get_by_text('表格',exact=True).click()
+ expect(page.get_by_role('columnheader',name='客资编号')).to_be_visible()
+ expect(page.get_by_role('button',name='指派B',exact=True)).to_have_count(1)
+ page.get_by_title('2',exact=True).click()
+ expect(page.get_by_role('button',name='L-TEST-21',exact=True)).to_be_visible()
+ assert page.evaluate('publicSeaFixture.calls.at(-1).pageNo')==2
+ page.get_by_title('1',exact=True).click()
+ page.get_by_role('button',name='指派B',exact=True).click()
+ expect(page.get_by_text('指派协同销售B',exact=True)).to_be_visible()
+ page.get_by_role('dialog').last.get_by_role('combobox').click()
+ page.get_by_text('验收协同销售',exact=True).click()
+ page.get_by_role('dialog').last.get_by_role('button',name=re.compile('确.*定')).click()
+ page.wait_for_timeout(500)
+ assert len(page.evaluate('publicSeaFixture.assignments'))==1
+ page.locator('.ant-drawer-close').first.click()
+ page.screenshot(path=str(out/'desktop.png'),full_page=True)
+ page.evaluate('publicSeaFixture.fail=true')
+ page.get_by_role('button',name=re.compile('刷.*新')).first.click()
+ expect(page.get_by_text('验收查询失败',exact=True)).to_be_visible()
+ page.evaluate('publicSeaFixture.fail=false')
+ page.get_by_role('button',name=re.compile('重.*试')).first.click()
+ expect(page.get_by_role('button',name='L-TEST-1',exact=True)).to_be_visible()
+ page.set_viewport_size({'width':390,'height':844})
+ expect(page.locator('.lead-inbox-item').first).to_be_visible()
+ page.locator('.lead-inbox-item').first.click()
+ expect(page.get_by_role('dialog')).to_be_visible()
+ page.wait_for_timeout(400)
+ page.screenshot(path=str(out/'mobile.png'),full_page=False)
+ assert not errors, errors
+ print('PASS pagination, action authorization, assignment, retry, desktop table/mobile detail; screenshots:',out)
+ browser.close()

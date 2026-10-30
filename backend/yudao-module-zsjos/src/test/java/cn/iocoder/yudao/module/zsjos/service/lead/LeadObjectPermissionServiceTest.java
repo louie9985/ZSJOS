@@ -269,7 +269,7 @@ class LeadObjectPermissionServiceTest {
     }
 
     @Test
-    void activePoolBlocksOwnerEditingAndQualificationButAllowsCollaboratorDealEntry() {
+    void activePoolAllowsOwnerEditingButStillBlocksQualification() {
         LeadDO lead = lead(10L, 20L);
         lead.setStatus("valid");
         lead.setAssignmentStatus("owned");
@@ -281,7 +281,7 @@ class LeadObjectPermissionServiceTest {
 
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
-            assertThrows(ServiceException.class, () -> service.check(1L, "basic-info-update"));
+            assertDoesNotThrow(() -> service.check(1L, "basic-info-update"));
             assertThrows(ServiceException.class, () -> service.check(1L, "qualify"));
 
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
@@ -290,7 +290,7 @@ class LeadObjectPermissionServiceTest {
     }
 
     @Test
-    void waitingPoolPausesFollowUpForOwnerAndOtherVisibleUsers() {
+    void waitingPoolAllowsOwnerWritingButRejectsOtherUsers() {
         LeadDO lead = lead(10L, 20L);
         lead.setStatus("valid"); lead.setAssignmentStatus("owned");
         LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
@@ -300,8 +300,8 @@ class LeadObjectPermissionServiceTest {
 
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
-            assertThrows(ServiceException.class, () -> service.check(1L, "follow-up-create"));
-            assertThrows(ServiceException.class, () -> service.check(1L, "basic-info-update"));
+            assertDoesNotThrow(() -> service.check(1L, "follow-up-create"));
+            assertDoesNotThrow(() -> service.check(1L, "basic-info-update"));
             assertThrows(ServiceException.class, () -> service.check(1L, "qualify"));
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
             assertEquals(LEAD_PERMISSION_DENIED.getCode(), assertThrows(ServiceException.class,
@@ -310,7 +310,7 @@ class LeadObjectPermissionServiceTest {
     }
 
     @Test
-    void assignedAndHistoricalPendingPoolsAllowOnlyConfiguredCollaboratorFollowUp() {
+    void assignedPoolAllowsBothButHistoricalPendingStillRestrictsOwnerFollowUp() {
         LeadDO lead = lead(10L, 20L); lead.setStatus("valid");
         LeadPublicSeaPoolCycleDO cycle = new LeadPublicSeaPoolCycleDO();
         cycle.setLeadId(1L); cycle.setOriginalOwnerUserId(20L); cycle.setCollaboratorUserId(30L);
@@ -320,7 +320,8 @@ class LeadObjectPermissionServiceTest {
             for (String status : List.of("assigned", "deal_pending")) {
                 cycle.setStatus(status);
                 security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
-                assertThrows(ServiceException.class, () -> service.check(1L, "follow-up-create"));
+                if ("assigned".equals(status)) assertDoesNotThrow(() -> service.check(1L, "follow-up-create"));
+                else assertThrows(ServiceException.class, () -> service.check(1L, "follow-up-create"));
                 security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
                 assertDoesNotThrow(() -> service.check(1L, "follow-up-create"));
                 security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(40L);

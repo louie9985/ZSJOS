@@ -24,6 +24,7 @@ export const pointsApi = {
   page: async (pageNo: number, management: boolean) => unwrap<PageResult<PointsRequest>>(await http.get(`${BASE}/page`, { params: { pageNo, pageSize: 20, management } })),
   get: async (id: number) => unwrap<PointsRequest>(await http.get(`${BASE}/get`, { params: { id } })),
   packages: async (management = false) => unwrap<PointsPackage[]>(await http.get(`${BASE}/${management ? 'package-list' : 'packages'}`)),
+  deletePackage: async (id: number) => unwrap<boolean>(await http.delete(`${BASE}/package-delete`, { params: { id } })),
   savePackage: async (data: Omit<PointsPackage, 'id'> & { id?: number }) => unwrap<number>(await http.post(`${BASE}/package-save`, data)),
   create: async (data: PointsCreate) => unwrap<number>(await http.post(`${BASE}/create`, data)),
   reveal: async (id: number) => unwrap<string>(await http.post(`${BASE}/reveal`, null, { params: { id } })),

@@ -60,6 +60,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
     @Resource private LeadCollaborationService collaborationService;
+    @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private LeadPublicSeaTaskCleanupService taskCleanupService;
     @Resource private LeadIdentityMaskingService identityMaskingService;
 
@@ -91,7 +92,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         LocalDateTime occurredAt = automatic ? LocalDateTime.now(java.time.ZoneId.of("Asia/Shanghai")) : LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        collaborationService.requireCanOperateForUpdate(lead, operatorUserId);
+        collaborationService.requireCanWriteForUpdate(lead, operatorUserId, false);
         if (!canFollow(lead)) {
             throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         }
@@ -309,6 +310,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             DictDataRespDTO result, DictDataRespDTO beforeCategory, DictDataRespDTO afterCategory,
             String categoryAfter, AdminUserRespDTO operator, Map<Long, FileInfoRespDTO> files) {
         boolean won = STATUS_WON.equals(lead.getStatus());
+        var activePool = publicSeaPoolService.getActiveCycle(lead.getId());
         if (opportunity == null || !won && !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING,
                 OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL)
                 .contains(opportunity.getStatus())) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
@@ -343,7 +345,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             lead.setLeadCategoryLabelSnapshot(record.getCategoryAfterLabelSnapshot());
         }
         // A public-sea collaborator must not complete the owner's first follow-up.
-        if (!won && Objects.equals(operatorUserId, lead.getOwnerUserId())
+        if (!won && activePool == null && Objects.equals(operatorUserId, lead.getOwnerUserId())
                 && lead.getCurrentAssignmentHistoryId() != null) {
             if (lead.getCurrentAssignmentFirstFollowUpAt() == null) {
                 LeadFollowUpRecordDO first = recordMapper.selectFirstByAssignment(
@@ -372,9 +374,12 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             // Cancel obsolete A/previous-B reminders; never complete them as the current B's work.
             taskCleanupService.cancelObsolete(lead.getId(), occurredAt);
         }
-        lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId,
-                FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY, record.getId(),
-                reqVO.getNextFollowUpAt(), occurredAt);
+        // A may add records, but must not complete B's reminder or create a personal A reminder in the pool.
+        if (activePool == null || Objects.equals(operatorUserId, activePool.getCollaboratorUserId())) {
+            lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId,
+                    FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY, record.getId(),
+                    reqVO.getNextFollowUpAt(), occurredAt);
+        }
         return convertOpportunity(record, opportunityImageMapper.selectListByRecordIds(List.of(record.getId())),
                 operator == null ? Map.of() : Map.of(operatorUserId, operator), null);
     }

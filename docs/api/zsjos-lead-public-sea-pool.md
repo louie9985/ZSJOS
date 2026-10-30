@@ -62,9 +62,13 @@ The entry-time department snapshot remains audit data only, so organization chan
 Opportunity visible to A's former team.
 
 Existing lead detail, follow-up, and sales-order APIs remain authoritative. During an active cycle,
-only the current configured collaborator B may create follow-up. Formal owner A retains ownership
-and read access but cannot create follow-up while the cycle is active. A waiting cycle has no personal
-follow-up responsibility. Reassignment switches responsibility to the new B; manager exit restores A.
+formal owner A may create follow-up in `waiting_assignment` and `assigned`; current collaborator B
+may create follow-up in `assigned` and historical `deal_pending`. A and current B may edit basic
+information during an active cycle, subject to configured `zsjos:lead:update` permission and valid
+Lead/Opportunity state (including historical approval). Other visible sales and previous collaborators
+remain denied. A waiting cycle has no personal follow-up task responsibility. Reassignment switches
+task responsibility to the new B; manager exit restores A. Record authorship is the actual operator.
+A recording follow-up does not complete B reminders or create personal A reminders in the pool.
 首购成交与补正必须先结束活动公海，不能因为 B 具备跟进权限而直接录单。每次变更都会锁定
 活动周期。正式转派或主管退出结束公海后才恢复成交入口；正式归属和业绩归属仍按原业务规则
 处理。
