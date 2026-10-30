@@ -110,3 +110,8 @@
 - Target: main，依赖其1068599已包含V354–V357及五项已交付功能。状态ready-to-merge；最终源码commit由紧接本条的Git提交确定，并记录到main整合handoff。
 - V358正式化完成：旧feature源替换为migrations/V358__home_metrics.sql；Core desired与fresh baseline仅追加两空表。MySQL8.4.11 9组通过，三份DDL/实际22列4索引一致；fixture前缀v358_verify_20261030111204_；SHA256 b03b8c285a6ab01a0f42808ec92910c9912d5ccb6dca4df3beb92cc0d3cc7010。
 - Java/前端功能源码维持前条164通过等证据；本次改变SQL/文档及baseline，整合后main重跑适用验证和全链。已知冲突TodayTasks须保留main取消/其他待办/导航验证及feature指标，Lead须保留公海写策略与metric只读scope。剩余集成风险明确交给root，不把分支证据当合并后验收。
+
+## 2026-10-30 11:54:56 北京时间 — merged
+- 最终分支源码提交b0c64ea6de62c4f74445ceba1af488a6b5ed8c87已通过；保留主分支取消/其他待办、公海协同、我的运营等功能，并补取消后动态计数刷新。
+- V358在主分支修正根菜单/system；两空表、正式连续编号及九组专项通过。合并后377项后端回归375通过2原跳过，两端构建通过；完整379条迁移执行成功且schema drift=0，历史9条数据断言仍失败，不能声称部署验收通过。完整证据和限制见local-all-branches-merge-20261030.md。
+- 未推送、未向业务库迁移或部署。原独立branch/worktree保留；状态merged，文件所有权释放。

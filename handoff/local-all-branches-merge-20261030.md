@@ -23,3 +23,10 @@
 - 测试工具修正：test_fresh成功执行后逐条record_migration，与真实migrate保持一致；数据级FAIL仍收集schema_drift并一起失败。8项执行器回归通过。不更改生产migrate行为或历史迁移。
 - 证据目录：D:/zsjos-merge-verify-20261030。独立MySQL临时容器已清理；保留V358合成验证schemas；无业务行复制/角色授权/业务库迁移/服务部署。只读确认业务库当前V356，V357/V358待另行部署。
 - 待提交：本合并树与本记录。原始表格、报告、截图、临时目录及4份缓存保持本地未提交；不推送、不删除分支或工作树，gitee/master按用户确认排除。
+
+## 2026-10-30 11:54:56 北京时间 — 合并完成
+- Status: merged。实现合并提交：1ddd10e0d2d05979e1ed1554db82c32ace237e23；父提交10685998c84f501e9faefdad6aef9ad71cdee132与b0c64ea6de62c4f74445ceba1af488a6b5ed8c87。
+- 已逐一执行merge-base --is-ancestor，所有本地开发branch及origin业务refs均包含于main。gitee/master按用户确认排除且未删除。
+- 合并后仅4份原有生成缓存仍为tracked dirty，原始数据、截图、临时报告/工具目录继续留本地未提交；无未解决冲突或遗留暂存源码。
+- 验证对应上述实现提交；本条仅记录结果，不改变已验证源码。完整fresh的9条历史断言仍是发布前限制，schema drift=0不等于fresh全PASS。
+- 未推送origin，未删除分支/worktree，未部署/重启现有服务，未向业务库执行V357/V358或授予权限。所有整合写入所有权释放。
