@@ -49,6 +49,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     @Resource private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Resource private PersonMapper personMapper;
+    @Resource private LeadSelfSourcedArchiveService archiveService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
     @Resource private LeadMapper leadMapper;
@@ -85,6 +86,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Override
     public boolean checkContact(LeadContactCheckReqVO request, Long userId,
                                 LeadSubmissionIdentityService.Identity requestedIdentity) {
+        if (requestedIdentity == LeadSubmissionIdentityService.Identity.SALES
+                || requestedIdentity == LeadSubmissionIdentityService.Identity.EDUCATION) {
+            return !archiveService.query(request.getMobile(), request.getWechatId(), userId, requestedIdentity).isEmpty();
+        }
         LeadSubmissionIdentityService.Resolution identity = switch (requestedIdentity) {
             case SALES -> {
                 identityService.requireSales(userId);
@@ -203,7 +208,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
         validateContact(mobile, wechatId);
-        if (contactActivationService.activate(mobile, wechatId, reqVO.getIdempotencyKey(), actorUserId,
+        if (!selfSourced && contactActivationService.activate(mobile, wechatId, reqVO.getIdempotencyKey(), actorUserId,
                 sourceType(identity), identity.partnerId())) {
             return LeadCreateRespVO.activated(null, null, null);
         }
@@ -216,27 +221,35 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                 : attachmentService.validateReferences(reqVO.getAttachments(), actorUserId);
         validateDispatch(reqVO, selfSourced);
 
-        LeadDuplicateReviewDO existingReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
-        if (existingReview != null) {
-            requireSamePartnerIdentity(existingReview.getSubmissionPartnerId(), identity);
-            requireSameEducationSource(existingReview.getSubmissionSourceType(), identity);
-            return duplicateReviewResponse(existingReview);
-        }
-        LeadDuplicateMatcher.MatchResult match = duplicateMatcher.matchSubmissionWeakRules(reqVO);
-        if (match.hasMatches()) {
-            LeadDuplicateReviewDO existingPending = duplicateReviewMapper.selectPendingByFingerprint(match.reviewFingerprint());
-            if (existingPending != null) return LeadCreateRespVO.reviewPending(existingPending.getId());
-            LeadDuplicateReviewDO review = duplicateReview(reqVO, actorUserId, identity, category, match,
-                    DUPLICATE_REVIEW_STATUS_PENDING, firstCandidate(match.candidates()),
-                    DUPLICATE_RESULT_SUSPECTED_CREATED, null);
-            duplicateReviewMapper.insert(review);
-            return LeadCreateRespVO.reviewPending(review.getId());
+        if (!selfSourced) {
+            LeadDuplicateReviewDO existingReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
+            if (existingReview != null) {
+                requireSamePartnerIdentity(existingReview.getSubmissionPartnerId(), identity);
+                requireSameEducationSource(existingReview.getSubmissionSourceType(), identity);
+                return duplicateReviewResponse(existingReview);
+            }
+            LeadDuplicateMatcher.MatchResult match = duplicateMatcher.matchSubmissionWeakRules(reqVO);
+            if (match.hasMatches()) {
+                LeadDuplicateReviewDO existingPending = duplicateReviewMapper.selectPendingByFingerprint(match.reviewFingerprint());
+                if (existingPending != null) return LeadCreateRespVO.reviewPending(existingPending.getId());
+                LeadDuplicateReviewDO review = duplicateReview(reqVO, actorUserId, identity, category, match,
+                        DUPLICATE_REVIEW_STATUS_PENDING, firstCandidate(match.candidates()),
+                        DUPLICATE_RESULT_SUSPECTED_CREATED, null);
+                duplicateReviewMapper.insert(review);
+                return LeadCreateRespVO.reviewPending(review.getId());
+            }
+
         }
 
         boolean automatic = selfSourced && isSelfSourced(sourceType(identity)) && reqVO.getNewMediaProviderUserId() == null;
         if (automatic) selfSourcedAutomation.validate(reqVO, actorUserId, sourceType(identity));
+        PersonDO selected = selfSourced ? archiveService.requireSelection(reqVO) : null;
+        if (selfSourced && selected == null) {
+            // Reservation uniqueness prevents a concurrent no-match request from silently reusing a new archive.
+            selected = personIdentityWriteService.createNew(reqVO.getName().trim(), reqVO.getMobile(), reqVO.getWechatId(), "lead");
+        }
         LeadCreateRespVO created = createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity, category,
-                requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()), automatic);
+                requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()), automatic, selected);
         if (!automatic) return created;
         selfSourcedAutomation.complete(created.getLeadId(), actorUserId, reqVO.getSelfSourcedNextFollowUpAt());
         recordSubmission(created.getLeadId(), actorUserId, identity);
@@ -278,7 +291,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                 ? selfSourcedSourceUserId(reqVO.getNewMediaProviderUserId(), submitterUserId)
                 : submitterUserId;
         return createApproved(reqVO, submitterUserId, sourceUserId, reusePersonId, products, region, attachments, identity,
-                category, sourceChannelLabel, false);
+                category, sourceChannelLabel, false, null);
     }
 
     private LeadCreateRespVO duplicateReviewResponse(LeadDuplicateReviewDO review) {
@@ -349,14 +362,14 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                                             List<LeadProductSnapshot> products, RegionSnapshot region,
                                             Map<Long, FileInfoRespDTO> attachments,
                                             LeadSubmissionIdentityService.Resolution identity,
-                                            LeadCategorySnapshotService.Selection category, String sourceChannelLabel, boolean deferFlowRecord) {
+                                            LeadCategorySnapshotService.Selection category, String sourceChannelLabel, boolean deferFlowRecord, PersonDO selectedArchive) {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
-        PersonDO person = reusePersonId == null
+        PersonDO person = selectedArchive != null ? selectedArchive : reusePersonId == null
                 ? personIdentityWriteService.resolveForLead(reqVO.getName().trim(), mobile, wechatId)
                 : personIdentityWriteService.update(reusePersonId, reqVO.getName().trim(), mobile, wechatId);
         if (person == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
-        if (!leadMapper.selectNonClosedByPersonForUpdate(person.getId(),
+        if (selectedArchive == null && !leadMapper.selectNonClosedByPersonForUpdate(person.getId(),
                 cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()).isEmpty()) {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }

@@ -3,7 +3,7 @@ import { ReloadOutlined, SendOutlined } from '@ant-design/icons'
 import { Alert, App, Button, Card, Cascader, Col, DatePicker, Descriptions, Form, Input, Radio, Row, Select, Space, Spin, Steps, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DICT_TYPE, LEAD_ASSIGNMENT_MODE, LEAD_ASSIGNMENT_OPTIONS, PHONE_PATTERN } from '../constants'
-import { api, type AreaNode, type LeadAttachment, type LeadCatalog, type LeadCreateResult } from '../services/api'
+import { api, type AreaNode, type LeadAttachment, type LeadCatalog, type LeadCreateResult, type LeadArchiveCandidate } from '../services/api'
 import { buildLeadAreaOptions, normalizeLeadAreaPath } from '../services/area'
 import LeadIntendedProductEditor, { type IntendedProductSelection } from '../components/LeadIntendedProductEditor'
 import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
@@ -85,6 +85,45 @@ export default function LeadSubmissionPage({
   const contactInput = (phone?: string, wechat?: string) => JSON.stringify([phone?.trim() || '', wechat?.trim().toLowerCase() || ''])
   const currentContactInput = contactInput(mobile, wechatId)
   const currentContactResult = contactResult?.input === currentContactInput ? contactResult : undefined
+  const [archiveMobile, setArchiveMobile] = useState('')
+  const [archiveWechat, setArchiveWechat] = useState('')
+  const [archiveCandidates, setArchiveCandidates] = useState<LeadArchiveCandidate[]>()
+  const [selectedArchive, setSelectedArchive] = useState<LeadArchiveCandidate>()
+  const [archiveLoading, setArchiveLoading] = useState(false)
+  const [archiveError, setArchiveError] = useState<string>()
+  const archiveRequest = useRef(0)
+  const invalidateArchive = () => {
+    archiveRequest.current += 1
+    setArchiveCandidates(undefined); setSelectedArchive(undefined); setArchiveError(undefined); setArchiveLoading(false)
+    setPendingValues(undefined)
+    form.setFieldsValue({ name: '', mobile: '', wechatId: '' })
+  }
+  const selectArchive = (candidate: LeadArchiveCandidate) => {
+    setSelectedArchive(candidate)
+    form.setFieldsValue({ name: candidate.name, mobile: candidate.mobile, wechatId: candidate.wechatId })
+    setPendingValues(undefined)
+  }
+  const queryArchive = async () => {
+    const sequence = ++archiveRequest.current
+    setArchiveLoading(true); setArchiveError(undefined); setArchiveCandidates(undefined); setSelectedArchive(undefined)
+    try {
+      const candidates = await api.querySelfSourcedArchive(educationSelfSourced, {
+        mobile: archiveMobile.trim() || undefined, wechatId: archiveWechat.trim() || undefined, idempotencyKey: createIdempotencyKey()
+      })
+      if (sequence !== archiveRequest.current) return
+      setArchiveCandidates(candidates)
+      if (candidates.length === 1) selectArchive(candidates[0])
+      else form.setFieldsValue({ name: '', mobile: candidates.length ? '' : archiveMobile.trim(), wechatId: candidates.length ? '' : archiveWechat.trim() })
+    } catch (error) {
+      if (sequence === archiveRequest.current) setArchiveError(error instanceof Error ? error.message : '查询失败，请重试')
+    } finally { if (sequence === archiveRequest.current) setArchiveLoading(false) }
+  }
+  const archiveReady = () => {
+    if (!selfSourced) return true
+    if (archiveLoading || !archiveCandidates) { message.error('请先查询档案'); return false }
+    if (archiveCandidates.length && !selectedArchive) { message.error('请先选择本次创建客资使用的档案'); return false }
+    return true
+  }
   const canCheckContact = permissions.some(permission => [
     'zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create'
   ].includes(permission))
@@ -188,6 +227,7 @@ export default function LeadSubmissionPage({
 
   /** 校验单步：字段规则 + 该步特有的非表单校验（意向课程、附件上传状态）。 */
   const validateStep = async (key: StepKey, notify: boolean) => {
+    if (key === 'info' && !archiveReady()) return false
     const fields = STEP_FIELDS[key].filter(field => {
       if (field === 'specifiedSalesUserId') return !selfSourced && canSpecifySales
         && form.getFieldValue('dispatchMode') === LEAD_ASSIGNMENT_MODE.SPECIFIED
@@ -228,6 +268,7 @@ export default function LeadSubmissionPage({
   const resetAll = () => {
     if (contactCheckBusy.current) return
     setContactResult(undefined)
+    invalidateArchive(); setArchiveMobile(''); setArchiveWechat('')
     form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined)
     setPendingValues(undefined); setInvalidSteps([]); setCurrent(0)
   }
@@ -297,6 +338,9 @@ export default function LeadSubmissionPage({
       }
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
       const result = await (educationSelfSourced ? api.createEducationSelfSourcedLead : selfSourced ? api.createSelfSourcedLead : api.createLead)({
+        ...(selfSourced ? { archiveQueryConfirmed: true, archiveQueryMobile: archiveMobile.trim() || undefined,
+          archiveQueryWechatId: archiveWechat.trim() || undefined, selectedPersonId: selectedArchive?.personId,
+          archiveSnapshotKey: selectedArchive?.snapshotKey } : {}),
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,
         provinceCode, cityCode,
         intendedProducts: intentions.map(item => ({ spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown, skuUnknown: item.skuUnknown, primary: item.key === primaryKey })),
@@ -339,23 +383,39 @@ export default function LeadSubmissionPage({
       <Form<FormValues> form={form} layout="vertical" onValuesChange={() => setPendingValues(undefined)} initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }}>
         {/* 各步用 hidden 收起而不是卸载：保留已填值与校验状态，回退不丢数据。 */}
         <div className="lead-form-step" hidden={current !== 0}>
+          {selfSourced && <Space orientation="vertical" style={{ width: '100%' }}>
+            <Title level={5}>查询已有档案</Title>
+            <Row gutter={[16, 8]}>
+              <Col xs={24} md={12}><Input aria-label="查询手机号" placeholder="手机号" value={archiveMobile} maxLength={32} onChange={e => { invalidateArchive(); setArchiveMobile(e.target.value) }} /></Col>
+              <Col xs={24} md={12}><Input aria-label="查询微信号" placeholder="微信号" value={archiveWechat} maxLength={64} onChange={e => { invalidateArchive(); setArchiveWechat(e.target.value) }} /></Col>
+            </Row>
+            <Button loading={archiveLoading} onClick={() => void queryArchive()}>查询</Button>
+            {archiveError && <Alert type="error" showIcon message={archiveError} action={<Button onClick={() => void queryArchive()}>重试</Button>} />}
+            {archiveCandidates && <Alert type="info" showIcon message={!archiveCandidates.length ? '系统中未查询到重复档案，本次将新建档案、客资' : archiveCandidates.length === 1 ? '查询到系统中已有一份重复档案，已默认选择' : `查询到系统中已有${archiveCandidates.length === 2 ? '两' : archiveCandidates.length}份重复档案，请选择本次以哪一份档案创建客资`} />}
+            {!!archiveCandidates?.length && <Radio.Group value={selectedArchive?.personId} onChange={e => { const candidate = archiveCandidates.find(item => item.personId === e.target.value); if (candidate) selectArchive(candidate) }}>
+              <Space orientation="vertical">{archiveCandidates.map(item => <Radio key={item.personId} value={item.personId}>
+                <Space wrap><span>姓名：{item.name || '未填写'}</span><span>手机号：{item.mobile || '未填写'}</span><span>微信号：{item.wechatId || '未填写'}</span>{item.personNo && <span>档案编号：{item.personNo}</span>}</Space>
+              </Radio>)}</Space>
+            </Radio.Group>}
+            {selectedArchive && <Alert type="info" showIcon message="本次将复用所选档案的姓名、联系方式，创建一条新的客资" />}
+          </Space>}
           <Title level={5}>客户信息</Title><Row gutter={[24, 0]}>
-            <Col xs={24} md={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }, { max: 100 }]}><Input /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }, { max: 100 }]}><Input disabled={selfSourced && (!!selectedArchive || !!archiveCandidates?.length)} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} disabled={selfSourced} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} disabled={selfSourced} /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="regionPath" label="客户地区" rules={[{ required: true, message: '请选择客户省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】" /></Form.Item></Col>
           </Row>
-          <Space orientation="vertical">
+          {!selfSourced && <Space orientation="vertical">
             {canCheckContact && <Button loading={checkingContact} disabled={currentContactResult?.matched} onClick={() => void checkContact()}>查重</Button>}
             <Text type="secondary">手机号、微信号至少填写一个；命中已有客资将自动激活提醒。</Text>
             {currentContactResult && <Alert showIcon type={currentContactResult.error ? 'error' : 'success'}
               message={currentContactResult.error || (currentContactResult.matched ? '客资已存在，已激活提醒' : '未发现重复客资，可继续填写提交。')}
               action={currentContactResult.error && <Button onClick={() => void checkContact()}>重试</Button>} />}
-          </Space>
+          </Space>}
           {selfSourced && <><Alert type="info" showIcon message={providerId != null ? "业务来源：新媒体引流，由本人代录" : "业务来源：本人自拓，无新媒体引流"}/><Title level={5}>客资提供方</Title><Row gutter={[24, 0]}>
             <Col xs={24} md={12}><Form.Item name="newMediaProviderUserId" preserve={false} extra="由新媒体引流、本人先收到信息时，请选择对应新媒体人员；未选择表示本人获客、无新媒体引流。提交后不可补选或更改。"><EmployeeSelect users={providers} loading={providerState.loading} showSearch optionFilterProp="label" allowClear placeholder="请选择新媒体提供方" notFoundContent={providerState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadProviders()}>重新加载</Button> : '暂无可选新媒体人员'} /></Form.Item></Col>
           </Row></>}
-          {automatic && <Alert showIcon type="info" message="提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。" description="仅查重通过并新建客资时自动处理；激活已有客资或进入复核仍按原流程。" />}
+          {automatic && <Alert showIcon type="info" message="提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。" description="本次新建客资将归属本人，已有档案可复用。" />}
           <Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>
             <Col xs={24} md={12}><Form.Item name="sourceChannel" label="来源渠道" rules={[{ required: true, message: '请选择来源渠道' }]}><Select options={sources} notFoundContent="来源渠道未配置" /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="leadCategory" label="客资分类" rules={[{ required: true, message: '请选择客资分类' }]}><Select options={categories} notFoundContent="客资分类未配置" /></Form.Item></Col>
@@ -416,11 +476,11 @@ export default function LeadSubmissionPage({
                   </Tag>)}</Space>
                   : '—'
               },
-              ...(automatic ? [{ key: 'automation', label: '提交处理', children: '查重通过并新建后：归属本人、自动首跟、判有效、生成商机' }, { key: 'reminder', label: '后续提醒', children: nextFollowUpAt ? formatTimestamp(nextFollowUpAt.valueOf()) : '请选择下次跟进时间' }] : []),
+              ...(automatic ? [{ key: 'automation', label: '提交处理', children: '新建后：归属本人、自动首跟、判有效、生成商机' }, { key: 'reminder', label: '后续提醒', children: nextFollowUpAt ? formatTimestamp(nextFollowUpAt.valueOf()) : '请选择下次跟进时间' }] : []),
               { key: 'files', label: '附件图片', children: files.length ? `${files.length} 张` : '未上传' },
               { key: 'remark', label: '备注信息', span: { xs: 1, md: 2 }, children: summary?.remark?.trim() || '—' }
             ]} />
-          <Text type="secondary">提交后客资将进入查重与派单流程，内容不可撤回。</Text>
+          <Text type="secondary">{selfSourced ? '提交后将创建新的客资，内容不可撤回。' : '提交后客资将进入查重与派单流程，内容不可撤回。'}</Text>
         </div>
         <div className="lead-form-actions"><Space>
           <Button disabled={checkingContact} onClick={resetAll}>重置</Button>

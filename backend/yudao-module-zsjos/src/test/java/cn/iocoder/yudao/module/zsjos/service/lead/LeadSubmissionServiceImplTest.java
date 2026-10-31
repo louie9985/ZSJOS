@@ -71,6 +71,7 @@ class LeadSubmissionServiceImplTest {
     @InjectMocks private LeadSubmissionServiceImpl service;
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private PersonMapper personMapper;
+    @Mock private LeadSelfSourcedArchiveService archiveService;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private LeadNotifyEventPublisher notifyEventPublisher;
     @Mock private LeadMapper leadMapper;
@@ -466,8 +467,7 @@ class LeadSubmissionServiceImplTest {
     @Test
     void salesDirectCreateRunsAutomationOnceAndReturnsServerState() {
         LeadCreateReqVO req=validDuplicateRequest();req.setRemark("已联系，有意向");prepareDuplicateValidation(req);
-        when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
-        when(personIdentityWriteService.resolveForLead(any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        when(archiveService.requireSelection(req)).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
         when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
@@ -478,6 +478,8 @@ class LeadSubmissionServiceImplTest {
         when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(saved.get());
         service.createSelfSourced(req,1L);
         verify(selfSourcedAutomation,org.mockito.Mockito.times(1)).complete(90L,1L,null);
+        org.mockito.Mockito.verifyNoInteractions(contactActivationService, duplicateMatcher, personIdentityWriteService);
+        verify(leadMapper, never()).selectNonClosedByPersonForUpdate(any(), any());
     }
 
     @Test
@@ -486,9 +488,6 @@ class LeadSubmissionServiceImplTest {
         LeadDO historical=new LeadDO().setId(30L).setSourceType(SOURCE_SALES_SELF).setStatus("submitted");
         when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(historical);
         assertFalse(service.createSelfSourced(req,1L).getAutomaticQualificationApplied());
-        org.mockito.Mockito.reset(leadMapper);
-        when(contactActivationService.activate(any(),any(),any(),eq(1L),eq(SOURCE_SALES_SELF),org.mockito.ArgumentMatchers.isNull())).thenReturn(true);
-        assertEquals("activated",service.createSelfSourced(req,1L).getOutcome());
         org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
     }
 
@@ -496,8 +495,7 @@ class LeadSubmissionServiceImplTest {
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
     void linkedProviderAndDuplicateReviewKeepExistingFlow(boolean education) {
         LeadCreateReqVO req=validDuplicateRequest();req.setNewMediaProviderUserId(2L);prepareDuplicateValidation(req);
-        when(duplicateMatcher.matchSubmissionWeakRules(req)).thenReturn(match(null,List.of(),"none",null,null,null));
-        when(personIdentityWriteService.resolveForLead(any(),any(),any())).thenReturn(new PersonDO().setId(50L));
+        when(archiveService.requireSelection(req)).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
         when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
@@ -515,6 +513,8 @@ class LeadSubmissionServiceImplTest {
         when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(saved.get());
         if (education) service.createEducationSelfSourced(req,1L); else service.createSelfSourced(req,1L);
         verify(leadMapper,org.mockito.Mockito.times(1)).insert(any(LeadDO.class));
+        org.mockito.Mockito.verifyNoInteractions(contactActivationService, duplicateMatcher, personIdentityWriteService);
+        verify(leadMapper, never()).selectNonClosedByPersonForUpdate(any(), any());
     }
 
     private static LeadCreateReqVO baseRequest() {

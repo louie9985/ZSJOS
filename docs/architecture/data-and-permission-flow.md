@@ -1100,3 +1100,8 @@ Teaching closure is service-scoped and independent of the shared media relations
 ## 学员档案独立授权（2026-10-25）
 
 学员管理下配置 `zsjos:student-archive:read`、`update`、`sensitive-read`、`export`。档案敏感字段、报名材料附件和敏感修订使用档案 sensitive-read，档案导出使用档案 export；普通导出仍脱敏。报名履约公共池及报名信息表继续使用自己的 `zsjos:registration:*` / `zsjos:student-info-form:*`，两条授权链不互相回退，避免勾选档案按钮时把公共池父菜单及查询权限带给学习规划师。两端均消费服务端能力标记；后端累计检查功能权限及原服务关系对象范围。V350 仅新增菜单元数据，不迁移或新增角色授权。升级授权窗口详见[信息表与档案契约](../api/student-information-collection.md)。
+
+
+## Self-sourced archive candidate projection (2026-10-31)
+
+Sales/education self-sourced create permissions authorize the explicitly confirmed contact-matching archive projection (full name, mobile, WeChat only). Matching uses existing contact and verified-alias predicates with tenant/logical-delete enforcement, independently of historical lead ownership or closure. This narrowly scoped selection projection does not confer ordinary Person/student/Lead read or write access. Creation revalidates candidate membership under lock and identity snapshot before linking; no archive mutation or identity merge occurs. Regions remain lead-owned. Both React Workbench and Vue Admin consume this contract. See [self-sourced archive selection](../api/zsjos-lead-submission-dispatch.md#自拓录档案查询与选择2026-10-31).

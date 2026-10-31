@@ -15,17 +15,30 @@
       :rules="rules"
       label-width="110px"
     >
+      <div v-if="selfSourced" class="mb-12px">
+        <el-form-item label="查询手机号"><el-input v-model="archiveMobile" @input="invalidateArchive" /></el-form-item>
+        <el-form-item label="查询微信号"><el-input v-model="archiveWechat" @input="invalidateArchive" /></el-form-item>
+        <el-button :loading="archiveLoading" @click="queryArchive">查询</el-button>
+        <el-alert v-if="archiveError" :title="archiveError" type="error" show-icon :closable="false"><el-button link @click="queryArchive">重试</el-button></el-alert>
+        <el-alert v-if="archiveCandidates" :closable="false" type="info" :title="!archiveCandidates.length ? '系统中未查询到重复档案，本次将新建档案、客资' : archiveCandidates.length === 1 ? '查询到系统中已有一份重复档案，已默认选择' : `查询到系统中已有${archiveCandidates.length === 2 ? '两' : archiveCandidates.length}份重复档案，请选择本次以哪一份档案创建客资`" />
+        <el-radio-group v-if="archiveCandidates?.length" :model-value="selectedArchive?.personId" @change="selectArchiveId">
+          <el-radio v-for="item in archiveCandidates" :key="item.personId" :value="item.personId" style="height: auto; white-space: normal; margin: 8px 0; width: 100%">
+            <span style="white-space: normal; overflow-wrap: anywhere">姓名：{{ item.name || '未填写' }}；手机号：{{ item.mobile || '未填写' }}；微信号：{{ item.wechatId || '未填写' }}<template v-if="item.personNo">；档案编号：{{ item.personNo }}</template></span>
+          </el-radio>
+        </el-radio-group>
+        <el-alert v-if="selectedArchive" title="本次将复用所选档案的姓名、联系方式，创建一条新的客资" type="info" :closable="false" />
+      </div>
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="客户姓名" prop="name"
-            ><el-input v-model="form.name" /></el-form-item></el-col
+            ><el-input v-model="form.name" :disabled="selfSourced && !!archiveCandidates?.length" /></el-form-item></el-col
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="手机号" prop="mobile" :required="!form.wechatId.trim()"
-            ><el-input v-model="form.mobile" /></el-form-item></el-col
+            ><el-input v-model="form.mobile" :disabled="selfSourced" /></el-form-item></el-col
       ></el-row>
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
-          ><el-form-item label="微信号" :required="!form.mobile.trim()"><el-input v-model="form.wechatId" /></el-form-item></el-col
+          ><el-form-item label="微信号" :required="!form.mobile.trim()"><el-input v-model="form.wechatId" :disabled="selfSourced" /></el-form-item></el-col
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="客户地区" prop="region"
             ><el-cascader
@@ -97,7 +110,7 @@
       ></el-form-item>
       <el-alert v-if="automatic" type="info" show-icon :closable="false" class="mb-12px"
         title="提交后将自动生成首跟记录并判定有效，请确认已联系客户且有意向。"
-        description="仅查重通过并新建客资时自动处理；激活已有客资或进入复核仍按原流程。" />
+        description="本次新建客资将归属本人，已有档案可复用。" />
       <el-form-item label="备注" prop="remark" :required="automatic"
         ><el-input v-model="form.remark" type="textarea" :rows="3" maxlength="1000" show-word-limit
       /></el-form-item>
@@ -105,7 +118,7 @@
         <el-date-picker v-model="form.selfSourcedNextFollowUpAt" type="datetime" value-format="x" placeholder="请选择下次跟进时间" class="w-100%" />
       </el-form-item>
       <el-alert v-if="automatic" type="info" :closable="false"
-        :title="'提交摘要：查重通过并新建后归属本人、自动首跟、判有效、生成商机。'"
+        :title="'提交摘要：新建后归属本人、自动首跟、判有效、生成商机。'"
         :description="form.selfSourcedNextFollowUpAt ? '后续提醒：' + formatZsjosTimestamp(Number(form.selfSourcedNextFollowUpAt)) : '请选择下次跟进时间'" />
     </el-form>
     <template #footer
@@ -159,6 +172,38 @@ const emptyForm = () => ({
   remark: ''
 })
 const form = reactive(emptyForm())
+const archiveMobile = ref('')
+const archiveWechat = ref('')
+const archiveCandidates = ref<MenuApi.LeadArchiveCandidate[]>()
+const selectedArchive = ref<MenuApi.LeadArchiveCandidate>()
+const archiveLoading = ref(false)
+const archiveError = ref('')
+let archiveSequence = 0
+const invalidateArchive = () => {
+  archiveSequence++
+  archiveCandidates.value = undefined; selectedArchive.value = undefined; archiveError.value = ''; archiveLoading.value = false
+  form.name = ''; form.mobile = ''; form.wechatId = ''
+}
+const selectArchiveId = (id: string | number | boolean | undefined) => {
+  const selected = archiveCandidates.value?.find(item => item.personId === id)
+  selectedArchive.value = selected
+  if (selected) { form.name = selected.name; form.mobile = selected.mobile || ''; form.wechatId = selected.wechatId || '' }
+}
+const queryArchive = async () => {
+  const sequence = ++archiveSequence
+  archiveLoading.value = true; archiveError.value = ''; archiveCandidates.value = undefined; selectedArchive.value = undefined
+  try {
+    const candidates = await MenuApi.querySelfSourcedArchive(!!props.educationSelfSourced, {
+      mobile: archiveMobile.value.trim() || undefined, wechatId: archiveWechat.value.trim() || undefined, idempotencyKey: crypto.randomUUID()
+    })
+    if (sequence !== archiveSequence) return
+    archiveCandidates.value = candidates
+    if (candidates.length === 1) selectArchiveId(candidates[0].personId)
+    else { form.name = ''; form.mobile = candidates.length ? '' : archiveMobile.value.trim(); form.wechatId = candidates.length ? '' : archiveWechat.value.trim() }
+  } catch (error: unknown) {
+    if (sequence === archiveSequence) archiveError.value = error instanceof Error ? error.message : '查询失败，请重试'
+  } finally { if (sequence === archiveSequence) archiveLoading.value = false }
+}
 const automatic = computed(() => !!props.selfSourced && form.newMediaProviderUserId == null)
 watch(automatic, enabled => {
   if (!enabled) form.selfSourcedNextFollowUpAt = undefined
@@ -216,6 +261,7 @@ const loadOptions = async () => {
   }
 }
 const open = () => {
+  invalidateArchive(); archiveMobile.value = ''; archiveWechat.value = ''
   idempotencyKey.value = undefined
   Object.assign(form, emptyForm())
   if (!canSpecifySales.value) form.dispatchMode = 'auto'
@@ -224,12 +270,19 @@ const open = () => {
 }
 const submit = async () => {
   if (saving.value) return
+  if (props.selfSourced) {
+    if (archiveLoading.value || !archiveCandidates.value) { message.warning('请先查询档案'); return }
+    if (archiveCandidates.value.length && !selectedArchive.value) { message.warning('请先选择本次创建客资使用的档案'); return }
+  }
   if (!await formRef.value?.validate().catch(() => false)) return
   saving.value = true
   try {
     const [provinceCode, cityCode] = form.region
     const result = await MenuApi.createLead(
       {
+        ...(props.selfSourced ? { archiveQueryConfirmed: true, archiveQueryMobile: archiveMobile.value.trim() || undefined,
+          archiveQueryWechatId: archiveWechat.value.trim() || undefined, selectedPersonId: selectedArchive.value?.personId,
+          archiveSnapshotKey: selectedArchive.value?.snapshotKey } : {}),
         name: form.name.trim(),
         mobile: form.mobile.trim() || undefined,
         wechatId: form.wechatId.trim() || undefined,

@@ -187,6 +187,9 @@ public interface ZsjosErrorCodeConstants {
 
     ErrorCode LEAD_RECYCLE_APPROVAL_ACTIVE = new ErrorCode(1_900_003_182, "客资存在审批中的订单、转派申请或申诉，暂不可回收");
     ErrorCode LEAD_SELF_SOURCED_REMARK_REQUIRED = new ErrorCode(1_900_003_180, "销售自拓自动判有效需填写录单备注，说明已联系及意向情况");
+    ErrorCode LEAD_ARCHIVE_QUERY_REQUIRED = new ErrorCode(1_900_003_190, "请先查询档案");
+    ErrorCode LEAD_ARCHIVE_SELECTION_REQUIRED = new ErrorCode(1_900_003_191, "请先选择本次创建客资使用的档案");
+    ErrorCode LEAD_ARCHIVE_CHANGED = new ErrorCode(1_900_003_192, "档案或查询条件已变化，请重新查询并确认");
     ErrorCode LEAD_CONTACT_REQUIRED = new ErrorCode(1_900_003_001, "手机号和微信号至少填写一个");
     ErrorCode LEAD_CONTACT_CONFLICT = new ErrorCode(1_900_003_002, "手机号和微信号分别属于不同客户，请核对后重试");
     ErrorCode LEAD_REGION_INVALID = new ErrorCode(1_900_003_003, "客户省市地区无效或层级不匹配");

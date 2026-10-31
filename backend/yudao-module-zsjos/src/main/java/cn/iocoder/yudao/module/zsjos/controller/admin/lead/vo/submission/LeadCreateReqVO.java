@@ -11,6 +11,11 @@ import java.util.List;
 
 @Data
 public class LeadCreateReqVO {
+    private Boolean archiveQueryConfirmed;
+    @Size(max = 32) private String archiveQueryMobile;
+    @Size(max = 64) private String archiveQueryWechatId;
+    private Long selectedPersonId;
+    @Size(max = 64) private String archiveSnapshotKey;
     @NotBlank @Size(max = 100) private String name;
     @Size(max = 32) private String mobile;
     @Size(max = 64) private String wechatId;

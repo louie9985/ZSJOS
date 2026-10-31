@@ -1337,7 +1337,13 @@ export type LeadAttachment = {
   contentType: string;
   fileSize: number;
 };
+export type LeadArchiveCandidate = { personId: number; personNo?: string; name: string; mobile?: string; wechatId?: string; snapshotKey: string };
 export type LeadCreateRequest = {
+  archiveQueryConfirmed?: boolean;
+  archiveQueryMobile?: string;
+  archiveQueryWechatId?: string;
+  selectedPersonId?: number;
+  archiveSnapshotKey?: string;
   selfSourcedNextFollowUpAt?: Timestamp;
   name: string;
   mobile?: string;
@@ -3708,6 +3714,8 @@ export const api = {
     notify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyResult>(await http.post('/zsjos/calendar-notification/send', data)),
     previewNotify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyPreview>(await http.post('/zsjos/calendar-notification/preview', data)),
   },
+  querySelfSourcedArchive: async (education: boolean, data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
+    unwrap<LeadArchiveCandidate[]>(await http.post(education ? "/zsjos/lead/education-self-sourced/archive-query" : "/zsjos/lead/self-sourced/archive-query", data)),
   checkLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
     unwrap<boolean>(await http.post("/zsjos/lead/contact-check", data)),
   checkSelfSourcedLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>

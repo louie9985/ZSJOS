@@ -61,7 +61,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 提交接口先执行统一查重。同字段手机号或同字段微信号命中任何历史客资时为强重复，创建 `duplicate_flag=strong_duplicate`、`duplicate_result=strong_rejected` 的查重审计记录，并返回稳定业务错误 `LEAD_DUPLICATE_STRONG_CONFLICT`；本次不创建 `Person`、`Lead`、派单或指定销售任务。交叉联系方式、姓名+明确省市+明确主意向课程、姓名+手机号后四位命中时为疑似重复，保存提交快照、候选快照、命中规则和 `reviewFingerprint`，返回 `outcome=review_pending + reviewId`；相同 fingerprint 已有待处理任务时复用最早任务，不追加可见复核项。`duplicateAutoResolutionEnabled` 仅用于交叉联系方式疑似重复：开启时自动关闭本次复核并返回 `duplicate_auto_closed`，不创建 Lead、不改动历史客资。完全无命中返回 `created + leadId + leadNo`。
 
-当前提交页联系方式查重已收敛为强重复激活：手机号、微信号至少填写一个；同字段或交叉字段命中时，逐条创建 `LeadActivation` 并发送 `zsjos.lead.activated`，同一请求对同一客资按幂等键只处理一次，不改变历史客资状态和归属。手机号与微信号分别命中不同客资时分别激活和通知；无负责人时仍记录激活，页面统一显示“客资已存在，已激活提醒”。最终提交前服务端再次执行该联系方式激活，未命中联系方式时才继续执行既有弱重复复核规则。联系方式查重接口为 `POST /zsjos/lead/contact-check`、`/self-sourced/contact-check` 和 `/education-self-sourced/contact-check`，分别受对应提交权限保护。
+当前提交页联系方式查重已收敛为强重复激活：手机号、微信号至少填写一个；同字段或交叉字段命中时，逐条创建 `LeadActivation` 并发送 `zsjos.lead.activated`，同一请求对同一客资按幂等键只处理一次，不改变历史客资状态和归属。手机号与微信号分别命中不同客资时分别激活和通知；无负责人时仍记录激活，页面统一显示“客资已存在，已激活提醒”。最终提交前服务端再次执行该联系方式激活，未命中联系方式时才继续执行既有弱重复复核规则。普通联系方式查重接口为 `POST /zsjos/lead/contact-check`。自拓入口改用下述档案查询契约，不再执行激活提醒。
 
 自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售或教务本人，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。V080 将默认“客资新建”站内信拆成两条规则：实际提交销售继续收到通用提交成功消息；仅当销售或教务自拓时明确选择了不同于提交人的新媒体提供方，该提供方才收到关联提醒。V257 对未编辑的 V080 默认模板使用 `lead.submitterIdentityLabel` 区分销售/教务。未选择提供方以及普通新媒体提交均不产生这条关联提醒。管理员已有的启用、停用或已编辑规则保持不变，历史客资不补发消息。
 
@@ -370,3 +370,25 @@ Admin LeadCreateDialog 与 Workbench LeadSubmissionPage 继续传相同的选择
 本节覆盖早期“包含已关闭客资”的提交提醒范围。联系方式命中仅提醒未关闭且未删除的客资，多条命中分别记录与通知。锁定客资后再次检查关闭状态，避免查询后关闭仍被提醒。只存在已关闭客资或只有客户档案时，复用经身份核验的客户创建新客资，不覆盖原客户身份、不删除历史客资。暂停、公海、已成交等非 closed 状态仍参与原查重；不增加当前承接客资或自动转派。
 
 V355 移除一档一条未删除客资的数据库约束；提交在 Person 锁下重新读取非关闭客资。身份写入同时检查占用和实际主档，避免旧导入缺少占用时重复建档。前端请求及 activated/created/review_pending 响应契约保持，适用于管理端、工作台及合作方入口。当前部署和真实账号验收尚未完成，见 [归一验证记录](../operations/person-lead-unification.md)。
+
+
+## 自拓录档案查询与选择（2026-10-31）
+
+本节覆盖前文对销售、教务自拓统一查重及激活的描述。普通运营、兼职提交仍保留联系方式激活和弱重复复核。
+
+- 销售 `POST /zsjos/lead/self-sourced/archive-query`、学习规划师 `POST /zsjos/lead/education-self-sourced/archive-query` 使用对应现有自拓创建权限，同时验证提交身份。请求沿用联系方式查询 VO（mobile、wechatId、idempotencyKey），返回档案候选数组：personId（内部关联键）、personNo、name、mobile、wechatId、snapshotKey。
+- 复用原联系方式匹配条件（同字段、交叉字段、已验证历史别名），按 Person 返回；没有未关闭客资也可成为候选。不查询或授权读取历史客资详情，不写激活、不发通知。请求及完整响应不记入接口日志。旧自拓 contact-check 保留布尔响应兼容，但不再激活。
+- 无结果提示“系统中未查询到重复档案，本次将新建档案、客资”；一份默认选择；多份展示实际数量并要求选择，未选择不能下一步或提交。命中后不得忽略结果另建档案。
+- 仅复用姓名、手机号、微信号，选中后只读。地区不是 Person 字段，仍为本次 Lead 单独填写。提示“本次将复用所选档案的姓名、联系方式，创建一条新的客资”。
+- 创建请求增加 archiveQueryConfirmed、archiveQueryMobile、archiveQueryWechatId、selectedPersonId、archiveSnapshotKey。查询条件改变清除候选、选择及待提交状态；异步旧响应不能覆盖新条件。
+- 创建事务按原查询条件重新锁定当前租户候选，校验选择属于候选及姓名/联系方式快照仍一致，从服务端档案取值。未查询返回 LEAD_ARCHIVE_QUERY_REQUIRED，未选档案返回 LEAD_ARCHIVE_SELECTION_REQUIRED，候选或快照改变返回 LEAD_ARCHIVE_CHANGED，要求重新查询确认。
+- 复用不修改 Person、不合并档案、不改变旧客资归属。直接自拓创建不受同档案未关闭客资限制，不进入重复审核；服务端选中的档案只能由上述自拓分支传入共用创建函数。普通提交及历史复核保留原限制。
+- 无候选创建仍使用联系方式预占及唯一约束，避免并发静默复用未确认的档案；冲突须重新查询。原请求幂等重放和自动首跟/有效判定权限保持；选择新媒体提供方的自拓代录同样使用档案选择，但仍保留其来源归因和非自动首跟规则。
+- React Workbench 与 Vue Admin 同步消费此契约。需先发布兼容服务端再更新客户端；旧自拓客户端缺少查询确认将被服务端拒绝并要求查询。数据库沿用 V355 移除活动 Person 唯一索引后的结构，不新增迁移、不补建历史失败提交。
+
+
+### 自拓查询审查修复（2026-10-31）
+
+未选择档案时先进行无锁候选校验；新建仍由 PersonIdentityWriteService 按“联系方式预占 → Person 加锁复核 → 创建”顺序执行，不能先持有 Person 范围锁再等待联系方式锁。若期间出现新档案，新建分支拒绝并要求重新查询，不静默复用。选中已有档案仍在事务内锁定并校验候选及快照，且不写联系方式占用。
+
+三个共用 LeadCreateReqVO 的创建入口均从访问日志移除 archiveQueryMobile、archiveQueryWechatId；查询入口仍不记录请求/响应正文。Admin 档案查询开启 preserveBusinessError，内联提示保留后端业务失败原因。

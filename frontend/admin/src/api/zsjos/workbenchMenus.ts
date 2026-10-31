@@ -110,3 +110,9 @@ export const createCustomerRepurchase = (data: Record<string, unknown> & { order
 
 export const subordinateBatchTransferCandidates = (leadIds: number[]): Promise<Array<{id: number; nickname: string}>> =>
   request.get({ url: '/zsjos/subordinate-sales/batch-transfer-candidates', params: {leadIds: leadIds.join(',')} })
+
+export interface LeadArchiveCandidate {
+  personId: number; personNo?: string; name: string; mobile?: string; wechatId?: string; snapshotKey: string
+}
+export const querySelfSourcedArchive = (education: boolean, data: { mobile?: string; wechatId?: string; idempotencyKey: string }): Promise<LeadArchiveCandidate[]> =>
+  request.post({ url: education ? '/zsjos/lead/education-self-sourced/archive-query' : '/zsjos/lead/self-sourced/archive-query', data, preserveBusinessError: true })

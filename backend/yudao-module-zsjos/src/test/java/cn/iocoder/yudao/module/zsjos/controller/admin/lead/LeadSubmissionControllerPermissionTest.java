@@ -8,6 +8,32 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LeadSubmissionControllerPermissionTest {
     @Test
+    void createLogsRemoveArchiveContactsUsingTheActualSanitizer() throws Exception {
+        var filter = cn.iocoder.yudao.framework.apilog.core.filter.ApiAccessLogFilter.class;
+        var sanitize = filter.getDeclaredMethod("sanitizeJson", String.class, String[].class);
+        sanitize.setAccessible(true);
+        for (String method : new String[]{"create", "createSelfSourced", "createEducationSelfSourced"}) {
+            var annotation = LeadSubmissionController.class.getMethod(method, LeadCreateReqVO.class)
+                    .getAnnotation(cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog.class);
+            org.junit.jupiter.api.Assertions.assertNotNull(annotation);
+            String result = (String) sanitize.invoke(null,
+                    "{\"archiveQueryMobile\":\"synthetic-phone\",\"archiveQueryWechatId\":\"synthetic-wechat\",\"mobile\":\"synthetic-phone\",\"selectedPersonId\":7}",
+                    annotation.sanitizeKeys());
+            org.junit.jupiter.api.Assertions.assertFalse(result.contains("synthetic"));
+            org.junit.jupiter.api.Assertions.assertTrue(result.contains("selectedPersonId"));
+        }
+    }
+
+    @Test
+    void archiveQueriesRequireTheirOwnEntryPermission() throws Exception {
+        var request = cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadContactCheckReqVO.class;
+        assertEquals("@ss.hasPermission('zsjos:lead:self-sourced:create')", LeadSubmissionController.class
+                .getMethod("querySalesArchive", request).getAnnotation(PreAuthorize.class).value());
+        assertEquals("@ss.hasPermission('zsjos:lead:education-self-sourced:create')", LeadSubmissionController.class
+                .getMethod("queryEducationArchive", request).getAnnotation(PreAuthorize.class).value());
+    }
+
+    @Test
     void contactCheckUsesConfiguredSubmissionPermissions() throws Exception {
         var auth = LeadSubmissionController.class.getMethod("checkContact",
                 cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadContactCheckReqVO.class)

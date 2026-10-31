@@ -26,6 +26,23 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/lead")
 public class LeadSubmissionController {
     @Resource private LeadSubmissionService submissionService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadSelfSourcedArchiveService archiveService;
+
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
+    @PostMapping("/self-sourced/archive-query")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
+    public CommonResult<List<LeadArchiveCandidateRespVO>> querySalesArchive(@Valid @RequestBody LeadContactCheckReqVO req) {
+        return success(archiveService.query(req.getMobile(), req.getWechatId(), getLoginUserId(),
+                cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.SALES));
+    }
+
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
+    @PostMapping("/education-self-sourced/archive-query")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
+    public CommonResult<List<LeadArchiveCandidateRespVO>> queryEducationArchive(@Valid @RequestBody LeadContactCheckReqVO req) {
+        return success(archiveService.query(req.getMobile(), req.getWechatId(), getLoginUserId(),
+                cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.EDUCATION));
+    }
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadProductService productService;
     @Resource private ZsjosProductSkuService skuService;
@@ -60,7 +77,7 @@ public class LeadSubmissionController {
     }
 
     @PostMapping("/self-sourced/contact-check")
-    @Operation(summary = "销售自拓联系方式查重并激活已有客资")
+    @Operation(summary = "销售自拓联系方式查询（兼容布尔结果）")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
     public CommonResult<Boolean> checkSelfSourcedContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
         return success(submissionService.checkContact(reqVO, getLoginUserId(),
@@ -68,13 +85,14 @@ public class LeadSubmissionController {
     }
 
     @PostMapping("/education-self-sourced/contact-check")
-    @Operation(summary = "教务自拓联系方式查重并激活已有客资")
+    @Operation(summary = "教务自拓联系方式查询（兼容布尔结果）")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
     public CommonResult<Boolean> checkEducationSelfSourcedContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
         return success(submissionService.checkContact(reqVO, getLoginUserId(),
                 cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.EDUCATION));
     }
 
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(sanitizeKeys = {"archiveQueryMobile", "archiveQueryWechatId"})
     @PostMapping("/create")
     @Operation(summary = "提交客资")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:submit')")
@@ -82,6 +100,7 @@ public class LeadSubmissionController {
         return success(submissionService.create(reqVO, getLoginUserId()));
     }
 
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(sanitizeKeys = {"archiveQueryMobile", "archiveQueryWechatId"})
     @PostMapping("/self-sourced/create")
     @Operation(summary = "销售提交自拓客资")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
@@ -89,6 +108,7 @@ public class LeadSubmissionController {
         return success(submissionService.createSelfSourced(reqVO, getLoginUserId()));
     }
 
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(sanitizeKeys = {"archiveQueryMobile", "archiveQueryWechatId"})
     @PostMapping("/education-self-sourced/create")
     @Operation(summary = "教务提交自拓客资并直接归属本人")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
