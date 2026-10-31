@@ -85,8 +85,8 @@ export default function LeadSubmissionPage({
   const contactInput = (phone?: string, wechat?: string) => JSON.stringify([phone?.trim() || '', wechat?.trim().toLowerCase() || ''])
   const currentContactInput = contactInput(mobile, wechatId)
   const currentContactResult = contactResult?.input === currentContactInput ? contactResult : undefined
-  const [archiveMobile, setArchiveMobile] = useState('')
-  const [archiveWechat, setArchiveWechat] = useState('')
+  const archiveMobile = mobile || ''
+  const archiveWechat = wechatId || ''
   const [archiveCandidates, setArchiveCandidates] = useState<LeadArchiveCandidate[]>()
   const [selectedArchive, setSelectedArchive] = useState<LeadArchiveCandidate>()
   const [archiveLoading, setArchiveLoading] = useState(false)
@@ -96,14 +96,14 @@ export default function LeadSubmissionPage({
     archiveRequest.current += 1
     setArchiveCandidates(undefined); setSelectedArchive(undefined); setArchiveError(undefined); setArchiveLoading(false)
     setPendingValues(undefined)
-    form.setFieldsValue({ name: '', mobile: '', wechatId: '' })
   }
   const selectArchive = (candidate: LeadArchiveCandidate) => {
     setSelectedArchive(candidate)
-    form.setFieldsValue({ name: candidate.name, mobile: candidate.mobile, wechatId: candidate.wechatId })
     setPendingValues(undefined)
   }
+  useEffect(() => { invalidateArchive() }, [currentContactInput])
   const queryArchive = async () => {
+    if (!await form.validateFields(['mobile', 'wechatId']).then(() => true).catch(() => false)) return
     const sequence = ++archiveRequest.current
     setArchiveLoading(true); setArchiveError(undefined); setArchiveCandidates(undefined); setSelectedArchive(undefined)
     try {
@@ -113,7 +113,6 @@ export default function LeadSubmissionPage({
       if (sequence !== archiveRequest.current) return
       setArchiveCandidates(candidates)
       if (candidates.length === 1) selectArchive(candidates[0])
-      else form.setFieldsValue({ name: '', mobile: candidates.length ? '' : archiveMobile.trim(), wechatId: candidates.length ? '' : archiveWechat.trim() })
     } catch (error) {
       if (sequence === archiveRequest.current) setArchiveError(error instanceof Error ? error.message : '查询失败，请重试')
     } finally { if (sequence === archiveRequest.current) setArchiveLoading(false) }
@@ -268,7 +267,7 @@ export default function LeadSubmissionPage({
   const resetAll = () => {
     if (contactCheckBusy.current) return
     setContactResult(undefined)
-    invalidateArchive(); setArchiveMobile(''); setArchiveWechat('')
+    invalidateArchive()
     form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined)
     setPendingValues(undefined); setInvalidSteps([]); setCurrent(0)
   }
@@ -383,28 +382,26 @@ export default function LeadSubmissionPage({
       <Form<FormValues> form={form} layout="vertical" onValuesChange={() => setPendingValues(undefined)} initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }}>
         {/* 各步用 hidden 收起而不是卸载：保留已填值与校验状态，回退不丢数据。 */}
         <div className="lead-form-step" hidden={current !== 0}>
-          {selfSourced && <Space orientation="vertical" style={{ width: '100%' }}>
-            <Title level={5}>查询已有档案</Title>
-            <Row gutter={[16, 8]}>
-              <Col xs={24} md={12}><Input aria-label="查询手机号" placeholder="手机号" value={archiveMobile} maxLength={32} onChange={e => { invalidateArchive(); setArchiveMobile(e.target.value) }} /></Col>
-              <Col xs={24} md={12}><Input aria-label="查询微信号" placeholder="微信号" value={archiveWechat} maxLength={64} onChange={e => { invalidateArchive(); setArchiveWechat(e.target.value) }} /></Col>
-            </Row>
-            <Button loading={archiveLoading} onClick={() => void queryArchive()}>查询</Button>
-            {archiveError && <Alert type="error" showIcon message={archiveError} action={<Button onClick={() => void queryArchive()}>重试</Button>} />}
-            {archiveCandidates && <Alert type="info" showIcon message={!archiveCandidates.length ? '系统中未查询到重复档案，本次将新建档案、客资' : archiveCandidates.length === 1 ? '查询到系统中已有一份重复档案，已默认选择' : `查询到系统中已有${archiveCandidates.length === 2 ? '两' : archiveCandidates.length}份重复档案，请选择本次以哪一份档案创建客资`} />}
-            {!!archiveCandidates?.length && <Radio.Group value={selectedArchive?.personId} onChange={e => { const candidate = archiveCandidates.find(item => item.personId === e.target.value); if (candidate) selectArchive(candidate) }}>
-              <Space orientation="vertical">{archiveCandidates.map(item => <Radio key={item.personId} value={item.personId}>
-                <Space wrap><span>姓名：{item.name || '未填写'}</span><span>手机号：{item.mobile || '未填写'}</span><span>微信号：{item.wechatId || '未填写'}</span>{item.personNo && <span>档案编号：{item.personNo}</span>}</Space>
-              </Radio>)}</Space>
-            </Radio.Group>}
-            {selectedArchive && <Alert type="info" showIcon message="本次将复用所选档案的姓名、联系方式，创建一条新的客资" />}
-          </Space>}
           <Title level={5}>客户信息</Title><Row gutter={[24, 0]}>
-            <Col xs={24} md={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }, { max: 100 }]}><Input disabled={selfSourced && (!!selectedArchive || !!archiveCandidates?.length)} /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} disabled={selfSourced} /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} disabled={selfSourced} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }, { max: 100 }]}><Input /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="regionPath" label="客户地区" rules={[{ required: true, message: '请选择客户省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】" /></Form.Item></Col>
           </Row>
+          {selfSourced && <div className="lead-archive-lookup">
+            <Button loading={archiveLoading} onClick={() => void queryArchive()}>查找档案</Button>
+            {archiveError && <Alert type="error" showIcon message={archiveError} action={<Button onClick={() => void queryArchive()}>重试</Button>} />}
+            {archiveCandidates && <Alert type="info" showIcon message={!archiveCandidates.length
+              ? '系统中未查询到重复档案，本次将新建档案、客资'
+              : '该客户已在系统中存在，请确认客户档案与已有信息一致，本次创建将关联至此档案'}
+              description={archiveCandidates.length > 1 ? `查询到 ${archiveCandidates.length} 份档案，请选择本次关联的客户档案。` : archiveCandidates.length === 1 ? '已默认选中下方档案，请核对。姓名和联系方式以本次填写为准。' : undefined} />}
+            {!!archiveCandidates?.length && <Radio.Group className="lead-archive-options" value={selectedArchive?.personId} onChange={e => { const candidate = archiveCandidates.find(item => item.personId === e.target.value); if (candidate) selectArchive(candidate) }}>
+              {archiveCandidates.map(item => <Radio className="lead-archive-option" key={item.personId} value={item.personId}>
+                <div className="lead-archive-heading"><strong>{item.name || '姓名未填写'}</strong><Text type="secondary">{item.personNo || '客户档案'}</Text></div>
+                <dl className="lead-archive-fields"><div><dt>手机号</dt><dd>{item.mobile || '未填写'}</dd></div><div><dt>微信号</dt><dd>{item.wechatId || '未填写'}</dd></div></dl>
+              </Radio>)}
+            </Radio.Group>}
+          </div>}
           {!selfSourced && <Space orientation="vertical">
             {canCheckContact && <Button loading={checkingContact} disabled={currentContactResult?.matched} onClick={() => void checkContact()}>查重</Button>}
             <Text type="secondary">手机号、微信号至少填写一个；命中已有客资将自动激活提醒。</Text>

@@ -16,6 +16,16 @@
 - Evidence boundary: reuse all-branches and owning feature handoff verification for unchanged code, including their disclosed live/production limitations. Current task did not run full fresh/upgrade MySQL, full frontend builds/browser, real-account API/order/BPM acceptance or any remote maintenance. Prior handoff maintenance permissions do not authorize another database/service operation in this Git task.
 - Publication: finish merge commit and normal push origin/main; verify actual exact remote hash. Temporary files/caches/editor metadata/raw workbook/reports/screenshots remain local; no feature branch/worktree or dependency changes. Ownership released after remote verification.
 
+## Registration update — self-sourced archive correction publication / 2026-10-31 Beijing
+- Context: local/main/D:/ZSJ-OS; owner /root; base e7b529ff0b19bb413c4c03ccf5a9a08b964b0c83. User again authorizes remote merge, commit and push. Fetch and merge --ff-only confirm already up to date; no merge needed.
+- Scope: current archive association correction in service/test, both frontend forms/style, directly affected docs and feature handoff plus this record. Latest explicit feature correction overrides earlier readonly copied-identity behavior: inputs stay editable, selection associates Person only, submitted identity remains Lead snapshot, no Person mutation.
+- Migration: no numbered migration changes, so no renumbering. Static database check PASS. Reuse correction delivery's focused Java/frontend/browser evidence and disclosed Admin/global-style/runtime limits; no new source behavior implementation during publication.
+
+## Delivery preparation — subsequent publication / 2026-10-31 Beijing
+- Result: stage source/test/docs/handoffs only; exclude four tracked caches and local reports/screenshots/raw workbook/tmp/editor files. Commit and normal push origin/main, verify exact remote hash and report identity after completion.
+- Verification: scoped staging/diff/conflict/private-key patterns, static database check; feature evidence in local-self-sourced-archive-query-20261031.md. No full runtime/release acceptance claimed. No database/service/deployment, dependency, feature-branch or worktree action. Ownership released on remote verification.
+- Publication checks completed: 9 files staged; whitespace check PASS; conflict/private-key-token counts zero; no staged binary files; migration-numbering tests 4 PASS. Four original generated caches remain unstaged. Feature behavior tests were not rerun by this Git-only publication; owning correction delivery remains the test evidence source.
+
 ## Registration update — subsequent publication / 2026-10-31 Beijing
 - Context: local/main/D:/ZSJ-OS; owner /root; base f25209c0b48765ef9b54463f6225f6a78e2363ae. User again authorizes handoff-guided merge, commit and push. Fetch confirms HEAD/origin equal, merge --ff-only already up to date.
 - Scope: delivered self-sourced archive lookup/selection, its tests, both frontend consumers and API/permission docs, owning handoff and this record. No additional business edits, migration/identity repair, database/service/deployment or branch/worktree operations.

@@ -37,6 +37,10 @@ public class LeadSelfSourcedArchiveService {
         String mobile = StrUtil.trimToNull(request.getArchiveQueryMobile());
         String wechat = normalizeWechat(request.getArchiveQueryWechatId());
         validateContact(mobile, wechat);
+        if (!Objects.equals(mobile, StrUtil.trimToNull(request.getMobile()))
+                || !Objects.equals(wechat, normalizeWechat(request.getWechatId()))) {
+            throw exception(LEAD_ARCHIVE_CHANGED);
+        }
         // A new Person must reserve contacts before taking Person locks. createNew performs
         // the authoritative locking recheck after reservation, including concurrent new matches.
         List<PersonDO> matches = request.getSelectedPersonId() == null
@@ -57,9 +61,7 @@ public class LeadSelfSourcedArchiveService {
         if (!Objects.equals(candidate(selected).getSnapshotKey(), request.getArchiveSnapshotKey())) {
             throw exception(LEAD_ARCHIVE_CHANGED);
         }
-        request.setName(selected.getName());
-        request.setMobile(selected.getMobile());
-        request.setWechatId(selected.getWechatId());
+        // The selected Person is an association, not the source of this submission's snapshots.
         return selected;
     }
 

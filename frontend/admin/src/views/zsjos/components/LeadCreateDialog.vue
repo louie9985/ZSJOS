@@ -15,30 +15,17 @@
       :rules="rules"
       label-width="110px"
     >
-      <div v-if="selfSourced" class="mb-12px">
-        <el-form-item label="查询手机号"><el-input v-model="archiveMobile" @input="invalidateArchive" /></el-form-item>
-        <el-form-item label="查询微信号"><el-input v-model="archiveWechat" @input="invalidateArchive" /></el-form-item>
-        <el-button :loading="archiveLoading" @click="queryArchive">查询</el-button>
-        <el-alert v-if="archiveError" :title="archiveError" type="error" show-icon :closable="false"><el-button link @click="queryArchive">重试</el-button></el-alert>
-        <el-alert v-if="archiveCandidates" :closable="false" type="info" :title="!archiveCandidates.length ? '系统中未查询到重复档案，本次将新建档案、客资' : archiveCandidates.length === 1 ? '查询到系统中已有一份重复档案，已默认选择' : `查询到系统中已有${archiveCandidates.length === 2 ? '两' : archiveCandidates.length}份重复档案，请选择本次以哪一份档案创建客资`" />
-        <el-radio-group v-if="archiveCandidates?.length" :model-value="selectedArchive?.personId" @change="selectArchiveId">
-          <el-radio v-for="item in archiveCandidates" :key="item.personId" :value="item.personId" style="height: auto; white-space: normal; margin: 8px 0; width: 100%">
-            <span style="white-space: normal; overflow-wrap: anywhere">姓名：{{ item.name || '未填写' }}；手机号：{{ item.mobile || '未填写' }}；微信号：{{ item.wechatId || '未填写' }}<template v-if="item.personNo">；档案编号：{{ item.personNo }}</template></span>
-          </el-radio>
-        </el-radio-group>
-        <el-alert v-if="selectedArchive" title="本次将复用所选档案的姓名、联系方式，创建一条新的客资" type="info" :closable="false" />
-      </div>
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="客户姓名" prop="name"
-            ><el-input v-model="form.name" :disabled="selfSourced && !!archiveCandidates?.length" /></el-form-item></el-col
+            ><el-input v-model="form.name" /></el-form-item></el-col
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="手机号" prop="mobile" :required="!form.wechatId.trim()"
-            ><el-input v-model="form.mobile" :disabled="selfSourced" /></el-form-item></el-col
+            ><el-input v-model="form.mobile" /></el-form-item></el-col
       ></el-row>
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
-          ><el-form-item label="微信号" :required="!form.mobile.trim()"><el-input v-model="form.wechatId" :disabled="selfSourced" /></el-form-item></el-col
+          ><el-form-item label="微信号" :required="!form.mobile.trim()"><el-input v-model="form.wechatId" /></el-form-item></el-col
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="客户地区" prop="region"
             ><el-cascader
@@ -47,6 +34,19 @@
               :props="{ value: 'selectionCode', label: 'name', children: 'children' }"
               class="w-100%" /></el-form-item></el-col
       ></el-row>
+      <div v-if="selfSourced" class="archive-lookup">
+        <el-button :loading="archiveLoading" @click="queryArchive">查找档案</el-button>
+        <el-alert v-if="archiveError" :title="archiveError" type="error" show-icon :closable="false"><el-button link @click="queryArchive">重试</el-button></el-alert>
+        <el-alert v-if="archiveCandidates" :closable="false" type="info" show-icon
+          :title="archiveCandidates.length ? '该客户已在系统中存在，请确认客户档案与已有信息一致，本次创建将关联至此档案' : '系统中未查询到重复档案，本次将新建档案、客资'"
+          :description="archiveCandidates.length > 1 ? `查询到 ${archiveCandidates.length} 份档案，请选择本次关联的客户档案。` : archiveCandidates.length === 1 ? '已默认选中下方档案，请核对。姓名和联系方式以本次填写为准。' : undefined" />
+        <el-radio-group v-if="archiveCandidates?.length" class="archive-options" :model-value="selectedArchive?.personId" @change="selectArchiveId">
+          <el-radio v-for="item in archiveCandidates" :key="item.personId" :value="item.personId" class="archive-option">
+            <div class="archive-heading"><strong>{{ item.name || '姓名未填写' }}</strong><span>{{ item.personNo || '客户档案' }}</span></div>
+            <dl class="archive-fields"><div><dt>手机号</dt><dd>{{ item.mobile || '未填写' }}</dd></div><div><dt>微信号</dt><dd>{{ item.wechatId || '未填写' }}</dd></div></dl>
+          </el-radio>
+        </el-radio-group>
+      </div>
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
           ><el-form-item label="来源渠道" prop="sourceChannel"
@@ -172,8 +172,8 @@ const emptyForm = () => ({
   remark: ''
 })
 const form = reactive(emptyForm())
-const archiveMobile = ref('')
-const archiveWechat = ref('')
+const archiveMobile = computed(() => form.mobile)
+const archiveWechat = computed(() => form.wechatId)
 const archiveCandidates = ref<MenuApi.LeadArchiveCandidate[]>()
 const selectedArchive = ref<MenuApi.LeadArchiveCandidate>()
 const archiveLoading = ref(false)
@@ -182,13 +182,12 @@ let archiveSequence = 0
 const invalidateArchive = () => {
   archiveSequence++
   archiveCandidates.value = undefined; selectedArchive.value = undefined; archiveError.value = ''; archiveLoading.value = false
-  form.name = ''; form.mobile = ''; form.wechatId = ''
 }
 const selectArchiveId = (id: string | number | boolean | undefined) => {
   const selected = archiveCandidates.value?.find(item => item.personId === id)
   selectedArchive.value = selected
-  if (selected) { form.name = selected.name; form.mobile = selected.mobile || ''; form.wechatId = selected.wechatId || '' }
 }
+watch(() => [form.mobile.trim(), form.wechatId.trim().toLowerCase()], invalidateArchive, { flush: 'sync' })
 const queryArchive = async () => {
   const sequence = ++archiveSequence
   archiveLoading.value = true; archiveError.value = ''; archiveCandidates.value = undefined; selectedArchive.value = undefined
@@ -199,7 +198,6 @@ const queryArchive = async () => {
     if (sequence !== archiveSequence) return
     archiveCandidates.value = candidates
     if (candidates.length === 1) selectArchiveId(candidates[0].personId)
-    else { form.name = ''; form.mobile = candidates.length ? '' : archiveMobile.value.trim(); form.wechatId = candidates.length ? '' : archiveWechat.value.trim() }
   } catch (error: unknown) {
     if (sequence === archiveSequence) archiveError.value = error instanceof Error ? error.message : '查询失败，请重试'
   } finally { if (sequence === archiveSequence) archiveLoading.value = false }
@@ -261,7 +259,7 @@ const loadOptions = async () => {
   }
 }
 const open = () => {
-  invalidateArchive(); archiveMobile.value = ''; archiveWechat.value = ''
+  invalidateArchive()
   idempotencyKey.value = undefined
   Object.assign(form, emptyForm())
   if (!canSpecifySales.value) form.dispatchMode = 'auto'
@@ -323,3 +321,17 @@ const submit = async () => {
 }
 defineExpose({ open })
 </script>
+
+<style scoped>
+.archive-lookup { display: grid; gap: 12px; margin-bottom: 16px; }
+.archive-lookup > .el-button { justify-self: start; }
+.archive-options { display: grid; gap: 8px; }
+.archive-option { height: auto; margin: 0; padding: 12px; border: 1px solid var(--el-border-color); border-radius: var(--el-border-radius-base); align-items: flex-start; }
+.archive-option.is-checked { border-color: var(--el-color-primary); background: var(--el-color-primary-light-9); }
+.archive-option :deep(.el-radio__label) { flex: 1; min-width: 0; white-space: normal; }
+.archive-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; overflow-wrap: anywhere; }
+.archive-heading span, .archive-fields dt { color: var(--el-text-color-secondary); font-size: 12px; }
+.archive-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 0; }
+.archive-fields dd { margin: 4px 0 0; color: var(--el-text-color-primary); overflow-wrap: anywhere; }
+@media(max-width: 480px) { .archive-fields { grid-template-columns: 1fr; } }
+</style>

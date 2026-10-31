@@ -54,14 +54,14 @@ class LeadSelfSourcedArchiveServiceTest {
         assertEquals(LEAD_ARCHIVE_SELECTION_REQUIRED.getCode(),assertThrows(ServiceException.class,()->service.requireSelection(request())).getCode());
         verify(personMapper,never()).selectDuplicateCandidatesForUpdate(any(),any(),any());
     }
-    @Test void selectedArchiveCopiesOnlyIdentityAndNeverWritesPerson() {
-        PersonDO selected=person(12);
+    @Test void selectedArchivePreservesSubmissionSnapshotsAndNeverWritesPerson() {
+        PersonDO selected=person(12).setMobile(null);
         when(personMapper.selectDuplicateCandidates(null,"wx_test")).thenReturn(List.of(selected));
         var snapshot=service.query(null,"wx_test",7L,SALES).getFirst();
-        when(personMapper.selectDuplicateCandidatesForUpdate(null,"wx_test",1L)).thenReturn(List.of(person(11),selected));
-        var req=request(); req.setSelectedPersonId(12L);req.setArchiveSnapshotKey(snapshot.getSnapshotKey());
-        assertSame(selected,service.requireSelection(req)); assertEquals("测试档案",req.getName());
-        assertEquals("13800000000",req.getMobile()); assertEquals("OTHER",req.getProvinceCode());
+        when(personMapper.selectDuplicateCandidatesForUpdate("13800000001","wx_test",1L)).thenReturn(List.of(person(11),selected));
+        var req=request(); req.setMobile("13800000001"); req.setArchiveQueryMobile("13800000001"); req.setSelectedPersonId(12L);req.setArchiveSnapshotKey(snapshot.getSnapshotKey());
+        assertSame(selected,service.requireSelection(req)); assertEquals("本次填写",req.getName());
+        assertEquals("13800000001",req.getMobile()); assertNull(selected.getMobile()); assertEquals("wx_test",req.getWechatId()); assertEquals("OTHER",req.getProvinceCode());
         verify(personMapper,never()).updateById(any(PersonDO.class));
     }
     @Test void changedSnapshotOrForeignSelectionIsRejected() {
