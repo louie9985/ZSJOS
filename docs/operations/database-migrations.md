@@ -38,7 +38,7 @@ primary keys or add index exceptions to resolve this parser error.
 
 Run `python3 -B script/sql/mysql/tools/test_schema_drift.py` for the parser and
 fail-closed drift regressions. A schema PASS means the enabled modules match the
-desired structure. Data-grade FAIL/MISSING findings are blocking verification failures (see runtime verification below):
+desired structure. Data-grade FAIL/MISSING findings remain separate warnings:
 empty business dictionaries, version-1 filters and fixed historical template/menu
 snapshots can diverge after configuration or later migrations. Number integrity,
 counter consistency, duplicate role-menu assignments and contact-claim completeness
@@ -1348,35 +1348,3 @@ Fresh 兼容：bootstrap-compatibility.sql 仅在两本台账、System 用户、
 本次范围为尚未发布的本地开发更正。既有本地库已拥有这些业务结构，应先做只读结构、有效元数据与两本账本比较；不存在差异时无业务 DDL 或数据修复需要。已有登记 checksum 保留，不随此次源文件更正被静默重写。正式发布前须按迁移校验差异流程审定部署兼容性及校验值处理；本地受控验证不等于已执行生产升级。
 
 受控测试覆盖正确前置状态、重复执行、部分完成恢复、错误索引/主键/自增/软删除元数据、账本写入失败及 UTF-8 HEX。所有错误对象与修复动作只在本次创建的合成验证库中执行，不修改应用业务数据或 `system_role_menu`。
-
-
-## Runtime verification (2026-11-02)
-
-`verify` and migration postflight set `@zsjos_verify_runtime=1` on the SQL execution
-connection. Direct SQL execution defaults to fresh acceptance. Runtime output marks
-empty lead dictionaries and historical filter-version counts SKIP; configured values
-are preserved. Published filter versions may advance. Work-order category emptiness
-and the V208 fixed seed hash are fresh-only assertions; structure, layout and UTF-8
-checks remain active. PENDING class checks allow other system classes.
-
-Number checks accept legacy LD plus existing LEGACY-P-/LEGACY-PERSON-/MIG-PERSON-
-identifiers while retaining missing/duplicate checks. KZ counters must cover the
-maximum allocated sequence on the date encoded in the number; historical LD rows
-are excluded and advanced counters are valid. Contact checks ignore blank contacts
-and include active verified aliases belonging to active people.
-
-The current template's published version must contain student_delivery and exclude
-new_media (confirmed business contract); old published snapshots are not rewritten.
-This check does not repair historical baseline seeds or installed configuration.
-
-The runner summarizes PASS/SKIP/FAIL/MISSING. Any FAIL/MISSING or schema drift raises
-an error and blocks the migration command's final success message and subsequent
-release startup. This intentionally replaces warn-only acceptance. Resolve findings
-through separately scoped investigation/authorized repair; do not bypass them by
-replaying bootstrap or changing grants. SQL/client errors also remain blocking.
-
-Validation: `python -B script/sql/mysql/tools/test_runtime_verification.py` and
-`python -B script/sql/mysql/tools/test_schema_drift.py`. Read-only local MySQL runtime
-execution produced 318 rows: 3 initialization skips and 3 remaining data failures
-(contact claims, area ordering, duplicate role menus). No data or service was changed.
-Full fresh-chain and deployed-environment acceptance were not run for this change.

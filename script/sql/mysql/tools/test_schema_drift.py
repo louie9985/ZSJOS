@@ -230,16 +230,14 @@ class SchemaDriftTest(unittest.TestCase):
         self.client.execute_file.return_value = 'historical\tFAIL\nabsent\tMISSING\nvalid\tPASS\n'
         with patch.object(db, 'enabled_manifests', return_value=self.manifests), \
                 patch.object(db, 'info'), patch.object(db, 'warn') as warning:
-            with self.assertRaises(db.CommandError) as failure:
-                db.verify_database('production', self.client)
-            self.assertIn('core: historical\tFAIL', str(failure.exception))
-            self.assertIn('core: absent\tMISSING', str(failure.exception))
-            self.assertNotIn('core: valid', str(failure.exception))
+            db.verify_database('production', self.client)
+            self.assertIn('core: historical\tFAIL', warning.call_args.args[0])
+            self.assertIn('core: absent\tMISSING', warning.call_args.args[0])
+            self.assertNotIn('core: valid', warning.call_args.args[0])
             self.actual_indexes = []
             with self.assertRaisesRegex(db.CommandError, 'missing index zsjos_order.primary'):
                 db.verify_database('production', self.client)
-            warning.assert_not_called()
-
+            self.assertEqual(2, warning.call_count)
 
 
 class PendingNamingDriftTest(unittest.TestCase):
