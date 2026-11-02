@@ -344,6 +344,7 @@ public interface ZsjosErrorCodeConstants {
             "客资仍在公海池中，退出公海或完成正式转派后才能录入成交");
     ErrorCode SALES_ORDER_ACTIVE_DUPLICATE = new ErrorCode(1_900_006_003, "该客资已有未完成成交订单");
     ErrorCode SALES_ORDER_CONTACT_REQUIRED = new ErrorCode(1_900_006_004, "手机号和微信号均为必填项");
+    ErrorCode SALES_ORDER_PROFILE_CHANGED = new ErrorCode(1_900_006_086, "客户档案已变化，请重新点击提交审批并核对档案信息");
     ErrorCode SALES_ORDER_AMOUNT_INVALID = new ErrorCode(1_900_006_005, "订单金额与成交课程金额不一致");
     ErrorCode SALES_ORDER_VOUCHER_REQUIRED = new ErrorCode(1_900_006_006, "已付款的非零订单必须上传缴费凭证");
     ErrorCode SALES_ORDER_ATTACHMENT_INVALID = new ErrorCode(1_900_006_007, "缴费凭证不存在或文件类型不支持");

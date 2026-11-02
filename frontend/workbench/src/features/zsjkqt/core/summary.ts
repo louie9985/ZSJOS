@@ -20,6 +20,7 @@ const STATUS_HOUR_LABELS: Partial<Record<AttendanceStatus, string[]>> = {
   调休: ["调休假", "调休"],
   婚假: ["婚假"],
   产假: ["产假", "陪产假", "产检假"],
+  产检假: ["产检假"],
   丧假: ["丧假"],
   工伤: ["工伤假", "工伤"],
 };
@@ -61,6 +62,7 @@ export function recalculateSummary(input: RecalculateSummaryInput): SummaryRevie
     funeralLeaveDays: 0,
     marriageLeaveDays: 0,
     maternityLeaveDays: 0,
+    prenatalLeaveDays: 0,
   };
 
   for (const day of input.days) {
@@ -84,6 +86,7 @@ export function recalculateSummary(input: RecalculateSummaryInput): SummaryRevie
     funeralLeaveDays: blankZero(stats.funeralLeaveDays),
     marriageLeaveDays: blankZero(stats.marriageLeaveDays),
     maternityLeaveDays: blankZero(stats.maternityLeaveDays),
+    prenatalLeaveDays: blankZero(stats.prenatalLeaveDays),
     compLeaveHours: adjustedLeaveHours.compLeaveHours,
     annualLeaveHours: toNumber(input.sourceSummaries[ANNUAL_LEAVE_HOURS]),
     overtimeHours: toNumber(input.sourceSummaries[OVERTIME_HOURS]),
@@ -295,6 +298,7 @@ function actualAttendanceStatusForHalf(day: DayReview, half: DayHalf): Attendanc
 }
 
 function attendanceHoursForHalf(day: DayReview, half: DayHalf, status: AttendanceStatus, workSchedule: AttendanceWorkSchedule): number {
+  if (status === "产检假") return fallbackHoursForHalf(half, workSchedule);
   if (status === "事假") return workedHoursAroundPersonalLeave(day, half, workSchedule);
   if (!ATTENDED_STATUSES.has(status)) return 0;
   const finalStatus = half === "morning" ? day.finalMorning : day.finalAfternoon;
@@ -368,6 +372,7 @@ function addAdjustedExceptionStats(stats: ReturnType<typeof createStatsShape>, d
     else if (value === "工伤") stats.injuryLeaveDays += statusHoursForHalf(day, half, value, workSchedule) / workSchedule.standardWorkHours;
     else if (value === "丧假") stats.funeralLeaveDays += statusHoursForHalf(day, half, value, workSchedule) / workSchedule.standardWorkHours;
     else if (value === "婚假") stats.marriageLeaveDays += statusHoursForHalf(day, half, value, workSchedule) / workSchedule.standardWorkHours;
+    else if (value === "产检假") stats.prenatalLeaveDays += statusHoursForHalf(day, half, value, workSchedule) / workSchedule.standardWorkHours;
     else if (value === "产假") stats.maternityLeaveDays += statusHoursForHalf(day, half, value, workSchedule) / workSchedule.standardWorkHours;
   }
 
@@ -420,6 +425,7 @@ function createStatsShape() {
     funeralLeaveDays: 0,
     marriageLeaveDays: 0,
     maternityLeaveDays: 0,
+    prenatalLeaveDays: 0,
   };
 }
 

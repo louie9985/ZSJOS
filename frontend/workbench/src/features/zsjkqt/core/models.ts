@@ -111,6 +111,7 @@ export interface SummaryReview {
   funeralLeaveDays: number | null;
   marriageLeaveDays: number | null;
   maternityLeaveDays: number | null;
+  prenatalLeaveDays?: number | null;
   compLeaveHours: number | null;
   annualLeaveHours: number | null;
   overtimeHours: number | null;

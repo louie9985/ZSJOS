@@ -1,5 +1,7 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
+报名资料收集（2026-11-01）：`zsjos/studentInfoTasks/index` → Workbench `/zsjos/student-info-tasks`，Vue Admin 过滤该组件。权限为 `zsjos:student-info-task:query` 并累加原报名公共池范围。两端履约仅展示任务状态与资料。见[任务契约](../api/order-student-information-tasks.md)。
+
 我的运营（2026-10-28）：`zsjos/myOperations/index` → Workbench `/zsjos/my-operations`；Vue Admin 过滤该组件。页面权限 `zsjos:my-operations:query`，运营名下客资复用 `LeadManagementPage`，范围含代录归属，不含合作方客资。见[我的运营契约](../api/my-operations.md)。
 
 首页指标：`/system/home-metric` / `zsjos/homeMetric/index` 为 Vue 管理配置，菜单明确 `admin_only`；React 首页 `/zsjos/tasks/today` 保留业务待办、其他待办、审批待办三张固定卡（2026-10-30用户明确例外），其他卡片消费已发布指标，下方业务任务不变。`metricContext` 深链进入同首页受控明细视图，不能增加菜单权限。见[配置与数据契约](../api/home-metrics.md)。

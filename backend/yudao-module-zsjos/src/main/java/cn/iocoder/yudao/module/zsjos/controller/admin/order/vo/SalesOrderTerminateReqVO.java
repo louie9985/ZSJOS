@@ -7,6 +7,8 @@ import lombok.Data;
 
 @Data
 public class SalesOrderTerminateReqVO {
+    // Omitted by existing clients: final termination. True requests withdrawal for revision.
+    private Boolean withdrawForRevision;
     @NotNull private Long approvalRoundId;
     @NotNull private Integer orderVersion;
     @NotNull private Integer roundVersion;

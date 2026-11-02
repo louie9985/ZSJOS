@@ -151,7 +151,9 @@ function buildEmployeeReviewFromExportedReport(
     sourceIndex,
     sourceSummaries: exportedSummarySourceValues(employee.summary),
     days,
-    summary: { ...employee.summary },
+    summary: { ...employee.summary, prenatalLeaveDays: employee.summary.prenatalLeaveDays === undefined
+      ? recalculateSummary({ days, sourceSummaries: {}, shouldAttendanceDays: null, payrollDays: null, entryDate: "", workSchedule: departmentSchedule.schedule }).prenatalLeaveDays
+      : employee.summary.prenatalLeaveDays },
     manualSummaryOverrides: {},
     issues: [],
     notes: "",

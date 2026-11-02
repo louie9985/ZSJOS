@@ -46,7 +46,7 @@
             </div>
           </template>
           <template v-else-if="condition.operator === 'between'">
-            <el-date-picker v-if="fieldOf(condition)?.valueType === 'date'" :model-value="dateRangeValue(condition.valueFrom, condition.valueTo)" type="datetimerange" value-format="x" start-placeholder="开始时间" end-placeholder="结束时间" @update:model-value="(value) => setRange(index, value)" />
+            <div v-if="fieldOf(condition)?.valueType === 'date'"><span>开始边界（含）</span><ZsjosDateOperand :model-value="condition.valueFrom" @update:model-value="value=>setValue(index,'valueFrom',value)"/><span>结束边界（含）</span><ZsjosDateOperand :model-value="condition.valueTo" @update:model-value="value=>setValue(index,'valueTo',value)"/></div>
             <div v-else class="number-range"><el-input-number :model-value="condition.valueFrom as number" @update:model-value="(value) => setValue(index, 'valueFrom', value)" /><span>至</span><el-input-number :model-value="condition.valueTo as number" @update:model-value="(value) => setValue(index, 'valueTo', value)" /></div>
           </template>
           <el-select v-else-if="fieldOf(condition)?.valueType === 'select'" :model-value="selectValue(condition)" multiple filterable fit-input-width popper-class="advanced-filter-select-popper" :loading="fieldOf(condition)?.optionsLoading" @change="(value) => setValue(index, 'value', value, true)">
@@ -54,7 +54,7 @@
             <template #empty><div class="filter-empty"><template v-if="fieldOf(condition)?.optionsError">选项加载失败 <el-button link type="primary" @click="emit('retryOptions', condition.fieldKey)">重试</el-button></template><template v-else>暂无可选项</template></div></template>
           </el-select>
           <el-input-number v-else-if="fieldOf(condition)?.valueType === 'number'" :model-value="numberValue(condition.value)" @update:model-value="(value) => setValue(index, 'value', value)" />
-          <el-date-picker v-else-if="fieldOf(condition)?.valueType === 'date'" :model-value="dateInputValue(condition.value)" type="datetime" value-format="x" placeholder="选择时间" @update:model-value="(value) => setValue(index, 'value', value)" />
+          <ZsjosDateOperand v-else-if="fieldOf(condition)?.valueType === 'date'" :model-value="condition.value" @update:model-value="value=>setValue(index,'value',value)"/>
           <el-input v-else :model-value="textValue(condition.value)" clearable @update:model-value="(value) => setValue(index, 'value', value)" />
         </template>
       </div>
@@ -67,6 +67,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import ZsjosDateOperand from './ZsjosDateOperand.vue'
 import type { AdvancedFilterCondition, AdvancedFilterField, AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'
 
 const props = withDefaults(defineProps<{ modelValue: AdvancedFilterGroup; fields: AdvancedFilterField[]; depth: number; total: number; removable?: boolean; relativeDateOptions?: Array<{ value: string; label: string }> }>(), { relativeDateOptions: () => [] })
@@ -93,16 +94,13 @@ const relativePlaceholder = computed(() => (props.relativeDateOptions.length ? '
 const selectValue = (condition: AdvancedFilterCondition) => Array.isArray(condition.value) ? condition.value as Array<string | number> : []
 const numberValue = (value: unknown) => typeof value === 'number' ? value : typeof value === 'string' && value !== '' ? Number(value) : undefined
 const textValue = (value: unknown) => typeof value === 'string' ? value : ''
-const dateInputValue = (value: unknown): Date | undefined => value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? new Date(Number(value)) : undefined
-const dateRangeValue = (from: unknown, to: unknown): [Date, Date] | undefined => { const start = dateInputValue(from), end = dateInputValue(to); return start && end ? [start, end] : undefined }
 const update = (next: AdvancedFilterGroup, immediate = false) => emit('update:modelValue', next, immediate)
 const setLogic = (logic: 'AND' | 'OR') => update({ ...props.modelValue, logic }, true)
 const addCondition = () => { const field = props.fields[0]; if (field && props.total < 20) update({ ...props.modelValue, conditions: [...props.modelValue.conditions, { fieldKey: field.fieldKey, operator: field.operators[0] }] }, true) }
 const addGroup = () => update({ ...props.modelValue, groups: [...props.modelValue.groups, blank()] }, true)
 const setField = (index: number, fieldKey: string) => { const field = props.fields.find((item) => item.fieldKey === fieldKey); if (!field) return; const conditions = [...props.modelValue.conditions]; conditions[index] = field.valueType === 'duration' ? { fieldKey, operator: field.operators[0], unit: 'hour' } : { fieldKey, operator: field.operators[0] }; update({ ...props.modelValue, conditions }, true) }
 const setOperator = (index: number, operator: string) => { const conditions = [...props.modelValue.conditions]; const current = conditions[index]; const field = fieldOf(current); conditions[index] = field?.valueType === 'duration' ? { fieldKey: current.fieldKey, operator, startFieldKey: current.startFieldKey, endFieldKey: current.endFieldKey, unit: current.unit || 'hour' } : { fieldKey: current.fieldKey, operator }; update({ ...props.modelValue, conditions }, true) }
-const setValue = (index: number, key: 'value' | 'valueFrom' | 'valueTo' | 'startFieldKey' | 'endFieldKey' | 'unit', value: unknown, immediate = false) => { const conditions = [...props.modelValue.conditions]; const normalized = fieldOf(conditions[index])?.valueType === 'date' && value !== undefined && value !== null ? Number(value) : value; conditions[index] = { ...conditions[index], [key]: normalized }; update({ ...props.modelValue, conditions }, immediate) }
-const setRange = (index: number, value?: [string | number, string | number]) => { const conditions = [...props.modelValue.conditions]; conditions[index] = { ...conditions[index], valueFrom: value?.[0] === undefined ? undefined : Number(value[0]), valueTo: value?.[1] === undefined ? undefined : Number(value[1]) }; update({ ...props.modelValue, conditions }) }
+const setValue = (index: number, key: 'value' | 'valueFrom' | 'valueTo' | 'startFieldKey' | 'endFieldKey' | 'unit', value: unknown, immediate = false) => { const conditions = [...props.modelValue.conditions]; const normalized = fieldOf(conditions[index])?.valueType === 'date' && conditions[index].operator !== 'relative' && typeof value !== 'object' && value !== undefined && value !== null ? Number(value) : value; conditions[index] = { ...conditions[index], [key]: normalized }; update({ ...props.modelValue, conditions }, immediate) }
 const removeCondition = (index: number) => update({ ...props.modelValue, conditions: props.modelValue.conditions.filter((_, item) => item !== index) }, true)
 const updateGroup = (index: number, group: AdvancedFilterGroup, immediate = false) => update({ ...props.modelValue, groups: props.modelValue.groups.map((item, itemIndex) => itemIndex === index ? group : item) }, immediate)
 const removeGroup = (index: number) => update({ ...props.modelValue, groups: props.modelValue.groups.filter((_, item) => item !== index) }, true)

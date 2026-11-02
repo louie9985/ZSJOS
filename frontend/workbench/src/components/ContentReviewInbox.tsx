@@ -56,7 +56,7 @@ export default function ContentReviewInbox({ rows, selectedId, loading, error, k
         {canSeeAll && <Checkbox checked={mine} onChange={event => onMine(event.target.checked)}>我是批次运营</Checkbox>}
       </div>}
     </div>
-    <div className="content-review-scroll">{error ? <Alert type="error" title={error} action={<Button onClick={onRetry}>重试</Button>} /> : loading ? <Skeleton active /> : rows.length ? rows.map(batch =>
+    <div className="content-review-scroll">{error && !rows.length ? <Alert type="error" title={error} action={<Button onClick={onRetry}>重试</Button>} /> : loading && !rows.length ? <Skeleton active /> : rows.length ? rows.map(batch =>
       <button type="button" key={batch.id} className={`content-review-list-item${batch.id === selectedId ? ' active' : ''}`} onClick={() => onSelect(batch.id)}>
         <div className="content-review-inbox-title"><strong>{batch.studentName || '未记录学员姓名'}</strong><Tag color={['DIRECTOR_REVIEW', 'FINAL_REVIEW'].includes(batch.status) ? 'processing' : batch.status === 'NEED_MODIFY' ? 'warning' : undefined}>{statusText[batch.status] || batch.status}</Tag></div>
         {reviewAccounts(batch).map((account, index) => <div className="content-review-inbox-account" key={account.accountId ?? index}>

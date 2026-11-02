@@ -63,3 +63,6 @@
   .student-info-field,
   .student-info-field.is-wide { grid-template-columns: minmax(0, 1fr); gap: var(--crm-sp-1); }
 }
+
+/* Keep draft/error notices separate from the following information sections. */
+.student-info-panel > .ant-alert { margin-bottom: var(--crm-sp-5); }

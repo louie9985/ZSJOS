@@ -1,3 +1,4 @@
+import { useMetricSourceApi } from '../services/metricPageScope'
 import { invalidateMenuTasks } from '../services/menuTaskRefresh'
 import { BUSINESS_APPROVAL_PROCESS_KEYS } from '../services/approvalNavigation'
 import BusinessTaskApproval, { hasBusinessApproval } from '../components/bpm/BusinessTaskApproval'
@@ -155,8 +156,9 @@ function useBusinessEntry(task: BpmTask | undefined, view: BpmTaskView) {
   }
 }
 
-export default function BpmApprovalCenterPage({ permissions, initialView }: {
+export default function BpmApprovalCenterPage({ permissions, initialView, metricTodo = false }: {
   permissions: string[]
+  metricTodo?: boolean
   initialView?: BpmTaskView
 }) {
   const navigate = useNavigate()
@@ -164,6 +166,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const linkedTaskId = new URLSearchParams(location.search).get('taskId')
   const { message, modal } = App.useApp()
   const screens = Grid.useBreakpoint()
+  const metricApi = useMetricSourceApi('bpm_todo', api)
   const resolvedInitialView = initialView || (location.pathname === APP_ROUTES.BPM_DONE ? 'done' : 'todo')
   const [view, setView] = useState<BpmTaskView>(resolvedInitialView)
   const [tasks, setTasks] = useState<BpmTask[]>([])
@@ -245,8 +248,8 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     setCountError('')
     try {
       const [todo, done] = await Promise.all([
-        api.bpmTaskPage('todo', { pageNo: 1, pageSize: 1, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS }),
-        api.bpmTaskPage('done', { pageNo: 1, pageSize: 1, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
+        metricApi.bpmTaskPage('todo', { pageNo: 1, pageSize: 1, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS }),
+        metricApi.bpmTaskPage('done', { pageNo: 1, pageSize: 1, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
       ])
       if (seq !== countSeq.current) return
       setCounts({ todo: todo.total, done: done.total })
@@ -273,7 +276,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     setLoadMoreError('')
     setUnauthorized(false)
     try {
-      const result = await api.bpmTaskPage(view, { pageNo: useTableLayout ? tablePage : 1, pageSize: useTableLayout ? tablePageSize : PAGE_SIZE, name: keyword.trim() || undefined, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
+      const result = await metricApi.bpmTaskPage(view, { pageNo: useTableLayout ? tablePage : 1, pageSize: useTableLayout ? tablePageSize : PAGE_SIZE, name: keyword.trim() || undefined, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
       let linkedTask: BpmTask | undefined
       if (view === 'todo' && linkedTaskId && !preserveSelection) {
         try { linkedTask = await feedbackApi.approvalTask(linkedTaskId) }
@@ -308,7 +311,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     const seq = requestSeq.current
     const nextPage = loadedPage + 1
     try {
-      const result = await api.bpmTaskPage(view, {
+      const result = await metricApi.bpmTaskPage(view, {
         pageNo: nextPage,
         pageSize: PAGE_SIZE,
         name: keyword.trim() || undefined,
@@ -468,7 +471,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         onChange={changeView}
         items={[
           { key: 'todo', label: `待办任务 ${counts.todo}` },
-          { key: 'done', label: `已办任务 ${counts.done}` }
+          ...(!metricTodo ? [{ key: 'done', label: `已办任务 ${counts.done}` }] : [])
         ]}
       />
     </header>

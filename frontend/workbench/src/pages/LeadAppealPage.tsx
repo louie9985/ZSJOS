@@ -1,3 +1,4 @@
+import { useMetricSourceApi, useMetricPageScope } from '../services/metricPageScope'
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -50,6 +51,8 @@ function parseOptionalNumber(value: string | number | undefined) {
 }
 
 export default function LeadAppealPage() {
+  const metricScope = useMetricPageScope()
+  const metricApi = useMetricSourceApi('lead_appeal', api)
   const location = useLocation()
   const [searchParams] = useSearchParams()
   const locationState = (location.state || {}) as LeadAppealLocationState
@@ -114,7 +117,7 @@ export default function LeadAppealPage() {
     if (!hasTarget || targetLocated.current) return false
     let nextCursor: string | undefined
     do {
-      const result = await api.leadAppealInboxCursor(targetHandled ?? handled, {
+      const result = await metricApi.leadAppealInboxCursor(targetHandled ?? handled, {
         cursor: nextCursor,
         limit: 50,
         keyword: keyword || undefined,
@@ -144,8 +147,8 @@ export default function LeadAppealPage() {
     setError('')
     try {
       const result = useTableLayout
-        ? await api.leadAppealInboxPage(handled, { pageNo: tablePage, pageSize: tablePageSize, keyword: keyword || undefined, advancedFilter })
-        : await api.leadAppealInboxCursor(handled, { cursor: append ? cursorRef.current : undefined, limit: 20, keyword: keyword || undefined, advancedFilter })
+        ? await metricApi.leadAppealInboxPage(handled, { pageNo: tablePage, pageSize: tablePageSize, keyword: keyword || undefined, advancedFilter })
+        : await metricApi.leadAppealInboxCursor(handled, { cursor: append ? cursorRef.current : undefined, limit: 20, keyword: keyword || undefined, advancedFilter })
       if (version !== requestVersion.current) return
       setTableTotal('total' in result ? result.total : 0)
       setItems(current => useTableLayout || !append
@@ -213,6 +216,7 @@ export default function LeadAppealPage() {
     <header className="business-inbox-scope-bar">
       <div className="business-inbox-scope-row">
         <Segmented
+          disabled={!!metricScope}
           value={handled ? 'done' : 'todo'}
           onChange={value => changeScope(() => { setHandled(value === 'done'); setTablePage(1) })}
           options={[{ value: 'todo', label: '待处理' }, { value: 'done', label: '已处理' }]}

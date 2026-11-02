@@ -465,7 +465,7 @@ class MysqlClient:
         result = run(self.base(self.mysql) + ["--execute", sql, self.config.database], env=self.env(), capture=True)
         return result.stdout or ""
 
-    def execute_file(self, path: Path) -> str:
+    def execute_file(self, path: Path, *, preamble: str = "") -> str:
         if path.resolve() == (SQL_ROOT / "bootstrap.sql").resolve():
             # Independent of the installed client's nested SOURCE error semantics.
             # Direct initialization still requires exclusive access; the SQL guard
@@ -484,7 +484,7 @@ class MysqlClient:
                 fail("ZSJOS_BOOTSTRAP_REQUIRES_EMPTY_DATABASE: "
                      "select an empty database without tables/views/routines/events; "
                      "no bootstrap SQL was sent")
-        result = run(self.base(self.mysql) + [self.config.database], env=self.env(), input_text=path.read_text(encoding="utf-8"), capture=True)
+        result = run(self.base(self.mysql) + [self.config.database], env=self.env(), input_text=preamble + path.read_text(encoding="utf-8"), capture=True)
         return result.stdout or ""
 
     def table_count(self) -> int:
@@ -1297,23 +1297,23 @@ def verify_database(environment: str, client: MysqlClient | None = None) -> None
     client = client or MysqlClient(db_config(environment))
     verify_applied_migration_integrity(client, manifests)
     data_failures: list[str] = []
+    counts = {"PASS": 0, "SKIP": 0, "FAIL": 0, "MISSING": 0}
     for code in module_order(manifests):
         verify_path = resolve_sql_path(manifests[code]["verify"])
-        output = client.execute_file(verify_path)
+        output = client.execute_file(verify_path, preamble="SET @zsjos_verify_runtime=1;\n")
         for line in output.splitlines():
+            status = line.strip().split("\t")[-1]
+            if status in counts:
+                counts[status] += 1
             if re.search(r"(?:^|\t)(FAIL|MISSING)$", line.strip()):
                 data_failures.append(f"{code}: {line}")
     drift = schema_drift(client, manifests)
-    if data_failures:
-        warn(
-            "Database data-grade verifiers reported FAIL/MISSING; "
-            "these include historical initialization snapshots and data-integrity audits. "
-            "Review each against the current business contract; a schema PASS "
-            "does not clear these findings:\n" + "\n".join(sorted(set(data_failures)))
-        )
-    if drift:
-        fail("Database verification failed:\n" + "\n".join(f"core drift: {item}" for item in drift))
-    info("PASS: database verification (data-grade verifiers warn-only) and schema drift checks completed.")
+    info("Runtime verification summary: " + ", ".join(f"{key}={value}" for key, value in counts.items()))
+    if drift or data_failures:
+        fail("Database verification FAILED (no data was repaired):\n" + "\n".join(
+            ["schema drift: " + item for item in drift]
+            + ["data/configuration: " + item for item in sorted(set(data_failures))]))
+    info("PASS: runtime database integrity and schema verification completed.")
 
 
 def reconcile_database(environment: str, apply: bool, include_seed_rows: bool = False) -> None:

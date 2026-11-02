@@ -1,3 +1,5 @@
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
 import ResourceLinkInput from '../components/ResourceLinkInput'
 import ResourceLink from '../components/ResourceLink'
 import {
@@ -23,7 +25,6 @@ import {
   Input,
   List,
   Modal,
-  Pagination,
   Select,
   Skeleton,
   Space,
@@ -390,22 +391,27 @@ export default function ContentProductionPage({ permissions = [] }: { permission
     finally { setDetailLoading(false) }
   }, [])
 
-  const load = useCallback(async (targetPage = 1, preferredId?: number) => {
+  const mergeRows=useInboxPageMerge<MediaContent>(keyword,true,row=>row.id)
+  const listRun=useRef(0),failedPage=useRef(1)
+  const load = useCallback(async (targetPage = 1, preferredId?: number, append=false) => {
+    const run=++listRun.current;failedPage.current=targetPage
     setLoading(true)
     setError('')
     try {
       const result = await api.mediaContent.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: keyword || undefined })
-      setRows(result.list)
+      if(run!==listRun.current)return
+      const merged=mergeRows(targetPage,result.list);setRows(merged)
       setTotal(result.total)
       setPage(targetPage)
-      const nextId = result.list.some(item => item.id === preferredId) ? preferredId : result.list[0]?.id
+      if(append)return
+      const nextId = merged.some(item => item.id === preferredId) ? preferredId : merged[0]?.id
       if (nextId) await loadDetail(nextId)
       else { setSelectedId(undefined); setSelected(undefined); setVersions([]) }
-    } catch (cause) { setRows([]); setSelected(undefined); setVersions([]); setSelectedId(undefined); setError(errorText(cause)) }
-    finally { setLoading(false) }
-  }, [keyword, loadDetail])
+    } catch (cause) { if(run!==listRun.current)return;if(!append){setRows([]);setSelected(undefined);setVersions([]);setSelectedId(undefined)} setError(errorText(cause)) }
+    finally { if(run===listRun.current)setLoading(false) }
+  }, [keyword, loadDetail,mergeRows])
 
-  useEffect(() => { void load(1) }, [keyword, load])
+  useEffect(() => { void load(1);return()=>{listRun.current++} }, [keyword, load])
 
   const refreshSelected = async () => { if (selectedId) await loadDetail(selectedId); await load(page, selectedId) }
 
@@ -441,7 +447,7 @@ export default function ContentProductionPage({ permissions = [] }: { permission
         {loading && !rows.length ? <Skeleton active /> : rows.length ? rows.map(row => <button type="button" key={row.id} className={`content-production-list-item${row.id === selectedId ? ' active' : ''}`} onClick={() => void loadDetail(row.id)}>
           <span><strong>{row.title || row.contentNo}</strong><Tag>{statusText[row.status] || row.status}</Tag></span><span>{row.contentNo} · 当前 V{row.currentVersionNo || 0}</span>
         </button>) : !error && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无内容" />}
-      </div>{total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={total} onChange={value => void load(value)} />}</aside>
+      </div><InboxLoadMore page={page} total={total} pageSize={PAGE_SIZE} loading={loading} error={error} rootSelector=".content-production-scroll" onMore={()=>void load(page+1,undefined,true)} onRetry={()=>void load(failedPage.current,undefined,failedPage.current>1)}/></aside>
       <main className="content-production-detail-pane">{detailLoading ? <Skeleton active paragraph={{ rows: 12 }} /> : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>} /> : selected ? <>
         <div className="content-production-heading"><div><Space><Tag>{statusText[selected.status] || selected.status}</Tag><Typography.Text>{selected.contentNo}</Typography.Text></Space><Typography.Title level={4}>{selected.title}</Typography.Title><Typography.Text type="secondary">账号 {selected.accountId} · 当前版本 V{selected.currentVersionNo || 0}</Typography.Text></div><Space wrap>
           {canEditCurrent && <Button icon={<EditOutlined />} onClick={() => setEditing(true)}>保存新版本</Button>}

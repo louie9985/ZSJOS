@@ -46,6 +46,7 @@ public class StudentInfoFormService {
     @Resource private SecurityFrameworkService security;
     @Resource private TenantFrameworkService tenants;
     @Resource private StudentInfoImageService images;
+    @Resource private StudentInfoTaskMapper collectionTasks;
     @Value("${zsjos.student-info.public-base-url:${zsjos.positioning.public-base-url:${ZSJOS_PUBLIC_H5_BASE_URL:}}}") private String publicBaseUrl;
     private static final SecureRandom RANDOM=new SecureRandom();
 
@@ -207,6 +208,35 @@ public class StudentInfoFormService {
         var saved = form.getDraftSnapshot() == null ? new Draft() : JsonUtils.parseObject(form.getDraftSnapshot(),Draft.class);
         saved.setRevision(form.getDraftRevision() == null ? 0 : form.getDraftRevision()); saved.setSavedAt(form.getDraftSavedAt()); return saved;
     }
+    // Task commands hold the owning order/task locks and enforce object permissions.
+    StudentInfoFormDO prepareTaskForm(StudentInfoTaskDO task) {
+        var productItem=orderItems.selectById(task.getOrderItemId());
+        if (productItem==null || !Objects.equals(productItem.getOrderId(),task.getOrderId())) throw exception(CONFIG_INVALID);
+        var product=productItem.getProductId()==null ? products.selectByProductRef(productItem.getProductRef()) : products.selectById(productItem.getProductId());
+        if (product==null) throw exception(CONFIG_INVALID);
+        var config=configService.published(); var path=productRules.path(product.getId());
+        var row=new StudentInfoFormDO(); row.setOrderItemId(task.getOrderItemId()); row.setPersonId(task.getPersonId());
+        row.setProductId(product.getId()); row.setConfigVersionId(config.getId()); row.setSalesUserId(getLoginUserId());
+        row.setTenantId(task.getTenantId()); row.setProductName(product.getName());
+        row.setFieldsSnapshot(JsonUtils.toJsonString(fields.withAttachmentPolicy(productRules.resolve(fields.parse(config.getFieldsJson()),configService.categoryIds(config),path))));
+        row.setCategoryPathSnapshot(JsonUtils.toJsonString(path)); row.setDraftRevision(0L);
+        return row;
+    }
+    void issueTaskForm(StudentInfoFormDO form) { rotate(form); forms.insert(form); }
+    void rotateTaskForm(StudentInfoFormDO form) {
+        rotate(form); forms.updateById(form);
+        forms.update(null,new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,form.getId())
+                .set(StudentInfoFormDO::getSentAt,null).set(StudentInfoFormDO::getSentByUserId,null));
+    }
+    Link taskLink(StudentInfoFormDO form,StudentInfoTaskDO task) {
+        if (form==null) return null;
+        var result=new Link(); result.setFormId(form.getId()); result.setStatus(state(form));
+        result.setCreatedAt(form.getCreateTime()); result.setExpiresAt(form.getExpiresAt());
+        result.setSentAt(form.getSentAt()); result.setSentByUserId(form.getSentByUserId()); result.setRegistrationVersion(task.getVersion());
+        result.setCanRegenerate(!"SUBMITTED".equals(form.getStatus()) && security.hasPermission(REGENERATE)); result.setCanRevoke("DRAFT".equals(state(form)) && security.hasPermission(REVOKE));
+        if ("DRAFT".equals(state(form))) result.setUrl(baseUrl()+"/student-info-form#token="+form.getTokenCiphertext());
+        return result;
+    }
     @Transactional(rollbackFor=Exception.class)
     public void submit(String token,Submit request) {
         withLockedToken(token,form->{
@@ -228,7 +258,14 @@ public class StudentInfoFormService {
     }
     public <T> T withLockedToken(String token,java.util.function.Function<StudentInfoFormDO,T> action) {
         var located=locate(token); return inTenant(located.getTenantId(),()->{
-            lockCase(located.getRegistrationCaseId()); var form=forms.lock(located.getId());
+            if (located.getRegistrationCaseId()!=null) lockCase(located.getRegistrationCaseId());
+            else {
+                var task=collectionTasks.byItem(located.getOrderItemId());
+                if (task==null || !Objects.equals(task.getPersonId(),located.getPersonId())) throw exception(LINK_INVALID);
+                orders.selectByIdForUpdate(task.getOrderId(),TenantContextHolder.getRequiredTenantId());
+                collectionTasks.lock(task.getId());
+            }
+            var form=forms.lock(located.getId());
             if (form==null || !hash(token).equals(form.getTokenHash())) throw exception(LINK_INVALID); return action.apply(form);
         });
     }
@@ -253,12 +290,12 @@ public class StudentInfoFormService {
         item=cases.selectByIdForUpdate(id,TenantContextHolder.getRequiredTenantId()); if (item==null) throw exception(LINK_INVALID); return item;
     }
     public String effectiveState(StudentInfoFormDO form) {
-        if (form==null) return "NONE"; if ("SUBMITTED".equals(form.getStatus())) return "SUBMITTED";
-        var item=cases.selectById(form.getRegistrationCaseId());
-        var order=item==null ? null : orders.selectById(item.getOrderId());
-        return item==null || order==null || Set.of("cancelled","ended").contains(item.getStatus()) || !Set.of("pending_approval","revision_required","effective").contains(order.getStatus()) ? "REVOKED" : state(form);
+        // Closing an order affects staff commands, not an already issued public token.
+        return form==null ? "NONE" : state(form);
     }
     private Link link(StudentInfoFormDO form,RegistrationCaseDO item) {
+        var order=item==null ? null : orders.selectById(item.getOrderId());
+        if (order==null || !Set.of("pending_approval","revision_required","effective").contains(order.getStatus())) throw exception(LINK_EXPIRED);
         if (form==null) return null; var result=new Link(); result.setFormId(form.getId()); result.setStatus(effectiveState(form));
         result.setCreatedAt(form.getCreateTime()); result.setExpiresAt(form.getExpiresAt()); result.setSentAt(form.getSentAt()); result.setSentByUserId(form.getSentByUserId()); result.setRegistrationVersion(item.getVersion());
         boolean editable=Set.of("pending","processing").contains(item.getStatus()) && !"SUBMITTED".equals(form.getStatus());

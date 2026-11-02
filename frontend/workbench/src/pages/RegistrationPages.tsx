@@ -1,3 +1,7 @@
+import RegistrationDetailLayout from '../components/RegistrationDetailLayout'
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
+import { useMetricSourceApi, useMetricPageScope } from '../services/metricPageScope'
 import TeachingServiceLifecyclePanel from '../components/TeachingServiceLifecyclePanel'
 import { StudentArchiveEditGuard, useStudentArchiveNavigationGuard } from '../components/StudentArchiveEditGuard'
 import { useWorkbenchPageGuard } from '../components/WorkbenchPageNavigation'
@@ -13,7 +17,7 @@ import { studentServiceColumnDefinitions, studentServiceColumns, studentColumnDe
 import BusinessSortMenu from '../components/BusinessSortMenu'
 import { readTableSort, sortChoices, type BusinessSort } from '../services/businessListSort'
 import BusinessTable from '../components/BusinessTable'
-import { InboxAvatarControls, InboxAvatarError, InboxAvatarPagination, useInboxAvatarRail } from '../components/InboxAvatarRail'
+import { InboxAvatarControls, InboxAvatarError, useInboxAvatarRail } from '../components/InboxAvatarRail'
 import ProductSpecs from '../components/ProductSpecs'
 import { createIdempotencyKey } from '../services/idempotency'
 import {  } from '../services/productSpecs'
@@ -91,9 +95,14 @@ function LoadState({
 }
 
 export function RegistrationPoolPage({ permissions = [] }: { permissions?: string[] }) {
+  const metricScope = useMetricPageScope()
+  const metricRegistrations = useMetricSourceApi('registration', api)
   const location = useLocation();
   const routeState = location.state as { registrationCaseId?: number } | null;
-  const [statusGroup, setStatusGroup] = useState<'pending' | 'processed' | 'all'>('pending');
+  const rawCaseId=new URLSearchParams(location.search).get('registrationCaseId');
+  const invalidCaseLink=rawCaseId!==null&&(!/^[1-9][0-9]*$/.test(rawCaseId)||!Number.isSafeInteger(Number(rawCaseId)));
+  const linkedCaseId=rawCaseId!==null?(invalidCaseLink?undefined:Number(rawCaseId)):routeState?.registrationCaseId;
+  const [statusGroup, setStatusGroup] = useState<'pending' | 'processed' | 'all'>(metricScope ? 'all' : 'pending');
   const [classAssigned, setClassAssigned] = useState<boolean>();
   const handledLocation = useRef<string | undefined>(undefined);
   const [rows, setRows] = useState<RegistrationCase[]>([]);
@@ -193,16 +202,20 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     },
     [applyCase],
   );
+  const failedListPage=useRef(1);
+  const mergeRows=useInboxPageMerge<RegistrationCase>(JSON.stringify([statusGroup,classAssigned,keyword,advancedFilter]),true,row=>row.id);
   const load = useCallback(
     async (targetPage = pageNo, preferredId?: number) => {
+      failedListPage.current=targetPage;
       const requestKey = `${statusGroup}:${classAssigned}:${targetPage}:${preferredId || "current"}:${keyword}:${JSON.stringify(advancedFilter)}`;
       if (inflightLists.current.has(requestKey)) return;
       inflightLists.current.add(requestKey);
       const generation = ++listGeneration.current;
+      const detailAtRequest=detailGeneration.current;
       setLoading(true);
       setError("");
       try {
-        const page = await api.registrationPoolPage({
+        const page = await metricRegistrations.registrationPoolPage({
             statusGroup,
             classAssigned: statusGroup === "pending" ? classAssigned : undefined,
             pageNo: targetPage,
@@ -211,9 +224,10 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
             advancedFilter,
           });
         if (generation !== listGeneration.current) return;
-        setRows(page.list);
+        setRows(current=>mergeRows(targetPage,page.list,current));
         setTotal(page.total);
         setPageNo(targetPage);
+        if(invalidCaseLink||(targetPage>1&&!preferredId)||detailAtRequest!==detailGeneration.current)return;
         const targetId = preferredId ?? page.list.find(row => row.id === activeCaseId.current)?.id ?? page.list[0]?.id;
         if (targetId && !draftDirty.current) await loadCase(targetId);
         else if (!targetId) { activeCaseId.current = undefined; ++detailGeneration.current; setSelected(undefined); setDetailLoading(false); }
@@ -224,14 +238,15 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, classAssigned, keyword, loadCase, pageNo, selected?.id, statusGroup],
+    [advancedFilter, classAssigned, keyword, loadCase, pageNo, selected?.id, statusGroup,mergeRows,invalidCaseLink],
   );
 
   useEffect(() => {
-    const preferredId = handledLocation.current !== location.key ? routeState?.registrationCaseId : undefined;
+    const preferredId = handledLocation.current !== location.key ? linkedCaseId : undefined;
     handledLocation.current = location.key;
+    if(invalidCaseLink){activeCaseId.current=undefined;detailGeneration.current++;setSelected(undefined);setDetailLoading(false)}
     void load(1, preferredId);
-  }, [advancedFilter, classAssigned, keyword, location.key, routeState?.registrationCaseId, statusGroup]);
+  }, [advancedFilter, classAssigned, keyword, location.key, linkedCaseId, statusGroup,invalidCaseLink]);
   useEffect(() => {
     const refresh = (event: Event) => {
       const caseId = Number(
@@ -398,8 +413,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       retry={() => activeCaseId.current && void loadCase(activeCaseId.current)}
     />
   ) : selected ? (
-    <div className="registration-detail">
-      <div className="registration-detail-hero">
+    <RegistrationDetailLayout hero={<>
         <Button className="registration-mobile-back" onClick={() => confirmLeave(() => { setMobileDetailOpen(false); void loadCase(selected.id); })}>返回列表</Button>
         <div>
           <Typography.Title level={4}>
@@ -420,11 +434,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           }
         >
           {selected.statusLabel || "未知状态"}
-        </Tag>
-      </div>
-      <div className="registration-detail-columns">
-        <aside className="registration-information" aria-label="相关信息" tabIndex={0}>
-          <Typography.Title level={5}>相关信息</Typography.Title>
+        </Tag> </>} information={<>
           <section className="registration-info-section">
             <Typography.Title level={5}>订单与学员</Typography.Title>
             <dl className="registration-facts">
@@ -458,11 +468,24 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               <div><dt>{selected.status === "completed" ? "完成时间" : "关闭时间"}</dt><dd>{formatTimestamp(selected.status === "completed" ? selected.completedAt : selected.cancelledAt)}</dd></div>
               {selected.cancelReason && <div><dt>结束 / 关闭原因</dt><dd>{selected.cancelReason}</dd></div>}
             </dl>
-          </section>}
-        </aside>
-        <div className="registration-operation-column">
-          <div className="registration-operation-scroll" aria-label="办理流程" tabIndex={0}>
-            <Typography.Title level={5}>办理流程</Typography.Title>
+          </section>} </>} actions={<>
+        {operationError && <Alert type="error" showIcon title={operationError} />}
+        <Typography.Text type="secondary" aria-live="polite">{completionReason}</Typography.Text>
+        <Space wrap>
+        {["pending", "processing"].includes(selected.status) ? <>
+          <Button
+            type="primary"
+            disabled={!hasPermission(permissions, "zsjos:registration:complete") || !selected.completable || mutationBusy || Boolean(classesDirty)}
+            loading={completing}
+            onClick={() => void complete()}
+          >完成报名履约</Button>
+          {hasPermission(permissions, "zsjos:registration:close") && (
+            <Button danger type="text" disabled={mutationBusy} onClick={() => { closeForm.setFieldsValue({ reason: selected.cancelReason || "" }); setCloseOpen(true); }}>{selected.orderItemId ? "结束本产品（无需交付）" : "关闭服务"}</Button>
+          )}
+        </> : null}
+        </Space>
+      </>}>
+
       <section className="registration-checklist-card registration-step">
         <div className="registration-step-heading"><span className="registration-step-number">1</span><Typography.Title level={5}>确认分班</Typography.Title><Tag>{classesDirty ? "未保存" : selected.deliveryEstablished ? "已建立交付" : terminal ? "已结束" : "待确认"}</Tag></div>
         <Typography.Paragraph type="secondary">{selected.assignmentBlockReason || (selected.deliveryEstablished ? "变更班级请通过班级管理办理转班。" : "保存分班后将流转至学生交付中心。已保存但尚未流转的历史分班，请再次保存；选择待分班时暂不分配学习规划师。")}</Typography.Paragraph>
@@ -575,33 +598,15 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         <Alert showIcon type={terminal || selected.completable ? "info" : "warning"} title={terminal ? selected.statusLabel : selected.completionBlockReason || "已满足完成条件"} />
         {classesDirty && <Typography.Paragraph type="secondary">分班选择尚未保存，请先保存分班。</Typography.Paragraph>}
       </section>
-          </div>
-      <div className="registration-detail-actions">
-        {operationError && <Alert type="error" showIcon title={operationError} />}
-        <Typography.Text type="secondary" aria-live="polite">{completionReason}</Typography.Text>
-        <Space wrap>
-        {["pending", "processing"].includes(selected.status) ? <>
-          <Button
-            type="primary"
-            disabled={!hasPermission(permissions, "zsjos:registration:complete") || !selected.completable || mutationBusy || Boolean(classesDirty)}
-            loading={completing}
-            onClick={() => void complete()}
-          >完成报名履约</Button>
-          {hasPermission(permissions, "zsjos:registration:close") && (
-            <Button danger type="text" disabled={mutationBusy} onClick={() => { closeForm.setFieldsValue({ reason: selected.cancelReason || "" }); setCloseOpen(true); }}>{selected.orderItemId ? "结束本产品（无需交付）" : "关闭服务"}</Button>
-          )}
-        </> : null}
-        </Space>
-      </div>
-        </div>
-      </div>
-    </div>
+    </RegistrationDetailLayout>
   ) : (
     <Empty description="从左侧选择一条报名履约任务" />
   );
 
+  const displayRows=selected&&linkedCaseId===selected.id&&!rows.some(row=>row.id===selected.id)?[selected,...rows]:rows;
   return (
     <section className={"workspace-page registration-page" + (mobileDetailOpen ? " is-detail-open" : "")}>
+      {invalidCaseLink&&<Alert type="error" title="报名履约任务跳转参数无效"/>}
       <div className="lead-filter-sections">
         <div className="lead-filter-row" role="group" aria-label="处理状态">
           <span className="lead-filter-row-label">处理状态</span>
@@ -653,15 +658,15 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                   <Skeleton active avatar paragraph={{ rows: 2 }} />
                 </div>
               ))
-            ) : !rows.length && !error ? (
+            ) : !displayRows.length && !error ? (
               <Empty description="当前筛选下暂无报名履约任务" />
             ) : (
-              rows.map((row) => (
+              displayRows.map((row) => (
                 <button
                   type="button"
                   key={row.id}
                   className={`lead-inbox-item${selected?.id === row.id ? " active" : ""}`}
-                  onClick={() => confirmLeave(() => { ++listGeneration.current; setMobileDetailOpen(true); void loadCase(row.id); })}
+                  onClick={() => confirmLeave(() => { setMobileDetailOpen(true); void loadCase(row.id); })}
                 >
                   <div className="lead-inbox-item-main">
                     <NameAvatar name={row.studentName || "学员"} seed={row.leadNo} size={36} />
@@ -694,16 +699,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               ))
             )}
           </div>
-          {total > PAGE_SIZE && (
-            <Pagination
-              className="registration-pagination"
-              simple
-              current={pageNo}
-              pageSize={PAGE_SIZE}
-              total={total}
-              onChange={(value) => confirmLeave(() => void load(value))}
-            />
-          )}
+          <InboxLoadMore page={pageNo} total={total} pageSize={PAGE_SIZE} loading={loading} error={error} rootSelector=".lead-inbox-scroll" onMore={()=>void load(pageNo+1)} onRetry={()=>void load(failedListPage.current)}/>
         </aside>
         <main className="lead-inbox-detail-pane registration-detail-pane">{(detailLoading || detailError || !selected) && <Button className="registration-mobile-back" onClick={() => setMobileDetailOpen(false)}>返回列表</Button>}{detailContent}</main>
       </div>
@@ -739,6 +735,7 @@ export function MyStudentsPage(props: { permissions?: string[]; tenantReadAll?: 
 }
 
 function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { permissions?: string[]; tenantReadAll?: boolean }) {
+  const metricStudents = useMetricSourceApi('student', api)
   const canQuery = hasPermission(permissions, 'zsjos:student:query-my');
   // The linked detail endpoint explicitly accepts student:query-my and enforces object read scope.
   const canQueryLead = canQuery || hasPermission(permissions, 'zsjos:lead:query');
@@ -869,11 +866,14 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
     } finally { if (generation === classOptionsGeneration.current) setClassOptionsLoading(false); }
   }, [permissions, tenantReadAll, readScope, canQuery, canQueryClasses]);
   useEffect(() => { void loadClassOptions(); }, [loadClassOptions]);
+  const failedListPage=useRef(1);
+  const mergeRows=useInboxPageMerge<ServiceStudent>(JSON.stringify([quickFilters,studentSort,readScope,keyword,classId,advancedFilter,requestedPersonId]),!useTableLayout,row=>row.serviceRelationId);
   const load = useCallback(
     async (targetPage = pageNo, options: { force?: boolean; reloadDetail?: boolean } = {}) => {
       if (options.reloadDetail !== false && !canLeaveArchive()) return;
       if (!canQuery) { setRows([]); setTotal(0); setSelected(undefined); setListUnauthorized(true); setLoading(false); return; }
       if (readScope.readScope === 'USER' && !readScope.targetUserId) { setRows([]); setTotal(0); setSelected(undefined); return; }
+      failedListPage.current=targetPage;
       const baseRequestKey = JSON.stringify(quickFilters) + ":" + `${JSON.stringify(studentSort)}:${JSON.stringify(readScope)}:${targetPage}:${keyword}:${classId || ''}:${JSON.stringify(advancedFilter)}`;
       if (!options.force && inflightLists.current.has(baseRequestKey)) return;
       const requestKey = options.force
@@ -886,7 +886,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
       setListUnauthorized(false);
       setError("");
       try {
-        const page = await api.myStudentServices({
+        const page = await metricStudents.myStudentServices({
           pendingTasksFirst: true,
           ...quickFilters,
           personId: requestedPersonId,
@@ -901,11 +901,11 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
           advancedFilter,
         });
         if (generation !== listGeneration.current) return;
-        setRows(page.list.map(asServiceStudent));
+        setRows(current=>mergeRows(targetPage,page.list.map(asServiceStudent),current));
         setTotal(page.total);
         setPageNo(targetPage);
         if (options.reloadDetail !== false && !requestedServiceId && detailAtRequest === detailGeneration.current) {
-          const target = selected && page.list.some((item) => item.serviceRelationId === selected.serviceRelationId)
+          const target = selected && (rows.some(item=>item.serviceRelationId===selected.serviceRelationId) || page.list.some((item) => item.serviceRelationId === selected.serviceRelationId))
             ? selected.serviceRelationId
             : (requestedPersonId && page.total !== 1 ? undefined : page.list[0]?.serviceRelationId);
           if (target) await loadStudent(target, false);
@@ -922,11 +922,11 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, readScope, tenantReadAll, studentSort, quickFilters, canQuery, canLeaveArchive],
+    [advancedFilter, classId, keyword, loadStudent, pageNo, requestedPersonId, selected, readScope, tenantReadAll, studentSort, quickFilters, canQuery, canLeaveArchive,mergeRows,rows],
   );
   useEffect(() => {
     void load(1);
-  }, [advancedFilter, classId, keyword, readScope, studentSort, quickFilters, canQuery]);
+  }, [advancedFilter, classId, keyword, readScope, studentSort, quickFilters, canQuery,useTableLayout]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
   // Reload only the list when obligations change; the active editor keeps its draft.
   useEffect(() => {
@@ -1146,16 +1146,7 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
               ))
             )}
           </div>
-          {total > PAGE_SIZE && (avatarRail.collapsed ? <InboxAvatarPagination page={pageNo} total={total} pageSize={PAGE_SIZE} loading={loading} onChange={value => void load(value)} /> :
-            <Pagination
-              className="registration-pagination"
-              simple
-              current={pageNo}
-              pageSize={PAGE_SIZE}
-              total={total}
-              onChange={(value) => void load(value)}
-            />
-          )}
+          <InboxLoadMore page={pageNo} total={total} pageSize={PAGE_SIZE} loading={loading} error={error} rootSelector=".lead-inbox-scroll" onMore={()=>void load(pageNo+1,{reloadDetail:false})} onRetry={()=>void load(failedListPage.current,{reloadDetail:false})}/>
         </aside>
         <main className="lead-inbox-detail-pane">{detailContent}</main>
       </div>}

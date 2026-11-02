@@ -1,6 +1,8 @@
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
 import BusinessTable from '../components/BusinessTable'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Avatar, Button, Drawer, Empty, Form, Image, Input, Modal, Pagination, Segmented, Space, Spin, Tag, Typography, message } from 'antd'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Avatar, Button, Drawer, Empty, Form, Image, Input, Modal, Segmented, Space, Spin, Tag, Typography, message } from 'antd'
 
 import { CheckOutlined } from '@ant-design/icons'
 import DetailFieldGrid from '../components/DetailFieldGrid'
@@ -26,25 +28,30 @@ export default function LeadComplaintPage() {
   const [form] = Form.useForm<{ result: 'founded' | 'unfounded'; opinion: string }>()
   const { useTableLayout } = useInboxTableLayout()
 
+  const mergeRows=useInboxPageMerge<LeadComplaint>(status,!useTableLayout,row=>row.id)
+  const request=useRef(0)
   const load = useCallback(async () => {
+    const run=++request.current
     setLoading(true)
     setError('')
     try {
       const result = await api.leadComplaintPage({ status, pageNo: page, pageSize: PAGE_SIZE })
-      setItems(result.list)
+      if(run!==request.current)return
+      const merged=mergeRows(page,result.list)
+      setItems(merged)
       setTotal(result.total)
-      setSelectedId(existing => existing && result.list.some(item => item.id === existing) ? existing : result.list[0]?.id)
+      setSelectedId(existing => existing && merged.some(item => item.id === existing) ? existing : merged[0]?.id)
     } catch (cause) {
-      setItems([])
-      setTotal(0)
-      setSelectedId(undefined)
+      if(run!==request.current)return
+      if(page===1||useTableLayout){setItems([]);setTotal(0);setSelectedId(undefined)}
       setError(cause instanceof Error ? cause.message : '投诉队列加载失败')
     } finally {
-      setLoading(false)
+      if(run===request.current)setLoading(false)
     }
-  }, [page, status])
+  }, [page, status, mergeRows,useTableLayout])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(()=>setPage(1),[useTableLayout])
+  useEffect(() => { void load();return()=>{request.current++} }, [load])
   const selected = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId])
 
   const decide = async () => {
@@ -115,12 +122,12 @@ export default function LeadComplaintPage() {
       <aside className="business-inbox-list-pane">
         {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
         <div className="business-inbox-scroll">
-          {loading ? <Spin/> : !items.length && !error ? <Empty description="暂无投诉"/> : items.map(item => <button key={item.id} type="button" className={`business-inbox-item${item.id === selectedId ? ' active' : ''}`} onClick={() => { setSelectedId(item.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
+          {loading && !items.length ? <Spin/> : !items.length && !error ? <Empty description="暂无投诉"/> : items.map(item => <button key={item.id} type="button" className={`business-inbox-item${item.id === selectedId ? ' active' : ''}`} onClick={() => { setSelectedId(item.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
             <div className="business-inbox-item-main"><Avatar>{(item.complainantUserName || '投').slice(0, 1)}</Avatar><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.leadNo}</strong><Tag color={item.status === 'pending' ? 'processing' : 'success'}>{item.status === 'pending' ? '待处理' : '已处理'}</Tag></div><span>{item.complainantUserName || '未知投诉人'} → {item.salesUserName || '未知负责人'}</span><span>{item.reason}</span></div></div>
             <div className="business-inbox-item-meta"><span>{formatTimestamp(item.createTime)}</span></div>
           </button>)}
         </div>
-        {total > PAGE_SIZE && <div className="business-inbox-pagination"><Pagination simple current={page} pageSize={PAGE_SIZE} total={total} onChange={setPage}/></div>}
+        <InboxLoadMore page={page} total={total} pageSize={PAGE_SIZE} loading={loading} error={error} rootSelector=".business-inbox-scroll" onMore={()=>setPage(page+1)} onRetry={()=>void load()}/>
       </aside>
       <main className="business-inbox-detail-pane">{detailContent}</main>
     </div>}

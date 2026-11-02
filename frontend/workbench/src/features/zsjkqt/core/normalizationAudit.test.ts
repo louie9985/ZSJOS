@@ -133,10 +133,11 @@ describe('异常转正常：已成立的回归契约', () => {
   })
 
   it.each([
-    '产检假8小时（08:30-18:00）',
-    '正常;产检假3.5小时（08:30-12:00）',
-    '正常;产检假4.5小时（13:30-18:00）',
-  ])('%s 计入当天出勤且保留独立假别', raw => {
+    ['产检假8小时（08:30-18:00）', 1],
+    ['正常;产检假3.5小时（08:30-12:00）', 0.44],
+    ['正常;产检假4.5小时（13:30-18:00）', 0.56],
+  ] as const)('%s 计入当天出勤且保留独立假别', (raw, leaveDays) => {
+    expect(summary(classified(raw)).prenatalLeaveDays).toBe(leaveDays)
     const day = classified(raw)
     expect([day.finalMorning, day.finalAfternoon]).toContain('产检假')
     expect(summary(day).actualAttendanceDays).toBe(1)

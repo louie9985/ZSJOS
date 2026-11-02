@@ -1,11 +1,15 @@
 # 报名履约与学员 API
 
+公共池与收集任务支持双向精确定位：公共池“前往报名资料收集”传递当前 registrationCaseId，由服务端核对订单商品关联；收集任务返回对应 registrationCaseId 并跳回公共池。URL 定位参数无效时展示错误，不自动打开首条任务；有效目标可独立于第一页列表展示。
+
+> 2026-11-01：[订单报名资料收集任务](order-student-information-tasks.md) 已接入审核事务。履约收集区域仅展示任务状态及资料，生成和发送在统一列表办理。
+
 直接录入无订单学员使用[学员直接新增](student-entry.md)，不生成报名履约任务。
 直接编导录入的媒体就绪状态与教学接收独立；历史 null 保持原接收判断。
 
 ### 学员信息收集（2026-10-16）
 
-每个报名任务绑定一份学员收集表。Workbench 与 Admin 均在履约详情提供生成链接／二维码和“已发送”勾选，勾选立即保存；最终履约完成只检查生成并发送事实，不等待学员提交。正常完成后链接继续有效，取消／结束／订单终止使未提交链接失效。生成／发送／轮换使用任务版本与幂等键，轮换清除发送确认。详情新增 informationSent、informationSentAt、informationSentByUserId、informationSubmissionStatus。服务投影新增 registrationCaseId，资料摘要／详情按当前任务读取，不再按客资回退。详见[收集表契约](student-information-collection.md)。
+报名履约按订单商品关联收集任务。两端详情仅同步收集状态与已提交资料，不再独立生成链接或确认发送；统一任务已发送或已复用即可满足原资料条件，无需额外等待客户提交。订单终止只关闭内部办理能力，不撤销已经发出的链接。详情保留 informationSent、informationSentAt、informationSentByUserId、informationSubmissionStatus，复用状态为 REUSED，未伪造发送时间。
 
 ### 学员管理服务摘要（2026-10-15）
 

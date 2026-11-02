@@ -29,6 +29,8 @@ extend the repository root instructions.
 
 ## UI implementation
 
+- 主从收件箱统一采用滚动追加加载，保留已加载记录和已选详情；筛选/范围变化重置加载位置，加载失败保留已有内容并提供重试。表格模式继续分页，不能把表格分页控件直接用作收件箱翻页。仅提供全量目录 API 的人员/成员导航可分批呈现，但必须说明这是渐进渲染，不能宣称减少了接口读取量。
+
 - When changing shared layout, themes, navigation, or component styling, **MUST** consult the relevant parts of `frontend/workbench/docs/ui-guidelines.md` for token usage, page skeletons, and naming conventions. Reuse material already read in the current context unless it changed or is no longer available.
 - Visual decisions (dimensions, tokens, hierarchy, icons, interaction) **MUST** be grounded in the documented design system and existing page implementations. **MUST NOT** approximate from memory.
 - Prefer existing Ant Design, Pro Components, icon, and theme primitives over new custom controls.

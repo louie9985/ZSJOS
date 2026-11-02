@@ -1,0 +1,11 @@
+# local-student-info-cancelled-filter-20261102
+- Environment: local (environment variable and environment file absent).
+- Goal: accept CANCELLED task filter; clear stale rows on filter changes.
+- Non-goals: database changes, deployment, unrelated edits.
+- Branch/worktree/base: main; D:\ZSJ-OS; 0ecc74d4d13bcfbc0361ecdbc2bbd73327359425.
+- Owner: Codex; dependencies: existing task query contract; integration: None.
+- Ownership: StudentInfoTaskVO.java; StudentInfoTasksPage.tsx; StudentInfoTaskQueryTest.java; this handoff (includes contract clarification).
+- Verification: focused Jakarta validation regression, frontend typecheck; browser verification if available.
+- Contract: GET /zsjos/student-info-task/page accepts CANCELLED in addition to existing statuses; service already implements cancelled-order filtering. Filter scope changes clear previous rows and reset pagination; same-scope load failures preserve rows.
+- Ownership update: docs/api/student-information-collection.md, append only; preserve existing changes.
+- Delivery: CANCELLED validation and filter-scope reset implemented; API documentation updated. Maven focused Jakarta validation test passed; npm run typecheck passed; scoped whitespace check passed. Browser localhost serves a different interface, so changed workbench interaction and deployed API remain unverified. No service restart, database mutation, commit or deployment. Ownership released.

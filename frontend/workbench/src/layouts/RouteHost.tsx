@@ -1,4 +1,5 @@
 import MyOperationsPage from '../pages/MyOperationsPage'
+import StudentInfoTasksPage from '../pages/StudentInfoTasksPage'
 import { lazy, Suspense } from "react"
 const ZsjkqtPage = lazy(() => import("../features/zsjkqt/ZsjkqtPage"))
 import StudentEntryPage from '../pages/StudentEntryPage'
@@ -136,7 +137,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage tenantReadAll={tenantReadAll} permissions={permissions} onOpenAssignment={onOpenAssignment}/>
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
-  if (menu?.path === APP_ROUTES.SALES_ORDERS) return <MySalesOrderPage/>
+  if (menu?.path === APP_ROUTES.SALES_ORDERS) return <MySalesOrderPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EXPORT_TASKS) return <ExportTaskPage/>
@@ -155,6 +156,7 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.PRODUCT_CONFIG) return <ProductConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.WORK_PLAN_CONFIG) return <WorkPlanConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.STUDENT_INFO_TASKS) return <StudentInfoTasksPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions} tenantReadAll={tenantReadAll}/>
   if (menu?.path === APP_ROUTES.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />

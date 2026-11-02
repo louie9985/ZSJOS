@@ -490,7 +490,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (STATUS_REVISION_REQUIRED.equals(order.getStatus())) throw exception(REGISTRATION_FINANCE_REVISION_REQUIRED);
         if (!STATUS_EFFECTIVE.equals(order.getStatus())) throw exception(REGISTRATION_ORDER_NOT_EFFECTIVE);
         var information=informationForms.byCase(caseId);
-        if (information==null || information.getSentAt()==null) throw exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请生成收集表链接并确认已发送");
+        if (information==null || information.getSentAt()==null && !"reuse".equals(information.getSubmitSource())) throw exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中确认已发送或完成资料复用");
         List<RegistrationCaseChecklistItemDO> items = caseItemMapper.selectByCaseId(caseId);
         if (items.isEmpty() || items.stream().anyMatch(item -> ITEM_TYPE_CHECKBOX.equals(item.getItemType())
                 && !Boolean.TRUE.equals(item.getChecked()))) {
@@ -871,7 +871,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         result.setInformationSent(information!=null && information.getSentAt()!=null);
         result.setInformationSentAt(information==null ? null : information.getSentAt());
         result.setInformationSentByUserId(information==null ? null : information.getSentByUserId());
-        result.setInformationSubmissionStatus(information==null ? "NONE" : "DRAFT".equals(information.getStatus()) &&
+        result.setInformationSubmissionStatus(information==null ? "NONE" : "reuse".equals(information.getSubmitSource()) ? "REUSED" : "DRAFT".equals(information.getStatus()) &&
                 (information.getRevokedAt()!=null || information.getExpiresAt()==null || !information.getExpiresAt().isAfter(LocalDateTime.now())) ? "EXPIRED" : information.getStatus());
         if (order != null) {
             result.setOrderNo(order.getOrderNo()); result.setOrderStatus(order.getStatus()); result.setOrderStatusLabel(orderStatusLabel(order.getStatus())); result.setStudentName(order.getStudentName());
@@ -1004,8 +1004,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             code = COMPLETION_BLOCK_FINANCE_REVISION_REQUIRED; reason = "财务审核未通过，订单补正并重新审核通过后才能完成报名履约";
         } else if (!STATUS_EFFECTIVE.equals(order.getStatus())) {
             code = COMPLETION_BLOCK_ORDER_NOT_EFFECTIVE; reason = "订单尚未生效，暂时无法完成报名履约";
-        } else if (!Boolean.TRUE.equals(result.getInformationSent())) {
-            code = "information_not_sent"; reason = "请生成学员信息收集表链接并勾选已发送";
+        } else if (!Boolean.TRUE.equals(result.getInformationSent()) && !"REUSED".equals(result.getInformationSubmissionStatus())) {
+            code = "information_not_sent"; reason = "请在报名资料收集任务中确认已发送或完成资料复用";
         } else if (result.getItems() == null || result.getItems().isEmpty()
                 || result.getItems().stream().anyMatch(item -> ITEM_TYPE_CHECKBOX.equals(item.getItemType())
                 && !Boolean.TRUE.equals(item.getChecked()))) {

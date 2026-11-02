@@ -1,3 +1,5 @@
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
 import StageDurationTag from '../components/StageDurationTag'
 import type { EmbeddedApproval } from '../components/bpm/embeddedApproval'
 import { locateContentError, contentSaveError, contentResultUncertain, contentReviewDetailError, type ContentSavePhase } from '../services/contentReviewErrors'
@@ -32,7 +34,6 @@ import {
   Input,
   List,
   Modal,
-  Pagination,
   Radio,
   Select,
   Skeleton,
@@ -371,15 +372,18 @@ export default function ContentReviewBatchPage({ permissions = [], embedded }: {
     finally { if (run === detailRun.current) setDetailLoading(false) }
   }, [])
 
-  const load = useCallback(async (targetPage = 1, preferredId?: number) => {
+  const mergeRows=useInboxPageMerge<ContentReviewBatch>(JSON.stringify([keyword,mine,category,filters]),true,row=>row.id)
+  const failedPage=useRef(1)
+  const load = useCallback(async (targetPage = 1, preferredId?: number, append=false) => {
+    failedPage.current=targetPage
     const run = ++listRun.current
-    detailRun.current++
+    if(!append)detailRun.current++
     const targetId = preferredId ?? linkedBatchId
     // A notification target is independent from list filters, pagination and list availability.
     if (embedded) { if (targetId) await loadDetail(targetId); return }
-    const detailRequest = targetId ? loadDetail(targetId) : undefined
-    if (linkedBatchId || invalidBatchLink) setMobileDetail(true)
-    if (invalidBatchLink && !preferredId) {
+    const detailRequest = !append && targetId ? loadDetail(targetId) : undefined
+    if (!append && (linkedBatchId || invalidBatchLink)) setMobileDetail(true)
+    if (!append && invalidBatchLink && !preferredId) {
       setSelected(undefined); setSelectedId(undefined); selectedIdRef.current = undefined
       setDetailLoading(false); setDetailError('内容审批链接无效，请从消息中心重新打开')
     }
@@ -390,25 +394,34 @@ export default function ContentReviewBatchPage({ permissions = [], embedded }: {
         keyword: keyword || undefined, mine, ...filters,
         statuses: category === 'PENDING' && filters.stage ? [filters.stage] : contentReviewCategories.find(item => item.key === category)?.statuses })
       if (run !== listRun.current) return
-      setRows(result.list)
+      setRows(mergeRows(targetPage,result.list))
       setTotal(result.total)
       setPage(targetPage)
-      if (!targetId && !invalidBatchLink) {
+      if (!append && !targetId && !invalidBatchLink) {
         const nextId = result.list[0]?.id
         if (nextId) await loadDetail(nextId)
         else { setSelectedId(undefined); selectedIdRef.current = undefined; setSelected(undefined); setDetailLoading(false); setDetailError('') }
       }
     } catch (cause) {
       if (run !== listRun.current) return
-      setRows([]); setTotal(0); setError(errorText(cause))
-      if (!targetId && !invalidBatchLink) {
+      if(!append){setRows([]);setTotal(0)} setError(errorText(cause))
+      if (!append && !targetId && !invalidBatchLink) {
         setSelected(undefined); setSelectedId(undefined); setDetailLoading(false)
       }
     } finally { if (run === listRun.current) setLoading(false) }
     await detailRequest
-  }, [keyword, loadDetail, mine, category, filters, linkedBatchId, invalidBatchLink, !!embedded])
+  }, [keyword, loadDetail, mine, category, filters, linkedBatchId, invalidBatchLink, !!embedded,mergeRows])
 
-  useEffect(() => { void load(1) }, [load])
+  const loadedListScope=useRef<string|undefined>(undefined)
+  useEffect(() => {
+    const scope=JSON.stringify([keyword,mine,category,filters,!!embedded])
+    if(loadedListScope.current===scope) {
+      if(linkedBatchId){setMobileDetail(true);void loadDetail(linkedBatchId)}
+      else if(invalidBatchLink){setSelected(undefined);setSelectedId(undefined);selectedIdRef.current=undefined;setDetailLoading(false);setDetailError('内容审批链接无效，请从消息中心重新打开')}
+      return
+    }
+    loadedListScope.current=scope;void load(1)
+  }, [load,keyword,mine,category,filters,linkedBatchId,invalidBatchLink,!!embedded,loadDetail])
   useEffect(() => {
     // 加签、转办、委派、抄送需要人员候选；无处理权限时不请求。
     if (!hasPermission(permissions, 'bpm:task:update')) return
@@ -597,8 +610,7 @@ export default function ContentReviewBatchPage({ permissions = [], embedded }: {
             const params = new URLSearchParams(location.search); params.set('batchId', String(id))
             setMobileDetail(true); navigate({ pathname: APP_ROUTES.CONTENT_REVIEW, search: params.toString() })
           }) }} />
-        {total > PAGE_SIZE && <Pagination simple current={page} pageSize={PAGE_SIZE} total={total}
-          onChange={value => confirmChange(() => void load(value))} />}
+        <InboxLoadMore page={page} total={total} pageSize={PAGE_SIZE} loading={loading} error={error} rootSelector=".content-review-scroll" onMore={()=>void load(page+1,undefined,true)} onRetry={()=>void load(failedPage.current,undefined,failedPage.current>1)}/>
       </aside>}
       <main ref={detailPane} className="content-review-detail-pane">
         {!embedded && <Button className="content-review-mobile-back" icon={<ArrowLeftOutlined />} onClick={() => setMobileDetail(false)}>返回收件箱</Button>}

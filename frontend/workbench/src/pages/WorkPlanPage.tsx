@@ -1,5 +1,7 @@
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
 import { useLocation } from 'react-router-dom'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert, Button, Empty, Form, Input, InputNumber, List, Modal, Pagination,
   Radio, Select, Segmented, Space, Spin, Tag, Typography, Upload, message
@@ -283,17 +285,21 @@ export default function WorkPlanPage({ permissions }: { permissions: string[] })
   const [planModal, setPlanModal] = useState<{ plan?: WorkPlan }>(); const [taskModal, setTaskModal] = useState<{ task?: WorkTask; parentTaskId?: number }>()
   const [reportTask, setReportTask] = useState<WorkTask>(); const [reviewTask, setReviewTask] = useState<WorkTask>(); const [summaryModal, setSummaryModal] = useState(false)
   const canCreate = permissions.includes('zsjos:work-plan:create')
+  const mergePlans=useInboxPageMerge<WorkPlan>('plans',true,row=>row.id)
+  const listRun=useRef(0)
   const load = async () => {
+    const run=++listRun.current
     setLoading(true); setError(''); setAuxiliaryErrors([])
     try {
       const resources = await loadWorkPlanPageResources(api, page, permissions)
-      setPlans(resources.page.list); setTotal(resources.page.total); setTemplates(resources.templates)
+      if(run!==listRun.current)return
+      setPlans(mergePlans(page,resources.page.list)); setTotal(resources.page.total); setTemplates(resources.templates)
       setUsers(resources.users); setDepartments(resources.departments); setAuxiliaryErrors(resources.auxiliaryErrors)
-      if (detail) setDetail(await api.workPlan(detail.id))
-    } catch (cause) { setError(cause instanceof Error ? cause.message : '加载失败') }
-    finally { setLoading(false) }
+      if (detail && page===1) setDetail(await api.workPlan(detail.id))
+    } catch (cause) { if(run===listRun.current)setError(cause instanceof Error ? cause.message : '加载失败') }
+    finally { if(run===listRun.current)setLoading(false) }
   }
-  useEffect(() => { void load() }, [page])
+  useEffect(() => { void load();return()=>{listRun.current++} }, [page])
   const location = useLocation()
   useEffect(() => {
     const query = new URLSearchParams(location.search)
@@ -334,8 +340,8 @@ export default function WorkPlanPage({ permissions }: { permissions: string[] })
     <Space wrap><Segmented value={view} onChange={value => setView(value as typeof view)} options={[{ label: '我的计划', value: 'plans' }, { label: '我的任务', value: 'tasks' }, { label: '团队任务', value: 'team' }]} />{canCreate && <Button type="primary" icon={<PlusOutlined />} onClick={() => setPlanModal({})}>新建计划</Button>}</Space>
     {error && <Alert type="error" message={error} showIcon action={<Button onClick={() => void load()}>重试</Button>} />}
     {auxiliaryErrors.length > 0 && <Alert type="warning" message={auxiliaryErrors.join('；')} showIcon action={<Button onClick={() => void load()}>重试</Button>} />}
-    {loading ? <Spin /> : view === 'plans' ? <div className="work-plan-layout"><List className="work-plan-list-pane" bordered dataSource={plans} locale={{ emptyText: <Empty description="暂无计划" /> }} renderItem={plan => <List.Item className="work-plan-list-item" onClick={() => void openPlan(plan.id)}><List.Item.Meta title={plan.title} description={<Space><Tag>{STATUS[plan.status]}</Tag><span>{plan.startDate} 至 {plan.endDate}</span></Space>} /></List.Item>} /><div className="work-plan-detail-pane">{detail ? <><section className="lead-card work-plan-summary-card"><Typography.Title level={4}>{detail.title}</Typography.Title><DetailFieldGrid items={[{ key: 'status', label: '状态', value: detail.status === 'active' && detail.summaryReady ? '待总结' : STATUS[detail.status] }, { key: 'period', label: '周期', value: `${detail.startDate} 至 ${detail.endDate}` }, { key: 'objective', label: '目标', value: detail.objective, span: 2 }]}/></section><Space wrap className="work-plan-detail-actions">{detail.availableActions.includes('update') && <Button onClick={() => setPlanModal({ plan: detail })}>编辑计划</Button>}{detail.availableActions.includes('publish') && <Button type="primary" onClick={() => Modal.confirm({ title: '发布计划', content: detail.tasks?.length ? '发布后任务将进入待完成状态，确认继续？' : '当前计划暂无任务，发布后仍可继续拆解任务。确认发布？', onOk: async () => { await api.publishWorkPlan(detail.id, detail.version); await openPlan(detail.id); message.success('计划已发布') } })}>发布计划</Button>}{detail.availableActions.includes('assign') && <Button onClick={() => setTaskModal({})}>新增工作任务</Button>}{detail.availableActions.includes('close') && <Button type="primary" onClick={() => setSummaryModal(true)}>计划总结</Button>}</Space><List className="work-plan-task-list" bordered dataSource={detail.tasks || []} locale={{ emptyText: '暂无工作任务，可先发布计划再逐步拆解' }} renderItem={task => <List.Item actions={[renderTaskActions(task)]}><List.Item.Meta title={<>{task.parentTaskId ? '└ ' : ''}{task.title} <Tag>{STATUS[task.status]}</Tag></>} description={`${task.description || ''} ${task.dueAt ? `截止 ${task.dueAt}` : ''}${task.blockedByChildren ? ` · 仍有 ${(task.totalChildCount || 0) - (task.completedChildCount || 0)} 个下级任务未完成，可先提交整体汇报` : ''}`} /></List.Item>} /></> : <Empty description="选择一个计划查看详情" />}</div></div> : <List bordered dataSource={taskList} locale={{ emptyText: <Empty description="暂无任务" /> }} renderItem={task => <List.Item actions={[renderTaskActions(task)]}><List.Item.Meta title={<>{task.title} <Tag>{STATUS[task.status]}</Tag></>} description={`${task.planTitle || ''} ${task.dueAt ? `截止 ${task.dueAt}` : ''}`} /></List.Item>} />}
-    <Pagination current={page} pageSize={12} total={total} onChange={setPage} />
+    {loading && !plans.length ? <Spin /> : view === 'plans' ? <div className="work-plan-layout"><List className="work-plan-list-pane" bordered dataSource={plans} locale={{ emptyText: <Empty description="暂无计划" /> }} renderItem={plan => <List.Item className="work-plan-list-item" onClick={() => void openPlan(plan.id)}><List.Item.Meta title={plan.title} description={<Space><Tag>{STATUS[plan.status]}</Tag><span>{plan.startDate} 至 {plan.endDate}</span></Space>} /></List.Item>} /><div className="work-plan-detail-pane">{detail ? <><section className="lead-card work-plan-summary-card"><Typography.Title level={4}>{detail.title}</Typography.Title><DetailFieldGrid items={[{ key: 'status', label: '状态', value: detail.status === 'active' && detail.summaryReady ? '待总结' : STATUS[detail.status] }, { key: 'period', label: '周期', value: `${detail.startDate} 至 ${detail.endDate}` }, { key: 'objective', label: '目标', value: detail.objective, span: 2 }]}/></section><Space wrap className="work-plan-detail-actions">{detail.availableActions.includes('update') && <Button onClick={() => setPlanModal({ plan: detail })}>编辑计划</Button>}{detail.availableActions.includes('publish') && <Button type="primary" onClick={() => Modal.confirm({ title: '发布计划', content: detail.tasks?.length ? '发布后任务将进入待完成状态，确认继续？' : '当前计划暂无任务，发布后仍可继续拆解任务。确认发布？', onOk: async () => { await api.publishWorkPlan(detail.id, detail.version); await openPlan(detail.id); message.success('计划已发布') } })}>发布计划</Button>}{detail.availableActions.includes('assign') && <Button onClick={() => setTaskModal({})}>新增工作任务</Button>}{detail.availableActions.includes('close') && <Button type="primary" onClick={() => setSummaryModal(true)}>计划总结</Button>}</Space><List className="work-plan-task-list" bordered dataSource={detail.tasks || []} locale={{ emptyText: '暂无工作任务，可先发布计划再逐步拆解' }} renderItem={task => <List.Item actions={[renderTaskActions(task)]}><List.Item.Meta title={<>{task.parentTaskId ? '└ ' : ''}{task.title} <Tag>{STATUS[task.status]}</Tag></>} description={`${task.description || ''} ${task.dueAt ? `截止 ${task.dueAt}` : ''}${task.blockedByChildren ? ` · 仍有 ${(task.totalChildCount || 0) - (task.completedChildCount || 0)} 个下级任务未完成，可先提交整体汇报` : ''}`} /></List.Item>} /></> : <Empty description="选择一个计划查看详情" />}</div></div> : <List bordered dataSource={taskList} locale={{ emptyText: <Empty description="暂无任务" /> }} renderItem={task => <List.Item actions={[renderTaskActions(task)]}><List.Item.Meta title={<>{task.title} <Tag>{STATUS[task.status]}</Tag></>} description={`${task.planTitle || ''} ${task.dueAt ? `截止 ${task.dueAt}` : ''}`} /></List.Item>} />}
+    {view==='plans'?<InboxLoadMore page={page} total={total} pageSize={12} loading={loading} error={error} rootSelector=".work-plan-list-pane" onMore={()=>setPage(page+1)} onRetry={()=>void load()}/>:<Pagination current={page} pageSize={12} total={total} onChange={setPage}/>}
   </Space>
   <PlanEditor open={Boolean(planModal)} plan={planModal?.plan} templates={templates} users={users} departments={departments} onCancel={() => setPlanModal(undefined)} onSaved={savePlan} />
   <TaskEditor open={Boolean(taskModal)} task={taskModal?.task} parentTaskId={taskModal?.parentTaskId} plan={detail} users={users} departments={departments} fields={detail?.fieldDefinitions || []} onCancel={() => setTaskModal(undefined)} onSaved={async value => { if (!detail) return; if (taskModal?.task) await api.adjustWorkTask(taskModal.task.id, value); else await api.addWorkTask(detail.id, value); setTaskModal(undefined); await openPlan(detail.id); message.success('工作任务已保存') }} />

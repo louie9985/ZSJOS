@@ -1,3 +1,5 @@
+import { hasPermission } from '../services/managementAccess'
+import { useMetricSourceApi } from '../services/metricPageScope'
 import BusinessSortMenu from '../components/BusinessSortMenu'
 import { sortableColumns, readTableSort, sortChoices, type BusinessSort } from '../services/businessListSort'
 import BusinessTable from '../components/BusinessTable'
@@ -22,9 +24,11 @@ import LeadDetailModal from '../components/LeadDetailModal'
 
 const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
-const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revisionRequired: 0, effective: 0, superseded: 0 }
+const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revisionRequired: 0, effective: 0, superseded: 0, terminated: 0 }
 
-export default function MySalesOrderPage() {
+export default function MySalesOrderPage({ permissions = [] }: { permissions?: string[] }) {
+  const canManageOrder = hasPermission(permissions, 'zsjos:sales-order:create')
+  const metricApi = useMetricSourceApi('order', api)
   const navigate = useNavigate()
   const requestedOrderId = useRef(Number(new URLSearchParams(location.search).get('orderId')) || undefined)
   const [sort, setSort] = useState<BusinessSort>({})
@@ -48,6 +52,7 @@ export default function MySalesOrderPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [revisionOpen, setRevisionOpen] = useState(false)
   const [terminateOpen, setTerminateOpen] = useState(false)
+  const [withdrawForRevision, setWithdrawForRevision] = useState(false)
   const [terminationReason, setTerminationReason] = useState('')
   const avatarRail = useInboxAvatarRail('zsjos.orders.list-collapsed')
   const { useTableLayout } = useInboxTableLayout()
@@ -70,10 +75,10 @@ export default function MySalesOrderPage() {
     activePages.current.add(key); setLoading(true); setError('')
     try {
       const result = useTableLayout
-        ? await api.managementSalesOrderPage({ ...sort, pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
-        : await api.managementSalesOrderCursor({ ...sort, cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+        ? await metricApi.managementSalesOrderPage({ ...sort, pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+        : await metricApi.managementSalesOrderCursor({ ...sort, cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
       if (!useTableLayout && replace) {
-        const countPage = await api.managementSalesOrderPage({ pageNo: 1, pageSize: 1, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+        const countPage = await metricApi.managementSalesOrderPage({ pageNo: 1, pageSize: 1, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
         if (version !== listVersion.current) return
         setTableTotal(countPage.total)
       }
@@ -132,8 +137,9 @@ export default function MySalesOrderPage() {
       }}>客户档案</Button>}</div>
         <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" informationLayout="table"
           reloadVouchers={async () => (await api.managementSalesOrder(detail.id)).paymentVouchers}
-          onRevise={detail.canRevise ? () => setRevisionOpen(true) : undefined}
-          onTerminate={detail.canTerminate ? () => { resetTerminationIntent(); setTerminateOpen(true) } : undefined}/></>
+          onRevise={canManageOrder && detail.canRevise ? () => setRevisionOpen(true) : undefined}
+          onWithdraw={canManageOrder && detail.canTerminate && detail.status === 'pending_approval' ? () => { resetTerminationIntent(); setTerminationReason(''); setWithdrawForRevision(true); setTerminateOpen(true) } : undefined}
+          onTerminate={canManageOrder && detail.canTerminate ? () => { resetTerminationIntent(); setTerminationReason(''); setWithdrawForRevision(false); setTerminateOpen(true) } : undefined}/></>
         : <Empty description="从左侧选择一条订单"/>
   const revisionLead: SalesOrderEntryLead | undefined = detail ? {
     id: detail.leadId || 0, submittedName: detail.studentName, submittedMobile: detail.studentMobile, submittedWechatId: detail.studentWechatId,
@@ -148,7 +154,7 @@ export default function MySalesOrderPage() {
     <div className="sales-order-inbox-actions">
       {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => { setTablePage(1); setStatus(key as StatusTab) }} items={[
         { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
-        { key: 'revision_required', label: `已终止 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `历史旧单（已重提） ${counts.superseded}` }
+        { key: 'revision_required', label: `待重提 ${counts.revisionRequired}` }, { key: 'terminated', label: `已终止 ${counts.terminated ?? 0}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `历史旧单（已重提） ${counts.superseded}` }
       ]}/>}
     </div>
     {countsError && <Alert
@@ -193,17 +199,18 @@ export default function MySalesOrderPage() {
     </div>}
     <ResizableDetailDrawer desktopResizable={useTableLayout} className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="订单详情" placement="right" width="100%">{detailContent}</ResizableDetailDrawer>
     {revisionLead && <SalesOrderEntryModal lead={revisionLead} orderId={detail?.id} open={revisionOpen} onClose={() => setRevisionOpen(false)}
-      onSubmitted={id => { setRevisionOpen(false); reload(); setSelectedId(id) }}/>}<Modal title="终止订单审批" open={terminateOpen}
-      onCancel={() => { setTerminateOpen(false); setTerminationReason(''); resetTerminationIntent() }} okText="确认终止"
-      onOk={async () => { if (!detail || !terminationReason.trim()) { message.warning('请填写终止原因'); return }
+      onSubmitted={id => { setRevisionOpen(false); reload(); setSelectedId(id) }}/>}<Modal title={withdrawForRevision ? "撤回修改" : "终止订单"} open={terminateOpen}
+      onCancel={() => { setTerminateOpen(false); setTerminationReason(''); resetTerminationIntent() }} okText={withdrawForRevision ? "确认撤回" : "确认终止"}
+      onOk={async () => { if (!detail || !terminationReason.trim()) { message.warning('请填写操作原因'); return }
         await runTermination(async ({ complete, idempotencyKey }) => {
-          await api.terminateSalesOrder(detail.id, { reason: terminationReason.trim(), approvalRoundId: detail.currentApprovalRoundId,
+          await api.terminateSalesOrder(detail.id, { withdrawForRevision, reason: terminationReason.trim(), approvalRoundId: detail.currentApprovalRoundId,
             orderVersion: detail.version, roundVersion: detail.approvalRoundVersion, idempotencyKey })
-          complete(); message.success('订单审批已终止'); setTerminateOpen(false); setTerminationReason(''); reload()
-        }).catch(error => message.error(error instanceof Error ? error.message : '终止失败')) }}
-      confirmLoading={terminating} okButtonProps={{ danger: true, disabled: terminating }}>
-      <Form.Item label="终止原因" required><Input.TextArea rows={4} maxLength={1000} showCount value={terminationReason} onChange={event => setTerminationReason(event.target.value)} placeholder="填写终止原因"/></Form.Item>
+          complete(); message.success(withdrawForRevision ? '订单已撤回，可修改后重新提交' : '订单已终止'); setTerminateOpen(false); setTerminationReason(''); reload()
+        }).catch(error => message.error(error instanceof Error ? error.message : '操作失败')) }}
+      confirmLoading={terminating} okButtonProps={{ danger: !withdrawForRevision, disabled: terminating }}>
+      <Alert type="warning" showIcon message={withdrawForRevision ? "撤回将结束当前审批，订单进入待重提；修改提交后重新审批。" : "终止后订单不可修改或重新提交。"}/>
+      <Form.Item label="操作原因" required><Input.TextArea rows={4} maxLength={1000} showCount value={terminationReason} onChange={event => setTerminationReason(event.target.value)} placeholder="填写操作原因"/></Form.Item>
     </Modal>
-    {leadDetailModalLeadId && <LeadDetailModal leadId={leadDetailModalLeadId} open={leadDetailModalOpen} onClose={() => setLeadDetailModalOpen(false)} />}
+    {leadDetailModalLeadId && <LeadDetailModal permissions={permissions} leadId={leadDetailModalLeadId} open={leadDetailModalOpen} onClose={() => setLeadDetailModalOpen(false)} />}
   </section>
 }

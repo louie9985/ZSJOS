@@ -10,6 +10,7 @@ import java.util.List;
 
 @Data
 public class SalesOrderSubmitReqVO {
+    @Valid private OrderProfileUpdateReqVO profileUpdate;
     private Long purchaseIntentId;
     @Size(max = 5) private List<@Pattern(regexp = "studentNature|servicePeriod|studentSource|feeMode|paymentMethod") String> refreshedDictionaryFields;
     @Size(max = 100) private String buyerName;

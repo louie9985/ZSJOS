@@ -83,6 +83,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -91,6 +92,7 @@ class SalesOrderServiceImplTest {
     @InjectMocks private SalesOrderServiceImpl service;
     @Mock private RepurchaseDuplicateGuard repurchaseDuplicateGuard;
     @Mock private OrderContactCompletionService contactCompletionService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoTaskService studentInfoTaskService;
     @Mock private RepurchaseCustomerService repurchaseCustomers;
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService submissionIdentityService;
     @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
@@ -341,6 +343,7 @@ class SalesOrderServiceImplTest {
         assertEquals(100L, id);
         ArgumentCaptor<SalesOrderDO> orderCaptor = ArgumentCaptor.forClass(SalesOrderDO.class);
         verify(orderMapper).insert(orderCaptor.capture());
+        verify(studentInfoTaskService).ensureForOrder(id);
         assertEquals("education", orderCaptor.getValue().getFormalOwnerIdentity());
         verify(contactCompletionService).complete(orderCaptor.getValue(), 1L, 20L);
         assertEquals(20L, orderCaptor.getValue().getFormalSalesUserId());
@@ -854,7 +857,7 @@ class SalesOrderServiceImplTest {
         var result = service.getApprovalFilterProfile(20L);
         assertEquals(List.of("all", FILTER_CENTER_PENDING, STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED, STATUS_EFFECTIVE,
                 STATUS_TERMINATED, STATUS_SUPERSEDED), result.getOrderStates().stream().map(it -> it.getKey()).toList());
-        assertEquals(List.of("全部", "当前中心待审核", "待审核", "已终止", "已通过", "已终止", "历史旧单（已重提）"),
+        assertEquals(List.of("全部", "当前中心待审核", "待审核", "待重提", "已通过", "已终止", "历史旧单（已重提）"),
                 result.getOrderStates().stream().map(it -> it.getLabel()).toList());
         assertEquals(List.of(CENTER_REGISTRATION), result.getCenters().stream().map(it -> it.getKey()).toList());
         assertTrue(result.getGroups().isEmpty());
@@ -1336,9 +1339,9 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void terminatedOrderCannotBeResubmittedWhenReplacementOrderIsActive() {
+    void revisionOrderCannotBeResubmittedWhenReplacementOrderIsActive() {
         SalesOrderDO order = new SalesOrderDO();
-        order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_TERMINATED);
+        order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_REVISION_REQUIRED);
         SalesOrderDO replacement = new SalesOrderDO(); replacement.setId(101L); replacement.setStatus(STATUS_PENDING_APPROVAL);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         mockEligibleLeadAndOpportunity();
@@ -1348,15 +1351,15 @@ class SalesOrderServiceImplTest {
                 () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_ACTIVE_DUPLICATE.getCode(), error.getCode());
-        assertEquals(STATUS_TERMINATED, order.getStatus());
+        assertEquals(STATUS_REVISION_REQUIRED, order.getStatus());
         verifyNoInteractions(skuService, processInstanceApi);
     }
 
     @Test
-    void terminatedRepurchaseCannotBeResubmittedWhenAnyCustomerOrderIsActive() {
+    void revisionRepurchaseCannotBeResubmittedWhenAnyCustomerOrderIsActive() {
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setPersonId(10L); order.setOrderType(ORDER_TYPE_REPURCHASE);
-        order.setStatus(STATUS_TERMINATED);
+        order.setStatus(STATUS_REVISION_REQUIRED);
         SalesOrderDO replacement = new SalesOrderDO(); replacement.setId(101L); replacement.setStatus(STATUS_PENDING_APPROVAL);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         when(personMapper.selectByIdForUpdate(10L, 1L)).thenReturn(new PersonDO().setId(10L));
@@ -1366,7 +1369,7 @@ class SalesOrderServiceImplTest {
                 () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
 
         assertEquals(SALES_ORDER_ACTIVE_DUPLICATE.getCode(), error.getCode());
-        assertEquals(STATUS_TERMINATED, order.getStatus());
+        assertEquals(STATUS_REVISION_REQUIRED, order.getStatus());
         verifyNoInteractions(skuService, processInstanceApi);
     }
 
@@ -1389,6 +1392,7 @@ class SalesOrderServiceImplTest {
         req.setOrder(request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
         Long id = service.createSystemRepurchase(1L, 20L, req);
+        verify(studentInfoTaskService).ensureForOrder(id);
 
         assertEquals(101L, id);
         verify(contactCompletionService).complete(argThat(order -> Objects.equals(order.getId(), 101L)), eq(1L), eq(20L));
@@ -1438,6 +1442,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectByIdempotencyKey(req.getOrder().getIdempotencyKey())).thenReturn(created.getValue());
         var replay = JsonUtils.parseObject(originalRequest, SalesOrderRepurchaseReqVO.class);
         assertEquals(id, service.createMatchedRepurchase(10L, 20L, replay));
+        verify(studentInfoTaskService,times(1)).ensureForOrder(id);
         verify(orderMapper, times(1)).insert(any(SalesOrderDO.class));
         req.setRepurchaseReason("不同成交内容");
         assertThrows(ServiceException.class, () -> service.createMatchedRepurchase(10L, 20L, req));
@@ -1460,13 +1465,95 @@ class SalesOrderServiceImplTest {
         assertEquals(4, order.getVersion()); assertEquals(5, round.getVersion());
         verify(processInstanceApi).terminateProcessInstanceByBusiness(
                 20L, "process-1", "zsjos.sales-order.terminate", "客户取消");
-        verify(registrationService).cancelEarlyDeliveryByOrderId(eq(100L), eq("流程异常取消"), any());
+        verify(registrationService).cancelByOrderId(eq(100L), eq("成交订单审批已终止"), any());
         verify(notifyBusinessEventApi).publish(argThat(event ->
                 "zsjos.sales_order.cancelled".equals(event.getSceneCode())
                         && "sales-order-cancelled:200".equals(event.getSourceEventKey())
                         && List.of(20L).equals(event.getPayload().get("resultUserIds"))
                         && "客户取消".equals(event.getPayload().get("decisionReason"))));
         verifyNoInteractions(opportunityMapper, publicSeaPoolService);
+    }
+
+    @Test
+    void withdrawKeepsOrderRevisableAndIgnoresLateBpmEvent() {
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setOrderType(ORDER_TYPE_REPURCHASE);
+        order.setStatus(STATUS_PENDING_APPROVAL); order.setSubmitterUserId(20L); order.setCurrentApprovalRoundId(200L); order.setVersion(3);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setOrderId(100L);
+        round.setProcessInstanceId("process-1"); round.setStatus(ROUND_PENDING); round.setVersion(4);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order); when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
+        SalesOrderTerminateReqVO req = new SalesOrderTerminateReqVO(); req.setApprovalRoundId(200L); req.setOrderVersion(3);
+        req.setRoundVersion(4); req.setReason("客户取消"); req.setIdempotencyKey("terminate-1");
+
+        req.setWithdrawForRevision(true);
+        service.terminate(100L, 20L, req);
+        when(roundMapper.selectByProcessInstanceId("process-1")).thenReturn(round);
+        service.handleProcessResult("process-1", CANCEL.getStatus(), "late event");
+
+        assertEquals(STATUS_REVISION_REQUIRED, order.getStatus()); assertEquals(ROUND_TERMINATED, round.getStatus());
+        assertEquals(4, order.getVersion()); assertEquals(5, round.getVersion());
+        verify(processInstanceApi).terminateProcessInstanceByBusiness(
+                20L, "process-1", "zsjos.sales-order.terminate", "客户取消");
+        verify(registrationService).cancelByOrderId(eq(100L), eq("成交订单审批已终止"), any());
+        verify(notifyBusinessEventApi).publish(argThat(event ->
+                "zsjos.sales_order.cancelled".equals(event.getSceneCode())
+                        && "sales-order-cancelled:200".equals(event.getSourceEventKey())
+                        && List.of(20L).equals(event.getPayload().get("resultUserIds"))
+                        && "客户取消".equals(event.getPayload().get("decisionReason"))));
+        verifyNoInteractions(opportunityMapper, publicSeaPoolService);
+    }
+
+    @Test
+    void withdrawalRejectsWrongOwnerStaleVersionsAndNonPendingOrders() {
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setSubmitterUserId(20L); order.setCurrentApprovalRoundId(200L); order.setVersion(3);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setOrderId(100L);
+        round.setProcessInstanceId("process-1"); round.setStatus(ROUND_PENDING); round.setVersion(4);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+        when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
+        SalesOrderTerminateReqVO req = new SalesOrderTerminateReqVO(); req.setApprovalRoundId(200L);
+        req.setOrderVersion(3); req.setRoundVersion(4); req.setReason("修改资料");
+        req.setIdempotencyKey("withdraw-invalid"); req.setWithdrawForRevision(true);
+        assertServiceException(() -> service.terminate(100L, 30L, req), SALES_ORDER_TERMINATE_FORBIDDEN);
+        req.setOrderVersion(2);
+        assertServiceException(() -> service.terminate(100L, 20L, req), SALES_ORDER_VERSION_CONFLICT);
+        req.setOrderVersion(3);
+        for (String status : List.of(STATUS_REVISION_REQUIRED, STATUS_TERMINATED, STATUS_EFFECTIVE, STATUS_SUPERSEDED)) {
+            order.setStatus(status);
+            assertServiceException(() -> service.terminate(100L, 20L, req), SALES_ORDER_TERMINATE_FORBIDDEN);
+        }
+        verify(orderMapper, never()).updateById(any(SalesOrderDO.class));
+        verifyNoInteractions(processInstanceApi, registrationService, cashbackService);
+    }
+
+    @Test
+    void terminateRevisionPreservesFinishedRound() {
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setOrderType(ORDER_TYPE_REPURCHASE);
+        order.setStatus(STATUS_REVISION_REQUIRED); order.setSubmitterUserId(20L); order.setCurrentApprovalRoundId(200L); order.setVersion(3);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setOrderId(100L);
+        round.setSubmittedByUserId(20L); round.setProcessInstanceId("process-1"); round.setStatus(ROUND_REJECTED); round.setVersion(4);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order); when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
+        SalesOrderTerminateReqVO req = new SalesOrderTerminateReqVO(); req.setApprovalRoundId(200L); req.setOrderVersion(3);
+        req.setRoundVersion(4); req.setReason("客户取消"); req.setIdempotencyKey("terminate-1");
+
+        service.terminate(100L, 20L, req);
+
+        assertEquals(STATUS_TERMINATED, order.getStatus());
+        assertEquals(ROUND_REJECTED, round.getStatus());
+        assertEquals(4, order.getVersion());
+        assertEquals(4, round.getVersion());
+        verifyNoInteractions(processInstanceApi, registrationService, cashbackService, opportunityMapper, publicSeaPoolService);
+        verify(businessTaskCommandService).cancel(eq(TASK_TYPE_REVISION), eq(100L), eq(20L), any(), eq("客户取消"));
+        verify(roundMapper, never()).updateById(any(SalesOrderApprovalRoundDO.class));
+    }
+
+    @Test
+    void terminatedOrderCannotResubmitEvenWithoutReplacement() {
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setStatus(STATUS_TERMINATED);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", "test-wechat")));
+        assertEquals(SALES_ORDER_STATE_INVALID.getCode(), error.getCode());
+        verifyNoInteractions(skuService, processInstanceApi);
     }
 
     @org.junit.jupiter.params.ParameterizedTest

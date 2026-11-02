@@ -30,6 +30,11 @@ export const leadCatalog = () => request.get({ url: '/zsjos/lead/product/catalog
 export const leadSalesCandidates = (): Promise<Array<{ id: number; nickname: string }>> =>
   request.get({ url: '/zsjos/lead/sales-user/simple-list' })
 export const salesOrderCatalog = () => request.get({ url: '/zsjos/sales-order/product/catalog' })
+export type OrderProfileField = 'name' | 'mobile' | 'wechatId'
+export interface OrderProfile { personId?: number; name?: string; mobile?: string; wechatId?: string; fingerprint: string }
+export interface OrderProfileUpdate { fingerprint: string; fields: OrderProfileField[] }
+export const orderProfile = (id: number): Promise<OrderProfile> => request.get({ url: `/zsjos/sales-order/profile/order/${id}` })
+export const customerOrderProfile = (data: RepurchaseCustomerIdentity): Promise<OrderProfile> => request.post({ url: '/zsjos/sales-order/profile/customer', data })
 export const createLead = (data: Record<string, unknown>, selfSourced = false, educationSelfSourced = false) =>
   request.post({
     url: educationSelfSourced ? '/zsjos/lead/education-self-sourced/create' : selfSourced ? '/zsjos/lead/self-sourced/create' : '/zsjos/lead/create',

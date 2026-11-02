@@ -1,3 +1,5 @@
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
 import LeadManagementPage from './LeadManagementPage'
 import BusinessTable from '../components/BusinessTable'
 import {
@@ -5,7 +7,7 @@ import {
   PlusOutlined, ReloadOutlined, LeftOutlined, RightOutlined, StopOutlined
 } from '@ant-design/icons'
 import {
-  Alert, App, Button, Descriptions, Empty, Form, Input, Modal, Pagination, Segmented, Select,
+  Alert, App, Button, Descriptions, Empty, Form, Input, Modal, Segmented, Select,
   Skeleton, Space, Statistic, Tabs, Tag, Tooltip, Typography
 } from 'antd'
 import { type ProColumns } from '@ant-design/pro-components'
@@ -47,22 +49,23 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
   const [mobileForm] = Form.useForm<{ mobile: string }>(), [passwordForm] = Form.useForm<{ password: string }>()
   const partnerRequestRef = useRef(0), leadRequestRef = useRef(0)
 
+  const mergePartners=useInboxPageMerge<Partner>(appliedKeyword,view==='inbox',row=>row.id)
   const loadPartners = useCallback(async () => {
     const requestId = ++partnerRequestRef.current
     setLoading(true); setError('')
     try {
       const result = await managementApi.partnerPage({ pageNo: partnerPage, pageSize: 20, keyword: appliedKeyword || undefined })
       if (requestId !== partnerRequestRef.current) return
-      setPartners(result.list); setPartnerTotal(result.total)
-      setSelected(current => current && result.list.some(item => item.id === current.id)
-        ? result.list.find(item => item.id === current.id) : undefined)
+      const merged=mergePartners(partnerPage,result.list);setPartners(merged); setPartnerTotal(result.total)
+      setSelected(current => current && merged.some(item => item.id === current.id)
+        ? merged.find(item => item.id === current.id) : undefined)
     } catch (e) {
       if (requestId !== partnerRequestRef.current) return
-      setPartners([]); setPartnerTotal(0); setSelected(undefined); setError(e instanceof Error ? e.message : '兼职列表加载失败')
+      if(partnerPage===1||view==='table'){setPartners([]);setPartnerTotal(0);setSelected(undefined)} setError(e instanceof Error ? e.message : '兼职列表加载失败')
     } finally {
       if (requestId === partnerRequestRef.current) setLoading(false)
     }
-  }, [appliedKeyword, partnerPage])
+  }, [appliedKeyword, partnerPage,mergePartners,view])
 
   const loadLeads = useCallback(async () => {
     if (!selected) return
@@ -161,7 +164,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
   return <section className="workspace-page subordinate-partner-page">
     <div className="page-heading">
       <div><Typography.Title level={4}>兼职管理</Typography.Title><Typography.Text type="secondary">{canManageAll ? '管理当前租户全部兼职账号及其提交客资' : canReadAll ? '查看全部兼职及其提交客资' : hasExpandedQuery ? '查看本人及关联运营名下的兼职及其提交客资' : '查看直接归属给我的兼职及其提交客资'}</Typography.Text></div>
-      <Space wrap><Segmented value={view} onChange={setView} options={[{ label: '收件箱', value: 'inbox' }, { label: '表格', value: 'table' }]}/>
+      <Space wrap><Segmented value={view} onChange={value=>{setView(value as typeof view);setPartnerPage(1)}} options={[{ label: '收件箱', value: 'inbox' }, { label: '表格', value: 'table' }]}/>
         <Button aria-label="刷新兼职列表" icon={<ReloadOutlined/>} onClick={() => void loadPartners()}/>
         {canManageAll && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setCreateOpen(true)}>新增兼职</Button>}</Space>
     </div>
@@ -178,18 +181,14 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
         </div>
         {error && (rail.collapsed ? <InboxAvatarError message={error} retry={() => void loadPartners()} expand={() => rail.change(false)}/> : <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPartners()}>重试</Button>}/>)}
         <div id="subordinate-partner-list" className="subordinate-partner-scroll" ref={rail.scrollRef} aria-busy={loading}>
-          {loading ? (rail.collapsed ? <Skeleton.Avatar active size={36}/> : <Skeleton active/>) : partners.length ? partners.map(item => <Tooltip key={item.id} title={rail.collapsed ? `${item.name} · ${item.partnerNo}` : undefined} trigger={['hover', 'focus']}>
+          {loading && !partners.length ? (rail.collapsed ? <Skeleton.Avatar active size={36}/> : <Skeleton active/>) : partners.length ? partners.map(item => <Tooltip key={item.id} title={rail.collapsed ? `${item.name} · ${item.partnerNo}` : undefined} trigger={['hover', 'focus']}>
             <button type="button" className={`subordinate-partner-item${selected?.id === item.id ? ' active' : ''}`} aria-label={`${item.name} · ${item.partnerNo}`} aria-current={selected?.id === item.id ? 'true' : undefined} onClick={() => selectPartner(item)}>
               <SubjectAvatar seed={item.partnerNo} label={item.name} size={36}/>
               <span className="subordinate-partner-item-copy"><span className="subordinate-partner-item-title"><strong>{item.name}</strong><Tag>{statusLabel[item.status]}</Tag></span><span>{item.partnerNo}</span><span>{item.mobile || '无手机号'} · {item.assignedEmployeeName || '未分配'}</span></span>
             </button>
           </Tooltip>) : !error && (rail.collapsed ? <span role="status" className="subordinate-partner-empty">暂无兼职</span> : <Empty description="暂无授权范围内的兼职"/>)}
         </div>
-        {partnerTotal > 20 && (rail.collapsed ? <nav className="subordinate-partner-pagination" aria-label="兼职分页">
-          <Button aria-label="上一页兼职" icon={<LeftOutlined/>} disabled={loading || partnerPage <= 1} onClick={() => setPartnerPage(partnerPage - 1)}/>
-          <span>{partnerPage}/{Math.ceil(partnerTotal / 20)}</span>
-          <Button aria-label="下一页兼职" icon={<RightOutlined/>} disabled={loading || partnerPage >= Math.ceil(partnerTotal / 20)} onClick={() => setPartnerPage(partnerPage + 1)}/>
-        </nav> : <Pagination simple current={partnerPage} pageSize={20} total={partnerTotal} disabled={loading} showSizeChanger={false} onChange={setPartnerPage}/>)}
+        <InboxLoadMore page={partnerPage} total={partnerTotal} pageSize={20} loading={loading} error={error} rootSelector=".subordinate-partner-scroll" onMore={()=>setPartnerPage(partnerPage+1)} onRetry={()=>void loadPartners()}/>
       </aside>
       <main className="subordinate-partner-leads">
         {!selected ? <Empty description="请选择兼职查看概览与客资"/> : <>

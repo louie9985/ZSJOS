@@ -1,3 +1,4 @@
+import { useMetricSourceApi, useMetricPageScope } from '../services/metricPageScope'
 import SubordinateSalesCard from "../components/SubordinateSalesCard";
 import SubordinateSalesStatusFilter from "../components/SubordinateSalesStatusFilter";
 import BusinessTable from '../components/BusinessTable'
@@ -392,12 +393,14 @@ export default function SubordinateSalesPage({
   permissions: string[];
 }) {
   const [rows, setRows] = useState<SubordinateSales[]>([]);
+  const metricScope = useMetricPageScope()
+  const metricApi = useMetricSourceApi('subordinate_sales', api)
   const [total, setTotal] = useState(0);
   const [loadedPage, setLoadedPage] = useState(0);
   const [keyword, setKeyword] = useState("");
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [presence, setPresence] = useState<string>();
-  const [accountStatus, setAccountStatus] = useState<number | undefined>(0);
+  const [accountStatus, setAccountStatus] = useState<number | undefined>(metricScope ? undefined : 0);
   const [accepting, setAccepting] = useState<boolean>();
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -416,7 +419,7 @@ export default function SubordinateSalesPage({
   const requestVersionRef = useRef(0);
   const loadingMoreRef = useRef(false);
 
-  const requestPage = useCallback((pageNo: number) => api.subordinateSalesPage({
+  const requestPage = useCallback((pageNo: number) => metricApi.subordinateSalesPage({
     pageNo,
     pageSize: PAGE_SIZE,
     keyword: keyword.trim() || undefined,

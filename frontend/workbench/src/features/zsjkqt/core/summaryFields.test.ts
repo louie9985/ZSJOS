@@ -24,6 +24,7 @@ describe("SUMMARY_FIELD_DEFINITIONS", () => {
       "加班/小时",
       "加班未调休换算成工资",
       "备注",
+      "产检假/天",
     ]);
   });
 

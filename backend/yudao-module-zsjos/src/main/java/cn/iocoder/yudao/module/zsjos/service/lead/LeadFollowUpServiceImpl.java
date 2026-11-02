@@ -65,6 +65,27 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private LeadIdentityMaskingService identityMaskingService;
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
+    @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="取消跟进时间", target="lead", id=0, actor=1, actorType="ADMIN")
+    public boolean cancelNextFollowUp(Long leadId, Long operatorUserId, String reason) {
+        String normalized = reason == null ? "" : reason.strip();
+        if (normalized.isEmpty() || normalized.length() > 500)
+            throw exception(cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCancellationService.INVALID_REASON);
+        // Serialize against follow-up creation, so a concurrent new arrangement is not partially cleared.
+        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        collaborationService.requireCanWriteForUpdate(lead, operatorUserId, false);
+        if (!STATUS_WON.equals(lead.getStatus())) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
+        lifecycleTaskService.cancelFollowUpReminders(leadId, LocalDateTime.now(), normalized);
+        leadMapper.update(null, new LambdaUpdateWrapper<LeadDO>()
+                .eq(LeadDO::getId, leadId).set(LeadDO::getNextFollowUpAt, null));
+        opportunityMapper.update(null, new LambdaUpdateWrapper<OpportunityDO>()
+                .eq(OpportunityDO::getLeadId, leadId).set(OpportunityDO::getNextFollowUpAt, null));
+        return true;
+    }
+
+    @Override
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "follow-up-create")
     @Transactional(rollbackFor = Exception.class)
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="新增跟进", target="lead", id=0, actor=1, actorType="ADMIN")

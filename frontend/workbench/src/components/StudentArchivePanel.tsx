@@ -1,10 +1,10 @@
+import RegistrationArchiveCard from './RegistrationArchiveCard';
 import { useEffect, useRef, useState } from "react";
 import StudentArchiveExtraPanel from './StudentArchiveExtraPanel';
 import { useStudentArchiveEditor } from './StudentArchiveEditGuard';
 import {
   Alert,
   Button,
-  Card,
   Cascader,
   Collapse,
   Empty,
@@ -306,7 +306,7 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
   }
   return (
     <section className="lead-detail-tab-content student-archive-section">
-      <Card className="student-archive-card" title={<div className="archive-card-title"><span><small>01 · 报名资料</small><strong>报名收集资料</strong><em>提交快照保留，字段可逐项维护</em></span></div>}>
+      <RegistrationArchiveCard description="提交快照保留，字段可逐项维护">
       {data?.information.canExport && <Space wrap>
           <Button
             disabled={busy || !!editor}
@@ -394,7 +394,7 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
           />
         </>
       )}
-      </Card>
+      </RegistrationArchiveCard>
       <StudentArchiveExtraPanel key={relationId} relationId={relationId} />
     </section>
   );

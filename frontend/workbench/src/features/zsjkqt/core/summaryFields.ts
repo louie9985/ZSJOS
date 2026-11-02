@@ -29,4 +29,5 @@ export const SUMMARY_FIELD_DEFINITIONS: SummaryFieldDefinition[] = [
   { key: "overtimeHours", label: "加班/小时", valueType: "number" },
   { key: "overtimeToSalary", label: "加班未调休换算成工资", valueType: "text" },
   { key: "remark", label: "备注", valueType: "text" },
+  { key: "prenatalLeaveDays", label: "产检假/天", valueType: "number" },
 ];

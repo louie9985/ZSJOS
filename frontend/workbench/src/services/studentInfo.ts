@@ -43,6 +43,6 @@ export const studentInfoApi = {
   },
 }
 export const studentInfoStatus: Record<string,string> = {
-  NONE: '尚未生成', DRAFT: '待填写', SUBMITTED: '已提交', EXPIRED: '已失效', REVOKED: '已撤销',
+  REUSED: '已复用', NONE: '尚未生成', DRAFT: '待填写', SUBMITTED: '已提交', EXPIRED: '已失效', REVOKED: '已撤销',
 }
 export const studentInfoError = (error: unknown) => error instanceof Error ? error.message : '请求失败，请重试'

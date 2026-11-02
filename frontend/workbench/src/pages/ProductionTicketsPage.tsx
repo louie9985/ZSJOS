@@ -1,3 +1,5 @@
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
 import { ArrowLeftOutlined, FilterOutlined, ReloadOutlined } from '@ant-design/icons'
 import { App, Button, DatePicker, Empty, Form, Input, Modal, Pagination, Select, Skeleton, Tabs, Tag, Timeline } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -61,6 +63,7 @@ export default function ProductionTicketsPage({ permissions = [] }: { permission
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now() + clockOffset.current), 30000); return () => window.clearInterval(timer) }, [])
   useEffect(() => { const refresh = () => setRevision(value => value + 1); window.addEventListener(TICKET_CHANGED, refresh); return () => window.removeEventListener(TICKET_CHANGED, refresh) }, [])
   const deadlineFrom = dates?.[0]?.startOf('day').format('YYYY-MM-DD HH:mm:ss'), deadlineTo = dates?.[1]?.endOf('day').format('YYYY-MM-DD HH:mm:ss')
+  const mergeRows=useInboxPageMerge<ProductionTicket>(JSON.stringify([view,group,status,keyword,deadlineFrom,deadlineTo]),view!=='pool',row=>row.id)
   useEffect(() => {
     const sequence = ++listSequence.current
     setLoading(true); setError('')
@@ -68,17 +71,17 @@ export default function ProductionTicketsPage({ permissions = [] }: { permission
     const request = view === 'pool' ? api.productionTicket.poolPage(query) : api.productionTicket.page({ ...query, pendingAssignment: view === 'pending' || undefined, status: view === 'pending' ? 'pending_accept' : status, statusGroup: view === 'mine' ? group : undefined })
     request.then(result => {
       if (sequence !== listSequence.current) return
-      setRows(result.list); setTotal(result.total)
+      const merged=mergeRows(page,result.list);setRows(merged); setTotal(result.total)
       if (!result.list.length && page > 1 && result.total <= (page - 1) * pageSize) setPage(Math.max(1, Math.ceil(result.total / pageSize)))
-      if (!requestedId && view !== 'pool') {
+      if (!requestedId && view !== 'pool' && page===1) {
         const id = result.list.find(row => row.id === selectedRef.current?.id)?.id || result.list[0]?.id
         if (id) void readDetail(id)
         else { ++detailSequence.current; setSelected(undefined); setDetailLoading(false) }
       }
-    }).catch(cause => { if (sequence === listSequence.current) { setError(errorText(cause)); setRows([]); setTotal(0) } })
+    }).catch(cause => { if (sequence === listSequence.current) { setError(errorText(cause)); if(page===1||view==='pool'){setRows([]);setTotal(0)} } })
       .finally(() => { if (sequence === listSequence.current) setLoading(false) })
     return () => { ++listSequence.current }
-  }, [view, group, status, keyword, deadlineFrom, deadlineTo, page, pageSize, revision, readDetail])
+  }, [view, group, status, keyword, deadlineFrom, deadlineTo, page, pageSize, revision, readDetail,mergeRows])
   const clearSelection = () => { detailTarget.current = undefined; ++detailSequence.current; setSelected(undefined); setDetailError(''); setDetailLoading(false); setDetailOpen(false); setTicketId(undefined) }
   const changeView = (value: View) => { clearSelection(); setView(value); setPage(1); setStatus(undefined); setKeyword(''); setKeywordInput(''); setDates(null) }
   const filterChanged = () => { setPage(1); clearSelection() }
@@ -138,8 +141,8 @@ export default function ProductionTicketsPage({ permissions = [] }: { permission
     <div className="production-ticket-nav"><Tabs activeKey={view} onChange={key => changeView(key as View)} items={[...(canAccept ? [{ key: 'pending', label: '待接单' }] : []), { key: 'mine', label: '我的工单' }, { key: 'pool', label: '抢单池', disabled: !canPool }]} /><Button aria-label="刷新工单" icon={<ReloadOutlined />} onClick={() => setRevision(value => value + 1)} /></div>
     {view === 'mine' && <Tabs className="production-ticket-subtabs" activeKey={group} items={ticketGroups} onChange={key => { setGroup(key); setStatus(undefined); filterChanged() }} />}
     {view === 'pool' ? detailOpen ? detail : <><div className="production-ticket-pool-toolbar">{toolbar}<span>共 {total} 条工单</span></div><div className="production-ticket-pool-scroll" ref={scrollRef}>
-      {error ? <div role="status">{error}<Button onClick={() => setRevision(value => value + 1)}>重试</Button></div> : loading ? <Skeleton active /> : rows.length ? <div className="production-ticket-pool-grid">{rows.map(ticket => { const due = deadlinePresentation(ticket.deadlineAt, ticket.status, now); return <button key={ticket.id} className="production-ticket-pool-card" onClick={() => openTicket(ticket)}><div><strong>{ticket.ticketNo}</strong><Tag color="blue">待抢单</Tag></div><h3>{ticket.sceneName || '制作需求'}</h3><p>{identity(ticket)}</p><p className="production-ticket-summary">{ticket.dispatchContext?.operatorRemark || '点击查看完整制作要求'}</p><span>提交人：{ticket.submitterName || '未记录'}</span><footer className={`tone-${due.tone}`}><strong>{due.text}</strong><time>{due.date}</time><span>查看详情 →</span></footer></button> })}</div> : <Empty description="抢单池暂无符合条件的工单" />}
-    </div>{pagination}</> : <div className={`production-ticket-inbox ${detailOpen ? 'show-detail' : 'show-list'}`}><aside className="production-ticket-list-pane">{toolbar}<span className="production-ticket-count">共 {total} 条工单</span><div className="production-ticket-list-scroll">{error ? <div role="status">{error}<Button onClick={() => setRevision(value => value + 1)}>重试</Button></div> : loading ? <Skeleton active /> : rows.length ? rows.map(ticket => <button key={ticket.id} className={`production-ticket-list-item ${selected?.id === ticket.id ? 'active' : ''}`} onClick={() => openTicket(ticket)}><div><strong>{ticket.ticketNo}</strong><Tag color={ticket.status === 'rejected' ? 'error' : undefined}>{ticketStatuses[ticket.status] || ticket.status}</Tag></div><span>{identity(ticket)}</span><time>截止 {formatTimestamp(ticket.deadlineAt, '未设置')}</time></button>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无符合条件的工单" />}</div>{pagination}</aside>{detail}</div>}
+      {error && !rows.length ? <div role="status">{error}<Button onClick={() => setRevision(value => value + 1)}>重试</Button></div> : loading && !rows.length ? <Skeleton active /> : rows.length ? <div className="production-ticket-pool-grid">{rows.map(ticket => { const due = deadlinePresentation(ticket.deadlineAt, ticket.status, now); return <button key={ticket.id} className="production-ticket-pool-card" onClick={() => openTicket(ticket)}><div><strong>{ticket.ticketNo}</strong><Tag color="blue">待抢单</Tag></div><h3>{ticket.sceneName || '制作需求'}</h3><p>{identity(ticket)}</p><p className="production-ticket-summary">{ticket.dispatchContext?.operatorRemark || '点击查看完整制作要求'}</p><span>提交人：{ticket.submitterName || '未记录'}</span><footer className={`tone-${due.tone}`}><strong>{due.text}</strong><time>{due.date}</time><span>查看详情 →</span></footer></button> })}</div> : <Empty description="抢单池暂无符合条件的工单" />}
+    </div>{pagination}</> : <div className={`production-ticket-inbox ${detailOpen ? 'show-detail' : 'show-list'}`}><aside className="production-ticket-list-pane">{toolbar}<span className="production-ticket-count">共 {total} 条工单</span><div className="production-ticket-list-scroll">{error && !rows.length ? <div role="status">{error}<Button onClick={() => setRevision(value => value + 1)}>重试</Button></div> : loading && !rows.length ? <Skeleton active /> : rows.length ? rows.map(ticket => <button key={ticket.id} className={`production-ticket-list-item ${selected?.id === ticket.id ? 'active' : ''}`} onClick={() => openTicket(ticket)}><div><strong>{ticket.ticketNo}</strong><Tag color={ticket.status === 'rejected' ? 'error' : undefined}>{ticketStatuses[ticket.status] || ticket.status}</Tag></div><span>{identity(ticket)}</span><time>截止 {formatTimestamp(ticket.deadlineAt, '未设置')}</time></button>) : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无符合条件的工单" />}</div><InboxLoadMore page={page} total={total} pageSize={pageSize} loading={loading} error={error} rootSelector=".production-ticket-list-scroll" onMore={()=>setPage(page+1)} onRetry={()=>setRevision(value=>value+1)}/></aside>{detail}</div>}
     <Modal title={ticketActionLabels[dialogAction || '']} open={Boolean(dialogAction)} confirmLoading={saving} cancelButtonProps={{ disabled: saving }} closable={!saving} maskClosable={!saving} onCancel={() => setDialogAction(undefined)} onOk={() => dialogAction && void execute(dialogAction)} okText="确认">
       {dialogAction === 'APPROVE_TICKET' ? <p>确认成品符合要求，通过后工单将完成。</p> : <Form layout="vertical">{dialogAction === 'SUBMIT_TICKET' && <Form.Item label="成品链接" required><ResourceLinkInput aria-label="成品链接" value={completionUrl} maxLength={2000} onChange={event => setCompletionUrl(event.target.value)} /></Form.Item>}<Form.Item label={dialogAction === 'SUBMIT_TICKET' ? '提交备注（可选）' : '原因'} required={dialogAction !== 'SUBMIT_TICKET'}><Input.TextArea aria-label={dialogAction === 'SUBMIT_TICKET' ? '提交备注（可选）' : '原因'} rows={4} maxLength={dialogAction === 'SUBMIT_TICKET' ? 1000 : 500} showCount value={reason} onChange={event => setReason(event.target.value)} /></Form.Item></Form>}
     </Modal>

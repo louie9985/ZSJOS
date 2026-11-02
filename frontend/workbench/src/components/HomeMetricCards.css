@@ -1,0 +1,8 @@
+.home-metric-business-modal { top: 3dvh; padding-bottom: 0; }
+.home-metric-business-modal .ant-modal-body { display: flex; flex-direction: column; gap: var(--crm-gap); }
+.home-metric-business-modal .ant-modal-body > .workspace-page { flex: 1; min-height: 0; min-width: 0; width: 100%; height: 100%; margin: 0; }
+.home-metric-business-modal .lead-management-embedded { height: 100%; }
+.home-metric-business-modal .home-dashboard-grid { width: 100%; }
+@media (max-width: 767px) {
+  .home-metric-business-modal .ant-modal-container { padding: var(--crm-page-pad); }
+}

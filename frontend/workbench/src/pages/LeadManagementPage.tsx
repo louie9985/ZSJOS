@@ -1,3 +1,4 @@
+import { useMetricSourceApi } from '../services/metricPageScope'
 import LeadInboxSortControls from '../components/LeadInboxSortControls'
 import { myOperationsApi } from '../services/myOperations'
 import { managementApi } from '../services/managementApi'
@@ -161,15 +162,16 @@ function LeadStateTags({ lead }: { lead: ManagedLead }) {
   </Space>
 }
 
-export default function LeadManagementPage({ permissions, detailOnly = false, salesUserId, partnerId, operationsUserId, onScopeChanged, onDirtyChange }: { permissions: string[]; detailOnly?: boolean; salesUserId?: number; partnerId?: number; operationsUserId?: number; onScopeChanged?: () => void; onDirtyChange?: (dirty: boolean) => void }) {
+export default function LeadManagementPage({ permissions, detailOnly = false, metricEmbedded = false, salesUserId, partnerId, operationsUserId, onScopeChanged, onDirtyChange }: { permissions: string[]; detailOnly?: boolean; metricEmbedded?: boolean; salesUserId?: number; partnerId?: number; operationsUserId?: number; onScopeChanged?: () => void; onDirtyChange?: (dirty: boolean) => void }) {
   const operationsReadOnly = operationsUserId !== undefined
+  const metricApi = useMetricSourceApi('lead', api)
   const embedded = salesUserId !== undefined || partnerId !== undefined || operationsReadOnly
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const routeState = (!embedded ? location.state : null) as { leadId?: number; leadNo?: string; openFollowUp?: boolean; tab?: string; relationScope?: 'submitted' | 'owned' } | null
-  const queryLeadId = !embedded ? Number(searchParams.get('leadId')) || undefined : undefined
-  const requestedLeadNo = !embedded ? routeState?.leadNo || searchParams.get('leadNo') || undefined : undefined
+  const routeState = (!embedded && !metricEmbedded ? location.state : null) as { leadId?: number; leadNo?: string; openFollowUp?: boolean; tab?: string; relationScope?: 'submitted' | 'owned' } | null
+  const queryLeadId = !embedded && !metricEmbedded ? Number(searchParams.get('leadId')) || undefined : undefined
+  const requestedLeadNo = !embedded && !metricEmbedded ? routeState?.leadNo || searchParams.get('leadNo') || undefined : undefined
   const screens = Grid.useBreakpoint()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { useTableLayout: preferredTableLayout } = useInboxTableLayout()
@@ -317,7 +319,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
         : salesUserId !== undefined
         ? await api.subordinateSalesLeads(salesUserId, params)
         : audience === 'all'
-        ? await api.allLeadPage(params)
+        ? await metricApi.allLeadPage(params)
         : await api.managedLeadInboxPage(audience, params)
       if (version !== requestVersion.current) return
       setItems(current => {
@@ -733,7 +735,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, sa
     </section>
   }
 
-  return <><section className={`workspace-page lead-management-page${useTableLayout ? ' lead-management-table-page' : ''}${embedded ? ' lead-management-embedded' : ''}`}>
+  return <><section className={`workspace-page lead-management-page${useTableLayout ? ' lead-management-table-page' : ''}${embedded || metricEmbedded ? ' lead-management-embedded' : ''}`}>
     <header className="lead-simple-status-shell" role="group" aria-label="客资分级筛选">
       {returnTo && <Button icon={<ArrowLeftOutlined/>} onClick={() => navigate(returnTo)}>返回订单审批</Button>}
       {filterProfileError && <Space><Typography.Text type="secondary">{filterProfileError}</Typography.Text><Button size="small" onClick={() => void loadFilterProfile()}>重试筛选方案</Button></Space>}

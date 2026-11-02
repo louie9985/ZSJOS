@@ -100,6 +100,8 @@ public class SalesOrderRespVO {
         private String sourceType;
         private String sourceLabel;
         private String sourceUserName;
+        // Null means historical evidence is absent; never infer this from a missing name.
+        private Boolean selfSourcedWithoutProvider;
         // Absent on historical orders; an empty object records no owner at submission.
         private PartnerOwnerSnapshotVO partnerOwnerSnapshot;
         private String sourceChannel;

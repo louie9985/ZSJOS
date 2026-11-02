@@ -20,7 +20,7 @@
       />
       <el-select v-model="queryParams.status" placeholder="全部状态" clearable class="!w-160px">
         <el-option label="待审核" value="pending_approval" />
-        <el-option label="已终止" value="revision_required" />
+        <el-option label="待重提" value="revision_required" />
         <el-option label="已通过" value="effective" />
         <el-option label="已被重提" value="superseded" />
         <el-option label="已终止" value="terminated" />
@@ -60,34 +60,37 @@
         @click="openRevision"
         >补正并重新提交</el-button
       >
+      <el-button v-if="detail?.canTerminate && detail.status === 'pending_approval'"
+        v-hasPermi="['zsjos:sales-order:create']"
+        @click="withdrawForRevision = true; terminationReason = ''; terminateOpen = true">撤回修改</el-button>
       <el-button
         v-if="detail?.canTerminate"
         v-hasPermi="['zsjos:sales-order:create']"
         type="danger"
-        @click="terminateOpen = true"
-        >终止审批</el-button
+        @click="withdrawForRevision = false; terminationReason = ''; terminateOpen = true"
+        >终止订单</el-button
       >
     </template>
   </el-drawer>
-  <el-dialog v-model="terminateOpen" title="终止订单审批" width="520px">
+  <el-dialog v-model="terminateOpen" :title="withdrawForRevision ? '撤回修改' : '终止订单'" width="520px">
     <el-alert
-      title="终止后当前审批流程将结束，请确认业务状态后操作。"
+      :title="withdrawForRevision ? '撤回将结束当前审批，订单进入待重提；修改提交后重新审批。' : '终止后订单不可修改或重新提交，请确认后操作。'"
       type="warning"
       show-icon
       class="mb-12px"
     />
-    <el-form label-position="top"><el-form-item label="终止原因" required><el-input
+    <el-form label-position="top"><el-form-item label="操作原因" required><el-input
       v-model="terminationReason"
       type="textarea"
       :rows="4"
       maxlength="1000"
       show-word-limit
-      placeholder="填写终止原因"
+      placeholder="填写操作原因"
     /></el-form-item></el-form>
     <template #footer
       ><el-button @click="terminateOpen = false">取消</el-button
-      ><el-button type="danger" :loading="terminating" @click="terminate"
-        >确认终止</el-button
+      ><el-button :type="withdrawForRevision ? 'primary' : 'danger'" :loading="terminating" @click="terminate"
+        >{{ withdrawForRevision ? '确认撤回' : '确认终止' }}</el-button
       ></template
     >
   </el-dialog>
@@ -148,11 +151,13 @@
       ></template
     >
   </el-dialog>
+  <OrderProfileConfirmDialog ref="profileConfirm" />
 </template>
 
 <script setup lang="ts">
 import { getSimpleDictDataList } from '@/api/system/dict/dict.data'
 import OrderProductSummary from '../components/OrderProductSummary.vue'
+import OrderProfileConfirmDialog from '../components/OrderProfileConfirmDialog.vue'
 import OrderHistoryFacts from '../components/OrderHistoryFacts.vue'
 import { reactive, ref, toRaw, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -163,6 +168,7 @@ import { useMessage } from '@/hooks/web/useMessage'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
 
 const message = useMessage()
+const profileConfirm = ref<InstanceType<typeof OrderProfileConfirmDialog>>()
 const queryParams = reactive<{ keyword: string; status: string | undefined }>({ keyword: '', status: undefined })
 const resetQuery = (reload: () => void) => {
   queryParams.keyword = ''
@@ -176,6 +182,7 @@ const detail = ref<any>()
 const selectedId = ref<number>()
 const terminateOpen = ref(false)
 const terminationReason = ref('')
+const withdrawForRevision = ref(false)
 const terminating = ref(false)
 const revisionOpen = ref(false)
 const revising = ref(false)
@@ -229,17 +236,18 @@ const showDetail = (row: Api.WorkbenchListItem, reloadListPage: () => Promise<vo
   void loadDetail()
 }
 const terminate = async () => {
-  if (!detail.value || !terminationReason.value.trim()) return message.warning('请填写终止原因')
+  if (!detail.value || !terminationReason.value.trim()) return message.warning('请填写操作原因')
   terminating.value = true
   try {
     await Api.terminateSalesOrder(detail.value.id, {
+      withdrawForRevision: withdrawForRevision.value,
       approvalRoundId: detail.value.currentApprovalRoundId,
       orderVersion: detail.value.version,
       roundVersion: detail.value.approvalRoundVersion,
       reason: terminationReason.value.trim(),
       idempotencyKey: crypto.randomUUID()
     })
-    message.success('订单审批已终止')
+    message.success(withdrawForRevision.value ? '订单已撤回，可修改后重新提交' : '订单已终止')
     terminateOpen.value = false
     detailOpen.value = false
     terminationReason.value = ''
@@ -294,7 +302,12 @@ const resubmit = async () => {
   } catch (error) { return message.warning((error as Error).message) }
   revising.value = true
   try {
+    const profileUpdate = await profileConfirm.value?.confirm(await Api.orderProfile(detail.value.id), {
+      name: revision.studentName.trim(), mobile: revision.studentMobile.trim(), wechatId: revision.studentWechatId.trim()
+    })
+    if (!profileUpdate) return
     await Api.resubmitSalesOrder(detail.value.id, {
+      profileUpdate,
       refreshedDictionaryFields: refreshedDictionaryFields.value,
       buyerName: revision.buyerName?.trim() || undefined,
       studentName: revision.studentName.trim(),

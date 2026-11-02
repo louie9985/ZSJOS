@@ -1,6 +1,6 @@
 import type {TimestampValue} from './time'
 import {http,unwrap,type PageResult} from './api'
-export interface MetricConfig {id:number;version:number;enabled:boolean;publishedVersion?:number;spec:{operands?:{calculation:{source:string}}[];name:string;description:string;unit:string;action:string;formula:string;percentage:boolean;decimals:number}}
+export interface MetricConfig {id:number;version:number;enabled:boolean;publishedVersion?:number;spec:{operands?:{calculation:{name?:string;source:string}}[];name:string;description:string;unit:string;action:string;formula:string;percentage:boolean;decimals:number}}
 export interface Evaluation {evaluatedAt:TimestampValue;result:{status:string;value:string|null};inputs:{name:string;sourceLabel?:string;range?:{start:TimestampValue;end:TimestampValue};result:{status:string;value:string|null}}[]}
 export interface MetricContext {id:number;spec:MetricConfig['spec'];evaluation:Evaluation;expiresAt:TimestampValue}
 export interface EvaluatedMetric {id:number;publishedVersion:number;spec:MetricConfig['spec'];contextId:string|null;evaluation:Evaluation}

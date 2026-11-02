@@ -1,3 +1,5 @@
+import InboxLoadMore from '../components/InboxLoadMore'
+import { useInboxPageMerge } from '../services/inboxAppend'
 import ResourceLink, { LinkedText, resourceTarget } from '../components/ResourceLink';
 import ResourceLinkInput from '../components/ResourceLinkInput';
 import { ticketSnapshotText } from '../services/productionTicketPresentation';
@@ -13,7 +15,6 @@ import {
   Input,
   InputNumber,
   Modal,
-  Pagination,
   Select,
   Skeleton,
   Space,
@@ -24,7 +25,7 @@ import {
   message,
 } from "antd";
 import type { FormInstance } from "antd/es/form";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   ApiError,
@@ -247,37 +248,42 @@ export default function MediaFeaturePage({
           : "";
   const canCreate =
     Boolean(createPermission) && hasPermission(permissions, createPermission);
+  const mergeRows=useInboxPageMerge<Row>(JSON.stringify([feature,keyword]),true,row=>row.id);
+  const listRun=useRef(0),failedPage=useRef(1);
   const load = useCallback(
-    async (targetPage = page, preferredId?: number) => {
+    async (targetPage = page, preferredId?: number, append=false) => {
+      const run=++listRun.current;failedPage.current=targetPage;
       setLoading(true);
       setError("");
-      setDetailError("");
+      if(!append)setDetailError("");
       try {
         const result = await loadRows(
           feature,
           targetPage,
           keyword || undefined,
         );
-        setRows(result.list);
+        if(run!==listRun.current)return;
+        setRows(mergeRows(targetPage,result.list));
         setTotal(result.total);
         setPage(targetPage);
+        if(append)return;
         let next =
           result.list.find((row) => row.id === preferredId) || result.list[0];
         if (preferredId && next?.id !== preferredId)
           next = ((await loadDetail(feature, preferredId)) as Row) || next;
         setSelected(next);
       } catch (cause) {
-        setRows([]);
-        setSelected(undefined);
+        if(run!==listRun.current)return;
+        if(!append){setRows([]);setSelected(undefined);}
         setError(errorText(cause));
       } finally {
-        setLoading(false);
+        if(run===listRun.current)setLoading(false);
       }
     },
-    [feature, keyword, page],
+    [feature, keyword, page,mergeRows],
   );
   useEffect(() => {
-    void load(1, requestedId);
+    void load(1, requestedId);return()=>{listRun.current++};
   }, [feature, keyword, requestedId]);
   const openDetail = async (row: Row) => {
     setSelected(row);
@@ -488,15 +494,7 @@ export default function MediaFeaturePage({
               ))
             )}
           </div>
-          {total > 20 && (
-            <Pagination
-              simple
-              current={page}
-              pageSize={20}
-              total={total}
-              onChange={(value) => void load(value)}
-            />
-          )}
+          <InboxLoadMore page={page} total={total} pageSize={20} loading={loading} error={error} rootSelector=".media-feature-scroll" onMore={()=>void load(page+1,undefined,true)} onRetry={()=>void load(failedPage.current,undefined,failedPage.current>1)}/>
         </aside>
         <main className="media-feature-detail-pane">
           {detailLoading ? (

@@ -1,3 +1,4 @@
+import InboxLoadMore from '../components/InboxLoadMore'
 import { useEffect, useState } from 'react'
 import { Alert, Button, Empty, Input, Skeleton, Space, Tabs, Tag, Typography } from 'antd'
 import { ArrowLeftOutlined, ReloadOutlined, TeamOutlined } from '@ant-design/icons'
@@ -8,12 +9,14 @@ import { DICT_TYPE } from '../constants'
 
 export default function MyOperationsPage({ permissions }: { permissions: string[] }) {
   const authorized = permissions.includes('zsjos:my-operations:query')
+  const [visiblePage,setVisiblePage]=useState(1)
   const [members, setMembers] = useState<OperationsMember[]>([])
   const [selected, setSelected] = useState<OperationsMember>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reload, setReload] = useState(0)
   const [keyword, setKeyword] = useState('')
+  useEffect(()=>setVisiblePage(1),[keyword,reload])
   const [statuses, setStatuses] = useState<DictData[]>([])
   const [statusError, setStatusError] = useState('')
   const [statusLoading, setStatusLoading] = useState(true)
@@ -55,7 +58,7 @@ export default function MyOperationsPage({ permissions }: { permissions: string[
     <div className={`subordinate-inbox-layout ${selected ? 'show-detail' : 'show-list'}`}>
       <aside className="subordinate-sales-list-pane" aria-label="运营成员">
         <div className="subordinate-sales-list">
-          {loading ? <Skeleton active /> : visible.map(row => <button type="button"
+          {loading ? <Skeleton active /> : visible.slice(0,visiblePage*20).map(row => <button type="button"
             className={`subordinate-sales-item ${selected?.userId === row.userId ? 'active' : ''}`}
             aria-pressed={selected?.userId === row.userId} key={row.userId} onClick={() => setSelected(row)}>
             <div className="subordinate-sales-item-title"><strong>{row.name || '姓名未配置'}</strong><Tag>{accountStatusLabel(row.accountStatus)}</Tag></div>
@@ -64,6 +67,7 @@ export default function MyOperationsPage({ permissions }: { permissions: string[
           {!loading && !error && !visible.length && <Empty image={<TeamOutlined />}
             description={keyword ? '没有匹配的运营' : '暂无关联运营，请检查编导与运营关联配置'} />}
         </div>
+        <InboxLoadMore page={visiblePage} total={visible.length} pageSize={20} loading={loading} error={error} rootSelector=".subordinate-sales-list" onMore={()=>setVisiblePage(value=>value+1)} onRetry={()=>setReload(value=>value+1)}/>
       </aside>
       <main className="subordinate-sales-detail-pane" aria-label="运营详情">
         {selected ? <div className="subordinate-sales-detail" key={selected.userId}>

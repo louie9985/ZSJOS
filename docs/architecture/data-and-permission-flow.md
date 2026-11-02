@@ -1,5 +1,15 @@
 # Data and Permission Flow
 
+## Order collection tasks (2026-11-01)
+
+Workbench `/zsjos/student-info-tasks` requires configured `zsjos:student-info-task:query`
+and the existing `zsjos:registration:query-pool` object population scope. Generation,
+link access, sending and rotation retain collection button permissions; reuse has its
+own button. Sensitive answer/attachment reads verify task, Person, order-item and current
+archive-revision bindings. Current customer archive reads/reuse select only the latest non-reuse submission and reject older sources; prior order snapshots remain separate evidence. Termination blocks staff links and writes, but does not revoke
+issued public tokens. Vue Admin filters this Workbench-only menu and retains fulfillment
+read projections. V359 grants no roles. See [the contract](../api/order-student-information-tasks.md).
+
 ## My Operations (2026-10-28)
 
 `zsjos:my-operations:query` gates the Workbench-only page. Current enabled `content_director_operator` relations define its member scope; system-user provider ownership defines Lead scope, including assisted entry and excluding Partner leads. Read visibility does not grant sales commands or submitter-assistance commands. Every selected member and detail is revalidated against live relationships. V354 defines metadata only; System role management owns grants. Both frontend menu consumers are covered; Vue Admin filters the unsupported component. See [My Operations](../api/my-operations.md).

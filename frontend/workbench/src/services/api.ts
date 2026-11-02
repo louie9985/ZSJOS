@@ -1863,7 +1863,11 @@ export type LeadAppeal = {
   canSubmitNextRound: boolean;
 };
 export type SalesOrderVoucher = LeadAttachment;
+export type OrderProfileField = 'name' | 'mobile' | 'wechatId';
+export type OrderProfile = { personId?: number; name?: string; mobile?: string; wechatId?: string; fingerprint: string };
+export type OrderProfileUpdate = { fingerprint: string; fields: OrderProfileField[] };
 export type SalesOrderSubmitRequest = {
+  profileUpdate?: OrderProfileUpdate;
   refreshedDictionaryFields?: string[];
   purchaseIntentId?: number;
   buyerName?: string;
@@ -2057,6 +2061,7 @@ export type SalesOrder = {
     sourceType?: string;
     sourceLabel?: string;
     sourceUserName?: string;
+    selfSourcedWithoutProvider?: boolean | null;
     partnerOwnerSnapshot?: SalesOrderPartnerOwnerSnapshot | null;
     sourceChannel?: string;
     sourceChannelLabelSnapshot?: string;
@@ -2138,6 +2143,7 @@ export type SalesOrderListItem = Pick<
   leadSourceType?: string;
   partnerOwnerSnapshot?: SalesOrderPartnerOwnerSnapshot | null;
   leadSourceUserName?: string;
+  leadSelfSourcedWithoutProvider?: boolean | null;
   leadOwnerUserName?: string;
   formalOwnerIdentity?: string;
   formalOwnerIdentityLabel?: string;
@@ -2177,6 +2183,7 @@ export type SalesOrderSupervisorInboxItem = {
   roundVersion: number;
 };
 export type SalesOrderStatusCounts = {
+  terminated?: number;
   total: number;
   pendingApproval: number;
   revisionRequired: number;
@@ -4836,6 +4843,10 @@ export const api = {
     unwrap<PaymentRefund>(await http.post("/zsjos/payment-refund/direct", data)),
   paymentRefund: async (id: number) => unwrap<PaymentRefund>(await http.get(`/zsjos/payment-refund/${id}`)),
   refreshPaymentRefund: async (id: number) => unwrap<PaymentRefund>(await http.post(`/zsjos/payment-refund/${id}/refresh`)),
+  orderProfile: async (kind: 'lead' | 'student' | 'order', id: number) =>
+    unwrap<OrderProfile>(await http.get(`/zsjos/sales-order/profile/${kind}/${id}`)),
+  customerOrderProfile: async (identity: RepurchaseCustomerIdentity) =>
+    unwrap<OrderProfile>(await http.post('/zsjos/sales-order/profile/customer', identity)),
   submitSalesOrder: async (leadId: number, data: SalesOrderSubmitRequest) =>
     unwrap<number>(
       await http.post(`/zsjos/sales-order/lead/${leadId}/submit`, data),
@@ -5180,6 +5191,7 @@ export const api = {
   terminateSalesOrder: async (
     orderId: number,
     data: {
+      withdrawForRevision?: boolean;
       reason: string;
       approvalRoundId: number;
       orderVersion: number;
@@ -5197,6 +5209,8 @@ export const api = {
       await http.post("/zsjos/sales-order/voucher/upload", data),
     );
   },
+  cancelLeadNextFollowUp: async (id: number, reason: string) =>
+    invalidateMenuTasks(unwrap<boolean>(await http.post(`/zsjos/lead/${id}/follow-ups/cancel-next-time`, { reason }))),
   cancelBusinessTask: async (id: number, reason: string) =>
     invalidateMenuTasks(unwrap<boolean>(await http.post(`/zsjos/business-task/${id}/cancel`, { reason }))),
   businessTaskSummary: async (params?: { readScope?: "SELF" | "ALL" | "USER"; targetUserId?: number }) =>

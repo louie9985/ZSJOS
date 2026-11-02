@@ -31,6 +31,14 @@ public class LeadFollowUpController {
     @Resource private LeadFollowUpService followUpService;
     @Resource private LeadAttachmentService attachmentService;
 
+    @PostMapping("/{id}/follow-ups/cancel-next-time")
+    @Operation(summary = "取消已成交客资的跟进时间")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead-follow-up:create') && @ss.hasPermission('zsjos:business-task:cancel')")
+    public CommonResult<Boolean> cancelNextFollowUp(@PathVariable("id") Long id,
+            @Valid @RequestBody cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskCancelReqVO reqVO) {
+        return success(followUpService.cancelNextFollowUp(id, getLoginUserId(), reqVO.getReason()));
+    }
+
     @GetMapping("/{id}/follow-ups/page")
     @Operation(summary = "获得客资跟进记录")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:follow-up-read','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')")

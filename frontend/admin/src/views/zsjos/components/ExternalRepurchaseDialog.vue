@@ -169,8 +169,10 @@
       ></template
     >
   </el-dialog>
+  <OrderProfileConfirmDialog ref="profileConfirm" />
 </template>
 <script setup lang="ts">
+import OrderProfileConfirmDialog from './OrderProfileConfirmDialog.vue'
 import { catalogSpecs, specText } from '@/utils/productSpecs'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
 import * as MenuApi from '@/api/zsjos/workbenchMenus'
@@ -334,6 +336,7 @@ const handleVoucherSelect = (file: UploadFile) => {
   vouchers.value.push(item)
   if (item.status === 'uploading') void uploadVoucher(item)
 }
+const profileConfirm = ref<InstanceType<typeof OrderProfileConfirmDialog>>()
 const submit = async () => {
   if (!checked.value || !readyForOrder.value || checking.value) { message.warning('请补齐手机号和微信号并重新校验客户身份'); return }
   await formRef.value?.validate()
@@ -351,6 +354,10 @@ const submit = async () => {
   }
   saving.value = true
   try {
+    const profileUpdate = await profileConfirm.value?.confirm(await MenuApi.customerOrderProfile({
+      customerName: form.customerName.trim(), customerMobile: form.customerMobile.trim(), customerWechatId: form.customerWechatId.trim()
+    }), { name: form.studentName.trim(), mobile: form.customerMobile.trim(), wechatId: form.customerWechatId.trim() })
+    if (!profileUpdate) return
     const [provinceCode, cityCode] = form.region
     const province = areas.value.find((i) => i.selectionCode === provinceCode)
     const city = province?.children?.find((i: any) => i.selectionCode === cityCode)
@@ -361,6 +368,7 @@ const submit = async () => {
       customerWechatId: form.customerWechatId.trim() || undefined,
       repurchaseReason: form.repurchaseReason.trim(),
       order: {
+        profileUpdate,
         buyerName: form.customerName.trim(),
         studentName: form.studentName.trim(),
         studentNature: form.studentNature,

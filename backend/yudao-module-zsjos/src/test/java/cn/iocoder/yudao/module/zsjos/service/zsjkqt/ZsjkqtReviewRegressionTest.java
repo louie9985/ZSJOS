@@ -107,4 +107,22 @@ class ZsjkqtReviewRegressionTest {
             assertEquals(status, parsed.path("employees").get(0).path("days").get(0).path("morning").asText());
         }
     }
+
+    @Test void prenatal_summary_roundtrips_and_legacy_reports_remain_readable() throws Exception {
+        var project = snapshot().path("project");
+        ((ObjectNode) project.path("employees").get(0).path("summary")).put("prenatalLeaveDays", 0.44);
+        var engine = new ZsjkqtExcelEngine();
+        byte[] bytes = engine.exportReport(project);
+        var parsed = JsonUtils.getObjectMapper().valueToTree(engine.parseReport(bytes, "正式表.xlsx"));
+        assertEquals(0.44, parsed.path("employees").get(0).path("summary").path("prenatalLeaveDays").asDouble());
+        try (var book = new XSSFWorkbook(new ByteArrayInputStream(bytes))) {
+            var sheet = book.getSheetAt(0);
+            int last = sheet.getRow(0).getLastCellNum() - 1;
+            assertEquals("产检假/天", sheet.getRow(0).getCell(last).getStringCellValue());
+            for (var row : sheet) if (row.getCell(last) != null) row.removeCell(row.getCell(last));
+            var out = new java.io.ByteArrayOutputStream(); book.write(out);
+            var old = JsonUtils.getObjectMapper().valueToTree(engine.parseReport(out.toByteArray(), "旧表.xlsx"));
+            assertFalse(old.path("employees").get(0).path("summary").has("prenatalLeaveDays"));
+        }
+    }
 }

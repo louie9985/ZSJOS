@@ -1,12 +1,15 @@
+import DateOperand from './DateOperand'
+import { isRelativeTime, relativeTimeLabel } from './relativeTime'
 import { filterSelectDisplayProps } from "./filterSelectDisplay"
 import { DeleteOutlined, FilterOutlined, PlusOutlined, ReloadOutlined, SaveOutlined, SearchOutlined } from '@ant-design/icons'
-import { Alert, Badge, Button, DatePicker, Empty, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tag, message, type InputRef } from 'antd'
+import { Alert, Badge, Button, Empty, Input, InputNumber, Modal, Select, Space, Spin, Switch, Tag, message, type InputRef } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState, type ReactNode, type Ref } from 'react'
 import { api, type AdvancedFilterCondition, type AdvancedFilterField, type AdvancedFilterGroup, type AdvancedFilterScene, type AdvancedFilterTemplate } from '../services/api'
 import ResizableDrawer from './ResizableDrawer'
 import { ADVANCED_FILTER_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 
+const formatDateOperand = (value: unknown) => isRelativeTime(value) ? relativeTimeLabel(value) : dayjs(Number(value)).format('YYYY-MM-DD HH:mm')
 const operatorLabels: Record<string, string> = {
   contains: '包含', not_contains: '不包含', eq: '等于', ne: '不等于', in: '属于', not_in: '不属于',
   gt: '晚于/大于', gte: '不早于/大于等于', lt: '早于/小于', lte: '不晚于/小于等于', between: '区间',
@@ -71,8 +74,6 @@ function ConditionRow({ value, fields, relativeDateOptions, onChange, onRemove }
       ? { fieldKey: value.fieldKey, operator, startFieldKey: value.startFieldKey, endFieldKey: value.endFieldKey, unit: value.unit || 'hour' }
       : { fieldKey: value.fieldKey, operator })
   }
-  const dateValue = (key: 'value' | 'valueFrom' | 'valueTo', item: { valueOf(): number } | null) => onChange({ ...value, [key]: item?.valueOf() })
-  const date = (raw: unknown) => hasValue(raw) ? dayjs(Number(raw)) : null
   const number = (raw: unknown) => typeof raw === 'number' ? raw : typeof raw === 'string' && raw !== '' ? Number(raw) : undefined
   let control = null
   if (field && !noValue) {
@@ -89,14 +90,14 @@ function ConditionRow({ value, fields, relativeDateOptions, onChange, onRemove }
       control = <Select popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={value.value as string | undefined} options={relativeDateOptions} onChange={item => onChange({ ...value, value: item })} {...filterSelectDisplayProps}/>
     } else if (value.operator === 'between') {
       control = <Space.Compact block>{field.valueType === 'date'
-        ? <><DatePicker showTime value={date(value.valueFrom)} onChange={item => dateValue('valueFrom', item)}/><DatePicker showTime value={date(value.valueTo)} onChange={item => dateValue('valueTo', item)}/></>
+        ? <Space direction="vertical" style={{width:'100%'}}><span>开始边界（含）</span><DateOperand value={value.valueFrom} onChange={item=>onChange({...value,valueFrom:item})}/><span>结束边界（含）</span><DateOperand value={value.valueTo} onChange={item=>onChange({...value,valueTo:item})}/></Space>
         : <><InputNumber value={value.valueFrom as number | undefined} onChange={item => onChange({ ...value, valueFrom: item })}/><InputNumber value={value.valueTo as number | undefined} onChange={item => onChange({ ...value, valueTo: item })}/></>}</Space.Compact>
     } else if (field.valueType === 'select') {
       control = <Select mode="multiple" showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={(value.value as Array<string | number>) || []} options={field.options} loading={field.optionsLoading} notFoundContent={field.optionsError ? <Button type="link" size="small" onClick={field.retryOptions}>加载失败，重试</Button> : '暂无可选项'} onChange={item => onChange({ ...value, value: item })} {...filterSelectDisplayProps}/>
     } else if (field.valueType === 'number') {
       control = <InputNumber value={value.value as number | undefined} onChange={item => onChange({ ...value, value: item })}/>
     } else if (field.valueType === 'date') {
-      control = <DatePicker showTime value={date(value.value)} onChange={item => dateValue('value', item)}/>
+      control = <DateOperand value={value.value} onChange={item=>onChange({...value,value:item})}/>
     } else control = <Input value={(value.value as string) || ''} onChange={event => onChange({ ...value, value: event.target.value })}/>
   }
   return <div className="advanced-filter-condition">
@@ -161,6 +162,8 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
   const [searchText, setSearchText] = useState(keyword)
   const [catalogState, setCatalogState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [templates, setTemplates] = useState<AdvancedFilterTemplate[]>([])
+  const [deleteTarget, setDeleteTarget] = useState<AdvancedFilterTemplate>()
+  const [deletingTemplate, setDeletingTemplate] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<number>()
   const [templateState, setTemplateState] = useState<'idle' | 'loading' | 'error'>('idle')
   const [saveOpen, setSaveOpen] = useState(false)
@@ -263,8 +266,25 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
       setSavingTemplate(false)
     }
   }
+  const deleteTemplate = async () => {
+    if (!deleteTarget || deletingTemplate) return
+    setDeletingTemplate(true)
+    try {
+      await api.deletePersonalAdvancedFilterTemplate(deleteTarget.id)
+      setTemplates(current => current.filter(item => item.id !== deleteTarget.id))
+      setSelectedTemplateId(current => current === deleteTarget.id ? undefined : current)
+      setDeleteTarget(undefined)
+      message.success('个人筛选模板已删除')
+      await loadTemplates()
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : '删除筛选模板失败，请重试')
+    } finally {
+      setDeletingTemplate(false)
+    }
+  }
   const templateOptions = useMemo(() => templates.map(template => ({
     value: template.id,
+    template,
     label: `${template.scope === 'system' ? '系统' : '个人'} · ${template.name}${template.defaultTemplate ? ' · 默认' : ''}`
   })), [templates])
   const active = flattened(value)
@@ -280,12 +300,12 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
     }
     if (condition.operator === 'is_empty' || condition.operator === 'is_not_empty') return ''
     if (condition.operator === 'between') return field?.valueType === 'date'
-      ? `${dayjs(Number(condition.valueFrom)).format('YYYY-MM-DD HH:mm')} - ${dayjs(Number(condition.valueTo)).format('YYYY-MM-DD HH:mm')}`
+      ? `${formatDateOperand(condition.valueFrom)} - ${formatDateOperand(condition.valueTo)}`
       : `${condition.valueFrom ?? ''} - ${condition.valueTo ?? ''}`
     const raw = Array.isArray(condition.value) ? condition.value : [condition.value]
     return raw.map(item => field?.options.find(option => String(option.value) === String(item))?.label
       || relativeDateOptions.find(option => option.value === item)?.label
-      || (field?.valueType === 'date' ? dayjs(Number(item)).format('YYYY-MM-DD HH:mm') : String(item ?? ''))).join('、')
+      || (field?.valueType === 'date' ? formatDateOperand(item) : String(item ?? ''))).join('、')
   }
   const submitKeyword = () => onKeyword(searchText.trim())
   return <>
@@ -294,13 +314,26 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
     <ResizableDrawer className="advanced-filter-drawer" open={open} placement="right" width="min(560px, 100vw)" defaultSize={560} minSize={420} storageKey={ADVANCED_FILTER_DRAWER_WIDTH_STORAGE_KEY} title="高级筛选" onClose={cancel} footer={<div className="advanced-filter-footer"><Button onClick={() => setDraft(blank())}>重置</Button><Space><Button onClick={cancel}>取消</Button><Button aria-label="应用筛选" type="primary" loading={applying} disabled={disabled || catalogState !== 'ready'} onClick={() => void apply()}>应用筛选</Button></Space></div>}>
       {pageKey && <div className="advanced-filter-template-panel">
         <div className="advanced-filter-template-actions">
-          <Select allowClear value={selectedTemplateId} className="advanced-filter-template-select" loading={templateState === 'loading'} status={templateState === 'error' ? 'error' : undefined} placeholder="选择筛选模板" optionFilterProp="label" popupMatchSelectWidth={FILTER_TEMPLATE_POPUP_WIDTH} showSearch options={templateOptions} onChange={applyTemplate} {...filterSelectDisplayProps}/>
+          <Select allowClear value={selectedTemplateId} className="advanced-filter-template-select" loading={templateState === 'loading'} status={templateState === 'error' ? 'error' : undefined} placeholder="选择筛选模板" optionFilterProp="label" popupMatchSelectWidth={FILTER_TEMPLATE_POPUP_WIDTH} showSearch options={templateOptions} optionRender={option => <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--crm-sp-2)' }}>
+            <span style={{ flex: 1, minWidth: 0, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{option.data.label}</span>
+            {option.data.template.scope === 'personal' && <Button type="text" danger size="small" icon={<DeleteOutlined/>}
+              aria-label={`删除模板：${option.data.template.name}`} title="删除模板"
+              onMouseDown={event => { event.preventDefault(); event.stopPropagation() }}
+              onKeyDown={event => event.stopPropagation()}
+              onClick={event => { event.stopPropagation(); setDeleteTarget(option.data.template) }}/>}
+          </div>} onChange={applyTemplate} {...filterSelectDisplayProps}/>
           <Button icon={<SaveOutlined/>} disabled={!filterCount(draft)} onClick={openSave}>保存模板</Button>
         </div>
         {templateState === 'error' && <Alert type="warning" showIcon message="筛选模板加载失败" action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void loadTemplates()}>重试</Button>}/>}
       </div>}
       {catalogState === 'loading' ? <div className="advanced-filter-state"><Spin/><span>正在加载可筛选字段</span></div> : catalogState === 'error' ? <Alert type="error" showIcon message="筛选字段加载失败" action={<Button icon={<ReloadOutlined/>} onClick={() => void loadCatalog()}>重试</Button>}/> : fields.length ? <GroupEditor value={draft} fields={fields} relativeDateOptions={relativeDateOptions} depth={0} total={conditionCount(draft)} onChange={setDraft}/> : <Empty description="当前场景没有可用筛选字段"/>}
     </ResizableDrawer>
+    <Modal title="删除个人筛选模板" open={!!deleteTarget} confirmLoading={deletingTemplate}
+      okText="删除" cancelText="取消" okButtonProps={{ danger: true }} cancelButtonProps={{ disabled: deletingTemplate }}
+      closable={!deletingTemplate} maskClosable={!deletingTemplate} keyboard={!deletingTemplate}
+      onCancel={() => { if (!deletingTemplate) setDeleteTarget(undefined) }} onOk={() => void deleteTemplate()}>
+      确定删除模板“{deleteTarget?.name}”吗？删除后无法恢复，当前筛选条件会保留。
+    </Modal>
     <Modal title="保存个人筛选模板" open={saveOpen} confirmLoading={savingTemplate} onCancel={() => setSaveOpen(false)} onOk={() => void saveTemplate()}>
       <Space direction="vertical" style={{ width: '100%' }}>
         <Input maxLength={30} showCount placeholder="模板名称" value={templateName} onChange={event => setTemplateName(event.target.value)}/>

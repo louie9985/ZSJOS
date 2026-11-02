@@ -14,6 +14,8 @@ import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferr
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import PaymentQrCard from './PaymentQrCardModal'
+import OrderProfileConfirmModal, { profileDifferences } from './OrderProfileConfirmModal'
+import type { OrderProfile, OrderProfileField } from '../services/api'
 
 type Values = {
   repurchaseReason?: string
@@ -85,8 +87,11 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const [loadError, setLoadError] = useState('')
   const [vouchers, setVouchers] = useState<DeferredUploadItem<SalesOrderVoucher>[]>([])
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [profile, setProfile] = useState<OrderProfile>()
+  const [profileFields, setProfileFields] = useState<OrderProfileField[]>([])
+  const [profileLoading, setProfileLoading] = useState(false)
+  const profileRequest = useRef(0)
   const [pendingValues, setPendingValues] = useState<Values>()
-  const [orderNo, setOrderNo] = useState<string>()
   const [collectionMode, setCollectionMode] = useState<CollectionMode>('offline_paid')
   const [purchaseIntent, setPurchaseIntent] = useState<PurchaseIntent>()
   const [draftSaving, setDraftSaving] = useState(false)
@@ -135,7 +140,6 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       })))
 
       setHistoricalItems(order?.items || [])
-      setOrderNo(order?.orderNo)
       const regionPath = resolveLeadAreaPath(areaResult as AreaNode[], order?.provinceCode || lead.provinceCode,
         order?.cityCode || lead.cityCode, order?.provinceName || lead.provinceName, order?.cityName || lead.cityName)
       const primary = lead.primaryProduct?.spuRef && lead.primaryProduct.skuRef
@@ -177,13 +181,15 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   }
 
   useEffect(() => {
+    profileRequest.current++
+    setProfileLoading(false); setProfile(undefined)
     if (!open) return
     resetIntent(); submittedDraft.current = undefined
     setConfirmOpen(false); setPendingValues(undefined)
     form.resetFields(); setVouchers([]); void load()
   }, [open, lead.id, orderId, resetIntent])
 
-  const close = () => { setConfirmOpen(false); setPendingValues(undefined); onClose() }
+  const close = () => { profileRequest.current++; setConfirmOpen(false); setPendingValues(undefined); onClose() }
 
   const options = (type: string) => (dicts[type] || []).map(item => ({ value: item.value, label: item.label }))
   const buildDraftRequest = (values: Partial<Values>, idempotencyKey: string): PurchaseIntentDraftRequest | undefined => {
@@ -225,7 +231,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     } finally { setDraftSaving(false) }
   }
   const prepareSubmit = async () => {
-    if (loading || loadError || (orderId && !revisionOrder)) return
+    if (loading || loadError || profileLoading || saving || (orderId && !revisionOrder)) return
     const amountError = validateSalesOrderAmounts(form.getFieldValue('items'), collectionMode)
     if (amountError) { message.warning(amountError); return }
     if (!orderId && collectionMode === 'online_link' && purchaseIntent?.paymentStatus !== 'paid') {
@@ -236,18 +242,29 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     const validationError = validateSalesOrderSubmission(values.mobile, values.wechatId, total, vouchers.length)
     if (validationError) { message.warning(validationError); return }
     if (values.giftItems?.length && !values.giftShippingAddress?.trim()) { message.warning('选择礼品后请填写邮寄地址'); return }
-    setPendingValues(values); setConfirmOpen(true)
+    setProfileLoading(true)
+    const requestId = ++profileRequest.current
+    try {
+      const current = externalCustomer ? await api.customerOrderProfile(externalCustomer)
+        : await api.orderProfile(orderId ? 'order' : studentRepurchase ? 'student' : 'lead', orderId || lead.id)
+      if (requestId !== profileRequest.current) return
+      setProfile(current)
+      setProfileFields(profileDifferences(current, { name: values.studentName, mobile: values.mobile, wechatId: values.wechatId }).map(f => f.key))
+      setPendingValues(values); setConfirmOpen(true)
+    } catch (error) { if (requestId === profileRequest.current) message.error(errorText(error)) }
+    finally { if (requestId === profileRequest.current) setProfileLoading(false) }
   }
   const submit = async () => {
     if (loading || loadError || (orderId && !revisionOrder)) return
     const values = pendingValues
     setConfirmOpen(false)
-    if (!values) return
+    if (!values || !profile) return
     const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
     const region = findRegion(areas, values.regionPath)
     if (!region.provinceName) { message.warning('请选择有效省市'); return }
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const request: SalesOrderSubmitRequest = {
+        profileUpdate: profile ? { fingerprint: profile.fingerprint, fields: profileFields } : undefined,
         refreshedDictionaryFields, buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
         studentMobile: values.mobile.trim(), studentWechatId: values.wechatId.trim(),
         provinceCode, provinceName: region.provinceName, cityCode, cityName: region.cityName,
@@ -301,7 +318,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     })
   }
 
-  return <Modal title={repurchase ? '录入复购订单' : orderId ? '补正成交' : '录入成交'} open={open} onCancel={close} footer={null} width={980} destroyOnHidden>
+  return <><Modal title={repurchase ? '录入复购订单' : orderId ? '补正成交' : '录入成交'} open={open} onCancel={close} footer={null} width={980} destroyOnHidden>
     {loadError && <Alert type="error" showIcon message="成交配置加载失败" description={loadError}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
@@ -334,6 +351,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" rules={[{ required: true, whitespace: true, message: '请填写微信号' }, { max: 64, message: '微信号最多64个字符' }]}><Input maxLength={64} disabled={customerRepurchase || Boolean(purchaseIntent?.paymentLocked && resolveSalesOrderContacts(purchaseIntent.draft, undefined, {}).wechatId)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】"/></Form.Item></Col>
         </Row>
+        <Typography.Paragraph type="secondary">请填写本次报名的真实信息。与客户档案不一致时，提交前可选择是否更新档案。</Typography.Paragraph>
         <Divider titlePlacement="start">报名与服务</Divider>
         <Row gutter={16}>
           <Col xs={24} md={12}><Form.Item name="agreedExamTime" label="商定考试时间"><Input maxLength={100}/></Form.Item></Col>
@@ -380,9 +398,12 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         </Row>
         <Space wrap>{!orderId && <Button icon={<SaveOutlined/>} loading={draftSaving} onClick={() => void saveDraft(false)}>保存草稿</Button>}
           {paymentLinkActionLabel && <Button type="primary" icon={<LinkOutlined/>} loading={draftSaving} onClick={() => void saveDraft(true)}>{paymentLinkActionLabel}</Button>}
-          <IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」审批` : `提交「${lead.submittedName}」的成交订单审批`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
+          <Button type="primary" loading={saving || profileLoading} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button><Button onClick={close}>取消</Button></Space>
       </Form>
     </Spin>
-  </Modal>
+  </Modal><OrderProfileConfirmModal open={open && confirmOpen} profile={profile}
+    incoming={{ name: pendingValues?.studentName || '', mobile: pendingValues?.mobile || '', wechatId: pendingValues?.wechatId || '' }}
+    fields={profileFields} onFieldsChange={setProfileFields} loading={saving}
+    onCancel={() => setConfirmOpen(false)} onConfirm={() => void submit()}/></>
 }
 

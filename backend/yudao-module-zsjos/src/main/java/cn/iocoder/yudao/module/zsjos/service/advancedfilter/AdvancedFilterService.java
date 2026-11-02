@@ -95,7 +95,7 @@ public class AdvancedFilterService {
         if (group == null) throw exception(ADVANCED_FILTER_INVALID);
         validateShape(group, 0, new int[]{0});
         if (hasConditions(group)) {
-            groupSql(group, scene, new LinkedHashMap<>(Map.of("validateOnly", true)));
+            groupSql(freezeRelativeDates(group, Instant.now()), scene, new LinkedHashMap<>(Map.of("validateOnly", true)));
         } else if (!SCENES.contains(scene)) {
             throw exception(ADVANCED_FILTER_INVALID);
         }
@@ -168,7 +168,7 @@ public class AdvancedFilterService {
     public boolean matches(String scene, AdvancedFilterGroupReqVO group, Function<String, Object> valueProvider) {
         if (group == null) return true;
         validateShape(group, 0, new int[]{0});
-        return matchesGroup(scene, group, valueProvider);
+        return matchesGroup(scene, freezeRelativeDates(group, Instant.now()), valueProvider);
     }
 
     private List<Long> keywordIds(String keyword, Function<String, List<Long>> query) {
@@ -189,12 +189,16 @@ public class AdvancedFilterService {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("tenantId", TenantContextHolder.getTenantId());
         params.putAll(extra);
-        String sql = groupSql(group, scene, params);
+        String sql = groupSql(freezeRelativeDates(group, Instant.now()), scene, params);
         if (sql.isBlank()) throw exception(ADVANCED_FILTER_INVALID);
         return new AdvancedFilterQuery(sql, params);
     }
 
     private void validateShape(AdvancedFilterGroupReqVO group, int depth, int[] count) {
+        if (depth == 0 && group instanceof AdvancedFilterIntersection) {
+            group.getGroups().forEach(child -> validateShape(child, 0, new int[]{0}));
+            return;
+        }
         if (group == null || group.getConditions() == null || group.getGroups() == null
                 || group.getConditions().stream().anyMatch(Objects::isNull)
                 || group.getGroups().stream().anyMatch(Objects::isNull)
@@ -218,7 +222,8 @@ public class AdvancedFilterService {
             related.forEach((relation, predicates) -> parts.add("EXISTS (" + relation + " AND "
                     + String.join(" AND ", predicates) + ")"));
         } else group.getConditions().forEach(condition -> parts.add(compile(condition, scene, params).sql()));
-        group.getGroups().forEach(child -> parts.add("(" + groupSql(child, scene, params) + ")"));
+        group.getGroups().stream().filter(this::hasConditions)
+                .forEach(child -> parts.add("(" + groupSql(child, scene, params) + ")"));
         return parts.isEmpty() ? "" : String.join(" " + group.getLogic() + " ", parts);
     }
 
@@ -495,13 +500,21 @@ public class AdvancedFilterService {
         if (group == null || asOf == null) throw exception(ADVANCED_FILTER_INVALID);
         var copy = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(
                 cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(group), AdvancedFilterGroupReqVO.class);
-        freezeGroup(copy, asOf.atZone(BEIJING).toLocalDate());
+        freezeGroup(copy, asOf.atZone(BEIJING).toLocalDateTime());
         return copy;
     }
-    private void freezeGroup(AdvancedFilterGroupReqVO group, LocalDate date) {
+    private void freezeGroup(AdvancedFilterGroupReqVO group, LocalDateTime date) {
         for (var child : group.getGroups() == null ? List.<AdvancedFilterGroupReqVO>of() : group.getGroups()) freezeGroup(child, date);
-        for (var condition : group.getConditions() == null ? List.<AdvancedFilterConditionReqVO>of() : group.getConditions())
-            if ("relative".equals(condition.getOperator())) condition.setRelativeBaseDate(date);
+        for (var condition : group.getConditions() == null ? List.<AdvancedFilterConditionReqVO>of() : group.getConditions()) {
+            if ("relative".equals(condition.getOperator()) && condition.getRelativeBaseDate() == null)
+                condition.setRelativeBaseDate(date.toLocalDate());
+            Field field = FIELDS.get(condition.getFieldKey());
+            if (field != null && "date".equals(field.type()) && !"relative".equals(condition.getOperator())) {
+                condition.setValue(RelativeTimeOperand.resolve(condition.getValue(), date));
+                condition.setValueFrom(RelativeTimeOperand.resolve(condition.getValueFrom(), date));
+                condition.setValueTo(RelativeTimeOperand.resolve(condition.getValueTo(), date));
+            }
+        }
     }
     private String ref(Map<String, Object> params, Object value) {
         if (value == null) throw exception(ADVANCED_FILTER_INVALID);

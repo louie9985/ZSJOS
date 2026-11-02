@@ -12,6 +12,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RestController @RequestMapping("/zsjos/home-metric")
 public class HomeMetricController {
     @Resource private HomeMetricConfigService service;
+    @Resource private HomeMetricPageService pages;
     @Resource private HomeMetricQueryRateLimit rateLimit;
     @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissions;
     @GetMapping("/permissions") @PreAuthorize("@ss.hasPermission('zsjos:home-metric:query')")
@@ -48,6 +49,12 @@ public class HomeMetricController {
     @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode=cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
     @PostMapping("/details") @PreAuthorize("isAuthenticated()")
     public CommonResult<PageResult<Map<String,Object>>> details(@RequestBody Details request){rateLimit.check(getLoginUserId());return success(service.details(request,getLoginUserId()));}
+    @PostMapping("/source-page") @PreAuthorize("isAuthenticated()")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(mode=cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.READ_ONLY)
+    public CommonResult<Object> sourcePage(@RequestBody HomeMetricPageService.Request request) {
+        rateLimit.check(getLoginUserId());
+        return success(pages.page(request,getLoginUserId()));
+    }
     public record Option(String value,String label) {}
     private List<Option> options(String... pairs){var result=new ArrayList<Option>();for(int i=0;i<pairs.length;i+=2)result.add(new Option(pairs[i],pairs[i+1]));return result;}
     @GetMapping("/options") @PreAuthorize("@ss.hasPermission('zsjos:home-metric:query')")

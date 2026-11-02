@@ -108,3 +108,21 @@
 
 
 产品/SKU选项来源新增 `business_api`：`declaredOptionSource` 为 `product-catalog:spu` / `product-catalog:sku`。后端通过商品模块已有服务解析引用与标签，实际响应的 `optionSource` 置空；空结果为 `empty`，数据源异常使目录请求失败并走原有重试。两端联合类型已同步，不增加客户端商品目录请求或静态选项。
+
+
+## 相对时间比较值（2026-11-01）
+
+日期字段的 `eq/gt/gte/lt/lte/between` 可使用固定 epoch 毫秒或相对时间对象。
+`value`、`valueFrom`、`valueTo` 独立选择，区间仍为闭区间；原 `relative` 操作的期间语义不变。
+
+```json
+{"fieldKey":"lead.qualificationDeadlineAt","operator":"lt","value":{"kind":"relative","base":"today_start","offset":0,"unit":"day"}}
+```
+
+- `base`: `now` 当前时刻、`today_start` 今天 00:00、`week_start` 周一 00:00、`month_start` 月初、`quarter_start` 季初、`year_start` 年初。
+- `offset`: -10000 到 10000 的整数，负数表示之前；`unit`: minute/hour/day/week/month/year。
+- 所有基准使用 Asia/Shanghai。每次求值使用同一个时刻，月/年偏移按日历计算，月末落在目标月最后一个有效日期。
+- 小于今天即 `< 今天00:00`；今天及以前用 `< 今天开始+1天`。等于比较精确时间点，不表示整天。
+- 普通模板保存表达式并在查询时重新求值；指标上下文通过 `freezeRelativeDates` 冻结成具体时间点，已有期间冻结日期不覆盖。
+- SQL 和内存筛选采用同一解析规则，空值不匹配大小比较；非法基准、单位、偏移或倒置区间返回既有高级筛选无效错误。
+- 两端技术选项跟随该后端协议，不属于管理员业务字典。此次未引入共享包，避免为小型协议映射新增工作区和依赖；React/Vue 控件分别归属各端。

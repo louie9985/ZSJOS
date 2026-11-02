@@ -15,10 +15,10 @@ import java.util.stream.*;
 public class ZsjkqtExcelEngine {
     static final String METADATA = "_attendance_metadata";
     static final String[] TITLES = {
-        "应出勤日", "实出勤日", "计薪日", "入职日期", "缺卡", "迟到", "迟到是否惩罚", "早退", "旷工", "事假/小时", "病假/天", "工伤/天", "丧假/天", "婚假/天", "产假/天", "调休/小时", "年假/小时", "加班/小时", "加班未调休换算成工资", "备注"
+        "应出勤日", "实出勤日", "计薪日", "入职日期", "缺卡", "迟到", "迟到是否惩罚", "早退", "旷工", "事假/小时", "病假/天", "工伤/天", "丧假/天", "婚假/天", "产假/天", "调休/小时", "年假/小时", "加班/小时", "加班未调休换算成工资", "备注", "产检假/天"
     };
     static final String[] FIELDS = {
-        "shouldAttendanceDays", "actualAttendanceDays", "payrollDays", "entryDate", "missingCardCount", "lateText", "latePunishment", "earlyText", "absenceDays", "personalLeaveHours", "sickLeaveDays", "injuryLeaveDays", "funeralLeaveDays", "marriageLeaveDays", "maternityLeaveDays", "compLeaveHours", "annualLeaveHours", "overtimeHours", "overtimeToSalary", "remark"
+        "shouldAttendanceDays", "actualAttendanceDays", "payrollDays", "entryDate", "missingCardCount", "lateText", "latePunishment", "earlyText", "absenceDays", "personalLeaveHours", "sickLeaveDays", "injuryLeaveDays", "funeralLeaveDays", "marriageLeaveDays", "maternityLeaveDays", "compLeaveHours", "annualLeaveHours", "overtimeHours", "overtimeToSalary", "remark", "prenatalLeaveDays"
     };
     static final Set<String> STATUSES = Set.of("", "出勤", "休息", "带薪", "迟到", "早退", "缺卡", "异常", "加班", "旷工", "事假", "病假", "年假", "调休", "婚假", "产假", "陪产假", "产检假", "丧假", "工伤");
     static final int MAX_CELL_TEXT_LENGTH = 32767;
@@ -174,7 +174,10 @@ public class ZsjkqtExcelEngine {
             };
             for(int c=0; c<4; c++) if(!headers[c].equals(cellText(s, 0, c))) throw formatError();
             for(int d=1; d<=count; d++) if(!dateHeader(year, month, d).equals(cellText(s, 0, 3+d))) throw formatError();
-            for(int i=0; i<TITLES.length; i++) if(!TITLES[i].equals(cellText(s, 0, first+i))) throw formatError();
+            for(int i=0; i<TITLES.length; i++) {
+                if(i == TITLES.length - 1 && cellText(s, 0, first+i).isEmpty()) continue; // Legacy reports lack the appended prenatal summary.
+                if(!TITLES[i].equals(cellText(s, 0, first+i))) throw formatError();
+            }
             List<Map<String, Object>> employees=new ArrayList<>();
             for(int r=1; r<=s.getLastRowNum(); r++) {
                 String department=cellText(s, r, 1), name=cellText(s, r, 2);
@@ -187,6 +190,7 @@ public class ZsjkqtExcelEngine {
                 }
                 Map<String, Object> summary=new LinkedHashMap<>();
                 for(int i=0; i<FIELDS.length; i++) {
+                    if(i == FIELDS.length - 1 && cellText(s, 0, first+i).isEmpty()) continue;
                     Object v=value(s, r, first+i);
                     summary.put(FIELDS[i], "--".equals(v)||"".equals(v)?null:v);
                 }
@@ -403,7 +407,7 @@ public class ZsjkqtExcelEngine {
                 s.setColumnWidth(3+d, 18*256);
             }
             double[] widths= {
-                10, 10, 9, 12, 8, 10, 14, 10, 10, 12, 10, 10, 10, 10, 10, 12, 12, 12, 26, 18
+                10, 10, 9, 12, 8, 10, 14, 10, 10, 12, 10, 10, 10, 10, 10, 12, 12, 12, 26, 18, 12
             };
             for(int i=0; i<TITLES.length; i++) {
                 put(h, first+i, TITLES[i], header);

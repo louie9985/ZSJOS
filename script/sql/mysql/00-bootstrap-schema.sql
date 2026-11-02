@@ -8425,3 +8425,17 @@ CREATE TABLE IF NOT EXISTS zsjos_home_metric_version (
  deleted BIT(1) NOT NULL DEFAULT b'0',tenant_id BIGINT NOT NULL DEFAULT 1,
  PRIMARY KEY(id),UNIQUE KEY uk_home_metric_version(tenant_id,metric_id,version)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='首页指标发布快照';
+
+
+-- V359 order collection task structure; migration owns metadata and historical links.
+CREATE TABLE IF NOT EXISTS zsjos_student_info_task (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  order_id BIGINT NOT NULL, order_item_id BIGINT NOT NULL, person_id BIGINT NOT NULL,
+  form_id BIGINT NULL, source_form_id BIGINT NULL, source_revision INT NULL,
+  version INT NOT NULL DEFAULT 0, last_command_key VARCHAR(64) NULL,
+  last_command_fingerprint VARCHAR(64) NULL, operator_user_id BIGINT NULL,
+  creator VARCHAR(64) NOT NULL DEFAULT '', create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater VARCHAR(64) NOT NULL DEFAULT '', update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted BIT(1) NOT NULL DEFAULT b'0', tenant_id BIGINT NOT NULL DEFAULT 1,
+  UNIQUE KEY uk_tenant_item (tenant_id,order_item_id), KEY idx_person (tenant_id,person_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单报名资料收集任务';

@@ -10,11 +10,12 @@ const groupTitles: Record<string, string> = {
   basic: '基本信息', education: '学历与报考', career: '职业与学习目的', materials: '证明材料',
 }
 
-export default function StudentInfoPanel({ caseId }: { caseId: number }) {
-  return <StudentInfoPanelContent key={caseId} caseId={caseId} />
+export type StudentInfoReader = Pick<typeof studentInfoApi, 'detail' | 'image' | 'export'>
+export default function StudentInfoPanel({ caseId, reader = studentInfoApi, showDraft = false }: { caseId: number; showDraft?: boolean; reader?: StudentInfoReader }) {
+  return <StudentInfoPanelContent key={caseId} caseId={caseId} reader={reader} showDraft={showDraft} />
 }
 
-function StudentInfoPanelContent({ caseId }: { caseId: number }) {
+function StudentInfoPanelContent({ caseId, reader, showDraft }: { caseId: number; showDraft: boolean; reader: StudentInfoReader }) {
   const [data, setData] = useState<StudentInfoDetail>()
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(true), [exporting, setExporting] = useState(false)
@@ -24,11 +25,11 @@ function StudentInfoPanelContent({ caseId }: { caseId: number }) {
     const current = ++generation.current
     setData(undefined); setBusy(true); setError('')
     try {
-      const detail = await studentInfoApi.detail(caseId)
+      const detail = await reader.detail(caseId)
       if (current !== generation.current) return
       // The server owns sensitive-read access; render once the authorized projection is complete.
-      if (detail.status === 'SUBMITTED' && detail.canReadSensitive) {
-        const complete = await studentInfoApi.detail(caseId, true)
+      if ((detail.status === 'SUBMITTED' || showDraft) && detail.canReadSensitive) {
+        const complete = await reader.detail(caseId, true)
         if (current !== generation.current) return
         if (!complete.canReadSensitive) throw new Error('资料查看权限已变化，请刷新重试')
         setData(complete)
@@ -45,14 +46,14 @@ function StudentInfoPanelContent({ caseId }: { caseId: number }) {
   useEffect(() => {
     void load()
     return () => { generation.current++ }
-  }, [caseId])
+  }, [caseId, reader])
 
   const attachment = (image: StudentInfoImage): AttachmentResource => {
     const current = generation.current
     const metadata = { name: image.name, type: image.contentType, size: image.size }
     const loadContent = async (): Promise<AttachmentResource> => {
       if (current !== generation.current) throw new Error('资料已刷新或关闭，请重新打开附件')
-      const url = await studentInfoApi.image(caseId, image)
+      const url = await reader.image(caseId, image)
       if (current !== generation.current) {
         URL.revokeObjectURL(url)
         throw new Error('资料已刷新或关闭，请重新打开附件')
@@ -64,7 +65,7 @@ function StudentInfoPanelContent({ caseId }: { caseId: number }) {
   const download = async () => {
     const current = generation.current
     setExporting(true); setError('')
-    try { await studentInfoApi.export(caseId) }
+    try { await reader.export(caseId) }
     catch (cause) { if (current === generation.current) setError(studentInfoError(cause)) }
     finally { setExporting(false) }
   }
@@ -73,15 +74,16 @@ function StudentInfoPanelContent({ caseId }: { caseId: number }) {
   for (const field of [...(data?.fields || [])].sort((a, b) => a.sort - b.sort)) {
     groups.set(field.group, [...(groups.get(field.group) || []), field])
   }
-  return <section className="student-info-panel">
+  return <section className="student-info-panel archive-registration-content">
     <div className="student-info-toolbar">
       {data && <Tag color={data.status === 'SUBMITTED' ? 'success' : undefined}>{studentInfoStatus[data.status] || data.status}</Tag>}
 
       {data?.status === 'SUBMITTED' && data.canExport && <Button icon={<DownloadOutlined />} loading={exporting} disabled={busy} onClick={() => void download()}>导出</Button>}
     </div>
+    {showDraft && data?.id && data.status!=='SUBMITTED' && <Alert type="info" showIcon title="学员尚未提交，以下为最近一次已保存内容" description="尚未保存的输入不会显示；此处只读，不会替学员提交。"/>}
     {error && <Alert type="error" showIcon title={error} action={<Button onClick={() => void load()}>重试</Button>} />}
     {busy ? <div className="student-info-loading" role="status"><Space><Spin /><span>正在加载报名资料…</span></Space></div>
-      : data?.status !== 'SUBMITTED' ? !error && <Empty description="暂无已提交的学员信息" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+      : (data?.status !== 'SUBMITTED' && !(showDraft && data?.id)) ? !error && <Empty description={showDraft ? "尚未生成收集表，生成后在此展示填写资料" : "暂无已提交的学员信息"} image={Empty.PRESENTED_IMAGE_SIMPLE} />
         : <div className="student-info-layout">
           <div className="student-info-main">{[...groups].map(([group, fields]) => <section className="student-info-section" key={group}>
             <h4>{groupTitles[group] || '其他资料'}</h4>
@@ -89,8 +91,8 @@ function StudentInfoPanelContent({ caseId }: { caseId: number }) {
               const value = data.values[field.key]
               const images = data.images.filter(image => image.fieldKey === field.key)
               const wide = field.type === 'textarea' || field.type === 'images' || (value?.length || 0) > 120
-              return <div key={field.key} className={`student-info-field${wide ? ' is-wide' : ''}`}>
-                <dt>{field.label}</dt>
+              return <div key={field.key} className={`student-info-field archive-registration-field${wide ? ' is-wide' : ''}`}>
+                <dt><span className="archive-description-label">{field.label}</span></dt>
                 <dd>{field.type === 'images' ? images.length ? <>
                   <div className="student-info-attachments">{images.map(image => data.canReadSensitive
                     ? <AttachmentCard key={`${generation.current}:${image.id}`} name={image.name} load={async () => attachment(image)} />

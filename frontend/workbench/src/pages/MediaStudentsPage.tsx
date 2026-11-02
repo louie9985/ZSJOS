@@ -1,3 +1,4 @@
+import { useMetricSourceApi, useMetricPageScope } from '../services/metricPageScope'
 import StudentEntryDialog from '../components/StudentEntryDialog'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import BusinessSortMenu from '../components/BusinessSortMenu'
@@ -200,6 +201,8 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
 }
 
 function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }) {
+  const metricScope = useMetricPageScope()
+  const metricStudents = useMetricSourceApi('media_student', api.mediaStudents)
   const [entryOpen, setEntryOpen] = useState(false)
   // The student inbox deliberately remains master-detail for every global inbox layout setting.
   const location = useLocation()
@@ -255,7 +258,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
   const [selectedId, setSelectedId] = useState<number>()
   const selectedStudent = useRef<number | undefined>(undefined)
   const firstListLoad = useRef(true)
-  const [servicePeriodTab, setServicePeriodTab] = useState('in')
+  const [servicePeriodTab, setServicePeriodTab] = useState(metricScope ? 'all' : 'in')
   const [servicePeriodSaving, setServicePeriodSaving] = useState(false)
   const servicePeriodBusy = useRef(false)
   const selectFirstOnLoad = useRef(false)
@@ -447,7 +450,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
     listBusy.current = true
     const run = ++listRun.current; setLoading(true); setMoreError(''); if (!append) setError('')
     try {
-      const result = await api.mediaStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: (append ? loadedKeyword.current : keyword) || undefined,
+      const result = await metricStudents.page({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: (append ? loadedKeyword.current : keyword) || undefined,
         inServicePeriod: servicePeriodTab === 'all' ? undefined : servicePeriodTab === 'in', advancedFilter, operatorUserId: operatorFilter?.id, ...studentSort })
       if (run !== listRun.current) return
       firstListLoad.current = false

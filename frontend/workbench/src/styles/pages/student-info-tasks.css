@@ -1,0 +1,31 @@
+.collection-list-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--crm-sp-3); width: 100%; }
+.collection-list-heading strong { min-width: 0; overflow-wrap: anywhere; }
+.collection-list-heading .ant-tag { flex-shrink: 0; margin-inline-end: 0; }
+
+/* Carry the workspace's remaining height through Spin to the actual scroll area. */
+.student-info-tasks-page { min-width: 0; overflow: hidden; }
+.student-info-tasks-page > .ant-space,
+.student-info-tasks-page > .ant-tabs,
+.student-info-tasks-page > .ant-alert { flex-shrink: 0; }
+.student-info-tasks-page .collection-list-loading,
+.student-info-tasks-page .collection-list-loading > .ant-spin-container {
+  display: flex; flex: 1; flex-direction: column; min-height: 0; overflow: hidden;
+}
+.student-info-tasks-page .sales-order-list-pane > .ant-pagination { flex-shrink: 0; }
+.student-info-tasks-page .collection-table-area { flex: 1; min-height: 0; overflow: auto; }
+
+.student-info-tasks-page .sales-order-list-copy > span { white-space: normal; overflow-wrap: anywhere; overflow: visible; }
+
+.collection-detail-modal .ant-modal-body { height: min(760px, 75vh); container: registration-detail / inline-size; }
+
+.student-info-tasks-page .lead-inbox-item-copy > span { white-space: normal; overflow-wrap: anywhere; }
+
+.collection-filter-toolbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-4);
+}
+.collection-filter-toolbar > .ant-input-search { flex: 1; min-width: 180px; }

@@ -1,3 +1,4 @@
+import InboxLoadMore from '../components/InboxLoadMore'
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -347,8 +348,9 @@ export default function LeadPublicSeaPoolPage() {
                     </div>
                   </div>
                 </button>)}
-            {items.length < total && <div className="public-sea-pool-load-more"><Button loading={loading} onClick={() => void load({ pageNo: pageNo + 1, append: true })}>加载更多</Button></div>}
+
           </div>
+          <InboxLoadMore page={pageNo} total={total} pageSize={pageSize} loading={loading} error={error} rootSelector=".lead-inbox-scroll" onMore={()=>void load({pageNo:pageNo+1,append:true})} onRetry={()=>void load({pageNo:items.length?pageNo+1:1,append:items.length>0})}/>
         </aside>
         <main className="lead-inbox-detail-pane">
           {detailContent}

@@ -86,6 +86,14 @@ export function orderPartnerOwnerText(sourceType: string | undefined, snapshot?:
   return snapshot.employeeName || '姓名未记录'
 }
 
+export function orderSourcePersonText(sourceType?: string, name?: string, selfSourcedWithoutProvider?: boolean | null): string {
+  if (selfSourcedWithoutProvider === true) {
+    if (sourceType === 'sales_self_sourced') return '销售本人自拓（未关联新媒体）'
+    if (sourceType === 'education_self_sourced') return '教务本人自拓（未关联新媒体）'
+  }
+  return name || '历史未记录'
+}
+
 export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListItem {
   return {
     id: order.id,
@@ -120,6 +128,7 @@ export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListIte
     leadSourceType: order.leadProfile?.sourceType,
     partnerOwnerSnapshot: order.leadProfile?.partnerOwnerSnapshot,
     leadSourceUserName: order.leadProfile?.sourceUserName,
+    leadSelfSourcedWithoutProvider: order.leadProfile?.selfSourcedWithoutProvider,
     leadOwnerUserName: order.leadProfile?.ownerUserName,
     leadCategoryLabelSnapshot: order.leadProfile?.leadCategoryLabelSnapshot,
     leadSourceChannelLabelSnapshot: order.leadProfile?.sourceChannelLabelSnapshot,

@@ -11,5 +11,6 @@ import lombok.EqualsAndHashCode;
 public class StudentInfoImageDO extends TenantBaseDO {
     private Long id, formId, infraFileId, fileSize;
     private String fieldKey, side, contentType;
+    private String originalName;
     private Boolean archiveOnly;
 }

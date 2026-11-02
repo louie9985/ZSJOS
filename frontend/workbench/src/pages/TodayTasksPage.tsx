@@ -1,3 +1,4 @@
+import { useMetricSourceApi } from '../services/metricPageScope'
 import HomeTodoSummary from '../components/HomeTodoSummary'
 import HomeMetricCards from '../components/HomeMetricCards'
 import { useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
@@ -56,6 +57,7 @@ function BusinessTaskPanel({
   onRefreshSummary: () => Promise<void>
 }) {
   const navigate = useNavigate()
+  const metricApi = useMetricSourceApi('business_todo', api)
   const navigation = useWorkbenchPageNavigation()
   const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' })
   const [scopeSummary, setScopeSummary] = useState<BusinessTaskSummary>()
@@ -95,7 +97,7 @@ function BusinessTaskPanel({
     setLoading(true)
     try {
       const [result, counts] = await Promise.all([
-        api.businessTaskList({ ...(tenantReadAll ? readScope : {}), status: 'pending',
+        metricApi.businessTaskList({ ...(tenantReadAll ? readScope : {}), status: 'pending',
           bucket, pageNo, pageSize: PAGE_SIZE }),
         api.businessTaskSummary(tenantReadAll ? readScope : undefined)
       ])
@@ -327,7 +329,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
   return (
     <section ref={pageRef} className="workspace-page today-tasks-page">
       <div className="home-dashboard-grid">
-        <section className="home-summary-region" aria-label="首页指标"><HomeTodoSummary permissions={permissions} summary={businessSummary} loading={summaryLoading} error={businessError} refreshVersion={metricRefreshVersion} onRefresh={() => loadSummary()} /><HomeMetricCards refreshVersion={metricRefreshVersion} slots={9} /></section>
+        <section className="home-summary-region" aria-label="首页指标"><HomeTodoSummary permissions={permissions} summary={businessSummary} loading={summaryLoading} error={businessError} refreshVersion={metricRefreshVersion} onRefresh={() => loadSummary()} /><HomeMetricCards permissions={permissions} refreshVersion={metricRefreshVersion} slots={9} /></section>
         <HomeCalendarPanel permissions={permissions} />
         <BusinessTaskPanel summaryError={businessError} canCancel={permissions.includes('zsjos:business-task:cancel')} tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <BusinessTaskPanel summaryError={businessError} canCancel={permissions.includes('zsjos:business-task:cancel')} other tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
@@ -335,4 +337,11 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
       </div>
     </section>
   )
+}
+
+export function MetricBusinessTasks({ permissions }: { permissions: string[] }) {
+  const navigate = useNavigate()
+  const refresh = useCallback(async () => {}, [])
+  const props = { canCancel: permissions.includes('zsjos:business-task:cancel'), tenantReadAll: false, onRefreshSummary: refresh, onOpenAssignment: () => navigate(APP_ROUTES.LEAD_ASSIGNMENT) }
+  return <div className="home-dashboard-grid"><BusinessTaskPanel {...props}/><BusinessTaskPanel {...props} other/></div>
 }

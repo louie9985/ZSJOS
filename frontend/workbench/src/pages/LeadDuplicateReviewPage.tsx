@@ -1,3 +1,4 @@
+import { useMetricSourceApi, useMetricPageScope } from '../services/metricPageScope'
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Button, Empty, Form, Input, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
@@ -59,8 +60,14 @@ function snapshotValue(snapshot: DuplicateReviewSnapshot | undefined, keys: stri
   return typeof value === 'string' ? value : '-'
 }
 
+const duplicatePageApi = {
+  duplicateReviewPage: (params: Omit<Parameters<typeof api.duplicateReviewPage>[0], 'status'> & { status?: 'pending' | 'completed' }) => api.duplicateReviewPage({ ...params, status: params.status ?? 'pending' }),
+}
+
 export default function LeadDuplicateReviewPage({ permissions }: { permissions: string[] }) {
-  const [status, setStatus] = useState<'pending' | 'completed'>('pending')
+  const metricScope = useMetricPageScope()
+  const metricApi = useMetricSourceApi('duplicate_review', duplicatePageApi)
+  const [status, setStatus] = useState<'pending' | 'completed' | 'all'>(metricScope ? 'all' : 'pending')
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [items, setItems] = useState<LeadDuplicateReview[]>([])
@@ -97,7 +104,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
     }
     setError('')
     try {
-      const result = await api.duplicateReviewPage({ status, pageNo: page, pageSize: useTableLayout ? tablePageSize : 100, keyword: keyword || undefined, advancedFilter })
+      const result = await metricApi.duplicateReviewPage({ status: status === 'all' ? undefined : status, pageNo: page, pageSize: useTableLayout ? tablePageSize : 100, keyword: keyword || undefined, advancedFilter })
       const next = result.list
       setItems(current => useTableLayout || !append
         ? next
@@ -190,7 +197,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
   return <section className={`workspace-page message-inbox-page duplicate-review-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="message-inbox-header">
       <div><Typography.Title level={4}>重复客资复核</Typography.Title><Typography.Text type="secondary">公共队列按提交时间处理，结论提交后不可覆盖</Typography.Text></div>
-      <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[{ key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
+      <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[...(metricScope ? [{ key: 'all', label: '全部' }] : []), { key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
     </header>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
     {useTableLayout ? <><BusinessTable<LeadDuplicateReview> filters={<><AdvancedFilterToolbar scene="duplicate_review" pageKey="lead_duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="lead-duplicate-review-page-1"

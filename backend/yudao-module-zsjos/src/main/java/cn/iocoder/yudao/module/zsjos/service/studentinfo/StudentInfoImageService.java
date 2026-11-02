@@ -35,6 +35,31 @@ public class StudentInfoImageService {
     @Value("${mybatis-plus.encryptor.password:}") private String key;
 
     public List<Image> list(Long formId) { return images.byForm(formId).stream().map(this::project).toList(); }
+    void copyForCollection(StudentInfoFormDO source,StudentInfoFormDO target,List<Image> selected,List<Field> fields) {
+        for (var field:fields) {
+            if (!"images".equals(field.getType())) continue;
+            var allowed=selected.stream().filter(i->field.getKey().equals(i.getFieldKey()))
+                    .filter(i->StudentInfoReusePolicy.attachmentCompatible(field,i))
+                    .limit("identity_images".equals(field.getKey()) ? 2 : field.getMaxImages()).toList();
+            for (var image:allowed) {
+                var original=requireImageId(source.getId(),image.getId());
+                // Own each new Infra object: removing a draft attachment must never delete historical material.
+                byte[] encrypted;
+                try { encrypted=files.getFileContent(original.getInfraFileId()); }
+                catch(Exception error) { throw exception(FIELD_INVALID,"历史材料暂不可用，请重试"); }
+                var stored=files.createFileInfo(encrypted,UUID.randomUUID()+".bin",
+                        "student-info-private/"+target.getId(),"application/octet-stream");
+                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                    @Override public void afterCompletion(int status) {
+                        if (status!=STATUS_COMMITTED) try { files.deleteFileIfExists(stored.getId()); } catch(Exception ignored) { }
+                    }
+                });
+                var copy=new StudentInfoImageDO(); copy.setFormId(target.getId()); copy.setFieldKey(original.getFieldKey());
+                copy.setSide(original.getSide()); copy.setInfraFileId(stored.getId()); copy.setFileSize(original.getFileSize());
+                copy.setOriginalName(original.getOriginalName()); copy.setContentType(original.getContentType()); copy.setArchiveOnly(false); copy.setTenantId(target.getTenantId()); images.insert(copy);
+            }
+        }
+    }
     public List<Image> archiveList(Long formId, List<Long> ids) {
         return ids.stream().map(id -> project(requireImageId(formId,id))).toList();
     }
@@ -55,7 +80,7 @@ public class StudentInfoImageService {
                 @Override public void afterCompletion(int status) { if (status!=STATUS_COMMITTED) try { files.deleteFileIfExists(stored.getId()); } catch(Exception ignored) { } }
             });
             var row=new StudentInfoImageDO(); row.setFormId(form.getId()); row.setFieldKey(fieldKey); row.setSide(side==null ? "" : side);
-            row.setInfraFileId(stored.getId()); row.setFileSize((long)content.length); row.setContentType(type); row.setArchiveOnly(true);
+            row.setOriginalName(originalName(upload.getOriginalFilename())); row.setInfraFileId(stored.getId()); row.setFileSize((long)content.length); row.setContentType(type); row.setArchiveOnly(true);
             row.setTenantId(form.getTenantId()); images.insert(row); return project(row);
         } catch(cn.iocoder.yudao.framework.common.exception.ServiceException error) { throw error; }
         catch(Exception error) { throw exception(FIELD_INVALID,"图片上传失败，请重试"); }
@@ -71,10 +96,19 @@ public class StudentInfoImageService {
                     || selected.stream().map(StudentInfoImageDO::getSide).distinct().count()!=selected.size())) throw exception(FIELD_INVALID,field.getLabel());
         }
     }
+    // Client paths are not display names; the encrypted storage object still uses an independent UUID.
+    static String originalName(String name) {
+        if (name==null) return null;
+        String base=name.replace('\\','/');
+        base=base.substring(base.lastIndexOf('/')+1).replaceAll("[\\p{Cntrl}]", "");
+        return base.isBlank() ? null : base;
+    }
     private Image project(StudentInfoImageDO row) {
         var result=new Image(); result.setId(row.getId()); result.setFieldKey(row.getFieldKey()); result.setSide(row.getSide());
         result.setContentType(row.getContentType()); result.setSize(row.getFileSize());
-        result.setName(row.getFieldKey()+"-"+row.getId()+StudentInfoAttachmentValidator.extension(row.getContentType())); return result;
+        result.setName(row.getOriginalName()==null || row.getOriginalName().isBlank()
+                ? row.getFieldKey()+"-"+row.getId()+StudentInfoAttachmentValidator.extension(row.getContentType())
+                : row.getOriginalName()); return result;
     }
     @Transactional(rollbackFor=Exception.class)
     public Image upload(String token,String fieldKey,String side,MultipartFile upload) {
@@ -94,7 +128,7 @@ public class StudentInfoImageService {
                     @Override public void afterCompletion(int status) { if (status!=STATUS_COMMITTED) try { files.deleteFileIfExists(stored.getId()); } catch(Exception ignored) { /* retained encrypted orphan; never exposed as an image */ } }
                 });
                 var row=new StudentInfoImageDO(); row.setFormId(form.getId()); row.setFieldKey(fieldKey); row.setSide(identity ? side : "");
-                row.setInfraFileId(stored.getId()); row.setFileSize((long)content.length); row.setContentType(type); images.insert(row); return project(row);
+                row.setOriginalName(originalName(upload.getOriginalFilename())); row.setInfraFileId(stored.getId()); row.setFileSize((long)content.length); row.setContentType(type); images.insert(row); return project(row);
             } catch (cn.iocoder.yudao.framework.common.exception.ServiceException error) { throw error; }
             catch (Exception error) { throw exception(FIELD_INVALID,"图片上传失败，请重试"); }
         });

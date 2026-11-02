@@ -271,6 +271,6 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       <Form.Item label="申请原因" required><Input.TextArea rows={5} maxLength={1000} showCount value={reason}
         onChange={event => setReason(event.target.value)} placeholder="说明需要主管确认的事项"/></Form.Item>
     </Modal>
-    {leadDetailModalLeadId && <LeadDetailModal leadId={leadDetailModalLeadId} open={leadDetailModalOpen} onClose={() => setLeadDetailModalOpen(false)} />}
+    {leadDetailModalLeadId && <LeadDetailModal permissions={permissions} leadId={leadDetailModalLeadId} open={leadDetailModalOpen} onClose={() => setLeadDetailModalOpen(false)} />}
   </section>
 }

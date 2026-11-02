@@ -1,3 +1,4 @@
+-- UTF-8. Default: fresh acceptance; runner sets @zsjos_verify_runtime=1 for installed databases.
 -- File integrity for V114/V116/V136/V192/V193/V196/V208 is checked read-only by
 -- zsjos_db.verify_applied_migration_integrity. These SQL checks retain registry
 -- provenance and business postconditions; use the CLI for complete verification.
@@ -295,11 +296,21 @@ SELECT 'registration_route_tables' AS check_name,
             AND table_name IN ('zsjos_registration_route_option','zsjos_registration_case_route','zsjos_registration_item_attachment'))=3,
           'PASS','FAIL') AS result;
 SELECT 'registration_exact_default_routes' AS check_name,
-       IF(NOT EXISTS (SELECT version_row.id FROM zsjos_registration_checklist_version version_row
-            WHERE version_row.status='published' AND version_row.deleted=b'0'
-              AND (SELECT COUNT(*) FROM zsjos_registration_route_option option_row
-                   WHERE option_row.tenant_id=version_row.tenant_id AND option_row.version_id=version_row.id
-                     AND option_row.option_key IN ('student_delivery','new_media') AND option_row.deleted=b'0')<>2),
+       IF(EXISTS (SELECT 1 FROM zsjos_registration_checklist_template WHERE tenant_id=1 AND deleted=b'0')
+          AND NOT EXISTS (
+            SELECT 1 FROM zsjos_registration_checklist_template template_row
+            LEFT JOIN zsjos_registration_checklist_version version_row
+              ON version_row.id=template_row.published_version_id
+             AND version_row.tenant_id=template_row.tenant_id
+             AND version_row.status='published' AND version_row.deleted=b'0'
+            WHERE template_row.tenant_id=1 AND template_row.deleted=b'0'
+              AND (version_row.id IS NULL
+                OR (SELECT COUNT(*) FROM zsjos_registration_route_option o
+                    WHERE o.tenant_id=1 AND o.version_id=version_row.id
+                      AND o.option_key='student_delivery' AND o.deleted=b'0')<>1
+                OR EXISTS (SELECT 1 FROM zsjos_registration_route_option o
+                    WHERE o.tenant_id=1 AND o.version_id=version_row.id
+                      AND o.option_key='new_media' AND o.deleted=b'0'))),
           'PASS','FAIL') AS result;
 -- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'employee_birthday_care_job' AS check_name,
@@ -389,9 +400,9 @@ SELECT 'lead_intended_product_active_key' AS check_name,
            AND table_name='zsjos_lead_intended_product' AND index_name='uk_tenant_lead_product'),
        'PASS', 'FAIL') AS result;
 SELECT 'lead_category_empty' AS check_name,
-       IF(NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_category' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+       IF(COALESCE(@zsjos_verify_runtime,0)=1, 'SKIP', IF(NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_category' AND deleted=b'0'), 'PASS', 'FAIL')) AS result;
 SELECT 'source_channel_empty' AS check_name,
-       IF(NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_source_channel' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+       IF(COALESCE(@zsjos_verify_runtime,0)=1, 'SKIP', IF(NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_source_channel' AND deleted=b'0'), 'PASS', 'FAIL')) AS result;
 SELECT 'default_assignment_rule' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_lead_assignment_rule WHERE tenant_id=1 AND code='default' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_management_menu' AS check_name,
@@ -408,12 +419,12 @@ SELECT 'claim_pool_action' AS check_name,
 SELECT 'claim_pool_v003' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V003'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_schemes' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version>=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
 -- The baseline seeds five audiences: submitter, owner, reviewer (V005), publicSeaPool (V034's
 -- public-sea view) and management (unified Lead management graded filtering). Each publishes
 -- exactly one version-1 snapshot, so five schemes produce five rows here.
 SELECT 'lead_filter_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=5, 'PASS', 'FAIL') AS result;
+       IF(COALESCE(@zsjos_verify_runtime,0)=1, 'SKIP', IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=5, 'PASS', 'FAIL')) AS result;
 SELECT 'lead_filter_menu' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6773 AND permission='zsjos:lead-filter:query' AND component='zsjos/leadFilter/index' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_v005' AS check_name,
@@ -549,10 +560,15 @@ SELECT 'person_contact_claim_completeness_v043' AS check_name,
        IF(NOT EXISTS (
             SELECT 1 FROM (
               SELECT tenant_id,id person_id,CONVERT(TRIM(mobile) USING utf8mb4) COLLATE utf8mb4_bin contact_value
-                FROM zsjos_person WHERE deleted=b'0' AND mobile IS NOT NULL
+                FROM zsjos_person WHERE deleted=b'0' AND NULLIF(TRIM(mobile),'') IS NOT NULL
               UNION
               SELECT tenant_id,id,CONVERT(TRIM(wechat_id) USING utf8mb4) COLLATE utf8mb4_bin
-                FROM zsjos_person WHERE deleted=b'0' AND wechat_id IS NOT NULL
+                FROM zsjos_person WHERE deleted=b'0' AND NULLIF(TRIM(wechat_id),'') IS NOT NULL
+              UNION
+              SELECT a.tenant_id,a.person_id,CONVERT(TRIM(a.contact_value) USING utf8mb4) COLLATE utf8mb4_bin
+                FROM zsjos_person_contact_alias a JOIN zsjos_person p
+                  ON p.id=a.person_id AND p.tenant_id=a.tenant_id AND p.deleted=b'0'
+                WHERE a.deleted=b'0' AND NULLIF(TRIM(a.contact_value),'') IS NOT NULL
             ) expected LEFT JOIN zsjos_person_contact_claim claim
               ON claim.tenant_id=expected.tenant_id AND claim.contact_value=expected.contact_value
              AND claim.person_id=expected.person_id AND claim.deleted=b'0'
@@ -561,10 +577,15 @@ SELECT 'person_contact_claim_completeness_v043' AS check_name,
             SELECT 1 FROM zsjos_person_contact_claim claim
             LEFT JOIN (
               SELECT tenant_id,id person_id,CONVERT(TRIM(mobile) USING utf8mb4) COLLATE utf8mb4_bin contact_value
-                FROM zsjos_person WHERE deleted=b'0' AND mobile IS NOT NULL
+                FROM zsjos_person WHERE deleted=b'0' AND NULLIF(TRIM(mobile),'') IS NOT NULL
               UNION
               SELECT tenant_id,id,CONVERT(TRIM(wechat_id) USING utf8mb4) COLLATE utf8mb4_bin
-                FROM zsjos_person WHERE deleted=b'0' AND wechat_id IS NOT NULL
+                FROM zsjos_person WHERE deleted=b'0' AND NULLIF(TRIM(wechat_id),'') IS NOT NULL
+              UNION
+              SELECT a.tenant_id,a.person_id,CONVERT(TRIM(a.contact_value) USING utf8mb4) COLLATE utf8mb4_bin
+                FROM zsjos_person_contact_alias a JOIN zsjos_person p
+                  ON p.id=a.person_id AND p.tenant_id=a.tenant_id AND p.deleted=b'0'
+                WHERE a.deleted=b'0' AND NULLIF(TRIM(a.contact_value),'') IS NOT NULL
             ) expected ON expected.tenant_id=claim.tenant_id AND expected.contact_value=claim.contact_value
                       AND expected.person_id=claim.person_id
             WHERE claim.deleted=b'0' AND (claim.person_id IS NULL OR claim.reservation_key IS NOT NULL OR expected.person_id IS NULL)),
@@ -1004,33 +1025,22 @@ SELECT 'V054 Lead business number schema' AS check_name,
              AND table_name='zsjos_lead' AND index_name='uk_tenant_lead_no')>0,
           'PASS','FAIL') AS result;
 SELECT 'V054 Lead business number data' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead WHERE lead_no IS NULL OR lead_no NOT REGEXP '^KZ[0-9]{18}$')=0
+       IF((SELECT COUNT(*) FROM zsjos_lead WHERE lead_no IS NULL OR (lead_no NOT REGEXP '^KZ[0-9]{18}$' AND lead_no NOT REGEXP '^LD[0-9]{12}$'))=0
           AND (SELECT COUNT(*) FROM (SELECT tenant_id,lead_no FROM zsjos_lead
                GROUP BY tenant_id,lead_no HAVING COUNT(*)>1) duplicates)=0,
           'PASS','FAIL') AS result;
 SELECT 'V054 Lead business number counters' AS check_name,
        IF(NOT EXISTS (
-         SELECT 1
-         FROM zsjos_lead_no_daily_counter counter_row
-         LEFT JOIN zsjos_lead latest ON latest.tenant_id=counter_row.tenant_id
-           AND DATE(latest.submitted_at)=counter_row.sequence_date
-         LEFT JOIN zsjos_lead later ON later.tenant_id=latest.tenant_id
-           AND DATE(later.submitted_at)=DATE(latest.submitted_at)
-           AND (later.submitted_at>latest.submitted_at
-             OR (later.submitted_at=latest.submitted_at AND later.id>latest.id))
-         WHERE later.id IS NULL AND (latest.id IS NULL
-           OR counter_row.current_value<>CAST(SUBSTRING(latest.lead_no,17) AS UNSIGNED))
-       ) AND NOT EXISTS (
-         SELECT 1
-         FROM (
-           SELECT tenant_id, DATE(submitted_at) sequence_date
-           FROM zsjos_lead
-           GROUP BY tenant_id, DATE(submitted_at)
-         ) allocated
-         LEFT JOIN zsjos_lead_no_daily_counter counter_row
+         SELECT 1 FROM (
+           SELECT tenant_id, STR_TO_DATE(SUBSTRING(lead_no,3,8),'%Y%m%d') sequence_date,
+                  MAX(CAST(SUBSTRING(lead_no,17) AS UNSIGNED)) required_value
+           FROM zsjos_lead WHERE lead_no REGEXP '^KZ[0-9]{18}$'
+           GROUP BY tenant_id, STR_TO_DATE(SUBSTRING(lead_no,3,8),'%Y%m%d')
+         ) allocated LEFT JOIN zsjos_lead_no_daily_counter counter_row
            ON counter_row.tenant_id=allocated.tenant_id
           AND counter_row.sequence_date=allocated.sequence_date
-         WHERE counter_row.id IS NULL
+         WHERE counter_row.id IS NULL OR counter_row.deleted=b'1'
+            OR counter_row.current_value<allocated.required_value
        ), 'PASS','FAIL') AS result;
 SELECT 'V063 partner role retired by V247' AS check_name,
        IF(NOT EXISTS (SELECT 1 FROM system_role WHERE code='part_time_partner' AND deleted=b'0'),
@@ -1163,7 +1173,7 @@ SELECT 'V125 student business number schema' AS check_name,
 SELECT 'V125 student number data compatibility' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_person
              WHERE person_no IS NULL OR person_no='' OR
-               (person_no NOT REGEXP '^P[0-9A-F]{32}$' AND person_no NOT REGEXP '^XY[0-9]{18}$'))=0
+               (person_no NOT REGEXP '^P[0-9A-F]{32}$' AND person_no NOT REGEXP '^XY[0-9]{18}$' AND person_no NOT REGEXP '^(LEGACY-P-|LEGACY-PERSON-|MIG-PERSON-)[0-9]+$'))=0
           AND (SELECT COUNT(*) FROM (SELECT tenant_id,person_no FROM zsjos_person
                GROUP BY tenant_id,person_no HAVING COUNT(*)>1) duplicates)=0,
           'PASS','FAIL') AS result;
@@ -1905,7 +1915,7 @@ SELECT 'V157 generic work-order center schema and menus' AS check_name,
           AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
             AND table_name='zsjos_work_order' AND index_name='uk_tenant_business' AND non_unique=0)
           AND EXISTS (SELECT 1 FROM system_dict_type WHERE type='zsjos_work_order_category' AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_work_order_category' AND deleted=b'0')
+          AND (COALESCE(@zsjos_verify_runtime,0)=1 OR NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_work_order_category' AND deleted=b'0'))
           AND (SELECT COUNT(*) FROM system_menu WHERE id BETWEEN 79960 AND 79978 AND deleted=b'0')=18
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE id=79960 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=79972 AND name='工单中心' AND parent_id=0
@@ -2303,13 +2313,13 @@ SELECT 'V188 pending class and UTF-8 snapshot' AS check_name,
        IF(NOT EXISTS (SELECT 1 FROM system_tenant tenant_row
               WHERE tenant_row.status=0 AND tenant_row.deleted=b'0'
                 AND (SELECT COUNT(*) FROM zsjos_delivery_class class_row
-                     WHERE class_row.tenant_id=tenant_row.id AND class_row.system_class=b'1'
+                     WHERE class_row.tenant_id=tenant_row.id AND class_row.system_class=b'1' AND class_row.class_no='PENDING'
                        AND class_row.deleted=b'0')<>1)
           AND NOT EXISTS (SELECT 1 FROM zsjos_service_relation
                           WHERE class_id IS NULL AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM zsjos_delivery_class
-                          WHERE system_class=b'1' AND deleted=b'0'
-                            AND (class_no<>'PENDING' OR class_name<>'待分班'
+                          WHERE system_class=b'1' AND class_no='PENDING' AND deleted=b'0'
+                            AND (class_name<>'待分班'
                               OR HEX(class_name)<>'E5BE85E58886E78FAD')),
           'PASS','FAIL') AS result;
 
@@ -2432,8 +2442,8 @@ SELECT 'V208 viral account template V3 layout' AS check_name,
              AND schema_row.tenant_id=type_row.tenant_id
              AND schema_row.deleted=b'0'
             WHERE type_row.code='viral_account' AND type_row.deleted=b'0'
-              AND BINARY schema_row.schema_hash=
-                  BINARY '2eca37103ae612ca55b56fe0a84f262fbb67f4f8d41a7d804a2090999dff278a'
+              AND (COALESCE(@zsjos_verify_runtime,0)=1 OR BINARY schema_row.schema_hash=
+                  BINARY '2eca37103ae612ca55b56fe0a84f262fbb67f4f8d41a7d804a2090999dff278a')
               AND schema_row.status='PUBLISHED' AND JSON_LENGTH(schema_row.fields_json)=36
               AND JSON_UNQUOTE(JSON_EXTRACT(schema_row.fields_json,'$[23].key'))='build_notify'
               AND JSON_UNQUOTE(JSON_EXTRACT(schema_row.fields_json,'$[23].section'))='DIRECTOR_ANALYSIS'

@@ -27,30 +27,30 @@ public class StudentInfoFormController {
     @PostMapping("/{caseId}/student-info-form")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:create')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    public CommonResult<Link> generate(@PathVariable Long caseId,@Valid @RequestBody Command request) { return success(service.generate(caseId,request)); }
+    public CommonResult<Link> generate(@PathVariable Long caseId,@Valid @RequestBody Command request) { throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中办理"); }
 
     @GetMapping("/{caseId}/student-info-form/link")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:link-read')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
-    public CommonResult<Link> link(@PathVariable Long caseId) { return success(service.getLink(caseId)); }
+    public CommonResult<Link> link(@PathVariable Long caseId) { throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中办理"); }
 
     @PostMapping("/{caseId}/student-info-form/regenerate")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:regenerate')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     public CommonResult<Link> regenerate(@PathVariable Long caseId,@Valid @RequestBody Command request) {
-        return success(service.regenerate(caseId,request));
+        throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中办理");
     }
     @PostMapping("/{caseId}/student-info-form/revoke")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:revoke')")
     public CommonResult<Link> revoke(@PathVariable Long caseId,@Valid @RequestBody Command request) {
-        return success(service.revoke(caseId,request));
+        throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中办理");
     }
     @PostMapping("/{caseId}/student-info-form/sent")
     @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:sent')")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     public CommonResult<Link> sent(@PathVariable Long caseId,@Valid @RequestBody Command request) {
-        return success(service.confirmSent(caseId,request));
+        throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中办理");
     }
     @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoImageService images;
     @GetMapping("/{caseId}/student-info-form/images/{imageId}")

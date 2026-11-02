@@ -72,6 +72,7 @@
 </template>
 
 <script setup lang="ts">
+import { isRelativeTime, relativeTimeLabel } from "./relativeTime"
 import { Filter, Loading } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -239,6 +240,10 @@ const durationSummary = (condition: Api.AdvancedFilterCondition) => {
 const summarize = (condition: Api.AdvancedFilterCondition) => {
   const field = fieldMap.value[condition.fieldKey]
   if (condition.fieldKey === 'duration.diff') return durationSummary(condition)
+  if (field?.valueType === 'date' && condition.operator !== 'relative') {
+    const label = (v: unknown) => isRelativeTime(v) ? relativeTimeLabel(v) : v == null ? '' : new Date(Number(v)).toLocaleString('zh-CN', {timeZone:'Asia/Shanghai'})
+    return `${field.label} ${operatorLabels[condition.operator]} ${condition.operator === 'between' ? label(condition.valueFrom) + ' 至 ' + label(condition.valueTo) : label(condition.value)}`
+  }
   const value = condition.operator !== 'relative' ? '' : ` ${relativeDateOptions.value.find((item) => item.value === condition.value)?.label || condition.value || ''}`
   return `${field?.group || ''} · ${field?.label || '筛选字段'} ${operatorLabels[condition.operator] || condition.operator}${value}`
 }

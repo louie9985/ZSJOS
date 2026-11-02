@@ -38,6 +38,20 @@ function order(overrides: Partial<SalesOrder> = {}): SalesOrder {
 }
 
 describe('SalesOrderDetailCards Lead profile', () => {
+  it('offers withdrawal only during approval and keeps revision and final termination distinct', () => {
+    const render = (status: SalesOrder['status'], canTerminate: boolean, canRevise: boolean) => renderToStaticMarkup(
+      <SalesOrderDetailCards mode="mine" order={order({ status, canTerminate, canRevise })}
+        onWithdraw={() => undefined} onTerminate={() => undefined} onRevise={() => undefined}/> )
+    const pending = render('pending_approval', true, false)
+    expect(pending).toContain('撤回修改')
+    expect(pending).toContain('终止订单')
+    const revision = render('revision_required', true, true)
+    expect(revision).not.toContain('撤回修改')
+    expect(revision).toContain('修改并重新提交')
+    expect(revision).toContain('终止订单')
+    expect(render('pending_approval', false, false)).not.toContain('撤回修改')
+    expect(render('terminated', false, false)).not.toContain('修改并重新提交')
+  })
   it('opts into information tables while retaining snapshot text and default consumers', () => {
     const data = order({ status: 'effective', classType: '旧班种', paymentMethodLabelSnapshot: '历史支付标签' })
     const table = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" informationLayout="table" order={data}/>)
@@ -118,7 +132,7 @@ describe('SalesOrderDetailCards Lead profile', () => {
     expect(html).toContain('sales-order-detail-main')
     expect(html).toContain('sales-order-approval-sidebar')
     expect(html).toContain('sales-order-approval-actions')
-    expect(html).toContain('订单已驳回，等待补正')
+    expect(html).toContain('订单待重提')
     expect(html).toContain('付款凭证不清晰')
     expect(html).toContain('修改并重新提交')
   })

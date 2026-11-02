@@ -6,13 +6,13 @@ import { Alert, Button, Empty, Image, Space, Tag, Timeline, Typography } from 'a
 import { CheckOutlined, CloseOutlined, CopyOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem, type SalesOrderSupervisorApproval, type SalesOrderSupervisorConfirmation } from '../services/api'
 import { formatTimestamp } from '../services/time'
-import { canReviewSalesOrderTask, orderPartnerOwnerText } from '../services/salesOrder'
+import { canReviewSalesOrderTask, orderPartnerOwnerText, orderSourcePersonText } from '../services/salesOrder'
 import DetailFieldGrid from './DetailFieldGrid'
 import SalesOrderInformationTable from './SalesOrderInformationTable'
 import SalesOrderVoucherAttachments from './SalesOrderVoucherAttachments'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
-  pending_approval: '待审核', revision_required: '已终止', effective: '已通过', superseded: '历史旧单（已重提）', terminated: '已终止'
+  pending_approval: '待审核', revision_required: '待重提', effective: '已通过', superseded: '历史旧单（已重提）', terminated: '已终止'
 }
 export const SALES_ORDER_STATUS_COLORS: Record<SalesOrder['status'], string> = {
   pending_approval: 'gold', revision_required: 'red', effective: 'green', superseded: 'default', terminated: 'default'
@@ -114,7 +114,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
   </section>
 }
 
-export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', reloadVouchers, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
+export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', reloadVouchers, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate, onWithdraw }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
   mode: 'mine' | 'team' | 'approval-todo' | 'approval-done'
@@ -125,6 +125,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
   onRequestSupervisor?: () => void
   onRevise?: () => void
   onTerminate?: () => void
+  onWithdraw?: () => void
 }) {
   const tableLayout = informationLayout === 'table'
   const InformationFields = tableLayout ? SalesOrderInformationTable : DetailFieldGrid
@@ -156,13 +157,13 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
       ? { label: '指定派单', color: 'orange' as const }
       : undefined
   const hasApprovalActions = Boolean((mode === 'mine' && (
-    ((order.status === 'revision_required' || order.status === 'terminated') && order.canRevise && onRevise)
+    ((order.status === 'revision_required') && order.canRevise && onRevise)
     || (order.canTerminate && onTerminate)
   )) || (mode === 'approval-todo' && canReview))
   const statusAlert = (() => {
     if (order.status === 'revision_required') return {
-      type: 'error' as const, title: '订单已驳回，等待补正',
-      description: order.decisionReason || '审批人未填写可展示的驳回原因'
+      type: 'error' as const, title: '订单待重提',
+      description: order.decisionReason || order.terminationReason || '请修改后重新提交审批'
     }
     if (order.status === 'terminated') return {
       type: 'warning' as const, title: '订单已终止：销售手动撤销', description: `撤销原因：${order.terminationReason || '未记录撤销原因'}`
@@ -207,7 +208,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
         <div className="lead-profile-meta">
           <div className="lead-profile-row"><span className="lead-field-label">成交归属身份</span><span className="lead-field-value">{order.formalOwnerIdentityLabel || '未记录'}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">业务来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">来源人员</span><span className="lead-field-value">{leadProfile.sourceUserName || '历史未记录'}</span></div>
+          <div className="lead-profile-row sales-order-source-person"><span className="lead-field-label">来源人员</span><span className="lead-field-value">{orderSourcePersonText(leadProfile.sourceType, leadProfile.sourceUserName, leadProfile.selfSourcedWithoutProvider)}</span></div>
           {leadProfile.sourceType === 'partner' && <div className="lead-profile-row sales-order-partner-owner"><span className="lead-field-label">兼职归属新媒体员工</span><span className="lead-field-value">{orderPartnerOwnerText(leadProfile.sourceType, leadProfile.partnerOwnerSnapshot)}</span></div>}
           <div className="lead-profile-row"><span className="lead-field-label">负责人</span><span className="lead-field-value">{leadProfile.ownerUserName || '历史未记录'}{leadProfile.ownerIdentity && ` · ${leadProfile.ownerIdentityLabel}`}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || "历史未记录"}</span></div>
@@ -292,8 +293,9 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
       <aside className="sales-order-approval-sidebar" aria-label="审批状态">
         <Alert className="sales-order-approval-status" showIcon {...statusAlert}/>
         {hasApprovalActions && <Space wrap className="sales-order-approval-actions">
-          {mode === 'mine' && (order.status === 'revision_required' || order.status === 'terminated') && order.canRevise && onRevise && <Button className="sales-order-revise-button" type="primary" icon={<EditOutlined/>} onClick={onRevise}>修改并重新提交</Button>}
-          {mode === 'mine' && order.canTerminate && onTerminate && <Button danger icon={<StopOutlined/>} onClick={onTerminate}>终止审批</Button>}
+          {mode === 'mine' && (order.status === 'revision_required') && order.canRevise && onRevise && <Button className="sales-order-revise-button" type="primary" icon={<EditOutlined/>} onClick={onRevise}>修改并重新提交</Button>}
+          {mode === 'mine' && order.status === 'pending_approval' && order.canTerminate && onWithdraw && <Button onClick={onWithdraw}>撤回修改</Button>}
+          {mode === 'mine' && order.canTerminate && onTerminate && <Button danger icon={<StopOutlined/>} onClick={onTerminate}>终止订单</Button>}
           {mode === 'approval-todo' && canReview && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button>{onRequestSupervisor && order.canRequestSupervisorConfirmation && <Button icon={<UserSwitchOutlined/>} onClick={onRequestSupervisor}>申请主管确认</Button>}</>}
         </Space>}
         <SalesOrderApprovalRail nodes={approvalNodes}/>

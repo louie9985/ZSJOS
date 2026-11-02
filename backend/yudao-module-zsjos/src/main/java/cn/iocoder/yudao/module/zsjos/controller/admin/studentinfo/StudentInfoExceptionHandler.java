@@ -19,7 +19,7 @@ import jakarta.validation.ConstraintViolationException;
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(assignableTypes = {StudentInfoFormController.class, PublicStudentInfoFormController.class,
-        StudentInfoConfigController.class})
+        StudentInfoConfigController.class, StudentInfoTaskController.class})
 public class StudentInfoExceptionHandler {
     @ExceptionHandler(Exception.class)
     public CommonResult<?> handle(Exception error, HttpServletResponse response) {
