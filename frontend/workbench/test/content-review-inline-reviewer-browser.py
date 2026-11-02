@@ -71,6 +71,12 @@ with sync_playwright() as p:
 
         open_case('revision', width)
         expect(page.get_by_text('审核编导甲', exact=True)).to_be_visible()
+        for expected_contexts in (2, 3):
+            page.locator('.ant-modal:visible .ant-modal-footer button').first.click()
+            expect(page.get_by_role('dialog')).to_have_count(0)
+            page.get_by_role('button', name='继续草稿').click()
+            expect(page.get_by_text('审核编导甲', exact=True)).to_be_visible()
+            assert len(requests('/submit-context')) == expected_contexts
         choose()
         page.get_by_role('button', name='重新提交审批', exact=True).click()
         expect(page.get_by_role('dialog')).to_have_count(0)
