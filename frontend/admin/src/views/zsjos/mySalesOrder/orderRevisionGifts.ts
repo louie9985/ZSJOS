@@ -47,14 +47,10 @@ export function revisionGiftOptions(catalog: GiftConfigVO[], historical: GiftSna
   return [...options.values()]
 }
 
-export function revisionGiftPayload(codes: string[], address: string | undefined, options: RevisionGiftOption[]) {
+export function revisionGiftPayload(codes: string[], _address: string | undefined, options: RevisionGiftOption[]) {
   if (!Array.isArray(codes) || codes.some(code => !options.some(option => option.value === code))) {
     throw new Error('请重新选择有效礼品')
   }
   const giftItems = [...new Set(codes)]
-  const giftShippingAddress = giftItems.length ? address?.trim() : undefined
-  if (giftItems.length && (!giftShippingAddress || giftShippingAddress.length > 1000)) {
-    throw new Error('选择礼品后请填写邮寄地址，最多 1000 个字符')
-  }
-  return { giftItems, giftShippingAddress }
+  return { giftItems, giftShippingAddress: undefined }
 }

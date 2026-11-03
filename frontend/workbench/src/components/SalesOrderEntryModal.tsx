@@ -241,7 +241,6 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     if (!values) return
     const validationError = validateSalesOrderSubmission(values.mobile, values.wechatId, total, vouchers.length)
     if (validationError) { message.warning(validationError); return }
-    if (values.giftItems?.length && !values.giftShippingAddress?.trim()) { message.warning('选择礼品后请填写邮寄地址'); return }
     setProfileLoading(true)
     const requestId = ++profileRequest.current
     try {
@@ -273,7 +272,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         feeMode: values.feeMode, paymentMethod: values.paymentMethod, remark: values.remark?.trim() || undefined,
         studentSpecialRequirements: values.specialRequirements?.trim() || undefined,
         materialDeliveryContact: values.materialDeliveryContact?.trim() || undefined,
-        giftItems: values.giftItems || [], giftShippingAddress: values.giftShippingAddress?.trim() || undefined,
+        giftItems: values.giftItems || [], giftShippingAddress: undefined,
         items: values.items.map(item => { const [spuRef, skuRef] = item.courseKey!.split('::'); return { spuRef, skuRef, actualAmount: Number(item.actualAmount) } }),
         paymentVouchers: [], idempotencyKey
       }
@@ -390,10 +389,9 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         <Row gutter={16}>
           <Col xs={24} md={12}><Form.Item name="giftItems" label="礼品"><TreeSelect treeData={giftNodes} treeCheckable showCheckedStrategy={TreeSelect.SHOW_CHILD} multiple allowClear placeholder="请选择礼品" style={{ width: '100%' }} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
           <Col xs={24} md={12}>
-            <Form.Item name="giftShippingAddress" label="礼品邮寄地址" dependencies={['giftItems']}
-              rules={[{ required: Boolean(giftItems?.length), whitespace: Boolean(giftItems?.length), message: '选择礼品后请填写邮寄地址' }]}>
-              <Input.TextArea rows={3} maxLength={1000} showCount placeholder="选择礼品后必填"/>
-            </Form.Item>
+            {Boolean(giftItems?.length) && <Form.Item label="礼品邮寄地址">
+              <span>邮寄地址自动读取报名收集表信息，不再需要填写</span>
+            </Form.Item>}
           </Col>
         </Row>
         <Space wrap>{!orderId && <Button icon={<SaveOutlined/>} loading={draftSaving} onClick={() => void saveDraft(false)}>保存草稿</Button>}

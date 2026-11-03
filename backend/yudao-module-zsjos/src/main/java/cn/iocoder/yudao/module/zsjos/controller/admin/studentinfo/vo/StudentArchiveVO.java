@@ -31,6 +31,6 @@ public interface StudentArchiveVO {
         @NotNull @Min(0) private Integer revision;
         @NotBlank @Size(max=64) private String idempotencyKey;
         @Size(max=500) private String reason;
-        @NotNull @Size(max=32) private Map<String, Object> changes;
+        @NotNull @Size(max=33) private Map<String, Object> changes;
     }
 }

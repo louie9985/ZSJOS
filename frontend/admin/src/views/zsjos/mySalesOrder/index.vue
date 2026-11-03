@@ -131,9 +131,8 @@
           <div v-else-if="!revisionGiftLoading && !revisionGiftChoices.length" style="color: var(--el-text-color-secondary)">暂无可选礼品</div>
         </div>
       </el-form-item>
-      <el-form-item label="礼品邮寄地址" :required="Boolean(revision.giftItems?.length)">
-        <el-input v-model="revision.giftShippingAddress" type="textarea" :rows="2" maxlength="1000" show-word-limit
-          placeholder="选择礼品后必填" aria-label="礼品邮寄地址" />
+      <el-form-item v-if="revision.giftItems?.length" label="礼品邮寄地址">
+        <span>邮寄地址自动读取报名收集表信息，不再需要填写</span>
       </el-form-item>
       <el-form-item label="备注"
         ><el-input

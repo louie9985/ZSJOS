@@ -29,7 +29,7 @@ class StudentInfoFieldsTest {
     }
     @Test void rejectsExtraFieldsChangedTypesAndEmptyPublication() {
         var config=fields.presets();
-        assertEquals(32, config.size());
+        assertEquals(33, config.size());
         config.get(0).setType("dict");
         assertThrows(ServiceException.class, () -> fields.validateConfig(config,false));
         var disabled=fields.presets(); disabled.forEach(f -> f.setEnabled(false));
