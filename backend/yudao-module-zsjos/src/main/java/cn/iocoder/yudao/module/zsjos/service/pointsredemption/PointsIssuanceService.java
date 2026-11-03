@@ -3,8 +3,6 @@ package cn.iocoder.yudao.module.zsjos.service.pointsredemption;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
-import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.pointsredemption.PointsRequestDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.pointsredemption.PointsRequestMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
@@ -25,7 +23,6 @@ public class PointsIssuanceService {
     @Resource private PointsCrypto crypto;
     @Resource private TransactionTemplate transactions;
     @Resource private RedissonClient redis;
-    @Resource private BpmProcessTaskApi tasks;
     @Resource private NotifyBusinessEventApi notifications;
 
     public int drain() {
@@ -48,14 +45,7 @@ public class PointsIssuanceService {
                         || "failed".equals(current.getIssueStatus())) return null;
                 if ("issued".equals(current.getIssueStatus())) return current;
                 platform.requireConfigured(); crypto.validate();
-                // Validate frozen approvers and BPM's recorded manual or consecutive-deduplication decisions.
-                Set<String> keys = new HashSet<>(JsonUtils.parseArray(current.getTaskKeysJson(), String.class));
-                List<String> orderedKeys = JsonUtils.parseArray(current.getTaskKeysJson(), String.class);
-                List<Long> approvers = JsonUtils.parseArray(current.getApproverIdsJson(), Long.class);
-                var decisions = tasks.getProcessNodeStatuses(current.getProcessInstanceId(), keys);
-                if (!validApprovalDecisions(orderedKeys, approvers, decisions, current.getApplicantUserId())) {
-                    current.setIssueStatus("failed"); current.setLastError("审批记录未满足指定审批人及连续同人自动去重要求"); requests.updateById(current); return null;
-                }
+                // The BPM terminal-status event is authoritative, including configured automatic approvals.
                 if (current.getPlatformUrl() == null) {
                     current.setPlatformUrl(platform.currentBaseUrl());
                     if (current.getValidDays() != null) current.setExpiresAt(LocalDateTime.now().withNano(0).plusDays(current.getValidDays()));
@@ -115,35 +105,6 @@ public class PointsIssuanceService {
                 }
             });
         } finally { lock.unlock(); }
-    }
-
-    static boolean validApprovalDecisions(List<String> orderedKeys, List<Long> approvers,
-            List<BpmProcessNodeStatusRespDTO> decisions, Long applicant) {
-        if (orderedKeys.isEmpty() || new HashSet<>(orderedKeys).size() != orderedKeys.size()
-                || approvers.size() != orderedKeys.size() || decisions.size() != orderedKeys.size()) return false;
-        Map<String, BpmProcessNodeStatusRespDTO> byKey = new HashMap<>();
-        for (var decision : decisions) {
-            if (!orderedKeys.contains(decision.getTaskDefinitionKey())
-                    || byKey.put(decision.getTaskDefinitionKey(), decision) != null) return false;
-        }
-        for (int i = 0; i < orderedKeys.size(); i++) {
-            var decision = byKey.get(orderedKeys.get(i));
-            Long approver = approvers.get(i);
-            if (approver == null || Objects.equals(approver, applicant) || !"approved".equals(decision.getStatus())) return false;
-            if (decision.getActionUserId() != null) {
-                if (!Objects.equals(decision.getActionUserId(), approver)
-                        || Boolean.TRUE.equals(decision.getConsecutiveApprovalDeduplicated())) return false;
-            } else {
-                // The preceding accepted decision ultimately traces back to a manual action by this same approver.
-                if (i == 0 || !Boolean.TRUE.equals(decision.getConsecutiveApprovalDeduplicated())
-                        || !Objects.equals(decision.getReviewerUserId(), approver)
-                        || !Objects.equals(approvers.get(i - 1), approver)) return false;
-                var previous = byKey.get(orderedKeys.get(i - 1));
-                if (previous.getEndTime() == null || decision.getEndTime() == null
-                        || decision.getEndTime().isBefore(previous.getEndTime())) return false;
-            }
-        }
-        return true;
     }
 
     @ZsjosPermission(bizType="points-redemption", bizId="#id", action="refresh")

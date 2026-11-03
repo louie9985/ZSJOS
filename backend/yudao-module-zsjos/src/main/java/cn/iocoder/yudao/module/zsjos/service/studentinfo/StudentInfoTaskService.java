@@ -200,6 +200,22 @@ public class StudentInfoTaskService {
         if (!Objects.equals(task.getPersonId(),order.getPersonId())) throw exception(CONFIG_INVALID);
         return task;
     }
+    @ZsjosPermission(bizType="student-info-task",bizId="#id",action="create")
+    @Transactional(rollbackFor=Exception.class)
+    public GenerationConfig generationConfig(Long id) {
+        var task=lock(id);
+        if(task.getFormId()!=null) throw exception(VERSION_CONFLICT);
+        var form=collection.prepareTaskForm(task);
+        var result=new GenerationConfig(); result.setConfigVersionId(form.getConfigVersionId());
+        result.setFields(collection.definitions(form));
+        result.setSelectableMaterialKeys(StudentInfoMaterialSelection.selectable(result.getFields()));
+        var order=orders.selectById(task.getOrderId());
+        if(order==null) throw exception(LINK_INVALID);
+        boolean hasGift=!cn.iocoder.yudao.module.zsjos.service.order.SalesOrderGiftSnapshot.read(order.getGiftItems()).isEmpty();
+        result.setDefaultSelectedKeys(result.getSelectableMaterialKeys().stream()
+                .filter(key -> hasGift && "gift_shipping_address".equals(key)).toList());
+        return result;
+    }
     @ZsjosPermission(bizType="student-info-task",bizId="#id",action="link-read")
     @Transactional(rollbackFor=Exception.class)
     public StudentInfoVO.Link link(Long id) {
@@ -257,7 +273,11 @@ public class StudentInfoTaskService {
     @Transactional(rollbackFor=Exception.class)
     public Row reuse(Long id,Command request) { return create(id,request,true); }
     private Row create(Long id,Command request,boolean reuse) {
-        var task=lock(id); String fingerprint=cn.hutool.crypto.digest.DigestUtil.sha256Hex(reuse+":"+request.getSourceFormId()+":"+request.getSourceRevision()+":"+getLoginUserId());
+        var task=lock(id);
+        var materialKeys=request.getMaterialKeys()==null ? List.<String>of() : request.getMaterialKeys();
+        if(reuse && (request.getMaterialKeys()!=null || request.getConfigVersionId()!=null)) throw exception(FIELD_INVALID,"复用不支持调整材料");
+        String fingerprint=cn.hutool.crypto.digest.DigestUtil.sha256Hex(reuse+":"+request.getSourceFormId()+":"+request.getSourceRevision()+":"+getLoginUserId()
+                +(!reuse ? ":"+request.getConfigVersionId()+":"+JsonUtils.toJsonString(materialKeys.stream().sorted().toList()) : ""));
         if (Objects.equals(task.getLastCommandKey(),request.getIdempotencyKey())) {
             if (!Objects.equals(task.getLastCommandFingerprint(),fingerprint)) throw exception(VERSION_CONFLICT);
             return row(task);
@@ -276,6 +296,10 @@ public class StudentInfoTaskService {
             target.setSalesUserId(getLoginUserId());target.setProductId(replaced.getProductId());target.setProductName(replaced.getProductName());
             target.setConfigVersionId(replaced.getConfigVersionId());target.setFieldsSnapshot(replaced.getFieldsSnapshot());
             target.setCategoryPathSnapshot(replaced.getCategoryPathSnapshot());target.setDraftRevision(0L);
+        }
+        if(!reuse) {
+            if(request.getMaterialKeys()!=null && !Objects.equals(request.getConfigVersionId(),target.getConfigVersionId())) throw exception(VERSION_CONFLICT);
+            target.setFieldsSnapshot(JsonUtils.toJsonString(StudentInfoMaterialSelection.select(collection.definitions(target),materialKeys)));
         }
         StudentInfoFormDO source=null; StudentArchiveRevisionDO revision=null;
         if (request.getSourceFormId()!=null || !reuse) {

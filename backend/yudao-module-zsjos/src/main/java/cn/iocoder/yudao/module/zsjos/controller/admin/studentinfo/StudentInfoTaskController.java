@@ -52,6 +52,9 @@ public class StudentInfoTaskController {
     @GetMapping("/{id}") @PreAuthorize("@ss.hasPermission('zsjos:student-info-task:query')")
     public CommonResult<Row> detail(@PathVariable Long id) { return success(service.detail(id)); }
     @ApiAccessLog(requestEnable=false,responseEnable=false)
+    @GetMapping("/{id}/generation-config") @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:create') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    public CommonResult<GenerationConfig> generationConfig(@PathVariable Long id) { return success(service.generationConfig(id)); }
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
     @PostMapping("/{id}/generate") @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:create') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
     public CommonResult<Row> generate(@PathVariable Long id,@Valid @RequestBody Command command) { return success(service.generate(id,command)); }
     @ApiAccessLog(requestEnable=false,responseEnable=false)

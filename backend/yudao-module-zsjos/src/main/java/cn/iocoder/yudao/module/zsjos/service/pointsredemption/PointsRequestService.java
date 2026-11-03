@@ -74,8 +74,8 @@ public class PointsRequestService {
         row.setSubmittedAt(LocalDateTime.now()); row.setAttempts(0); row.setNotified(false);
         row.setOrderId("ZSJOS-POINTS-" + UUID.randomUUID());
         row.setProcessDefinitionId(definition.getId());
-        row.setApproverIdsJson(JsonUtils.toJsonString(approval.approverIds(definition, userId)));
-        row.setTaskKeysJson(JsonUtils.toJsonString(PointsApprovalPolicy.orderedTasks(definition).stream().map(t -> t.getKey()).toList()));
+        row.setApproverIdsJson("[]");
+        row.setTaskKeysJson("[]");
         row.setProcessInstanceId(UUID.randomUUID().toString());
         requests.insert(row);
         var process = new BpmProcessInstanceCreateReqDTO();

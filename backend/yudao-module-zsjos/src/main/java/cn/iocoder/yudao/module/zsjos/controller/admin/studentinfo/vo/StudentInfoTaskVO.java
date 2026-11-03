@@ -17,8 +17,16 @@ public final class StudentInfoTaskVO {
     @Data public static class Command {
         @NotNull private Integer version;
         @NotBlank @Size(max=64) private String idempotencyKey;
+        @Size(max=13) private List<@NotBlank String> materialKeys;
+        private Long configVersionId;
         private Long sourceFormId;
         private Integer sourceRevision;
+    }
+    @Data public static class GenerationConfig {
+        private Long configVersionId;
+        private List<StudentInfoVO.Field> fields;
+        private List<String> selectableMaterialKeys;
+        private List<String> defaultSelectedKeys;
     }
     @Data public static class Candidate {
         private Long formId;

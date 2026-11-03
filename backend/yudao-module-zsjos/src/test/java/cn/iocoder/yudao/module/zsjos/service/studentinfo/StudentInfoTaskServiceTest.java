@@ -114,7 +114,12 @@ class StudentInfoTaskServiceTest {
         var target=new StudentInfoFormDO();when(collection.prepareTaskForm(task)).thenReturn(target);
         var source=submitted();when(forms.currentArchive(3L)).thenReturn(source);when(forms.lock(8L)).thenReturn(source);
         var field=new Field();field.setKey("name");field.setLabel("姓名");field.setType("text");field.setEnabled(true);field.setRequired(true);
-        when(collection.definitions(any())).thenReturn(List.of(field));
+        var portrait=new Field();portrait.setKey("portrait");portrait.setType("images");portrait.setEnabled(true);
+        target.setFieldsSnapshot(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(List.of(field,portrait)));
+        when(collection.definitions(any())).thenAnswer(call->{
+            StudentInfoFormDO form=call.getArgument(0);
+            return form==target ? new StudentInfoFields().parse(form.getFieldsSnapshot()) : List.of(field,portrait);
+        });
         var answer=new StudentInfoFormValueDO();answer.setFieldKey("name");answer.setValueText("已有资料待核对");when(answers.byForm(8L)).thenReturn(List.of(answer));
         doAnswer(call->{target.setId(9L);target.setStatus("DRAFT");target.setExpiresAt(java.time.LocalDateTime.now().plusDays(1));return null;}).when(collection).issueTaskForm(target);
         when(forms.selectById(9L)).thenReturn(target);
@@ -123,7 +128,51 @@ class StudentInfoTaskServiceTest {
         var draft=cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(target.getDraftSnapshot(),cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Draft.class);
         assertEquals("已有资料待核对",draft.getValues().get("name"));assertEquals(8L,task.getSourceFormId());assertNull(request.getSourceFormId());
         assertEquals(9L,service.generate(4L,request).getFormId());verify(collection,times(1)).issueTaskForm(target);
-        verify(images).copyForCollection(eq(source),eq(target),anyList(),anyList());verify(answers,never()).insert(any(StudentInfoFormValueDO.class));
+        verify(images).copyForCollection(eq(source),eq(target),anyList(),argThat(fields->fields.stream().noneMatch(f->"portrait".equals(f.getKey()))));
+        request.setMaterialKeys(List.of("portrait"));
+        assertThrows(ServiceException.class,()->service.generate(4L,request));
+        verify(answers,never()).insert(any(StudentInfoFormValueDO.class));
+    }
+    @Test void materialSelectionDefaultsOffAndCannotAddOrEnableFields() {
+        var fields=new StudentInfoFields().presets();
+        assertEquals(13,StudentInfoMaterialSelection.selectable(fields).size());
+        assertTrue(StudentInfoMaterialSelection.select(fields,List.of()).stream().anyMatch(f -> "textbook_shipping_address".equals(f.getKey())));
+        var defaults=StudentInfoMaterialSelection.select(fields,null);
+        assertTrue(defaults.stream().noneMatch(f->StudentInfoMaterialSelection.KEYS.contains(f.getKey())));
+        assertTrue(defaults.stream().anyMatch(f->"name".equals(f.getKey()) && f.getRequired()));
+        var selected=StudentInfoMaterialSelection.select(fields,List.of("identity_images","portrait"));
+        assertEquals(2,selected.stream().filter(f->StudentInfoMaterialSelection.KEYS.contains(f.getKey())).count());
+        assertThrows(ServiceException.class,()->StudentInfoMaterialSelection.select(fields,List.of("name")));
+        assertThrows(ServiceException.class,()->StudentInfoMaterialSelection.select(fields,List.of("unknown")));
+        assertThrows(ServiceException.class,()->StudentInfoMaterialSelection.select(fields,List.of("portrait","portrait")));
+        fields.stream().filter(f->"portrait".equals(f.getKey())).forEach(f->f.setEnabled(false));
+        assertThrows(ServiceException.class,()->StudentInfoMaterialSelection.select(fields,List.of("portrait")));
+    }
+    @Test void addressDefaultsFollowOrderGiftAndPublishedTemplate() {
+        var task=task();when(tasks.selectById(4L)).thenReturn(task);when(tasks.lock(4L)).thenReturn(task);
+        var order=order("pending_approval");
+        when(orders.selectByIdForUpdate(1L,1L)).thenReturn(order);
+        when(orders.selectById(1L)).thenReturn(order);
+        var form=new StudentInfoFormDO();when(collection.prepareTaskForm(task)).thenReturn(form);
+        var fields=new StudentInfoFields().presets();when(collection.definitions(form)).thenReturn(fields);
+        for(String gift: new String[]{null,"","  ","[]"," [ ] ","[{\"code\":\"gift\"}]","[\"{\\\"code\\\":\\\"gift\\\"}\"]"}) {
+            order.setGiftItems(gift);
+            var config=service.generationConfig(4L);
+            assertFalse(config.getDefaultSelectedKeys().contains("certificate_shipping_address"));
+            assertEquals(gift!=null && gift.contains("gift"),config.getDefaultSelectedKeys().contains("gift_shipping_address"));
+        }
+        fields.stream().filter(f -> "gift_shipping_address".equals(f.getKey())).forEach(f -> f.setEnabled(false));
+        assertFalse(service.generationConfig(4L).getDefaultSelectedKeys().contains("gift_shipping_address"));
+        order.setGiftItems("invalid");
+        assertThrows(ServiceException.class,()->service.generationConfig(4L));
+    }
+    @Test void generationRejectsStaleConfigurationBeforeIssuingOrCopying() {
+        var task=task();when(tasks.selectById(4L)).thenReturn(task);when(tasks.lock(4L)).thenReturn(task);
+        when(orders.selectByIdForUpdate(1L,1L)).thenReturn(order("pending_approval"));
+        var target=new StudentInfoFormDO();target.setConfigVersionId(12L);when(collection.prepareTaskForm(task)).thenReturn(target);
+        var request=command();request.setMaterialKeys(List.of("portrait"));request.setConfigVersionId(11L);
+        assertThrows(ServiceException.class,()->service.generate(4L,request));
+        verify(collection,never()).issueTaskForm(any());verifyNoInteractions(images);
     }
     private StudentInfoFormDO submitted() {
         var form=new StudentInfoFormDO(); form.setId(8L); form.setPersonId(3L); form.setOrderItemId(2L); form.setStatus("SUBMITTED"); return form;

@@ -1,15 +1,17 @@
 import type { ProductSpec } from './productSpecs'
 import { http, unwrap, type PageResult } from './api'
-import type { StudentInfoLink, StudentInfoDetail, StudentInfoImage } from './studentInfo'
+import type { StudentInfoLink, StudentInfoDetail, StudentInfoImage, StudentInfoField } from './studentInfo'
 export interface CollectionCandidate { formId: number; productName: string; revision: number; missing: string[] }
 export interface CollectionTask {
   id: number; orderId: number; orderItemId: number; personId: number; formId?: number; registrationCaseId?: number; version: number
   orderNo: string; studentName: string; productName: string; orderStatus: string; status: string
   specs?: ProductSpec[] | null; archiveStatus: string; canProcess: boolean; candidates: CollectionCandidate[]
 }
-export interface CollectionCommand { version: number; idempotencyKey: string; sourceFormId?: number; sourceRevision?: number }
+export interface CollectionGenerationConfig { configVersionId: number; fields: StudentInfoField[]; selectableMaterialKeys: string[]; defaultSelectedKeys?: string[] }
+export interface CollectionCommand { materialKeys?: string[]; configVersionId?: number; version: number; idempotencyKey: string; sourceFormId?: number; sourceRevision?: number }
 const base = '/zsjos/student-info-task'
 export const collectionTasksApi = {
+  generationConfig: async (id: number) => unwrap<CollectionGenerationConfig>(await http.get(`${base}/${id}/generation-config`)),
   byRegistration: async (caseId:number) => unwrap<CollectionTask>(await http.get(`${base}/by-registration/${caseId}`)),
   detail: async (id: number) => unwrap<CollectionTask>(await http.get(`${base}/${id}`)),
   page: async (pageNo: number, keyword: string, personId?: number, status?: string, orderStatus?: string) => unwrap<PageResult<CollectionTask>>(await http.get(`${base}/page`, { params: { pageNo, pageSize: 20, keyword, personId, status, orderStatus } })),

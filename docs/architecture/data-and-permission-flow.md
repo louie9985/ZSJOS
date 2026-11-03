@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## Management student summary (2026-11-03)
+
+Explicitly approved exception: `zsjos:student-summary:query` grants current-tenant full teaching-service population and archive-field reads, including sensitive and exam fields, without legacy personal/department/archive gates. Export additionally requires `zsjos:student-summary:export`. The exception is isolated to new read-only endpoints, preserves tenant and logical-delete constraints, and grants no legacy command or material-download access. Workbench uses BusinessTable; Vue Admin excludes the unsupported component. V361 adds metadata only, never role grants. See [student summary](../api/student-summary.md).
+
 ## Order collection tasks (2026-11-01)
 
 Workbench `/zsjos/student-info-tasks` requires configured `zsjos:student-info-task:query`

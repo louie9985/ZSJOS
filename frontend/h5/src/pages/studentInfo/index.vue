@@ -12,7 +12,7 @@
         <details v-for="group in visibleGroups" :key="group.key" :open="openGroups[group.key] !== false" class="collection-group norem" :data-group="group.key" @toggle="openGroups[group.key]=($event.target as HTMLDetailsElement).open">
           <summary class="norem" @click.prevent="openGroups[group.key]=openGroups[group.key] === false"><span class="collection-group-icon norem"><svg class="collection-group-svg norem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path :d="group.iconPath" /></svg></span><span class="collection-group-title norem"><strong>{{ group.label }}</strong><small>{{ group.note }}</small></span><van-icon name="arrow-down" /></summary>
           <div class="collection-grid norem">
-        <div v-for="field in group.fields" :key="field.key" class="collection-field norem" :class="{ 'collection-field-wide': field.type==='images' || field.type==='textarea' }">
+        <div v-for="field in group.fields" :key="field.key" :id="`collection-field-${field.key}`" tabindex="-1" :aria-describedby="fieldErrors[field.key] ? `collection-error-${field.key}` : undefined" class="collection-field norem" :class="{ 'collection-field-wide': field.type==='images' || field.type==='textarea' }">
           <label :for="field.key"><span :class="{ 'h5-required-label': field.required }">{{ field.label }}</span></label>
           <CollectionImages v-if="field.type==='images'" :key="token + field.key" :token="token" :field="field" :images="(runtime.images || []).filter(i=>i.fieldKey===field.key)" :disabled="saving" @change="updateImages(field.key,$event)" @busy="uploadBusy[field.key]=$event" @failed="uploadFailed[field.key]=$event" />
           <input v-else-if="['gender','age','household_area'].includes(field.key)" :id="field.key" :value="field.key === 'household_area' ? areaLabel : field.key === 'gender' ? genderLabel : answers.age" readonly placeholder="填写身份证后自动识别" />
@@ -21,6 +21,7 @@
           <input v-else :id="field.key" v-model="answers[field.key]" :required="field.required" :disabled="saving"
             :type="field.key === 'mobile' ? 'tel' : 'text'" :maxlength="field.key === 'mobile' ? 11 : field.key === 'id_card' ? 18 : 200"
             :pattern="field.key === 'mobile' ? '1[3-9][0-9]{9}' : undefined" autocomplete="off" />
+          <p v-if="fieldErrors[field.key]" :id="`collection-error-${field.key}`" class="collection-error norem" role="alert">{{ fieldErrors[field.key] }}</p>
           <p v-if="field.note">{{ field.note }}</p>
           <p v-if="field.key === 'household_area'">{{ areaError || '按身份证地址码自动识别' }}</p>
         </div>
@@ -33,9 +34,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import { showConfirmDialog } from 'vant'
+import { showConfirmDialog, showDialog } from 'vant'
 import { collectionApi, CollectionError, type CollectionArea, type CollectionRuntime, type CollectionImage } from '@/api/studentInfo'
 import CollectionImages from './CollectionImages.vue'
 import CollectionSelect from './CollectionSelect.vue'
@@ -104,6 +105,25 @@ watch(draftText, () => {
   if (!loading.value && draftChanged.value && !saving.value) draftTimer = setTimeout(() => { void saveDraftNow() }, 700)
 })
 const error = ref('')
+const fieldErrors = ref<Record<string, string>>({})
+async function reportSubmitError(message: string, key?: string) {
+  if (key) {
+    fieldErrors.value[key] = message
+    const field = runtime.value?.fields.find(f => f.key === key)
+    if (field) openGroups.value[field.group] = true
+    await nextTick()
+    const target = document.getElementById(`collection-field-${key}`)
+    target?.focus({ preventScroll: true })
+    target?.scrollIntoView({ block: 'center', behavior: 'auto' })
+  } else {
+    await showDialog({ title: '暂时无法提交', message: message || '提交失败，请重试' })
+  }
+}
+watch(() => ({ ...answers.value }), (values, previous) => {
+  for (const key of Object.keys(fieldErrors.value)) {
+    if (values[key] !== previous[key]) delete fieldErrors.value[key]
+  }
+})
 const openGroups = ref<Record<string,boolean>>({})
 const uploadBusy = ref<Record<string,boolean>>({})
 const uploadFailed = ref<Record<string,boolean>>({})
@@ -141,7 +161,7 @@ const statusText = computed(() => ({ SUBMITTED: '信息已提交，不可修改'
 const load = async () => {
   const sequence = ++loadSequence
   draftBusy.value = false; draftConflict.value = false
-  loading.value = true; error.value = ''; runtime.value = undefined
+  loading.value = true; error.value = ''; fieldErrors.value = {}; runtime.value = undefined
   try {
     if (!token.value) throw new Error('信息收集链接不完整')
     const data = await collectionApi.detail(token.value)
@@ -179,21 +199,22 @@ const reloadConflictedDraft = async () => {
 }
 const submit = async () => {
   if (!runtime.value || saving.value || hasUploads.value || hasUploadErrors.value) return
-  if (draftConflict.value) { error.value = draftError.value; return }
-  error.value = ''
-  if (answers.value.id_card && !validCollectionIdentity(answers.value.id_card)) { error.value = '请检查身份证号码'; return }
-  if (runtime.value.fields.some(f => f.key === 'household_area') && areaError.value) { error.value = areaError.value; return }
-  for(const f of runtime.value.fields){const images=runtime.value.images?.filter(i=>i.fieldKey===f.key)||[];const missing=f.type==='images'?images.length<(f.key==='identity_images'?2:1):f.type==='area'?!areaPath.value.length:!(answers.value[f.key]||'').trim();if(f.required&&missing){error.value='请填写'+f.label;openGroups.value[f.group]=true;document.getElementById(f.key)?.focus();return}}
+  if (draftConflict.value) { await reportSubmitError(draftError.value); return }
+  error.value = ''; fieldErrors.value = {}
+  if (answers.value.mobile && !/^1[3-9][0-9]{9}$/.test(answers.value.mobile)) { await reportSubmitError('请填写正确的11位手机号码', 'mobile'); return }
+  if (answers.value.id_card && !validCollectionIdentity(answers.value.id_card)) { await reportSubmitError('请检查身份证号码', 'id_card'); return }
+  if (runtime.value.fields.some(f => f.key === 'household_area') && areaError.value) { await reportSubmitError(areaError.value, 'household_area'); return }
+  for(const f of runtime.value.fields){const images=runtime.value.images?.filter(i=>i.fieldKey===f.key)||[];const missing=f.type==='images'?images.length<(f.key==='identity_images'?2:1):f.type==='area'?!areaPath.value.length:!(answers.value[f.key]||'').trim();if(f.required&&missing){await reportSubmitError(f.type === 'images' ? (f.key === 'identity_images' ? '请上传身份证正反面两张图片' : '请上传'+f.label) : '请填写'+f.label, f.key);return}}
   const area = runtime.value.fields.find(f => f.type === 'area')
-  if (area?.required && !areaPath.value.length) { error.value = '请填写有效身份证以识别户籍所在地'; return }
+  if (area?.required && !areaPath.value.length) { await reportSubmitError('请填写有效身份证以识别户籍所在地', 'id_card'); return }
   const requestToken = token.value
   try { await showConfirmDialog({ title: '确认提交', message: '提交后信息将锁定，不能再次修改。' }) } catch { return }
   if (requestToken !== token.value || runtime.value?.status !== 'DRAFT') return
   clearTimeout(draftTimer)
-  if (!await saveDraftNow()) { error.value = draftError.value; return }
+  if (!await saveDraftNow()) { await reportSubmitError(draftError.value); return }
   clearTimeout(draftTimer)
   if (requestToken !== token.value || runtime.value?.status !== 'DRAFT') return
-  if (draftConflict.value) { error.value = draftError.value; return }
+  if (draftConflict.value) { await reportSubmitError(draftError.value); return }
   saving.value = true
   try {
     const values: Record<string,string | number[]> = {}
@@ -206,7 +227,7 @@ const submit = async () => {
     if (requestToken !== token.value) return
     if (e instanceof CollectionError && e.code === 1900090011) { draftConflict.value = true; draftError.value = e.message }
     if (e instanceof CollectionError && [1900090006, 1900090007].includes(e.code)) await load()
-    else error.value = e instanceof Error ? e.message : '提交失败，请重试'
+    else await reportSubmitError(e instanceof Error ? e.message : '提交失败，请重试')
   }
   finally { saving.value = false }
 }
@@ -219,6 +240,8 @@ watch(token, () => {
 </script>
 
 <style scoped>
+.collection-field.norem .collection-error.norem { color: #b42318; font-weight: 500; }
+.collection-field.norem:focus { outline: 2px solid var(--h5-primary); outline-offset: 2px; }
 .collection-draft.norem { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 4px 12px; font-size: 12px; color: var(--h5-text-secondary); }
 .collection-draft.norem button { border: 0; background: transparent; color: var(--h5-primary); font: inherit; cursor: pointer; }
 .collection-group-svg.norem { display: block; width: 22px; height: 22px; }

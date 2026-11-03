@@ -13,6 +13,7 @@ import BusinessTable from '../components/BusinessTable'
 import StudentInfoPanel from '../components/StudentInfoPanel'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import OverflowToolbar, { type ToolbarAction } from '../components/OverflowToolbar'
+import StudentInfoGenerateModal from '../components/StudentInfoGenerateModal'
 import StudentInfoLinkModal, { type StudentInfoLinkClient } from '../components/StudentInfoLinkModal'
 import '../styles/pages/student-info-tasks.css'
 import { collectionTasksApi, collectionTaskReader, currentArchiveReader, type CollectionTask } from '../services/studentInfoTasks'
@@ -161,7 +162,8 @@ export default function StudentInfoTasksPage({ permissions }: { permissions: str
     <Modal width="min(1440px, calc(100vw - 32px))" className="registration-page collection-detail-modal" title="报名资料收集" open={Boolean(selected)&&(useTableLayout||!isDesktop)} onCancel={()=>{if(!busy){setSelected(undefined);setLinkMode(undefined)}}} footer={<Button disabled={busy} onClick={()=>{setSelected(undefined);setLinkMode(undefined)}}>关闭</Button>}>
       {detailContent}
     </Modal>
-    {selected&&linkMode&&<StudentInfoLinkModal caseId={selected.id} version={selected.version} mode={linkMode} client={linkClient} onClose={()=>setLinkMode(undefined)} onChanged={()=>void load()}/>}
+    {selected&&linkMode==='generate'&&<StudentInfoGenerateModal key={selected.id} task={selected} onClose={()=>setLinkMode(undefined)} onGenerated={row=>{setSelected(row);setLinkMode('view');void load()}}/>}
+    {selected&&linkMode==='view'&&<StudentInfoLinkModal caseId={selected.id} version={selected.version} mode={linkMode} client={linkClient} onClose={()=>setLinkMode(undefined)} onChanged={()=>void load()}/>}
     <Modal title="查看已有档案" open={archiveOpen} onCancel={closeArchive} width={1080} destroyOnHidden footer={<Space wrap>
       <Button disabled={busy||archiveLoading} onClick={()=>void viewArchive()}>刷新档案</Button>
       {archiveSource&&archiveTask?.canProcess&&!['SUBMITTED','REUSED'].includes(archiveTask.status)&&permitted('zsjos:student-info-task:reuse')&&permitted('zsjos:student-info-form:sensitive-read')&&<Button type="primary" loading={busy} disabled={!archiveReady||archiveLoading||!!archiveError||archiveSource.missing.length>0} onClick={()=>archiveTask.formId?Modal.confirm({title:'复用已有档案',content:'将以已有档案替换本任务未提交的收集表，旧填写链接将失效，原草稿会保留为订单记录。',onOk:()=>command('reuse')}):void command('reuse')}>复用已有档案</Button>}
