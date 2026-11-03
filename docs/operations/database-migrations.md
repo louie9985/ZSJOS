@@ -197,6 +197,18 @@ database; applied deployed copies remain a separate rollout. Retain widened sche
 
 ## Core schema synchronization and numbering
 
+V360 的 `zsjos_student_info_image.original_name` 必须同时出现在
+`schema/core.sql` 和 `00-bootstrap-schema.sql`，定义为可空 `TEXT`、
+`utf8mb4_unicode_ci`，与已发布的 V360 一致。漏同步会令已完成 V360 的数据库
+在部署预检中报 `unexpected column`。本次修正只同步当前结构与空库基线；
+不修改 V360 文件、已有字段、业务数据、权限或历史 checksum，也不增加迁移编号。
+空库按 `bootstrap.sql` 后执行各模块待执行迁移；旧库仍按原顺序执行 V360，
+其前置是两份账本均已登记 V323。已有 V360 且字段正确的数据库无需再次执行 DDL。
+重复迁移保留已有名称和版本记录；DDL 隐式提交，回退应用时保留字段，删除字段会丢失附件名称。
+验证包括隔离 MySQL 的完整初始化、V360 升级与重复/部分失败恢复，以及目标库只读结构比对。
+修正后重建 migrator，再执行 `db-plan`；部署脚本的 `db-plan` 会自动重建镜像。
+不得删除该列或放宽漂移检查来解除阻断。
+
 The V293 nullable JSON `zsjos_exam_schedule.attachment_ids_json` and V294 nullable
 datetime `zsjos_feedback_round.last_urged_at` must appear in both Core schema
 sources. Their omission caused post-migration verification to report these valid

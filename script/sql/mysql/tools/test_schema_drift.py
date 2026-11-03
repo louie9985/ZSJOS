@@ -89,6 +89,34 @@ class AnnotationSchemaContractTest(unittest.TestCase):
         self.assertNotIn(table, db.load_manifests()['core']['allowedExtraTables'])
 
 
+class StudentAttachmentSchemaContractTest(unittest.TestCase):
+    def test_v360_original_name_is_validated_in_both_schema_sources(self):
+        table = 'zsjos_student_info_image'
+        key = (table, 'original_name')
+        for relative in ('schema/core.sql', '00-bootstrap-schema.sql'):
+            with self.subTest(path=relative):
+                columns, _, _ = db.desired_schema(db.SQL_ROOT / relative)
+                self.assertEqual(('text', 'YES'), columns[key])
+                manifest = {'core': {'schema': relative}}
+                client = Mock(spec=db.MysqlClient)
+                for actual, expected in (
+                    ('text\tYES', []),
+                    ('', [f'missing column {table}.original_name']),
+                    ('varchar(255)\tYES', [
+                        f'column differs {table}.original_name '
+                        'expected=text/YES actual=varchar(255)/YES']),
+                    ('text\tNO', [
+                        f'column differs {table}.original_name '
+                        'expected=text/YES actual=text/NO']),
+                ):
+                    client.query.side_effect = [
+                        f'{table}\toriginal_name\t{actual}' if actual else '', '', '']
+                    with patch.object(db, 'desired_schema', return_value=(
+                        {key: columns[key]}, {}, {}
+                    )):
+                        self.assertEqual(expected, db.schema_drift(client, manifest))
+
+
 class SchemaDriftTest(unittest.TestCase):
     def setUp(self):
         self.manifests = {'core': db.load_manifests()['core']}

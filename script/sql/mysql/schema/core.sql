@@ -8226,6 +8226,7 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_image (
   updater VARCHAR(64) DEFAULT '', update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted BIT(1) NOT NULL DEFAULT b'0',
   archive_only BIT(1) NOT NULL DEFAULT b'0' COMMENT '仅档案维护使用，不改变原提交',
+  original_name TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '原始附件名称',
   PRIMARY KEY(id), KEY idx_student_info_image_form(tenant_id,form_id,deleted)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员收集表图片关联';
 
