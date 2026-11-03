@@ -14,7 +14,7 @@ public final class StudentInfoDraftPolicy {
                 && !Set.of("gender", "age", "household_area").contains(field.getKey());
     }
     public static Draft build(List<Field> fields, Draft previous, Map<String,String> input, Function<Field,List<Option>> options) {
-        if (input == null || input.size() > 32) throw exception(FIELD_INVALID, "草稿字段数量");
+        if (input == null || input.size() > 33) throw exception(FIELD_INVALID, "草稿字段数量");
         Map<String,Field> allowed = new LinkedHashMap<>();
         fields.stream().filter(StudentInfoDraftPolicy::editable).forEach(field -> allowed.put(field.getKey(),field));
         Map<String,String> values = new LinkedHashMap<>();

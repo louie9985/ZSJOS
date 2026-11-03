@@ -200,6 +200,12 @@ class GiftPurchaseServiceTest {
         verify(mapper).deleteById(12L); verify(operations, never()).delete(any());
     }
 
+    @Test void historicalOrderAddressSurvivesEvenWhenSourceOrderIsMissing() {
+        var row = row(); row.setOrderId(100L); row.setShippingAddress("stored-purchase-address");
+        when(mapper.selectOne(any())).thenReturn(row);
+        assertEquals("stored-purchase-address", service.get(12L).getShippingAddress());
+    }
+
     @Test void automaticAndManualProjectionsUseRecordedSourceNamesWithoutCurrentUserLookup() {
         var row = row(); row.setOrderId(7L);
         var order = new SalesOrderDO(); order.setId(7L); order.setTenantId(1L); order.setCurrentApprovalRoundId(8L); order.setSubmitterUserId(55L);
@@ -275,6 +281,7 @@ class GiftPurchaseServiceTest {
         ReflectionTestUtils.setField(orderService, "giftPurchaseMapper", mapper);
         var auditService = mock(GiftPurchaseService.class);
         ReflectionTestUtils.setField(orderService, "giftPurchaseService", auditService);
+        ReflectionTestUtils.setField(orderService, "giftAddressService", mock(cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentGiftAddressService.class));
         var order = new SalesOrderDO(); order.setId(7L); order.setOrderNo("ORDER-7"); order.setStudentName("学员");
         order.setGiftItems(row().getGiftItemsJson());
         when(mapper.selectCount(any())).thenReturn(0L);

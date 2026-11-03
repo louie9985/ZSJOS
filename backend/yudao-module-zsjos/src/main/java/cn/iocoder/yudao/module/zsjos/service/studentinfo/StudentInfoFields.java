@@ -46,11 +46,11 @@ public class StudentInfoFields {
             result.add(f);
         }
         for (Field field : result) if ("images".equals(field.getType())) field.setAllowedExtensions(extensions(field.getKey()));
-        for (String key : List.of("gift_shipping_address", "certificate_shipping_address")) {
+        for (String key : List.of("gift_shipping_address", "certificate_shipping_address", "textbook_shipping_address")) {
             Field f = new Field(); f.setKey(key);
-            f.setLabel("gift_shipping_address".equals(key) ? "礼品邮寄地址" : "证书邮寄地址");
+            f.setLabel("gift_shipping_address".equals(key) ? "礼品邮寄地址" : "textbook_shipping_address".equals(key) ? "教材邮寄地址" : "证书邮寄地址");
             f.setType("textarea"); f.setGroup("basic"); f.setEnabled(true); f.setRequired(false);
-            f.setSensitive(true); f.setSort("gift_shipping_address".equals(key) ? 91 : 92); f.setNote(""); result.add(f);
+            f.setSensitive(true); f.setSort("gift_shipping_address".equals(key) ? 91 : "textbook_shipping_address".equals(key) ? 93 : 92); f.setNote(""); result.add(f);
         }
         return result.stream().sorted(Comparator.comparing(Field::getSort)).toList();
     }
@@ -85,7 +85,7 @@ public class StudentInfoFields {
     }
 
     public List<Field> validateConfig(List<Field> input, boolean publishing) {
-        if (input == null || (input.size()!=30 && input.size()!=32)) throw exception(CONFIG_INVALID);
+        if (input == null || (input.size()!=30 && input.size()!=32 && input.size()!=33)) throw exception(CONFIG_INVALID);
         Map<String,Field> preset = new HashMap<>();
         presets().forEach(f -> preset.put(f.getKey(), f));
         Set<String> seen = new HashSet<>();
@@ -167,7 +167,7 @@ public class StudentInfoFields {
     }
 
     public List<StudentInfoFormValueDO> validateValues(List<Field> fields, Map<String,Object> values) {
-        if (values==null || values.size()>32) throw exception(FIELD_INVALID, "字段数量");
+        if (values==null || values.size()>33) throw exception(FIELD_INVALID, "字段数量");
         Set<String> allowed = new HashSet<>();
         fields.stream().filter(Field::getEnabled).forEach(f -> allowed.add(f.getKey()));
         if (!allowed.containsAll(values.keySet())) throw exception(FIELD_INVALID, "未知或停用字段");

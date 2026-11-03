@@ -140,6 +140,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private OrderPaymentAllocationMapper orderPaymentAllocationMapper;
     @Resource private GiftConfigMapper giftConfigMapper;
     @Resource private GiftPurchaseMapper giftPurchaseMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentGiftAddressService giftAddressService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.giftpurchase.GiftPurchaseService giftPurchaseService;
 
     @Override
@@ -1211,7 +1212,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         GiftPurchaseDO p = new GiftPurchaseDO();
         p.setOrderId(order.getId()); p.setOrderNo(order.getOrderNo()); p.setStudentName(order.getStudentName());
         p.setStudentMobile(order.getStudentMobile()); p.setStudentWechatId(order.getStudentWechatId());
-        p.setGiftItemsJson(order.getGiftItems()); p.setShippingAddress(order.getGiftShippingAddress()); p.setGeneratedAt(now);
+        p.setGiftItemsJson(order.getGiftItems());
+        // Freeze the collected address at generation; later archive edits must not alter a purchase.
+        p.setShippingAddress(giftAddressService.latestAddress(order.getPersonId())); p.setGeneratedAt(now);
         try { giftPurchaseMapper.insert(p); } catch (DuplicateKeyException ignored) { return; }
         giftPurchaseService.recordGenerated(p.getId());
     }
@@ -1508,8 +1511,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private List<SalesOrderGiftSnapshot> validateGifts(SalesOrderSubmitReqVO req, String previousJson) {
         List<SalesOrderGiftSnapshot> gifts = SalesOrderGiftSnapshot.resolve(req.getGiftItems(), previousJson,
                 () -> giftConfigMapper.selectList(null), LocalDateTime.now());
-        if (!gifts.isEmpty() && (StrUtil.isBlank(req.getGiftShippingAddress()) || req.getGiftShippingAddress().length() > 1000))
-            throw exception(SALES_ORDER_GIFT_ADDRESS_REQUIRED);
         return gifts;
     }
 
@@ -1580,7 +1581,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setCustomerPaidAt(req.getCustomerPaidAt()); order.setFeeMode(req.getFeeMode()); order.setPaymentMethod(req.getPaymentMethod());
         order.setRemark(StrUtil.trim(req.getRemark())); order.setStudentSpecialRequirements(StrUtil.trim(req.getStudentSpecialRequirements()));
         order.setMaterialDeliveryContact(StrUtil.trim(req.getMaterialDeliveryContact()));
-        order.setGiftShippingAddress(StrUtil.trim(req.getGiftShippingAddress()));
+        order.setGiftShippingAddress(null);
         order.setGiftItems(JsonUtils.toJsonString(validated.gifts()));
         order.setPaymentVoucherRefs(JsonUtils.toJsonString(validated.vouchers())); order.setSubmittedAt(now);
     }

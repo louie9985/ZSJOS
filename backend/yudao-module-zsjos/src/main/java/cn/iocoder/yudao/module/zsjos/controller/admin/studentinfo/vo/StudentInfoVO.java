@@ -41,7 +41,7 @@ public final class StudentInfoVO {
     @Data public static class Save {
         private Long id;
         @NotNull @Min(0) private Integer revision;
-        @NotNull @Size(min=30,max=32) private List<@Valid Field> fields;
+        @NotNull @Size(min=30,max=33) private List<@Valid Field> fields;
         @NotNull private List<Long> educationCategoryIds = List.of();
         private Long productId;
     }
@@ -57,11 +57,11 @@ public final class StudentInfoVO {
     }
     @Data public static class Submit {
         @NotNull @jakarta.validation.constraints.Min(0) private Long revision;
-        @NotNull @Size(max=32) private Map<String, Object> values;
+        @NotNull @Size(max=33) private Map<String, Object> values;
     }
     @Data public static class DraftWrite {
         @NotNull @jakarta.validation.constraints.Min(0) private Long revision;
-        @NotNull @Size(max=32) private Map<String,String> values;
+        @NotNull @Size(max=33) private Map<String,String> values;
     }
     @Data public static class DraftSelection {
         private String code, label, dictType;
