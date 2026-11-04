@@ -62,7 +62,7 @@ Workbench 客资详情同时收到 `QUALIFICATION_TRANSFER` 与 `SUPERVISOR_TRAN
 - `GET /zsjos/lead/{leadId}/follow-ups/page`: paged follow-up history.
 - `GET /zsjos/lead/appeal/lead/{leadId}/list`: appeal history.
 - `GET /zsjos/lead-complaint/lead/{leadId}/list`: complaint history with display names and signed evidence URLs.
-- `GET /zsjos/sales-order/lead/{leadId}/customer-orders` and `/{orderId}`: customer order list and detail; only the Lead owner, an in-scope department manager, or `zsjos:lead:query-all` may pass the order-specific object action. A submitter-only relationship is insufficient.
+- `GET /zsjos/sales-order/lead/{leadId}/customer-orders` and `/{orderId}`: customer order list and detail; the unified Lead `sales-history-read` relationship is required. The employee provider can read all orders for the same current Person, including merged-origin repurchases; other viewers retain origin or independent-order checks. See the sales-order contract.
 
 ## Commands
 

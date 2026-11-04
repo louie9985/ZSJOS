@@ -22,6 +22,44 @@ class ZsjkqtExcelEngineTest {
         "days":[{"day":1,"finalMorning":"出勤","finalAfternoon":"事假"}],
         "summary":{"shouldAttendanceDays":21,"actualAttendanceDays":99,"payrollDays":23,"entryDate":"2026-06-01","personalLeaveHours":7,"remark":"原表备注"}}]}
       """);}
+    @Test void prenatal_column_and_legacy_layouts_roundtrip() throws Exception {
+        for(int layout=0; layout<3; layout++) {
+            var data=project();
+            var summary=(tools.jackson.databind.node.ObjectNode)data.path("employees").get(0).path("summary");
+            summary.put("prenatalLeaveDays",0.5).put("compLeaveHours",3).put("annualLeaveHours",4);
+            byte[] bytes;
+            try(var book=new XSSFWorkbook(new ByteArrayInputStream(engine.exportReport(data)))) {
+                var sheet=book.getSheetAt(0); int first=34;
+                assertEquals("产假/天",sheet.getRow(0).getCell(first+14).getStringCellValue());
+                assertEquals("产检假/天",sheet.getRow(0).getCell(first+15).getStringCellValue());
+                assertEquals("备注",sheet.getRow(0).getCell(first+20).getStringCellValue());
+                if(layout>0) {
+                    for(int row=0;row<=1;row++) {
+                        var cells=sheet.getRow(row);
+                        for(int col=first+15;col<first+20;col++) {
+                            var from=cells.getCell(col+1);var to=cells.getCell(col, org.apache.poi.ss.usermodel.Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+                            if(from==null) to.setBlank();
+                            else if(from.getCellType()==org.apache.poi.ss.usermodel.CellType.NUMERIC) to.setCellValue(from.getNumericCellValue());
+                            else to.setCellValue(from.getStringCellValue());
+                        }
+                        cells.getCell(first+20).setBlank();
+                    }
+                    if(layout==1) {
+                        sheet.getRow(0).getCell(first+20).setCellValue("产检假/天");
+                        sheet.getRow(1).getCell(first+20).setCellValue(0.5);
+                    }
+                }
+                var output=new ByteArrayOutputStream();book.write(output);bytes=output.toByteArray();
+            }
+            var parsed=JsonUtils.getObjectMapper().valueToTree(engine.parseReport(bytes,"续改.xlsx"));
+            var result=parsed.path("employees").get(0).path("summary");
+            assertEquals(3,result.path("compLeaveHours").asInt());
+            assertEquals(4,result.path("annualLeaveHours").asInt());
+            assertEquals("原表备注",result.path("remark").asText());
+            if(layout<2) assertEquals(0.5,result.path("prenatalLeaveDays").asDouble());
+            else assertTrue(result.path("prenatalLeaveDays").isMissingNode());
+        }
+    }
     @Test void date_header_uses_month_day_and_weekday(){assertEquals("6月1日星期一",ZsjkqtExcelEngine.dateHeader(2026,6,1));assertEquals("6月30日星期二",ZsjkqtExcelEngine.dateHeader(2026,6,30));assertEquals("2月29日星期四",ZsjkqtExcelEngine.dateHeader(2024,2,29));}
     @Test void exported_sheet_month_requires_year(){assertArrayEquals(new int[]{2026,6},ZsjkqtExcelEngine.sheetMonth("2026年6月考勤"));assertThrows(IllegalArgumentException.class,()->ZsjkqtExcelEngine.sheetMonth("6月考勤"));}
     @Test void exported_attendance_report_can_be_reimported() throws Exception {
@@ -48,7 +86,7 @@ class ZsjkqtExcelEngineTest {
         Path file=Path.of("../../docs/testing/zsjkqt/original/上下班打卡_月报_20260501-20260531 (1).xlsx");assertTrue(Files.exists(file));JsonNode parsed=JsonUtils.getObjectMapper().valueToTree(engine.parseSource(Files.readAllBytes(file),file.getFileName().toString()));assertEquals(2026,parsed.path("attendance").path("year").asInt());assertEquals(5,parsed.path("attendance").path("month").asInt());assertEquals(39,parsed.path("attendance").path("employees").size());assertEquals(31,parsed.path("attendance").path("employees").get(0).path("dayDetails").size());
     }
     byte[] report(boolean metadata,String sheetName) throws Exception {
-        try(var b=new XSSFWorkbook();var out=new ByteArrayOutputStream()) {var s=b.createSheet(sheetName);var h=s.createRow(0);String[] head={"序号","部门","姓名","考勤"};for(int i=0;i<4;i++)h.createCell(i).setCellValue(head[i]);for(int d=1;d<=30;d++)h.createCell(3+d).setCellValue(ZsjkqtExcelEngine.dateHeader(2026,6,d));for(int i=0;i<ZsjkqtExcelEngine.TITLES.length;i++)h.createCell(34+i).setCellValue(ZsjkqtExcelEngine.TITLES[i]);var row=s.createRow(1);row.createCell(1).setCellValue("教务部");row.createCell(2).setCellValue("张三");for(int d=1;d<=30;d++)row.createCell(3+d).setCellValue(ZsjkqtExcelEngine.combined(d==1?"出勤":d==2?"休息":"",d==1?"事假":d==2?"休息":""));row.createCell(34).setCellValue(21);row.createCell(35).setCellValue(99);row.createCell(36).setCellValue(23);row.createCell(53).setCellValue("原表备注");
+        try(var b=new XSSFWorkbook();var out=new ByteArrayOutputStream()) {var s=b.createSheet(sheetName);var h=s.createRow(0);String[] head={"序号","部门","姓名","考勤"};for(int i=0;i<4;i++)h.createCell(i).setCellValue(head[i]);for(int d=1;d<=30;d++)h.createCell(3+d).setCellValue(ZsjkqtExcelEngine.dateHeader(2026,6,d));for(int i=0;i<ZsjkqtExcelEngine.TITLES.length;i++)h.createCell(34+i).setCellValue(ZsjkqtExcelEngine.TITLES[i]);var row=s.createRow(1);row.createCell(1).setCellValue("教务部");row.createCell(2).setCellValue("张三");for(int d=1;d<=30;d++)row.createCell(3+d).setCellValue(ZsjkqtExcelEngine.combined(d==1?"出勤":d==2?"休息":"",d==1?"事假":d==2?"休息":""));row.createCell(34).setCellValue(21);row.createCell(35).setCellValue(99);row.createCell(36).setCellValue(23);row.createCell(54).setCellValue("原表备注");
             if(metadata){var meta=b.createSheet(ZsjkqtExcelEngine.METADATA);String[][] values={{"appName","zhongshijian-kaoqintong"},{"schemaVersion","1"},{"year","2026"},{"month","6"},{"shouldAttendanceDays","20"},{"payrollDays","22"},{"restDays","6,13"},{"paidRestDays","1"}};for(int i=0;i<values.length;i++){var r=meta.createRow(i);r.createCell(0).setCellValue(values[i][0]);r.createCell(1).setCellValue(values[i][1]);}}
             b.write(out);return out.toByteArray();}
     }

@@ -29937,3 +29937,11 @@ uoyi-vue-pro.system_menu: insert only four absent rows with fixed IDs/names/perm
 - Implemented shared lead filter styling, pending-only saved-assignment filter and backend EXISTS/NOT EXISTS before pagination, with tenant and logical-delete correlation. Existing callers omit the optional parameter and retain prior behavior. Documentation updated.
 - Passed frontend typecheck, scoped diff check, Chrome fixture interaction at 1440/390 widths: false/true request parameters and reset on status change. Fixture verifies UI/request wiring only, not database results. Initial browser selector check had pipe encoding corruption; ASCII selectors passed.
 - Backend Maven compile blocked by JVM native-memory allocation failure; backend SQL execution and real-account acceptance remain unverified. No deployment or database mutation. Unrelated concurrent LeadManagementPage/SubordinatePartnerPage edits preserved. Ownership released.
+
+## Registration — local-prenatal-column-20261104
+- Environment local (variable/file absent); owner Codex /root; branch main; worktree D:/ZSJ-OS; base c9964acf71fdfec268c9e08c148308e9c81f1827; integration None.
+- Goal: move exported prenatal leave after maternity leave; preserve legacy import and calculations. Ownership: ZsjkqtExcelEngine.java, ZsjkqtExcelEngineTest.java, docs/api/zsjkqt.md, handoff/main.md; temporary isolated verification artifacts. Dependencies: existing POI/JUnit. Verification: current-source focused Excel tests, column and legacy roundtrip assertions, diff check.
+
+## Delivery — local-prenatal-column-20261104
+- Export places prenatal after maternity, before compensatory leave. Parser supports new order, appended historical column and absent historical column. Calculations unchanged; API documentation synchronized.
+- Current-source isolated javac/JUnit: 24 tests passed including three-layout workbook roundtrip; scoped diff check passed. Updated fixture remark position and verification working directory after initial test failures. No deployment or real-account export performed. Ownership released.

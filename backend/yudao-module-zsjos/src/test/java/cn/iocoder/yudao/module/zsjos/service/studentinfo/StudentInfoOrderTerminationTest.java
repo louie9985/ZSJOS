@@ -39,13 +39,15 @@ class StudentInfoOrderTerminationTest {
     }
     private RegistrationCaseDO item() { var item=new RegistrationCaseDO(); item.setId(2L); item.setOrderId(3L); item.setStatus("ended"); return item; }
     @AfterEach void clear() { TenantContextHolder.clear(); }
-    @Test void rejectedOrderTaskPublicLinkStillSavesAndSubmits() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings={"revision_required","superseded","terminated"})
+    void cancelledOrderTaskPublicLinkStillSavesAndSubmits(String status) {
         com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(),"rejection-test"),StudentInfoFormDO.class);
         var form=form();form.setRegistrationCaseId(null);form.setOrderItemId(4L);form.setPersonId(5L);
         var task=new StudentInfoTaskDO();task.setId(6L);task.setOrderId(3L);task.setOrderItemId(4L);task.setPersonId(5L);
         when(forms.byToken(anyString())).thenReturn(form);when(forms.lock(1L)).thenReturn(form);
         when(collectionTasks.byItem(4L)).thenReturn(task);
-        var order=new SalesOrderDO();order.setStatus("revision_required");when(orders.selectByIdForUpdate(3L,1L)).thenReturn(order);
+        var order=new SalesOrderDO();order.setStatus(status);when(orders.selectByIdForUpdate(3L,1L)).thenReturn(order);
         var draft=new DraftWrite();draft.setRevision(0L);draft.setValues(Map.of("name","合成学员"));
         assertEquals("合成学员",service.saveDraft(token,draft).getValues().get("name"));
         var submit=new Submit();submit.setRevision(0L);submit.setValues(Map.of("name","合成学员"));

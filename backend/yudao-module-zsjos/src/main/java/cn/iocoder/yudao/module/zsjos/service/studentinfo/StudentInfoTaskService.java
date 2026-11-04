@@ -23,7 +23,6 @@ import static cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.*;
 public class StudentInfoTaskService {
     @Resource private StudentInfoTaskMapper tasks;
     @Resource private SalesOrderMapper orders;
-    @Resource private SalesOrderApprovalRoundMapper approvalRounds;
     @Resource private SalesOrderItemMapper items;
     @Resource private StudentInfoFormMapper forms;
     @Resource private StudentInfoFormValueMapper answers;
@@ -59,7 +58,7 @@ public class StudentInfoTaskService {
         if (!permission.canList(getLoginUserId())) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         var filter=new LambdaQueryWrapperX<StudentInfoTaskDO>().eqIfPresent(StudentInfoTaskDO::getPersonId,query.getPersonId());
         if (query.getOrderStatus()!=null) filter.apply("EXISTS (SELECT 1 FROM zsjos_order o WHERE o.id=zsjos_student_info_task.order_id AND o.tenant_id=zsjos_student_info_task.tenant_id AND o.deleted=0 AND o.status={0})",query.getOrderStatus());
-        String cancelledOrder = "EXISTS (SELECT 1 FROM zsjos_order o WHERE o.id=zsjos_student_info_task.order_id AND o.tenant_id=zsjos_student_info_task.tenant_id AND o.deleted=0 AND (o.status IN ('revision_required','superseded') OR (o.status='terminated' AND EXISTS (SELECT 1 FROM zsjos_order_approval_round r WHERE r.order_id=o.id AND r.tenant_id=o.tenant_id AND r.deleted=0 AND r.status='rejected'))))";
+        String cancelledOrder = "EXISTS (SELECT 1 FROM zsjos_order o WHERE o.id=zsjos_student_info_task.order_id AND o.tenant_id=zsjos_student_info_task.tenant_id AND o.deleted=0 AND o.status IN ('revision_required','superseded','terminated'))";
         if ("CANCELLED".equals(query.getStatus())) filter.apply(cancelledOrder);
         else if (query.getStatus()!=null) filter.apply("NOT " + cancelledOrder);
         if ("PENDING".equals(query.getStatus())) filter.isNull(StudentInfoTaskDO::getFormId);
@@ -185,11 +184,7 @@ public class StudentInfoTaskService {
     }
     // Resubmission creates a separate order/items. Old tasks stay cancelled without revoking public forms.
     private boolean cancelled(SalesOrderDO order) {
-        if (Set.of("revision_required","superseded").contains(order.getStatus())) return true;
-        return "terminated".equals(order.getStatus()) && approvalRounds.selectCount(
-                new LambdaQueryWrapperX<cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalRoundDO>()
-                        .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalRoundDO::getOrderId, order.getId())
-                        .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalRoundDO::getStatus, "rejected")) > 0;
+        return Set.of("revision_required","superseded","terminated").contains(order.getStatus());
     }
     static boolean open(SalesOrderDO order) { return order!=null && Set.of("pending_approval","effective").contains(order.getStatus()); }
     private StudentInfoTaskDO lock(Long id) {

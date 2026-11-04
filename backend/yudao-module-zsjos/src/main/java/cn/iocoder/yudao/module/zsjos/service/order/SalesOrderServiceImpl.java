@@ -1101,6 +1101,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private boolean canReadCustomerHistory(LeadDO lead, SalesOrderDO order, Long userId) {
+        if (lead.getPersonId() == null || !Objects.equals(lead.getPersonId(), order.getPersonId())) return false;
+        // Employee source ownership grants the customer's full history, including merged origins.
+        // This is confined to Lead-authorized reads; order commands and performance keep their own scope.
+        if (userId != null && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(userId, lead.getProviderOwnerId())) return true;
         Long leadOrigin = lead.getIdentityOriginPersonId() == null ? lead.getPersonId() : lead.getIdentityOriginPersonId();
         Long orderOrigin = order.getIdentityOriginPersonId() == null ? order.getPersonId() : order.getIdentityOriginPersonId();
         return Objects.equals(leadOrigin, orderOrigin) || permissionService.canRead(order, userId);

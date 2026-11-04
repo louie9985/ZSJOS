@@ -10,6 +10,12 @@
 - `zsjos:sales-order:review`：工作台成交审批菜单与直接详情查询权限。审批池、通过和驳回接口的业务授权以配置部门成员关系和本人 BPM 任务为准，不按角色名称推断。
 - `zsjos:sales-order:supervisor-confirm`：统一“成交订单审批”入口中的主管待办/已办列表及确认决定权限。V076 为启用的稳定 `sales_manager` 角色补齐该权限；主管命令还要求当前用户是申请时固化的订单销售直属主管、持有本人 BPM 加签任务并通过订单对象校验。
 
+## 引流员工客户订单读取（2026-11-04）
+
+客资详情的 customer-orders 列表和详情保留既有功能权限与 `sales-history-read` 对象校验。在此基础上，当前用户为该客资的员工提供人（`providerOwnerType=system_user` 且 `providerOwnerId` 为本人）时，可查看同一当前 Person 的全部订单，包括复购及身份合并后的其他原始档案订单。不要求本人录单；代录人不因此取得引流提供人资格，Partner ID 也不能当作员工 ID。其他查看者仍按原始身份或独立订单权限读取，不能仅凭姓名/手机号相同跨客户读取。
+
+该授权仅用于客资上下文只读历史，不扩展订单管理/本人/团队列表、修改、审批或导出权限，不改变订单关联、贡献快照及新媒体大盘统计。高级筛选继续按客户订单判断。Workbench 的 LeadCustomerOrders 已调用这两个接口；Vue Admin 当前无 customer-orders 消费入口，其既有订单详情接口权限保持原样。
+
 ## 接口
 
 - `GET /zsjos/sales-order/product/catalog`：全部启用产品/SKU 目录。

@@ -23,7 +23,6 @@ class StudentInfoTaskServiceTest {
     @Mock cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseMapper registrationCases;
     @Mock StudentInfoTaskPermissionProvider permission;
     @Mock SalesOrderMapper orders;
-    @Mock SalesOrderApprovalRoundMapper approvalRounds;
     @Mock SalesOrderItemMapper items;
     @Mock StudentInfoFormMapper forms;
     @Mock StudentInfoFormValueMapper answers;
@@ -35,12 +34,11 @@ class StudentInfoTaskServiceTest {
     private SalesOrderDO order(String status) { var order=new SalesOrderDO();order.setId(1L);order.setPersonId(3L);order.setStatus(status);return order; }
     private StudentInfoTaskDO task() { var task=new StudentInfoTaskDO();task.setId(4L);task.setOrderId(1L);task.setOrderItemId(2L);task.setPersonId(3L);task.setVersion(0);return task; }
     private Command command() { var req=new Command();req.setVersion(0);req.setIdempotencyKey("fixture-key");req.setSourceFormId(8L);req.setSourceRevision(0);return req; }
-    @Test void rejectedAndSupersededTasksStayCancelledRegardlessOfFormCompletion() {
+    @Test void rejectedSupersededAndDirectlyTerminatedTasksStayCancelledRegardlessOfFormCompletion() {
         var task=task();when(tasks.selectById(4L)).thenReturn(task);
         when(collection.prepareTaskForm(task)).thenReturn(new StudentInfoFormDO());
         for (String status:List.of("revision_required","superseded","terminated")) {
             when(orders.selectById(1L)).thenReturn(order(status));
-            if ("terminated".equals(status)) when(approvalRounds.selectCount(any())).thenReturn(1L);
             task.setFormId(null);
             assertEquals("CANCELLED",service.detail(4L).getStatus());
             task.setFormId(8L);var form=submitted();when(forms.selectById(8L)).thenReturn(form);
@@ -81,7 +79,7 @@ class StudentInfoTaskServiceTest {
                 try(var result=statement.executeQuery("SELECT id FROM zsjos_student_info_task WHERE "+wrapper.getSqlSegment())) {
                     var ids=new java.util.ArrayList<Long>();while(result.next())ids.add(result.getLong(1));
                     var query=(cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoTaskVO.Query)call.getArgument(0);
-                    assertEquals("CANCELLED".equals(query.getStatus())?List.of(3L,2L,1L):List.of(5L,4L),ids);
+                    assertEquals("CANCELLED".equals(query.getStatus())?List.of(5L,3L,2L,1L):List.of(4L),ids);
                 }
                 return new cn.iocoder.yudao.framework.common.pojo.PageResult<StudentInfoTaskDO>(List.of(),0L);
             });

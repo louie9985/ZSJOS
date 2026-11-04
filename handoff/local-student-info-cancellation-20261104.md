@@ -1,0 +1,11 @@
+# local-student-info-cancellation-20261104
+- Environment: local (ZSJOS_AGENT_ENV and /etc/zsjos/agent-environment absent).
+- Goal: rejected, superseded and terminated order collection tasks remain CANCELLED; existing public links retain validity.
+- Non-goals: database changes, deployment, frontend redesign, order resubmission changes.
+- Branch: main; worktree: D:/ZSJ-OS; base: c9964acf71fdfec268c9e08c148308e9c81f1827.
+- Owner: Codex; integration/target branch: None; dependencies: existing order lifecycle and task APIs.
+- Ownership: StudentInfoTaskService.java; StudentInfoTaskServiceTest.java; StudentInfoOrderTerminationTest.java; docs/api/order-student-information-tasks.md; this record.
+- Verification: isolated existing collection Java compile/JUnit runner, SQL-filter execution in H2, public-link save/submit regressions, scoped diff check.
+- Delivery: list filtering and detail projection now cancel every terminated order without requiring rejected approval history; rejected/revision-required and superseded tasks remain cancelled. Public forms/tokens are untouched; resubmission keeps existing separate-order/task behavior. API documentation synchronized.
+- Verification: python script/student-info-tasks/verify_java.py --collection-only compiled current collection sources and passed 37/37 JUnit tests, including H2 filter execution and public save/submit for revision_required, superseded and terminated. git diff --check passed.
+- Limits: real-account API/browser/deployed acceptance not performed; no database migration, data write, service restart, commit or deployment. Ownership released.

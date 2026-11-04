@@ -1297,6 +1297,37 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void employeeProviderReadsMergedRepurchaseListAndDetailWithoutOrderOwnership() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setIdentityOriginPersonId(11L);
+        lead.setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER); lead.setProviderOwnerId(20L);
+        lead.setCreator("30"); // Assisted entry does not transfer provider visibility to the assistant.
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setPersonId(10L);
+        order.setIdentityOriginPersonId(12L); order.setOrderType(ORDER_TYPE_REPURCHASE);
+        order.setStatus(STATUS_EFFECTIVE);
+        order.setSubmitterUserId(40L); order.setFormalSalesUserId(40L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(orderMapper.selectByPersonId(10L)).thenReturn(List.of(order));
+        when(orderMapper.selectById(100L)).thenReturn(order);
+
+        assertEquals(100L, service.getCustomerOrders(1L, 20L).getFirst().getId());
+        var detail = service.getCustomerOrder(1L, 100L, 20L);
+        assertEquals(100L, detail.getId());
+        assertFalse(Boolean.TRUE.equals(detail.getCanRevise()));
+        verify(permissionService, never()).canRead(any(), any());
+        assertTrue(service.getCustomerOrders(1L, 30L).isEmpty());
+        assertThrows(ServiceException.class, () -> service.getCustomerOrder(1L, 100L, 30L));
+        lead.setProviderOwnerType(PROVIDER_OWNER_PARTNER);
+        assertTrue(service.getCustomerOrders(1L, 20L).isEmpty());
+        assertThrows(ServiceException.class, () -> service.getCustomerOrder(1L, 100L, 20L));
+        lead.setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER);
+        order.setPersonId(99L);
+        assertTrue(service.getCustomerOrders(1L, 20L).isEmpty());
+        assertThrows(ServiceException.class, () -> service.getCustomerOrder(1L, 100L, 20L));
+        verifyNoInteractions(processInstanceApi, registrationService);
+        verify(orderMapper, never()).updateById(any(SalesOrderDO.class));
+    }
+
+    @Test
     void mergedIdentityDoesNotExposeOtherOriginOrderDetail() {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setIdentityOriginPersonId(11L);
         SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setPersonId(10L); order.setIdentityOriginPersonId(12L);

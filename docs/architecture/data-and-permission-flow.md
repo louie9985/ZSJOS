@@ -1126,3 +1126,8 @@ Sales/education self-sourced create permissions authorize the explicitly confirm
 本节替代此前“选中后只读、从档案复制姓名及联系方式”的说明。保持原姓名、手机号、微信号表单，在原查重位置提供“查找档案”；不增加第二组输入框。选择已有 Person 仅确定关联，Lead 的 submittedName/submittedMobile/submittedWechatId 始终保存本次用户填写值，不自动写回 Person。原档案缺少联系方式时允许在本次录入补充。地区仍独立填写。
 
 提示：“该客户已在系统中存在，请确认客户档案与已有信息一致，本次创建将关联至此档案”。候选以有标签的姓名、档案编号、手机号、微信号展示；一份默认选中，多份必须选择。修改姓名保留选择；修改联系方式使查询与选择失效，必须重新查找。服务端核对查询联系方式与提交快照一致，并重新校验所选档案匹配及版本快照；不得用档案信息覆盖本次输入。普通提交限制、权限、租户和请求幂等保持不变。
+
+
+## Employee provider customer order history (2026-11-04)
+
+Within existing feature and Lead sales-history-read authorization, the system-user provider of that Lead may read every order for its current Person, including repurchases from merged origins. Assisted-entry submitters and Partner identities do not inherit this relationship. Other viewers retain original-origin/independent-order checks. This read-only exception does not expand general order scopes, commands, exports or performance attribution. See [order contract](../api/zsjos-sales-order.md).
