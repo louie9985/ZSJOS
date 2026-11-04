@@ -19,4 +19,5 @@ public class ExamCollectionAttachmentDO extends TenantBaseDO {
     private Long fileSize;
     private String contentType;
     private String originalName;
+    private String requestKey, requestHash;
 }

@@ -216,15 +216,31 @@ BEGIN
   file_size bigint NOT NULL,
   content_type varchar(100) NOT NULL,
   original_name varchar(512) NOT NULL,
+  request_key varchar(64) DEFAULT NULL,
+  request_hash varchar(64) DEFAULT NULL,
   creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
   create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY (id), KEY idx_submission (tenant_id,submission_id,field_key)
+  PRIMARY KEY (id), KEY idx_submission (tenant_id,submission_id,field_key),
+  UNIQUE KEY uk_upload_request (tenant_id,submission_id,request_key)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_exam_collection_attachment' AND column_name='request_key') THEN
+  ALTER TABLE zsjos_exam_collection_attachment ADD COLUMN request_key varchar(64) DEFAULT NULL;
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_exam_collection_attachment' AND column_name='request_hash') THEN
+  ALTER TABLE zsjos_exam_collection_attachment ADD COLUMN request_hash varchar(64) DEFAULT NULL;
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='zsjos_exam_collection_attachment' AND index_name='uk_upload_request') THEN
+  ALTER TABLE zsjos_exam_collection_attachment ADD UNIQUE KEY uk_upload_request (tenant_id,submission_id,request_key);
+ END IF;
  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
-  AND table_name='zsjos_exam_collection_attachment' AND column_name IN ('id','task_id','submission_id','field_key','side','infra_file_id','file_size','content_type','original_name','creator','updater','create_time','update_time','deleted','tenant_id'))<>15 THEN
+  AND table_name='zsjos_exam_collection_attachment' AND column_name IN ('id','task_id','submission_id','field_key','side','infra_file_id','file_size','content_type','original_name','request_key','request_hash','creator','updater','create_time','update_time','deleted','tenant_id'))<>17 THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 incomplete zsjos_exam_collection_attachment';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='zsjos_exam_collection_attachment' AND index_name='uk_upload_request'
+  GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')='tenant_id,submission_id,request_key' AND MAX(non_unique)=0) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 invalid upload idempotency index';
  END IF;
  IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
   AND table_name='zsjos_exam_collection_attachment' AND index_name='PRIMARY'

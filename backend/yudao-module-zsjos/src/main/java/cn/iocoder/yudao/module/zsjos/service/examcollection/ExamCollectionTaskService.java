@@ -101,7 +101,7 @@ public class ExamCollectionTaskService {
             var uri = URI.create(publicBaseUrl == null ? "" : publicBaseUrl.trim());
             if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) || uri.getHost() == null
                     || uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null) throw exception(URL_INVALID);
-            return uri.toString().replaceAll("/+$", "") + "/exam-collection/" + token;
+            return uri.toString().replaceAll("/+$", "") + "/exam-collection#token=" + token;
         } catch (IllegalArgumentException error) { throw exception(URL_INVALID); }
     }
 }

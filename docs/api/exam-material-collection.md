@@ -1,6 +1,6 @@
 # 考试资料收集（开发设计）
 
-状态：开发中。后端主流程、现有档案接入、独立考务页面和任务汇总已有实现；公开 H5、规划师首页提醒界面、归属纠正及完整联调仍待完成。环境为 local，独立分支 codex/exam-material-collection。
+状态：开发中。后端主流程、档案接入、考务页面、任务汇总和公开 H5 已有实现；规划师首页提醒界面、归属纠正及完整联调仍待完成。环境为 local，独立分支 codex/exam-material-collection。
 
 ## 业务契约
 
@@ -106,7 +106,7 @@ V362 前置为两本台账的 V361。新增以下八张表，均含租户、逻�
 | GET /page | query；标准分页、keyword、OPEN/COMPLETED；任务状态及应收/归档/异常/额外人数 |
 | GET /detail?id= | query + 对象校验；任务详情、冻结字段及统一链接 |
 
-统一链接路径为配置的 H5 基址加 `/exam-collection/{token}`。创建前验证 HTTP(S) 基址和加密配置；该公开路由尚未接入，不能作为当前可用的端到端能力交付。响应使用明确 VO，不返回 token 哈希、加密列、DAL 对象。
+统一链接为配置的 H5 基址加 `/exam-collection#token={token}`。凭证放在 fragment，不进入页面 HTTP 请求路径。创建前验证 HTTP(S) 基址和加密配置；H5 已接入匿名公开路由，实际后端 HTTP/存储联调仍待完成。响应使用明确 VO，不返回 token 哈希、加密列、DAL 对象。
 
 `StudentServiceArchiveStore` 是内部存储适配器，入口服务先完成权限和提交校验。读取优先服务修订，缺少时读取同 Person/订单商品的原报名表最新修订；没有报名表时返回空档案。原报名修订所选的内部补传附件同样保留。写入需要现有事务、锁定服务、核对租户和附件绑定，以提交 ID 幂等追加修订，拒绝不完整必填材料。现有档案详情/编辑/上传/下载/导出 API 已通过 StudentServiceArchiveFacade 接入；真实 HTTP、文件存储及部署验收尚未完成。
 
@@ -133,7 +133,7 @@ Workbench 类型检查及生产构建通过。Vue Admin 原新工作目录缺少
 | GET /detail | 仅任务名称、说明、状态和字段；完成后字段为空；不返回既有学员资料 |
 | POST /session | 创建七天有效的独立填写会话；任务完成时拒绝 |
 | POST /submit | idempotencyKey、values；同会话相同键及内容重试幂等，不同内容拒绝；再次填写使用新会话 |
-| POST /attachments | 按选中材料字段上传；验证会话、文件格式、数量和身份证正反面 |
+| POST /attachments | 携带 X-Exam-Upload-Key；按选中材料字段上传，验证会话、文件格式、数量和身份证正反面；同会话同键同内容重试返回同一附件 |
 | GET /attachments/{id} | 仅本会话草稿材料，返回解密字节；提交后公开不可读取历史材料 |
 | DELETE /attachments/{id} | 仅移除本会话草稿引用；保留加密存储以供受控清理，不删除历史提交材料 |
 
@@ -208,3 +208,17 @@ Workbench 原生路由 `/zsjos/exam-material-collection`，任务详情使用 `?
 - 截图：`artifacts/exam-collection/browser/task-create-desktop.png`、`task-resolution-desktop.png`、`task-summary-desktop.png`、`task-detail-mobile.png`。以上均为明确标注的合成夹具，不能替代真实 HTTP/存储验收。
 
 完整样式守卫目前有四项原有失败，涉及未修改的班级预览样式、layout.css 间距及既有缺失 token 引用；未为此扩大功能范围修改全站样式。新页面使用现有 token、组件与主题。UI-07 的明确字段前后差异展示、UI-10 规划师首页弹窗、UI-11 H5 和 UI-12 全面失败/未保存保护仍须在后续完成。
+
+## H5 与重试边界（后续验收进展）
+
+公开路由 `/exam-collection` 标记 requiresAuth=false，读取 fragment 中的 token；不读取学员主档、不要求合作方登录。使用独立 public-api 客户端，显式移除 Authorization，不进入 Partner 登录/刷新流程。表单只渲染服务端冻结字段，复用已有 CollectionImages 和身份证校验；原报名收集页保持默认附件客户端。
+
+每次填写创建独立会话，答案仅存于当前页面内存。上传中的文件显示进度，失败可重试或移除；会话失效可保留文字重新建立，附件重新上传。提交结果不确定时冻结当前输入，重试使用完全相同的请求键和内容；收到明确校验失败后恢复编辑。成功页面不宣称已匹配入档；“再填写一份”清空上次文字和附件并创建新会话。任务结束时不创建会话、不显示可提交表单。离开未提交表单会提示，提交或上传中避免切换。
+
+附件重试使用 Pending 文件的固定请求键。V362 的附件表增加 request_key/request_hash 与 `(tenant_id,submission_id,request_key)` 唯一索引；相同键和规范化内容返回原附件，不重复写入存储、不重复占身份证正反面名额；同键不同内容拒绝。索引和字段通过 information_schema 条件补齐开发中旧测试表，不修改已部署历史脚本。文件仍以加密字节存储，事务绑定失败补偿本次新对象。
+
+验证：88 项当前源码 Java 测试、8 项 H5 校验测试通过；H5 生产构建通过。隔离 MySQL 验证了缺上传幂等列/索引的恢复，以及同会话重复键拒绝、不同会话可复用请求键。H5 使用已有 pnpm-lock.yaml 离线冻结安装，仍执行项目 npm build 脚本；未新增依赖。noEmit 配置允许 TS 源码扩展导入，复用现有 Node 原生 TS 测试方式。
+
+浏览器合成夹具通过：空表阻止请求、字段标签关联、低位 x 规范化、未选字段不提交、附件响应丢失重试只出现一份、提交响应丢失重试同键同内容、成功后清空、会话失效保留文字、取消离开保留输入、空表不阻止离开、结束状态零会话创建。正式 App/router 启动也停留在匿名公开路由而非登录页；夹具禁用全部业务代理，Vite 依赖优化首次重载造成的 API 尝试被本地拒绝，预热后复测无新增业务请求。
+
+截图为 `artifacts/exam-collection/browser/h5-retry-desktop.png` 和 `h5-form-mobile.png`（390px，无整页水平溢出）。UI-11 的组件与状态验证已有证据；真实 HTTP/存储及其他前端的 UI-12 完整矩阵仍待完成。

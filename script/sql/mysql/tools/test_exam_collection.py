@@ -123,6 +123,12 @@ if __name__ == '__main__':
         apply(db)
         query(db, 'ALTER TABLE zsjos_exam_collection_task RENAME COLUMN class_ids_json TO fixture_retained_class_ids')
         verify(db)
+        db = fixture('upload_recovery')
+        apply(db)
+        query(db, 'ALTER TABLE zsjos_exam_collection_attachment RENAME COLUMN request_key TO fixture_retained_request_key')
+        query(db, 'ALTER TABLE zsjos_exam_collection_attachment RENAME COLUMN request_hash TO fixture_retained_request_hash')
+        query(db, 'ALTER TABLE zsjos_exam_collection_attachment DROP INDEX uk_upload_request')
+        verify(db)
         db = fixture('index_conflict')
         apply(db)
         query(db, 'ALTER TABLE zsjos_exam_collection_binding DROP INDEX uk_identity')
@@ -139,6 +145,15 @@ if __name__ == '__main__':
         query(db, "INSERT INTO zsjos_exam_collection_binding (tenant_id,task_id,identity_hash,service_relation_id) VALUES (1,2,%s,11)", ('a' * 64,))
         assert query(db, 'SELECT COUNT(*) FROM zsjos_exam_collection_binding') == ((2,),)
         print('PASS identity uniqueness is scoped to task')
+        query(db, "INSERT INTO zsjos_exam_collection_attachment(task_id,submission_id,field_key,infra_file_id,file_size,content_type,original_name,tenant_id,request_key,request_hash) VALUES (1,2,'portrait',999,1,'image/png','synthetic.png',1,'upload-key','synthetic')")
+        try:
+            query(db, "INSERT INTO zsjos_exam_collection_attachment(task_id,submission_id,field_key,infra_file_id,file_size,content_type,original_name,tenant_id,request_key,request_hash) VALUES (1,2,'portrait',998,1,'image/png','synthetic.png',1,'upload-key','synthetic')")
+        except pymysql.IntegrityError:
+            pass
+        else:
+            raise AssertionError('Duplicate upload request accepted')
+        query(db, "INSERT INTO zsjos_exam_collection_attachment(task_id,submission_id,field_key,infra_file_id,file_size,content_type,original_name,tenant_id,request_key,request_hash) VALUES (1,3,'portrait',997,1,'image/png','synthetic.png',1,'upload-key','synthetic')")
+        print('PASS upload idempotency uniqueness is scoped to session')
         assert query(db, "SELECT JSON_CONTAINS(%s,%s),JSON_CONTAINS(%s,%s)",
                      ('[{"source":"exam","id":7}]', '{"source":"exam","id":7}',
                       '[{"source":"registration","id":7}]', '{"source":"exam","id":7}')) == ((1, 0),)

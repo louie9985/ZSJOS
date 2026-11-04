@@ -44,9 +44,10 @@ public class PublicExamCollectionController {
     @PostMapping("/attachments")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     public CommonResult<Image> upload(@RequestHeader("X-Exam-Token") String token, @RequestHeader("X-Exam-Session") String session,
+            @RequestHeader("X-Exam-Upload-Key") String requestKey,
             @RequestParam String fieldKey, @RequestParam(defaultValue="") String side, @RequestParam MultipartFile file,
             HttpServletRequest request, HttpServletResponse response) {
-        noStore(response); rateLimit.check(session, request.getRemoteAddr()); return success(attachments.upload(token, session, fieldKey, side, file));
+        noStore(response); rateLimit.check(session, request.getRemoteAddr()); return success(attachments.upload(token, session, fieldKey, side, file,requestKey));
     }
     @DeleteMapping("/attachments/{id}")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
