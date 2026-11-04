@@ -24,7 +24,7 @@ public final class StudentInfoReusePolicy {
             } else {
                 var answer = answers.stream().filter(a -> field.getKey().equals(a.getFieldKey())).findFirst().orElse(null);
                 String value = answer == null ? null : "dict".equals(field.getType()) ? answer.getValueCode()
-                        : "area".equals(field.getType()) ? answer.getAreaCodePath() : answer.getValueText();
+                        : "area".equals(field.getType()) ? answer.getIdentityAreaSnapshot() != null ? answer.getAreaLabelSnapshot() : answer.getAreaCodePath() : answer.getValueText();
                 if (value == null || value.isBlank()) missing.add(field.getLabel());
             }
         }
@@ -57,6 +57,19 @@ public final class StudentInfoReusePolicy {
                 DraftSelection selection = new DraftSelection(); selection.setCode(value);
                 selection.setDictType(answer.getDictType()); selection.setLabel(answer.getValueLabelSnapshot());
                 selections.put(field.getKey(), selection);
+            }
+        }
+        if (target.stream().anyMatch(f -> "household_area".equals(f.getKey()) && Boolean.TRUE.equals(f.getEnabled()))) {
+            var area = answers.stream().filter(a -> "household_area".equals(a.getFieldKey()) && a.getIdentityAreaSnapshot()!=null).findFirst();
+            if (area.isPresent()) {
+                var snapshot = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(area.get().getIdentityAreaSnapshot(), Map.class);
+                Object savedInput = snapshot.get("input");
+                if (savedInput != null) {
+                    var restored = cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(
+                            cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(savedInput), IdentityAreaInput.class);
+                    String card = values.getOrDefault("id_card", "");
+                    if (card.startsWith(restored.getCode())) draft.setIdentityArea(restored);
+                }
             }
         }
         draft.setValues(values); draft.setSelections(selections); return draft;

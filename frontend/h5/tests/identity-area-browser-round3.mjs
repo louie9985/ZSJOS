@@ -1,0 +1,1 @@
+const task=await taskSpace(22); console.log(await task.page('p1').snapshot({scope:'full_page'}));

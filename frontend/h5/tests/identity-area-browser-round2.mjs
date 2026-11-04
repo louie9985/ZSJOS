@@ -1,0 +1,15 @@
+const task=await taskSpace(22); const page=task.page('p1');
+const card=code=>{const b=code+'20000101001';return b+'10X98765432'[[7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2].reduce((s,w,i)=>s+w*Number(b[i]),0)%11]};
+await page.fill('#id_card',card('420621'));
+await page.waitForFunction(()=>document.querySelector('#household_area')?.value.includes('襄阳县'));
+console.log('historical automatic recognition passed');
+await page.fill('#id_card',card('110101'));
+await page.waitForSelector('textarea[aria-label="本人填写的历史地区"]');
+await page.fill('textarea[aria-label="本人填写的历史地区"]','测试省 / 测试历史县');
+await page.waitForFunction(()=>document.querySelector('.collection-draft')?.textContent.includes('草稿已保存'));
+await page.reload();
+await page.waitForFunction(()=>document.querySelector('textarea[aria-label="本人填写的历史地区"]')?.value==='测试省 / 测试历史县');
+console.log('manual fallback and draft reload passed');
+await page.cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+await page.screenshot({path:'D:/ZSJ-OS/frontend/h5/tmp/identity-area-mobile.png'});
+console.log(await page.snapshot());

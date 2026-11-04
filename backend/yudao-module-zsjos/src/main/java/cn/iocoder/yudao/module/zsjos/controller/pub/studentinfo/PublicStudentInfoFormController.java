@@ -48,6 +48,13 @@ public class PublicStudentInfoFormController {
         response.setHeader("Cache-Control","no-store");
         return success(service.publicDetail(token));
     }
+    @GetMapping("/identity-area")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    public CommonResult<cn.iocoder.yudao.module.system.api.ip.dto.IdentityAreaRespDTO> identityArea(
+            @RequestHeader("X-Student-Info-Token") String token, @RequestParam String code, HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store");
+        return success(service.identityArea(token, code));
+    }
     @PostMapping("/submit")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     public CommonResult<Boolean> submit(@RequestHeader("X-Student-Info-Token") String token,

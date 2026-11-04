@@ -1,0 +1,11 @@
+const task=await taskSpace(22); const page=task.page('p1');
+await page.evaluate(()=>document.querySelector('textarea[aria-label="本人填写的历史地区"]').scrollIntoView({block:'center'}));
+await page.fill('textarea[aria-label="本人填写的历史地区"]','测试省 / 测试历史县');
+await page.waitForFunction(()=>document.querySelector('.collection-draft')?.textContent.includes('草稿已保存'));
+await page.reload();
+await page.waitForFunction(()=>document.querySelector('textarea[aria-label="本人填写的历史地区"]')?.value==='测试省 / 测试历史县');
+console.log('manual fallback and draft restoration passed');
+await page.cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+await page.evaluate(()=>document.querySelector('#collection-field-household_area').scrollIntoView({block:'center'}));
+await page.screenshot({path:'D:/ZSJ-OS/frontend/h5/tmp/identity-area-mobile.png'});
+console.log(await page.snapshot());

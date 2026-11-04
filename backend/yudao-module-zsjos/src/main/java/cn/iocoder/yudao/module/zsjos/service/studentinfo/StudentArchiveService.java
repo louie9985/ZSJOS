@@ -107,7 +107,7 @@ public class StudentArchiveService {
             var definition = collection.definitions(form).stream().filter(f -> f.getKey().equals(answer.getFieldKey())).findFirst().orElseThrow();
             if (Boolean.TRUE.equals(answer.getSensitive()) && !permitted(ARCHIVE_SENSITIVE)) continue;
             raw.put(answer.getFieldKey(), "dict".equals(definition.getType()) ? answer.getValueCode()
-                    : "area".equals(definition.getType()) ? Arrays.stream(answer.getAreaCodePath().split("/")).map(Integer::valueOf).toList() : answer.getValueText());
+                    : "area".equals(definition.getType()) ? answer.getAreaCodePath() == null ? List.of() : Arrays.stream(answer.getAreaCodePath().split("/")).map(Integer::valueOf).toList() : answer.getValueText());
         }
         var selected = images.archiveList(form.getId(), imageIds(form, latest)); result.setImages(selected);
         for (var field : collection.definitions(form)) if ("images".equals(field.getType()))

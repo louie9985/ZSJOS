@@ -37,6 +37,7 @@ public class StudentInfoFormService {
     @Resource private StudentInfoFormConfigMapper configs;
     @Resource private StudentInfoConfigService configService;
     @Resource private StudentInfoFields fields;
+    @Resource(name = "studentIdentityAreaService") private StudentIdentityAreaService identityAreaService;
     @Resource private StudentInfoProductRules productRules;
     @Resource private RegistrationCaseMapper cases;
     @Resource private SalesOrderMapper orders;
@@ -188,6 +189,14 @@ public class StudentInfoFormService {
             result.setDraft(draft); result.setOptions(options); result.setImages(images.list(form.getId())); return result;
         });
     }
+    public cn.iocoder.yudao.module.system.api.ip.dto.IdentityAreaRespDTO identityArea(String token, String code) {
+        var located = locate(token);
+        return inTenant(located.getTenantId(), () -> {
+            var form = forms.byToken(hash(token));
+            if (!"DRAFT".equals(effectiveState(form))) throw exception(LINK_EXPIRED);
+            return identityAreaService.resolve(code);
+        });
+    }
     @Transactional(rollbackFor=Exception.class)
     public Draft saveDraft(String token, DraftWrite request) {
         return withLockedToken(token,form -> {
@@ -195,9 +204,21 @@ public class StudentInfoFormService {
             var previous = draft(form);
             // A timed-out response can hide a successful write; identical retries are safe.
             if (request.getRevision() != null && previous.getRevision() == request.getRevision()+1
-                    && Objects.equals(request.getValues(),previous.getValues())) return previous;
+                    && Objects.equals(request.getValues(),previous.getValues())
+                    && Objects.equals(request.getIdentityArea(),previous.getIdentityArea())) return previous;
             if (!Objects.equals(request.getRevision(),previous.getRevision())) throw exception(DRAFT_CONFLICT);
             var saved = StudentInfoDraftPolicy.build(definitions(form),previous,request.getValues(),fields::options);
+            var area = request.getIdentityArea();
+            if (area != null) {
+                String card = request.getValues().getOrDefault("id_card", "").trim();
+                if (card.length()<6 || !card.substring(0,6).equals(area.getCode())
+                        || !Set.of("AUTO","MANUAL_TEXT","MANUAL_SELECTION").contains(Objects.requireNonNullElse(area.getMode(),""))
+                        || area.getText()!=null && area.getText().length()>200
+                        || area.getPath()!=null && area.getPath().size()>5
+                        || definitions(form).stream().noneMatch(f -> "household_area".equals(f.getKey()) && Boolean.TRUE.equals(f.getEnabled())))
+                    throw exception(FIELD_INVALID,"地区草稿");
+                saved.setIdentityArea(area);
+            }
             saved.setRevision(previous.getRevision()+1); saved.setSavedAt(LocalDateTime.now());
             var update = new StudentInfoFormDO(); update.setId(form.getId());
             update.setDraftSnapshot(JsonUtils.toJsonString(saved)); update.setDraftRevision(saved.getRevision()); update.setDraftSavedAt(saved.getSavedAt());
@@ -245,7 +266,9 @@ public class StudentInfoFormService {
             if (!Objects.equals(request.getRevision(), form.getDraftRevision() == null ? 0L : form.getDraftRevision())) throw exception(DRAFT_CONFLICT);
             var definitions=definitions(form); images.validateSubmission(form,definitions,request.getValues());
             var draft = draft(form);
-            for (var answer:fields.validateCollectionValues(definitions,request.getValues())) {
+            var validated = request.getIdentityArea() == null ? fields.validateCollectionValues(definitions,request.getValues())
+                    : identityAreaService.validate(definitions,request.getValues(),request.getIdentityArea());
+            for (var answer:validated) {
                 var saved = draft.getSelections().get(answer.getFieldKey());
                 if (saved != null && Objects.equals(saved.getCode(),answer.getValueCode()) && Objects.equals(saved.getDictType(),answer.getDictType()))
                     answer.setValueLabelSnapshot(saved.getLabel());

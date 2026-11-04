@@ -7221,6 +7221,7 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_form (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员信息收集表';
 
 CREATE TABLE IF NOT EXISTS zsjos_student_info_form_value (
+  `identity_area_snapshot` text NULL COMMENT '身份证地址码识别来源快照',
  id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, form_id bigint NOT NULL,
  field_key varchar(64) NOT NULL, field_type varchar(32) NOT NULL, value_text text,
  dict_type varchar(100) DEFAULT NULL, value_code varchar(200) DEFAULT NULL,
@@ -8440,3 +8441,17 @@ CREATE TABLE IF NOT EXISTS zsjos_student_info_task (
   deleted BIT(1) NOT NULL DEFAULT b'0', tenant_id BIGINT NOT NULL DEFAULT 1,
   UNIQUE KEY uk_tenant_item (tenant_id,order_item_id), KEY idx_person (tenant_id,person_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单报名资料收集任务';
+
+CREATE TABLE IF NOT EXISTS system_identity_area (
+ id BIGINT NOT NULL PRIMARY KEY,
+ code VARCHAR(6) NOT NULL,
+ province_name VARCHAR(100) NOT NULL,
+ city_name VARCHAR(100) NOT NULL,
+ name VARCHAR(100) NOT NULL,
+ record_status VARCHAR(20) NOT NULL,
+ valid_from VARCHAR(20) NOT NULL,
+ valid_until VARCHAR(20) NOT NULL,
+ successor_codes TEXT NOT NULL,
+ data_version VARCHAR(64) NOT NULL,
+ KEY idx_identity_area_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

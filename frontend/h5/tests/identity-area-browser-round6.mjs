@@ -1,0 +1,14 @@
+const task=await taskSpace(22); const page=task.page('p1');
+await page.reload();
+await page.waitForSelector('textarea[aria-label="本人填写的历史地区"]');
+await page.cdp('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+await page.evaluate(()=>document.querySelector('#collection-field-household_area').scrollIntoView({block:'center'}));
+const fs=await import('node:fs/promises');
+let shot=await page.cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+await fs.writeFile('D:/ZSJ-OS/frontend/h5/tmp/identity-area-mobile.png',Buffer.from(shot.data,'base64'));
+console.log(await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth})));
+await page.cdp('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+shot=await page.cdp('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+await fs.writeFile('D:/ZSJ-OS/frontend/h5/tmp/identity-area-desktop.png',Buffer.from(shot.data,'base64'));
+await page.evaluate(()=>document.querySelector('button[type="submit"],button.van-button--primary').scrollIntoView({block:'center'}));
+console.log(await page.snapshot());

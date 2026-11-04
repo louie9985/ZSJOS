@@ -55,11 +55,19 @@ public final class StudentInfoVO {
         @NotBlank @Size(max=64) private String idempotencyKey;
         private Boolean sent;
     }
+    @Data public static class IdentityAreaInput {
+        private String code;
+        private String mode;
+        private String text;
+        private List<Integer> path;
+    }
     @Data public static class Submit {
+        private IdentityAreaInput identityArea;
         @NotNull @jakarta.validation.constraints.Min(0) private Long revision;
         @NotNull @Size(max=33) private Map<String, Object> values;
     }
     @Data public static class DraftWrite {
+        private IdentityAreaInput identityArea;
         @NotNull @jakarta.validation.constraints.Min(0) private Long revision;
         @NotNull @Size(max=33) private Map<String,String> values;
     }
@@ -67,6 +75,7 @@ public final class StudentInfoVO {
         private String code, label, dictType;
     }
     @Data public static class Draft {
+        private IdentityAreaInput identityArea;
         private long revision;
         private LocalDateTime savedAt;
         private Map<String,String> values = Map.of();

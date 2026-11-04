@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/yescallop/areacodes",
+  "commit": "e2c2b2e1fb4ce1fb76e879aa0b80e229adaf950c",
+  "coverage": "1981-2025 annual administrative-code records; not a complete police identity-code registry",
+  "license": "CC0-1.0",
+  "sha256": {
+    "address-codes.csv": "3958825fc7b97a3d4d9053c67a95d79f424830698c2919824d45ec6092478026",
+    "LICENSE": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
+    "UPSTREAM.md": "d1cd78d7989dcdf718415f6654ee3eb5c75c48affb9b4cd071b9d7af90e26cbd"
+  }
+}

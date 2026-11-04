@@ -13,9 +13,13 @@
           <summary class="norem" @click.prevent="openGroups[group.key]=openGroups[group.key] === false"><span class="collection-group-icon norem"><svg class="collection-group-svg norem" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path :d="group.iconPath" /></svg></span><span class="collection-group-title norem"><strong>{{ group.label }}</strong><small>{{ group.note }}</small></span><van-icon name="arrow-down" /></summary>
           <div class="collection-grid norem">
         <div v-for="field in group.fields" :key="field.key" :id="`collection-field-${field.key}`" tabindex="-1" :aria-describedby="fieldErrors[field.key] ? `collection-error-${field.key}` : undefined" class="collection-field norem" :class="{ 'collection-field-wide': field.type==='images' || field.type==='textarea' }">
-          <label :for="field.key"><span :class="{ 'h5-required-label': field.required }">{{ field.label }}</span></label>
+          <label :for="field.key"><span :class="{ 'h5-required-label': field.required }">{{ field.key === 'household_area' ? '身份证地址码归属' : field.label }}</span></label>
           <CollectionImages v-if="field.type==='images'" :key="token + field.key" :token="token" :field="field" :images="(runtime.images || []).filter(i=>i.fieldKey===field.key)" :disabled="saving" @change="updateImages(field.key,$event)" @busy="uploadBusy[field.key]=$event" @failed="uploadFailed[field.key]=$event" />
-          <input v-else-if="['gender','age','household_area'].includes(field.key)" :id="field.key" :value="field.key === 'household_area' ? areaLabel : field.key === 'gender' ? genderLabel : answers.age" readonly placeholder="填写身份证后自动识别" />
+          <template v-else-if="field.key === 'household_area'">
+            <textarea v-if="manualAllowed && identityArea" :id="field.key" v-model="identityArea.text" aria-label="填写地区" placeholder="请填写完整省、市、区县名称" rows="2" maxlength="200" :required="field.required" :disabled="saving" />
+            <output v-else :id="field.key" class="identity-area-result norem" aria-live="polite">{{ areaBusy ? '正在识别…' : areaLabel || '填写身份证后自动识别' }}</output>
+          </template>
+          <input v-else-if="['gender','age'].includes(field.key)" :id="field.key" :value="field.key === 'gender' ? genderLabel : answers.age" readonly placeholder="填写身份证后自动识别" />
           <CollectionSelect v-else-if="field.type === 'dict'" :id="field.key" v-model="answers[field.key]" :label="field.label" :options="runtime.options[field.key] || []" :disabled="saving" />
           <textarea v-else-if="field.type === 'textarea'" :id="field.key" v-model="answers[field.key]" rows="3" maxlength="2000" :required="field.required" :disabled="saving" />
           <input v-else :id="field.key" v-model="answers[field.key]" :required="field.required" :disabled="saving"
@@ -23,7 +27,7 @@
             :pattern="field.key === 'mobile' ? '1[3-9][0-9]{9}' : undefined" autocomplete="off" />
           <p v-if="fieldErrors[field.key]" :id="`collection-error-${field.key}`" class="collection-error norem" role="alert">{{ fieldErrors[field.key] }}</p>
           <p v-if="field.note">{{ field.note }}</p>
-          <p v-if="field.key === 'household_area'">{{ areaError || '按身份证地址码自动识别' }}</p>
+          <p v-if="field.key === 'household_area'">{{ areaBusy ? '正在识别…' : areaError || '按身份证地址码自动识别' }}</p>
         </div>
           </div>
         </details>
@@ -37,10 +41,10 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { showConfirmDialog, showDialog } from 'vant'
-import { collectionApi, CollectionError, type CollectionArea, type CollectionRuntime, type CollectionImage } from '@/api/studentInfo'
+import { collectionApi, CollectionError, type CollectionArea, type CollectionRuntime, type CollectionImage, type IdentityAreaInput } from '@/api/studentInfo'
 import CollectionImages from './CollectionImages.vue'
 import CollectionSelect from './CollectionSelect.vue'
-import { validCollectionIdentity, deriveCollectionIdentity, findCollectionIdentityArea } from '@/utils/studentInfoValidation'
+import { validCollectionIdentity, deriveCollectionIdentity } from '@/utils/studentInfoValidation'
 
 const route = useRoute()
 const token = computed(() => new URLSearchParams(route.hash.slice(1)).get('token') || '')
@@ -51,6 +55,47 @@ const areas = ref<CollectionArea[]>([])
 const areaPath = ref<number[]>([])
 const areaLabel = ref('')
 const areaError = ref('')
+const areaBusy = ref(false)
+const manualAllowed = ref(false)
+const identityArea = ref<IdentityAreaInput>()
+let areaSequence = 0
+function enableManualArea() {
+  const identity = deriveCollectionIdentity(answers.value.id_card || '')
+  if (!identity || identityArea.value?.mode === 'MANUAL_TEXT') return
+  // Preserve earlier selection drafts as readable text when opening the simplified form.
+  const labels: string[] = []; let nodes = areas.value
+  for (const id of identityArea.value?.path || []) {
+    const node = nodes.find(item => item.id === id)
+    if (!node) { labels.length = 0; break }
+    labels.push(node.name); nodes = node.children || []
+  }
+  identityArea.value = { code: identity.areaCode, mode: 'MANUAL_TEXT', text: labels.join(' / ') }
+}
+const areaReady = computed(() => identityArea.value?.mode === 'AUTO'
+  ? !!areaLabel.value : (identityArea.value?.text || '').trim().length >= 2)
+async function resolveIdentityArea() {
+  const sequence = ++areaSequence, requestToken = token.value
+  const identity = deriveCollectionIdentity(answers.value.id_card || '')
+  areaLabel.value = ''; areaError.value = ''; manualAllowed.value = false; areaBusy.value = false
+  if (!identity || !runtime.value?.fields.some(f => f.key === 'household_area')) { identityArea.value = undefined; return }
+  if (identityArea.value?.code !== identity.areaCode) identityArea.value = undefined
+  areaBusy.value = true
+  try {
+    const result = await collectionApi.identityArea(requestToken, identity.areaCode)
+    if (sequence !== areaSequence || requestToken !== token.value) return
+    if (['CURRENT','HISTORICAL'].includes(result.status)) {
+      identityArea.value = { code: identity.areaCode, mode: 'AUTO' }
+      areaLabel.value = result.label || ''
+    } else {
+      manualAllowed.value = true; areaError.value = '未能自动识别，请直接填写地区'
+      enableManualArea()
+    }
+  } catch {
+    if (sequence !== areaSequence || requestToken !== token.value) return
+    manualAllowed.value = true; areaError.value = '未能自动识别，请直接填写地区'
+    enableManualArea()
+  } finally { if (sequence === areaSequence) areaBusy.value = false }
+}
 const loading = ref(false)
 const saving = ref(false)
 const draftRevision = ref(0)
@@ -65,7 +110,7 @@ let draftRequestSequence = 0
 const draftValues = computed(() => Object.fromEntries((runtime.value?.fields || [])
   .filter(f => ['text','textarea','dict'].includes(f.type) && !['gender','age','household_area'].includes(f.key))
   .map(f => [f.key, answers.value[f.key] || ''])))
-const draftText = computed(() => JSON.stringify(draftValues.value))
+const draftText = computed(() => JSON.stringify({ values: draftValues.value, identityArea: identityArea.value }))
 const draftChanged = computed(() => runtime.value?.status === 'DRAFT' && draftText.value !== savedDraftText.value)
 async function saveDraftNow(): Promise<boolean> {
   clearTimeout(draftTimer)
@@ -82,7 +127,7 @@ async function saveDraftNow(): Promise<boolean> {
   draftBusy.value = true; draftError.value = ''
   draftRequest = (async () => {
     try {
-      const saved = await collectionApi.saveDraft(requestToken, draftRevision.value, JSON.parse(text))
+      const saved = await collectionApi.saveDraft(requestToken, draftRevision.value, JSON.parse(text).values, JSON.parse(text).identityArea)
       if (sequence !== loadSequence || requestToken !== token.value) return false
       if (draftConflict.value) error.value = ''
       draftRevision.value = saved.revision; savedDraftText.value = text; draftSaved.value = true; draftConflict.value = false
@@ -143,19 +188,14 @@ const beforeUnload = (e:BeforeUnloadEvent)=>{if(dirty.value){e.preventDefault();
 const saveWhenHidden = ()=>{if(document.visibilityState === 'hidden' && draftChanged.value)void saveDraftNow()}
 window.addEventListener('beforeunload',beforeUnload)
 document.addEventListener('visibilitychange',saveWhenHidden)
-onBeforeUnmount(()=>{loadSequence++;clearTimeout(draftTimer);window.removeEventListener('beforeunload',beforeUnload);document.removeEventListener('visibilitychange',saveWhenHidden)})
+onBeforeUnmount(()=>{loadSequence++;areaSequence++;clearTimeout(draftTimer);window.removeEventListener('beforeunload',beforeUnload);document.removeEventListener('visibilitychange',saveWhenHidden)})
 const confirmLeave = async()=>{if(!dirty.value)return true;if(!hasUploads.value && !hasUploadErrors.value && await saveDraftNow())return true;try{await showConfirmDialog({title:'离开填写页？',message:'仍有内容未保存，离开后这些修改可能丢失。'});return true}catch{return false}}
 onBeforeRouteLeave(confirmLeave)
 onBeforeRouteUpdate((to,from)=>to.hash===from.hash ? true : confirmLeave())
-watch([() => answers.value.id_card, areas], () => {
-  if (/身份证|户籍所在地/.test(error.value)) error.value = ''
+watch(() => answers.value.id_card, () => {
   const identity = deriveCollectionIdentity(answers.value.id_card || '')
-  answers.value.age = identity?.age || ''
-  answers.value.gender = identity?.gender || ''
-  const path = identity ? findCollectionIdentityArea(areas.value, identity.areaCode) : []
-  areaPath.value = path.map(node => node.id)
-  areaLabel.value = path.map(node => node.name).join(' / ')
-  areaError.value = identity && !path.length ? '身份证地址码未匹配到地区，请联系报名老师维护地区配置' : ''
+  answers.value.age = identity?.age || ''; answers.value.gender = identity?.gender || ''
+  if (!loading.value) { identityArea.value = undefined; void resolveIdentityArea() }
 })
 const statusText = computed(() => ({ SUBMITTED: '信息已提交，不可修改', EXPIRED: '链接已失效', REVOKED: '链接已撤销' }[runtime.value?.status || ''] || '链接不可用'))
 const load = async () => {
@@ -170,19 +210,21 @@ const load = async () => {
       if (!data.fields.length) throw new Error('表单尚未配置')
       if (data.fields.some(f => f.type === 'area')) {
         if (!data.tenantId) throw new Error('表单信息不完整')
-        const result = await collectionApi.areas(data.tenantId)
+        const result = await collectionApi.areas(data.tenantId).catch(() => [])
         if (sequence !== loadSequence) return
         areas.value = result
-        if (!areas.value.length) throw new Error('地区配置为空，请联系报名老师')
+
       }
       for (const f of data.fields) if (!(f.key in answers.value)) answers.value[f.key] = ''
     }
     runtime.value = data
     if (data.status === 'DRAFT') {
       Object.assign(answers.value, data.draft?.values || {})
+      identityArea.value = data.draft?.identityArea
+      await resolveIdentityArea()
       draftRevision.value = data.draft?.revision || 0
       draftSaved.value = !!data.draft?.savedAt
-      savedDraftText.value = JSON.stringify(draftValues.value)
+      savedDraftText.value = JSON.stringify({ values: draftValues.value, identityArea: identityArea.value })
       draftError.value = ''
     }
   } catch (e) { if (sequence === loadSequence) error.value = e instanceof Error ? e.message : '加载失败' }
@@ -203,10 +245,10 @@ const submit = async () => {
   error.value = ''; fieldErrors.value = {}
   if (answers.value.mobile && !/^1[3-9][0-9]{9}$/.test(answers.value.mobile)) { await reportSubmitError('请填写正确的11位手机号码', 'mobile'); return }
   if (answers.value.id_card && !validCollectionIdentity(answers.value.id_card)) { await reportSubmitError('请检查身份证号码', 'id_card'); return }
-  if (runtime.value.fields.some(f => f.key === 'household_area') && areaError.value) { await reportSubmitError(areaError.value, 'household_area'); return }
-  for(const f of runtime.value.fields){const images=runtime.value.images?.filter(i=>i.fieldKey===f.key)||[];const missing=f.type==='images'?images.length<(f.key==='identity_images'?2:1):f.type==='area'?!areaPath.value.length:!(answers.value[f.key]||'').trim();if(f.required&&missing){await reportSubmitError(f.type === 'images' ? (f.key === 'identity_images' ? '请上传身份证正反面两张图片' : '请上传'+f.label) : '请填写'+f.label, f.key);return}}
+  if (runtime.value.fields.some(f => f.key === 'household_area') && areaBusy.value) { await reportSubmitError('地区正在识别，请稍候', 'household_area'); return }
+  for(const f of runtime.value.fields){const images=runtime.value.images?.filter(i=>i.fieldKey===f.key)||[];const missing=f.type==='images'?images.length<(f.key==='identity_images'?2:1):f.type==='area'?!areaReady.value:!(answers.value[f.key]||'').trim();if(f.required&&missing){await reportSubmitError(f.type === 'images' ? (f.key === 'identity_images' ? '请上传身份证正反面两张图片' : '请上传'+f.label) : '请填写'+f.label, f.key);return}}
   const area = runtime.value.fields.find(f => f.type === 'area')
-  if (area?.required && !areaPath.value.length) { await reportSubmitError('请填写有效身份证以识别户籍所在地', 'id_card'); return }
+  if (area?.required && !areaReady.value) { await reportSubmitError('请填写有效身份证以识别户籍所在地', 'id_card'); return }
   const requestToken = token.value
   try { await showConfirmDialog({ title: '确认提交', message: '提交后信息将锁定，不能再次修改。' }) } catch { return }
   if (requestToken !== token.value || runtime.value?.status !== 'DRAFT') return
@@ -219,7 +261,7 @@ const submit = async () => {
   try {
     const values: Record<string,string | number[]> = {}
     for (const f of runtime.value.fields) values[f.key] = f.type==='images' ? (runtime.value.images||[]).filter(i=>i.fieldKey===f.key).map(i=>i.id) : f.type === 'area' ? areaPath.value : (answers.value[f.key] || '')
-    await collectionApi.submit(requestToken, values, draftRevision.value)
+    await collectionApi.submit(requestToken, values, draftRevision.value, identityArea.value)
     if (requestToken !== token.value) return
     runtime.value = { ...runtime.value, status: 'SUBMITTED', fields: [], options: {}, images: [] }
     answers.value = {}; areaPath.value = []; areaLabel.value = ''
@@ -234,12 +276,13 @@ const submit = async () => {
 watch(token, () => {
   clearTimeout(draftTimer); draftRevision.value = 0; draftSaved.value = false; draftBusy.value = false; draftError.value = ''; draftConflict.value = false; savedDraftText.value = '{}'
   openGroups.value = {}
-  answers.value = {}; uploadBusy.value = {}; uploadFailed.value = {}; areaPath.value = []; areaLabel.value = ''; areaError.value = ''; areas.value = []
+  identityArea.value = undefined; areaSequence++; areaBusy.value = false; manualAllowed.value = false; answers.value = {}; uploadBusy.value = {}; uploadFailed.value = {}; areaPath.value = []; areaLabel.value = ''; areaError.value = ''; areas.value = []
   void load()
 }, { immediate: true })
 </script>
 
 <style scoped>
+.identity-area-result.norem{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.6;padding:8px 0;}
 .collection-field.norem .collection-error.norem { color: #b42318; font-weight: 500; }
 .collection-field.norem:focus { outline: 2px solid var(--h5-primary); outline-offset: 2px; }
 .collection-draft.norem { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 4px 12px; font-size: 12px; color: var(--h5-text-secondary); }
