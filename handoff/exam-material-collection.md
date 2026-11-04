@@ -17,3 +17,11 @@
 - Created independent branch/worktree from that commit. Main remains checked out in D:/ZSJ-OS; no database or service operations performed.
 - Current implementation concern: archive revisions are form-bound, while exam collection may target services without an existing form. Design must provide service-scoped archive integration without rewriting original order submission snapshots or bypassing existing permissions.
 - Remaining: maintained design/UI acceptance document, concrete archive integration contract, implementation and full scoped verification. Goal remains active.
+
+## Delivery — 2026-11-04 (Asia/Shanghai), matching policy foundation
+- Context: same registration; HEAD 12fa7d6f8d before this change. Prior goal turn made concrete progress (baseline/worktree/design commits).
+- Implemented ExamCollectionPolicy and seven JUnit regression cases: frozen roster matching, suffix normalization, same-service deduplication versus ambiguous services, confirmed out-of-roster binding, invalid binding, ordered application, distinct service counts, selected-field-only immutable merge and malformed field rejection.
+- Added script/exam-collection/verify_policy.py using existing local JUnit jars and this worktree's isolated artifacts directory; no dependency added or main build outputs touched.
+- Verified current sources: 7/7 tests passed; git diff --check passed. Design/API document records invocation and exact limits.
+- Source findings: Person DO has no direct identity-card field; current identity evidence is in collection/archive values. Existing StudentArchiveService requires a submitted form, so historical services without one need a service-owned archive projection/revision adapter rather than synthetic order/form records.
+- Not yet wired: controllers, DAL/schema, archive integration, public form, workbench pages, reminders and browser verification. No database or service state changed. Goal remains active; ownership retained.
