@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## Exam collection (feature branch, 2026-11-04)
+
+The user-approved `zsjos:exam-collection:query` contract permits current-tenant full student/class/archive reads only through the exam-collection feature and its task-context summary. Commands additionally require their configured button permission. `ExamCollectionPermissionProvider` checks tenant, logical deletion, page and action permissions for task objects; it does not infer roles or expand legacy student APIs. V362 defines metadata only, never role assignments. Initial task fields/create/page/detail endpoints are implemented; full roster/public/archive/summary integration and both frontend menu consumers remain in development. See [exam collection](../api/exam-material-collection.md).
+
 ## Management student summary (2026-11-03)
 
 Explicitly approved exception: `zsjos:student-summary:query` grants current-tenant full teaching-service population and archive-field reads, including sensitive and exam fields, without legacy personal/department/archive gates. Export additionally requires `zsjos:student-summary:export`. The exception is isolated to new read-only endpoints, preserves tenant and logical-delete constraints, and grants no legacy command or material-download access. Workbench uses BusinessTable; Vue Admin excludes the unsupported component. V361 adds metadata only, never role grants. See [student summary](../api/student-summary.md).

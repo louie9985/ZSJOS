@@ -34,8 +34,9 @@ base = ROOT / 'backend/yudao-module-zsjos/src'
 package = 'java/cn/iocoder/yudao/module/zsjos'
 main = base / 'main' / package
 sources = []
-for directory in ('service/examcollection', 'dal/dataobject/examcollection', 'dal/mysql/examcollection'):
-    sources.extend((main / directory).glob('*.java'))
+for directory in ('service/examcollection', 'dal/dataobject/examcollection', 'dal/mysql/examcollection',
+                  'dal/dataobject/studentinfo', 'dal/mysql/studentinfo', 'controller/admin/examcollection'):
+    sources.extend((main / directory).rglob('*.java'))
 sources.extend([main / 'service/studentinfo/StudentInfoFields.java',
                 main / 'controller/admin/studentinfo/vo/StudentInfoVO.java'])
 tests = list((base / 'test' / package / 'service/examcollection').glob('*Test.java'))

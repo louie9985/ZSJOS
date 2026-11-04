@@ -93,3 +93,20 @@ V362 前置为两本台账的 V361。新增以下表，均含租户、逻辑删�
 
 - `python -B script/sql/mysql/tools/test_exam_collection.py`：新建且保留独立测试库；配置库仅作只读结构/台账来源。MySQL 8.4.11 验证首次/重复、缺前置、台账失败、残留 DDL 恢复、已有台账但缺表恢复、菜单冲突、索引冲突与修复、任务内身份证唯一性、中文 HEX。源库菜单、角色关系及台账前后相同。
 - `python -B script/exam-collection/verify_backend.py --classpath-args <已有javac参数文件>`：将已有依赖目录复制到本分支隔离输出，编译新增模型/Mapper/规则与当前字段源码，执行全部考试收集专项测试。当前 10/10 通过；未启动 Spring、未验证 HTTP、数据库 Mapper 往返或浏览器。
+
+## 已接入的管理 API（2026-11-04，尚未运行 HTTP 验收）
+
+前缀 `/admin-api/zsjos/exam-collection`，统一响应包装、ADMIN 身份与租户上下文；请求/响应正文日志关闭，响应 `Cache-Control: no-store`。
+
+| 接口 | 契约 |
+| --- | --- |
+| GET /fields | query 权限；返回已发布且启用的可选材料/证书地址定义 |
+| POST /create | query + create；title、description、selectedFields；生成字段快照和随机统一链接 |
+| GET /page | query；标准分页、keyword、OPEN/COMPLETED；任务状态及应收/归档/异常/额外人数 |
+| GET /detail?id= | query + 对象校验；任务详情、冻结字段及统一链接 |
+
+统一链接路径为配置的 H5 基址加 `/exam-collection/{token}`。创建前验证 HTTP(S) 基址和加密配置；该公开路由尚未接入，不能作为当前可用的端到端能力交付。响应使用明确 VO，不返回 token 哈希、加密列、DAL 对象。
+
+`StudentServiceArchiveStore` 是内部存储适配器，入口服务先完成权限和提交校验。读取优先服务修订，缺少时读取同 Person/订单商品的原报名表最新修订；没有报名表时返回空档案。原报名修订所选的内部补传附件同样保留。写入需要现有事务、锁定服务、核对租户和附件绑定，以提交 ID 幂等追加修订，拒绝不完整必填材料。旧档案详情/维护 API 尚未切换到该适配器，后续必须完成后才能宣称“已同步展示”。
+
+身份证索引使用现有加密密钥派生的 HMAC-SHA256，采用独立用途前缀；更换密钥会影响索引匹配，沿用现有加密密钥持久化与备份要求。公开链接为 32 字节安全随机值的 URL-safe 编码，查询使用 SHA-256 摘要。
