@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.*;
 import cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoFormService;
+import cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoFields;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -29,6 +30,7 @@ public class StudentServiceArchiveStore {
     @Resource private StudentInfoImageMapper legacyImages;
     @Resource private StudentInfoFormService collection;
     @Resource private ExamCollectionAttachmentMapper attachments;
+    @Resource private StudentInfoFields fieldValidation;
 
     public record Attachment(String source, Long id, String fieldKey, String side, String name,
                              String contentType, Long size) {}
@@ -109,6 +111,7 @@ public class StudentServiceArchiveStore {
         var valueMap = new LinkedHashMap<String, StudentInfoFormValueDO>();
         current.answers().stream().filter(v -> !keys.contains(v.getFieldKey())).forEach(v -> valueMap.put(v.getFieldKey(), v));
         incoming.forEach(v -> valueMap.put(v.getFieldKey(), v));
+        refreshIdentityDerived(current, fieldMap, valueMap);
         var fileIds = JsonUtils.parseArray(submission.getAttachmentIdsJson(), Long.class);
         if (fileIds == null || new HashSet<>(fileIds).size() != fileIds.size()) throw exception(FIELD_INVALID, "重复或缺失的材料引用");
         var files = new ArrayList<>(current.attachments().stream().filter(a -> !keys.contains(a.fieldKey())).toList());
@@ -140,5 +143,29 @@ public class StudentServiceArchiveStore {
         row.setFieldsSnapshot(JsonUtils.toJsonString(fieldMap.values())); row.setAnswersJson(JsonUtils.toJsonString(valueMap.values()));
         row.setAttachmentsJson(JsonUtils.toJsonString(files)); revisions.insert(row);
         return row.getRevision();
+    }
+
+    private void refreshIdentityDerived(Snapshot current, Map<String, Field> definitions,
+                                        Map<String, StudentInfoFormValueDO> values) {
+        var identity = values.get("id_card");
+        if (identity == null || identity.getValueText() == null) return;
+        String card = identity.getValueText().trim().toUpperCase(Locale.ROOT);
+        String oldCard = current.answers().stream().filter(v -> "id_card".equals(v.getFieldKey()))
+                .map(StudentInfoFormValueDO::getValueText).filter(Objects::nonNull).findFirst().orElse("");
+        if (card.equalsIgnoreCase(oldCard.trim())) return;
+        var derived = new ArrayList<Field>();
+        derived.add(definitions.get("id_card"));
+        for (String key : List.of("age", "gender")) {
+            var definition = definitions.get(key);
+            if (definition == null || !Boolean.TRUE.equals(definition.getEnabled())) continue;
+            // An unchanged dictionary choice retains its historical label even when the ID changes.
+            var previous = values.get(key);
+            if ("gender".equals(key) && card.length() == 18 && Character.isDigit(card.charAt(16))
+                    && previous != null && Objects.equals(previous.getValueCode(), (card.charAt(16) - '0') % 2 == 1 ? "1" : "2")) continue;
+            derived.add(definition);
+        }
+        if (derived.size() == 1) return;
+        fieldValidation.validateValues(derived, Map.of("id_card", card)).stream()
+                .filter(value -> !"id_card".equals(value.getFieldKey())).forEach(value -> values.put(value.getFieldKey(), value));
     }
 }

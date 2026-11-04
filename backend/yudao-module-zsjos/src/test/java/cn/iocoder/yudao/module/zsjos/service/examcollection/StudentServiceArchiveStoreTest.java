@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.*;
 import cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoFormService;
+import cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoFields;
 import org.junit.jupiter.api.*;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.ArgumentCaptor;
@@ -29,6 +30,7 @@ class StudentServiceArchiveStoreTest {
     StudentInfoImageMapper images;
     StudentInfoFormService collection;
     ExamCollectionAttachmentMapper files;
+    StudentInfoFields fieldValidation;
     ServiceRelationDO relation;
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
@@ -41,6 +43,7 @@ class StudentServiceArchiveStoreTest {
         images = inject("legacyImages", StudentInfoImageMapper.class);
         collection = inject("collection", StudentInfoFormService.class);
         files = inject("attachments", ExamCollectionAttachmentMapper.class);
+        fieldValidation = inject("fieldValidation", StudentInfoFields.class);
         relation = new ServiceRelationDO(); relation.setId(10L); relation.setPersonId(20L); relation.setTenantId(1L);
         when(relations.selectById(10L)).thenReturn(relation);
         when(relations.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
@@ -116,5 +119,38 @@ class StudentServiceArchiveStoreTest {
         var input = submission(); input.setAttachmentIdsJson("[7,7]");
         assertThrows(ServiceException.class, () -> store.apply(task, input, 10L, null, ""));
         verify(revisions, never()).insert(any(StudentServiceArchiveRevisionDO.class));
+    }
+
+    @Test void changedIdentityRefreshesExistingAgeButPreservesUnchangedGenderSnapshotAndUncollectedAddress() {
+        var current = new StudentServiceArchiveRevisionDO(); current.setPersonId(20L); current.setRevision(1);
+        var age = field("age"); age.setEnabled(true);
+        var gender = field("gender"); gender.setEnabled(true); gender.setType("dict");
+        var oldGender = answer("gender", null); oldGender.setValueCode("2"); oldGender.setValueLabelSnapshot("历史性别标签");
+        current.setFieldsSnapshot(JsonUtils.toJsonString(List.of(field("id_card"), age, gender, field("household_area"))));
+        current.setAnswersJson(JsonUtils.toJsonString(List.of(answer("id_card", "110105198001010026"), answer("age", "46"), oldGender, answer("household_area", "历史地址"))));
+        current.setAttachmentsJson("[]"); when(revisions.latest(10L)).thenReturn(current);
+        var task = task(); var id = field("id_card"); id.setEnabled(true); task.setFieldsSnapshot(JsonUtils.toJsonString(List.of(id)));
+        var input = submission(); input.setAnswersJson(JsonUtils.toJsonString(List.of(answer("id_card", "11010519491231002X"))));
+        when(fieldValidation.validateValues(anyList(), anyMap())).thenReturn(List.of(answer("age", "76")));
+        store.apply(task, input, 10L, null, "");
+        verify(fieldValidation).validateValues(argThat(list -> list.stream().map(Field::getKey).toList().equals(List.of("id_card", "age"))), eq(java.util.Map.of("id_card", "11010519491231002X")));
+        var captor = ArgumentCaptor.forClass(StudentServiceArchiveRevisionDO.class); verify(revisions).insert(captor.capture());
+        assertTrue(captor.getValue().getAnswersJson().contains("历史性别标签"));
+        assertTrue(captor.getValue().getAnswersJson().contains("历史地址"));
+        assertTrue(captor.getValue().getAnswersJson().contains("76"));
+    }
+
+    @Test void unchangedIdentityPreservesHistoricalDerivedSnapshots() {
+        var current = new StudentServiceArchiveRevisionDO(); current.setPersonId(20L); current.setRevision(1);
+        var age = field("age"); age.setEnabled(true);
+        current.setFieldsSnapshot(JsonUtils.toJsonString(List.of(field("id_card"), age)));
+        current.setAnswersJson(JsonUtils.toJsonString(List.of(answer("id_card", "11010519491231002x"), answer("age", "75"))));
+        current.setAttachmentsJson("[]"); when(revisions.latest(10L)).thenReturn(current);
+        var task = task(); task.setFieldsSnapshot(JsonUtils.toJsonString(List.of(field("id_card"))));
+        var input = submission(); input.setAnswersJson(JsonUtils.toJsonString(List.of(answer("id_card", "11010519491231002X"))));
+        store.apply(task, input, 10L, null, "");
+        verifyNoInteractions(fieldValidation);
+        var captor = ArgumentCaptor.forClass(StudentServiceArchiveRevisionDO.class); verify(revisions).insert(captor.capture());
+        assertTrue(captor.getValue().getAnswersJson().contains("75"));
     }
 }
