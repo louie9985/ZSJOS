@@ -31,6 +31,8 @@ BEGIN
   config_version_id bigint NOT NULL,
   fields_snapshot longtext NOT NULL,
   class_ids_json text DEFAULT NULL,
+  create_request_key varchar(64) DEFAULT NULL,
+  create_request_hash varchar(64) DEFAULT NULL,
   token_hash varchar(64) NOT NULL,
   token_ciphertext text NOT NULL,
   sequence_no bigint NOT NULL DEFAULT 0,
@@ -41,15 +43,32 @@ BEGIN
   create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY (id), UNIQUE KEY uk_token (token_hash)
+  PRIMARY KEY (id), UNIQUE KEY uk_token (token_hash), UNIQUE KEY uk_create_request (tenant_id,create_request_key)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
  -- Development-only V362 baseline expansion: preserve previously retained fixture tables.
  IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
   AND table_name='zsjos_exam_collection_task' AND column_name='class_ids_json') THEN
   ALTER TABLE zsjos_exam_collection_task ADD COLUMN class_ids_json text DEFAULT NULL AFTER fields_snapshot;
  END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_exam_collection_task' AND column_name='create_request_key') THEN
+  ALTER TABLE zsjos_exam_collection_task ADD COLUMN create_request_key varchar(64) DEFAULT NULL;
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_exam_collection_task' AND column_name='create_request_hash') THEN
+  ALTER TABLE zsjos_exam_collection_task ADD COLUMN create_request_hash varchar(64) DEFAULT NULL;
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+  AND table_name='zsjos_exam_collection_task' AND index_name='uk_create_request') THEN
+  ALTER TABLE zsjos_exam_collection_task ADD UNIQUE KEY uk_create_request (tenant_id,create_request_key);
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+  AND table_name='zsjos_exam_collection_task' AND index_name='uk_create_request'
+  GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')='tenant_id,create_request_key' AND MAX(non_unique)=0) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 invalid task uk_create_request';
+ END IF;
  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
-  AND table_name='zsjos_exam_collection_task' AND column_name IN ('id','title','description','status','config_version_id','fields_snapshot','class_ids_json','token_hash','token_ciphertext','sequence_no','revision','completion_reason','completed_at','creator','updater','create_time','update_time','deleted','tenant_id'))<>19 THEN
+  AND table_name='zsjos_exam_collection_task' AND column_name IN ('id','title','description','status','config_version_id','fields_snapshot','class_ids_json','create_request_key','create_request_hash','token_hash','token_ciphertext','sequence_no','revision','completion_reason','completed_at','creator','updater','create_time','update_time','deleted','tenant_id'))<>21 THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 incomplete zsjos_exam_collection_task';
  END IF;
  IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()

@@ -18,6 +18,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.net.URI;
 import java.util.List;
+import java.util.Objects;
+import cn.hutool.crypto.digest.DigestUtil;
+import org.springframework.dao.DuplicateKeyException;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 import static cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.CONFIG_MISSING;
@@ -50,6 +53,14 @@ public class ExamCollectionTaskService {
     @Transactional(rollbackFor=Exception.class)
     public Detail create(Create request) {
         require(CREATE);
+        Long actor = getLoginUserId(), tenant = TenantContextHolder.getRequiredTenantId();
+        if (actor == null) throw exception(DENIED);
+        if (request.getIdempotencyKey() == null || !request.getIdempotencyKey().matches("[A-Za-z0-9_-]{16,64}")) throw exception(CONFLICT);
+        String key = DigestUtil.sha256Hex(tenant + ":" + actor + ":" + request.getIdempotencyKey());
+        String hash = DigestUtil.sha256Hex(JsonUtils.toJsonString(List.of(request.getTitle().trim(),
+                request.getDescription() == null ? "" : request.getDescription().trim(), request.getSelectedFields().stream().sorted().toList())));
+        var previous = tasks.byCreateRequest(key, false);
+        if (previous != null) return replay(previous, tenant, key, hash);
         var config = configs.state("PUBLISHED");
         if (config == null) throw exception(CONFIG_MISSING);
         var snapshot = ExamCollectionFields.snapshot(JsonUtils.parseArray(config.getFieldsJson(), Field.class), request.getSelectedFields());
@@ -61,9 +72,24 @@ public class ExamCollectionTaskService {
         row.setDescription(request.getDescription() == null ? "" : request.getDescription().trim());
         row.setStatus(OPEN); row.setConfigVersionId(config.getId()); row.setFieldsSnapshot(JsonUtils.toJsonString(snapshot));
         row.setTokenHash(tokens.hash(token)); row.setTokenCiphertext(token); row.setRevision(0); row.setSequenceNo(0L);
-        tasks.insert(row);
+        row.setCreateRequestKey(key); row.setCreateRequestHash(hash);
+        try { tasks.insert(row); }
+        catch (DuplicateKeyException duplicate) {
+            // A concurrent request may have won after the consistent read. A current read sees its committed row.
+            previous = tasks.byCreateRequest(key, true);
+            if (previous == null) throw duplicate;
+            return replay(previous, tenant, key, hash);
+        }
         var detail = BeanUtils.toBean(row, Detail.class); detail.setCreatedAt(row.getCreateTime());
         detail.setFields(snapshot); detail.setUrl(publicUrl(token)); return detail;
+    }
+    private Detail replay(ExamCollectionTaskDO row, Long tenant, String key, String hash) {
+        if (!Objects.equals(row.getTenantId(), tenant) || Boolean.TRUE.equals(row.getDeleted())
+                || !Objects.equals(row.getCreateRequestKey(), key) || !Objects.equals(row.getCreateRequestHash(), hash)) throw exception(CONFLICT);
+        var result = BeanUtils.toBean(project(row), Detail.class);
+        result.setFields(JsonUtils.parseArray(row.getFieldsSnapshot(), Field.class));
+        result.setClassIds(row.getClassIdsJson() == null ? List.of() : JsonUtils.parseArray(row.getClassIdsJson(), Long.class));
+        result.setUrl(publicUrl(row.getTokenCiphertext())); return result;
     }
     public PageResult<Task> page(Query query) {
         require(QUERY);

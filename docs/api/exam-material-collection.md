@@ -102,11 +102,15 @@ V362 前置为两本台账的 V361。新增以下八张表，均含租户、逻�
 | 接口 | 契约 |
 | --- | --- |
 | GET /fields | query 权限；返回已发布且启用的可选材料/证书地址定义 |
-| POST /create | query + create；title、description、selectedFields；生成字段快照和随机统一链接 |
+| POST /create | query + create；title、description、selectedFields、idempotencyKey；生成字段快照和随机统一链接 |
 | GET /page | query；标准分页、keyword、OPEN/COMPLETED；任务状态及应收/归档/异常/额外人数 |
 | GET /detail?id= | query + 对象校验；任务详情、冻结字段及统一链接 |
 
 统一链接为配置的 H5 基址加 `/exam-collection#token={token}`。凭证放在 fragment，不进入页面 HTTP 请求路径。创建前验证 HTTP(S) 基址和加密配置；H5 已接入匿名公开路由，实际后端 HTTP/存储联调仍待完成。响应使用明确 VO，不返回 token 哈希、加密列、DAL 对象。
+
+创建请求的 `idempotencyKey` 为 16–64 位字母、数字、下划线或连字符，Workbench 使用 UUID。服务端将租户、当前操作人和请求键组成摘要，以任务表唯一索引防止并发重复；同键同内容返回原任务及链接，同键不同内容拒绝。重试不读取新发布的字段配置，不重建快照。并发插入败方使用锁定当前读读取已提交结果，避免可重复读快照看不到胜方记录。开发版 V362 条件添加 `create_request_key`、`create_request_hash` 和唯一索引，历史行保持 NULL，不伪造幂等键。
+
+创建界面在未知结果时保留并锁定原输入，同请求重试；收到明确业务拒绝后允许修改。未保存输入及未确认结果离开前提示，关闭不等于撤销已生成任务。页面刷新后不自动恢复敏感业务输入，离开未知结果后应先核对任务列表。
 
 `StudentServiceArchiveStore` 是内部存储适配器，入口服务先完成权限和提交校验。读取优先服务修订，缺少时读取同 Person/订单商品的原报名表最新修订；没有报名表时返回空档案。原报名修订所选的内部补传附件同样保留。写入需要现有事务、锁定服务、核对租户和附件绑定，以提交 ID 幂等追加修订，拒绝不完整必填材料。现有档案详情/编辑/上传/下载/导出 API 已通过 StudentServiceArchiveFacade 接入；真实 HTTP、文件存储及部署验收尚未完成。
 

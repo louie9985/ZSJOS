@@ -4,6 +4,7 @@ import type { SummaryColumn, SummaryQuery, SummaryRow } from './studentSummary';
 import type { Timestamp } from './time';
 
 export interface ExamTask { id:number; title:string; description:string; status:'OPEN'|'COMPLETED'; revision:number; createdAt?:Timestamp; completedAt?:Timestamp; completionReason?:string; expected:number; collected:number; exceptions:number; additional:number }
+export interface ExamCreateCommand {title:string;description?:string;selectedFields:string[];idempotencyKey:string}
 export interface ExamTaskDetail extends ExamTask { fields:StudentInfoField[]; classIds:number[]; url:string }
 export interface ExamClass { id:number; name:string; plannerId?:number; plannerName?:string }
 export interface ExamSubmission { id:number; serviceRelationId?:number; sequenceNo:number; revision:number; status:'ARCHIVED'|'EXCEPTION'|'INVALID'; exceptionCode?:string; submittedAt:Timestamp; values:Record<string,string> }
@@ -27,7 +28,7 @@ const post=<T>(url:string,data:object)=>http.post(url,data).then(r=>unwrap<T>(r)
 export const examCollectionApi={
   fields:()=>get<StudentInfoField[]>(`${base}/fields`),
   classes:()=>get<ExamClass[]>(`${base}/classes`),
-  create:(data:{title:string;description?:string;selectedFields:string[]})=>post<ExamTaskDetail>(`${base}/create`,data),
+  create:(data:ExamCreateCommand)=>post<ExamTaskDetail>(`${base}/create`,data),
   page:(params:Paging & {keyword?:string;status?:string})=>get<Page<ExamTask>>(`${base}/page`,params),
   detail:(id:number)=>get<ExamTaskDetail>(`${base}/detail`,{id}),
   notify:(id:number,revision:number,classIds:number[])=>post<boolean>(`${task(id)}/notify`,{revision,classIds}),

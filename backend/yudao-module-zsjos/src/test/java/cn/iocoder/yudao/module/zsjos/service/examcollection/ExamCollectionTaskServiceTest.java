@@ -9,6 +9,9 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.examcollection.vo.ExamColl
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.examcollection.ExamCollectionTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormConfigDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.ExamCollectionTaskMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.ExamCollectionMemberMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.ExamCollectionSubmissionMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.ExamCollectionBindingMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormConfigMapper;
 import cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoFields;
 import org.junit.jupiter.api.*;
@@ -33,7 +36,7 @@ class ExamCollectionTaskServiceTest {
         var config = new StudentInfoFormConfigDO(); config.setId(3L);
         config.setFieldsJson(JsonUtils.toJsonString(new StudentInfoFields().presets()));
         when(configs.state("PUBLISHED")).thenReturn(config);
-        var request = new ExamCollectionVO.Create(); request.setTitle(" test task "); request.setSelectedFields(List.of("portrait"));
+        var request = new ExamCollectionVO.Create(); request.setIdempotencyKey("synthetic-create-key"); request.setTitle(" test task "); request.setSelectedFields(List.of("portrait"));
         try (var security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(7L);
             assertThrows(ServiceException.class, () -> service.create(request));
@@ -55,6 +58,29 @@ class ExamCollectionTaskServiceTest {
                 assertThrows(ServiceException.class, () -> service.create(request));
             }
             verify(tasks, never()).insert(any(ExamCollectionTaskDO.class));
+            ReflectionTestUtils.setField(service, "publicBaseUrl", "https://example.invalid/h5/");
+            ReflectionTestUtils.setField(service, "members", mock(ExamCollectionMemberMapper.class));
+            ReflectionTestUtils.setField(service, "submissions", mock(ExamCollectionSubmissionMapper.class));
+            ReflectionTestUtils.setField(service, "bindings", mock(ExamCollectionBindingMapper.class));
+            when(tasks.byCreateRequest(anyString(), eq(false))).thenReturn(row.getValue());
+            clearInvocations(configs);
+            var replay = service.create(request);
+            assertEquals(result.getId(), replay.getId());assertEquals(result.getUrl(), replay.getUrl());
+            verifyNoInteractions(configs);
+            request.setTitle("changed task");assertThrows(ServiceException.class,()->service.create(request));request.setTitle("test task");
+            TenantContextHolder.setTenantId(2L);assertThrows(ServiceException.class,()->service.create(request));TenantContextHolder.setTenantId(1L);
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(8L);
+            when(permissions.hasAnyPermissions(8L, QUERY)).thenReturn(true);when(permissions.hasAnyPermissions(8L, CREATE)).thenReturn(true);
+            assertThrows(ServiceException.class,()->service.create(request));
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(7L);
+            // Simulate another transaction committing after our first read. Replay must use a current read.
+            when(tasks.byCreateRequest(anyString(), eq(false))).thenReturn(null);
+            when(tasks.byCreateRequest(anyString(), eq(true))).thenReturn(row.getValue());
+            doThrow(new org.springframework.dao.DuplicateKeyException("concurrent synthetic request")).when(tasks).insert(any(ExamCollectionTaskDO.class));
+            assertEquals(result.getUrl(), service.create(request).getUrl());
+            verify(tasks).byCreateRequest(eq(row.getValue().getCreateRequestKey()), eq(true));
+            when(tasks.byCreateRequest(anyString(), eq(true))).thenReturn(null);
+            assertThrows(org.springframework.dao.DuplicateKeyException.class,()->service.create(request));
         }
     }
 }

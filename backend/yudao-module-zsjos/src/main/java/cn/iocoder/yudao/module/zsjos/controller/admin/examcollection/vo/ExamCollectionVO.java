@@ -12,6 +12,7 @@ import java.util.Map;
 public final class ExamCollectionVO {
     private ExamCollectionVO() {}
     @Data public static class Create {
+        @NotBlank @Pattern(regexp="[A-Za-z0-9_-]{16,64}") private String idempotencyKey;
         @NotBlank @Size(max=200) private String title;
         @Size(max=2000) private String description;
         @NotNull @Size(max=12) private List<@NotBlank String> selectedFields;

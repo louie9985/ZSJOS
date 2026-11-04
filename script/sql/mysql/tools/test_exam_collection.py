@@ -134,6 +134,53 @@ if __name__ == '__main__':
         query(db, 'ALTER TABLE zsjos_student_service_archive_revision RENAME COLUMN written_keys_json TO fixture_retained_written_keys')
         verify(db)
         assert query(db, "SELECT HEX(column_comment) FROM information_schema.columns WHERE table_schema=%s AND table_name='zsjos_student_service_archive_revision' AND column_name='written_keys_json'", (db,)) == (('本次显式写入字段，用于安全纠正归属'.encode().hex().upper(),),)
+        db = fixture('create_retry')
+        apply(db)
+        query(db, 'ALTER TABLE zsjos_exam_collection_task RENAME COLUMN create_request_key TO fixture_retained_create_key')
+        query(db, 'ALTER TABLE zsjos_exam_collection_task RENAME COLUMN create_request_hash TO fixture_retained_create_hash')
+        query(db, 'ALTER TABLE zsjos_exam_collection_task DROP INDEX uk_create_request')
+        verify(db)
+        insert_task = "INSERT INTO zsjos_exam_collection_task(title,status,config_version_id,fields_snapshot,token_hash,token_ciphertext,tenant_id,create_request_key,create_request_hash) VALUES ('synthetic','OPEN',1,'[]',%s,'synthetic-encrypted',%s,'same-create-key','synthetic')"
+        query(db, insert_task, ('create-token-1',1))
+        try:
+            query(db, insert_task, ('create-token-2',1))
+        except pymysql.IntegrityError:
+            pass
+        else:
+            raise AssertionError('Duplicate task creation accepted')
+        query(db, insert_task, ('create-token-3',2))
+        assert query(db, 'SELECT COUNT(*) FROM zsjos_exam_collection_task WHERE tenant_id=1') == ((1,),)
+        print('PASS task create uniqueness and partial recovery')
+        # Overlapping repeatable-read transactions: a losing insert must use a current read to replay the winner.
+        connections = [pymysql.connect(host=address[1], port=int(address[2]), user=config['username'], password=str(config['password']),
+            database=db, charset='utf8mb4', autocommit=False) for _ in range(2)]
+        try:
+            for transaction in connections:
+                with transaction.cursor() as cursor:
+                    cursor.execute('SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ')
+                    cursor.execute("SELECT id FROM zsjos_exam_collection_task WHERE tenant_id=1 AND create_request_key='transaction-key'")
+                    assert cursor.fetchall() == ()
+            concurrent_insert = insert_task.replace("'same-create-key'", "'transaction-key'")
+            with connections[0].cursor() as cursor:
+                cursor.execute(concurrent_insert, ('transaction-token-1',1))
+                winner = cursor.lastrowid
+            connections[0].commit()
+            with connections[1].cursor() as cursor:
+                try:
+                    cursor.execute(concurrent_insert, ('transaction-token-2',1))
+                except pymysql.IntegrityError:
+                    pass
+                else:
+                    raise AssertionError('Concurrent task create was not rejected')
+                cursor.execute("SELECT id FROM zsjos_exam_collection_task WHERE tenant_id=1 AND create_request_key='transaction-key' FOR UPDATE")
+                assert cursor.fetchall() == ((winner,),)
+            connections[1].commit()
+            assert query(db, "SELECT COUNT(*) FROM zsjos_exam_collection_task WHERE tenant_id=1 AND create_request_key='transaction-key'") == ((1,),)
+            print('PASS competing create transactions replay committed winner with current read')
+        finally:
+            for transaction in connections:
+                transaction.rollback()
+                transaction.close()
         db = fixture('index_conflict')
         apply(db)
         query(db, 'ALTER TABLE zsjos_exam_collection_binding DROP INDEX uk_identity')

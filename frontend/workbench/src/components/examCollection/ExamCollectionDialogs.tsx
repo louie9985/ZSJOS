@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Button, Checkbox, Empty, Form, Input, Modal, Select, Space, Spin, Typography } from 'antd';
 import type { ProColumns } from '@ant-design/pro-components';
 import BusinessTable from '../BusinessTable';
 import { useBusinessOverlay } from '../OverlayCoordinator';
-import { examCollectionApi, type ExamCandidate, type ExamClass, type ExamTaskDetail } from '../../services/examCollection';
+import { examCollectionApi, type ExamCandidate, type ExamClass, type ExamTaskDetail, type ExamCreateCommand } from '../../services/examCollection';
+import { ApiError } from '../../services/api';
 import { studentInfoError, type StudentInfoField } from '../../services/studentInfo';
 
 const modalStyles = { container:{maxHeight:'calc(100dvh - 32px)',display:'flex',flexDirection:'column' as const},body:{overflowY:'auto' as const,minHeight:0},footer:{flexShrink:0} };
@@ -13,28 +14,45 @@ export function ExamCreateDialog({onClose,onCreated}:{onClose:()=>void;onCreated
   const [fields,setFields]=useState<StudentInfoField[]>([]),[selected,setSelected]=useState<string[]>([]);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[reload,setReload]=useState(0);
   const [ready,setReady]=useState(false);
+  const [pending,setPending]=useState<ExamCreateCommand>(),[discard,setDiscard]=useState(false);
+  const flight=useRef(false);
+  const title=Form.useWatch('title',form),description=Form.useWatch('description',form);
+  const dirty=Boolean(title?.trim()||description?.trim()||selected.length||pending);
+  useEffect(()=>{if(!dirty&&!busy)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty,busy]);
+  const close=()=>{if(flight.current)return;if(dirty)setDiscard(true);else onClose()};
   useEffect(()=>{let active=true;setLoading(true);setError('');setReady(false);void examCollectionApi.fields().then(v=>{if(active){setFields(v);setReady(true)}}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[reload]);
   const create=async()=>{
-    if(busy||loading||!ready)return;
-    const values=await form.validateFields().catch(()=>undefined);if(!values)return;
-    setBusy(true);setError('');try{onCreated(await examCollectionApi.create({...values,selectedFields:selected}));}catch(e){setError(studentInfoError(e))}finally{setBusy(false)}
+    if(flight.current||loading||!ready)return;
+    flight.current=true;setBusy(true);setError('');
+    try{
+      let command=pending;
+      if(!command){const values=await form.validateFields().catch(()=>undefined);if(!values)return;
+        command={...values,selectedFields:[...selected],idempotencyKey:crypto.randomUUID()};setPending(command);}
+      onCreated(await examCollectionApi.create(command));
+    }catch(e){setError(studentInfoError(e));
+      // Only a definite server rejection permits editing. An unknown outcome retries the exact command.
+      if(e instanceof ApiError&&(e.code>=1_000_000_000||[400,401,403].includes(e.code)))setPending(undefined);
+    }finally{flight.current=false;setBusy(false)}
   };
-  return <Modal open title="发起考试资料收集" width={720} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles}
-    onCancel={()=>{if(!busy)onClose()}} onOk={()=>void create()} okText="生成统一链接" confirmLoading={busy} okButtonProps={{disabled:loading||!ready}} closable={!busy} maskClosable={false}>
+  return <><Modal open title="发起考试资料收集" width={720} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles}
+    onCancel={close} onOk={()=>void create()} okText={pending?'重试确认生成结果':'生成统一链接'} confirmLoading={busy} okButtonProps={{disabled:loading||!ready}} closable={!busy} maskClosable={false}>
     <Space orientation="vertical" className="exam-collection-stack">
       {error&&<Alert type="error" title={error} action={!fields.length?<Button onClick={()=>setReload(v=>v+1)}>重新加载字段</Button>:undefined}/>}
-      <Form form={form} layout="vertical" disabled={busy} initialValues={{title:'',description:''}}>
+      {pending&&!busy&&<Alert type="warning" title="生成结果尚未确认" description="填写内容已保留，请重试确认结果；重试会返回同一任务，不会重复创建。"/>}
+      <Form form={form} layout="vertical" disabled={busy||!!pending} initialValues={{title:'',description:''}}>
         <Form.Item name="title" label="任务名称" rules={[{required:true,whitespace:true,message:'请填写任务名称'},{max:200}]}><Input placeholder="例如：11 月健康管理师考试资料收集" maxLength={200}/></Form.Item>
         <Form.Item name="description" label="填写说明" rules={[{max:2000}]}><Input.TextArea rows={3} maxLength={2000} showCount placeholder="向学员说明材料要求和注意事项"/></Form.Item>
       </Form>
       <Alert type="info" showIcon title="姓名、手机号、微信号、身份证号码固定必填" description="勾选的材料必填，未勾选的字段不会出现在收集表中。"/>
       <Typography.Text strong>选择本次收集字段（已选 {selected.length} 项）</Typography.Text>
-      {loading?<Spin/>:!ready?null:fields.length?<Checkbox.Group className="exam-collection-field-options" value={selected} disabled={busy} onChange={v=>setSelected(v.map(String))}>
+      {loading?<Spin/>:!ready?null:fields.length?<Checkbox.Group className="exam-collection-field-options" value={selected} disabled={busy||!!pending} onChange={v=>setSelected(v.map(String))}>
         {fields.map(f=><Checkbox key={f.key} value={f.key}>{f.label}</Checkbox>)}
       </Checkbox.Group>:<Empty description="尚无可用的已发布材料字段"/>}
       <Typography.Text type="secondary">生成后可复制统一链接，再选择服务中的班级通知学习规划师。</Typography.Text>
     </Space>
-  </Modal>;
+  </Modal><Modal open={discard} title={pending?'离开尚未确认的创建结果？':'放弃填写内容？'} onCancel={()=>setDiscard(false)} onOk={onClose} okText="离开" cancelText="继续处理">
+    <p>{pending?'任务可能已创建。建议先重试确认结果；离开后可在任务列表核对，避免再次发起相同任务。':'任务名称、说明和材料选择尚未提交。'}</p>
+  </Modal></>;
 }
 export function ExamNotifyDialog({task,onClose,onSaved}:{task:ExamTaskDetail;onClose:()=>void;onSaved:()=>void}){
   useBusinessOverlay(true);
