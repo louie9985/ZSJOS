@@ -35,11 +35,14 @@ package = 'java/cn/iocoder/yudao/module/zsjos'
 main = base / 'main' / package
 sources = []
 for directory in ('service/examcollection', 'dal/dataobject/examcollection', 'dal/mysql/examcollection',
-                  'dal/dataobject/studentinfo', 'dal/mysql/studentinfo', 'controller/admin/examcollection'):
+                  'dal/dataobject/studentinfo', 'dal/mysql/studentinfo', 'controller/admin/examcollection', 'controller/pub/examcollection'):
     sources.extend((main / directory).rglob('*.java'))
 sources.extend([main / 'service/studentinfo/StudentInfoFields.java',
+                main / 'service/studentinfo/StudentInfoImageService.java',
+                main / 'service/studentinfo/StudentInfoUploadRateLimit.java',
                 main / 'controller/admin/studentinfo/vo/StudentInfoVO.java'])
 tests = list((base / 'test' / package / 'service/examcollection').glob('*Test.java'))
+tests.append(base / 'test' / package / 'service/studentinfo/StudentInfoImagesAndRulesTest.java')
 sources.extend(tests)
 runner = out / 'ExamBackendTests.java'
 runner.write_text('''import org.junit.platform.launcher.core.*;
@@ -61,4 +64,4 @@ def run(command, values):
     subprocess.run([command, '@' + str(path)], cwd=ROOT, check=True)
 
 run('javac', ['-proc:full', '-parameters', '-encoding', 'UTF-8', '-cp', cp, '-d', out, *sources, runner])
-run('java', ['-cp', cp, 'ExamBackendTests', *['cn.iocoder.yudao.module.zsjos.service.examcollection.' + t.stem for t in tests]])
+run('java', ['-cp', cp, 'ExamBackendTests', *['cn.iocoder.yudao.module.zsjos.service.' + t.parent.name + '.' + t.stem for t in tests]])

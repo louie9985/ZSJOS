@@ -186,6 +186,9 @@ public class StudentInfoImageService {
         }
         return count;
     }
+    // Exam collection shares encrypted material storage without sharing public form tokens.
+    public byte[] encryptPrivateMaterial(byte[] data) throws Exception { return crypt(data, true); }
+    public byte[] decryptPrivateMaterial(byte[] data) throws Exception { return crypt(data, false); }
     byte[] crypt(byte[] data,boolean encrypt) throws Exception {
         if (key==null || key.isBlank()) throw exception(CONFIG_INVALID);
         byte[] derived=MessageDigest.getInstance("SHA-256").digest(("student-info-images:"+key).getBytes(StandardCharsets.UTF_8));
