@@ -107,7 +107,7 @@ public class StudentServiceArchiveFacade {
                 .eq(StudentServiceArchiveRevisionDO::getServiceRelationId, relation.getId()).orderByDesc(StudentServiceArchiveRevisionDO::getRevision));
         var legacyForm = relation.getRegistrationCaseId() == null ? null : forms.byCase(relation.getRegistrationCaseId());
         if (legacyForm != null && Objects.equals(legacyForm.getPersonId(), relation.getPersonId()) && Objects.equals(legacyForm.getOrderItemId(), relation.getOrderItemId())) {
-            result.setProductName(legacyForm.getProductName()); info.setCreatedAt(legacyForm.getCreateTime());
+            result.setProductName(legacyForm.getProductName()); info.setCreatedAt(legacyForm.getCreateTime()); info.setSubmittedAt(legacyForm.getSubmittedAt());
             var config = configs.selectById(legacyForm.getConfigVersionId()); info.setConfigVersion(config == null ? null : config.getVersionNo());
         }
         var oldRows = legacyForm != null && Objects.equals(legacyForm.getPersonId(), relation.getPersonId()) && Objects.equals(legacyForm.getOrderItemId(), relation.getOrderItemId())
@@ -141,7 +141,10 @@ public class StudentServiceArchiveFacade {
             item.setSubmissionId(s.getId()); item.setOperatorName("学员填写"); item.setModifiedAt(s.getSubmittedAt()); return item;
         }).toList());
         rows.stream().filter(r -> r.getRevision() <= snapshot.revision() && "exam_submission".equals(r.getSource()))
-                .findFirst().ifPresent(r -> info.setSubmittedAt(r.getCreateTime()));
+                .findFirst().ifPresent(r -> {
+                    var original = r.getSubmissionId() == null ? null : submissions.selectById(r.getSubmissionId());
+                    if (original != null && Objects.equals(original.getTaskId(), r.getTaskId())) info.setSubmittedAt(original.getSubmittedAt());
+                });
         return result;
     }
     public Edit edit(Long id) {

@@ -13,6 +13,6 @@ describe('summary export columns', () => {
     expect(visibleSummaryColumns(columns, { old: { order: 0 } })).toEqual(['name', 'mobile', 'info.id_card'])
   })
   it('Vue Admin excludes unsupported summary without hiding its other menus', () => {
-    expect(filterAdminRoutes([{ component: 'zsjos/studentSummary/index' }, { component: 'system/user/index' }])).toEqual([{ component: 'system/user/index' }])
+    expect(filterAdminRoutes([{ component: 'zsjos/studentSummary/index' }, { component: 'zsjos/examCollection/index' }, { component: 'system/user/index' }])).toEqual([{ component: 'system/user/index' }])
   })
 })

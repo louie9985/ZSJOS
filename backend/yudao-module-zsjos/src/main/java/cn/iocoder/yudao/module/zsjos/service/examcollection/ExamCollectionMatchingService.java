@@ -48,6 +48,9 @@ public class ExamCollectionMatchingService {
         if (relation == null || !Objects.equals(relation.getTenantId(), tenant) || Boolean.TRUE.equals(relation.getDeleted())) {
             unmatched(submission, "INVALID_BINDING"); return;
         }
+        if (cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation)) {
+            unmatched(submission, "SERVICE_CLOSED"); return;
+        }
         if (binding == null) {
             binding = new ExamCollectionBindingDO(); binding.setTenantId(tenant); binding.setTaskId(task.getId());
             binding.setIdentityHash(submission.getIdentityHash()); binding.setServiceRelationId(relationId);

@@ -86,6 +86,7 @@ public class StudentServiceArchiveStore {
                 || submission.getSubmittedAt() == null || submission.getRequestHash() == null)
             throw exception(LINK_INVALID);
         var relation = requireRelation(relations.selectByIdForUpdate(relationId, tenant));
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relation);
         String key = "exam-submit:" + submission.getId();
         var previous = revisions.byRequest(relationId, key);
         if (previous != null) {

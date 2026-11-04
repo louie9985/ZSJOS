@@ -19,4 +19,5 @@ public interface ExamCollectionConstants {
     ErrorCode SESSION_INVALID = new ErrorCode(1_900_170_005, "填写会话已失效，请重新打开收集链接");
     ErrorCode KEY_MISSING = new ErrorCode(1_900_170_006, "考试资料收集加密配置不可用，请联系管理员");
     ErrorCode CLASS_INVALID = new ErrorCode(1_900_170_007, "所选班级不存在或不在服务中，请重新选择");
+    ErrorCode ARCHIVE_CONFLICT = new ErrorCode(1_900_170_008, "目标学员档案已被修改，请刷新档案后重新确认归属");
 }

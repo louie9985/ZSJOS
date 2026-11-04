@@ -36,7 +36,8 @@ public class ExamCollectionResolutionService {
         if (!EXCEPTION.equals(row.getStatus())) throw exception(CONFLICT);
         var target = relations.selectByIdForUpdate(request.getServiceRelationId(), task.getTenantId());
         if (target == null || Boolean.TRUE.equals(target.getDeleted()) || !Objects.equals(target.getTenantId(), task.getTenantId())) throw exception(NOT_FOUND);
-        if (archives.current(target.getId()).revision() != request.getArchiveRevision()) throw exception(CONFLICT);
+        cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(target);
+        if (archives.current(target.getId()).revision() != request.getArchiveRevision()) throw exception(ARCHIVE_CONFLICT);
         var binding = bindings.selectOne(new LambdaQueryWrapperX<ExamCollectionBindingDO>()
                 .eq(ExamCollectionBindingDO::getTaskId, taskId).eq(ExamCollectionBindingDO::getIdentityHash, row.getIdentityHash()));
         if (binding != null && !Objects.equals(binding.getServiceRelationId(), target.getId()))

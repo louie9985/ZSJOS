@@ -56,6 +56,9 @@ public final class ExamCollectionVO {
     @Data @EqualsAndHashCode(callSuper=true) public static class SubmissionDetail extends Submission {
         private List<Field> fields;
         private List<cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Image> attachments;
+        private long pendingGroupCount;
+        private Long latestPendingSubmissionId;
+        private LocalDateTime latestPendingSubmittedAt;
     }
     @Data @EqualsAndHashCode(callSuper=true) public static class CandidateQuery extends PageParam {
         @Size(max=200) private String keyword;

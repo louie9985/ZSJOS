@@ -102,6 +102,22 @@ class StudentSummaryServiceTest {
         assertEquals("TEST-IDENTITY-TEXT",row.values().get("info.id_card"));assertFalse(row.values().containsKey("mobile"));
         verify(permissions,never()).hasAnyPermissions(any(),eq("zsjos:student-archive:sensitive-read"));
     }
+    @Test void examRevisionOverridesOldDraftAndWorksWithoutOriginalForm() {
+        row(false);
+        var archiveMapper=(cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.StudentServiceArchiveRevisionMapper)ReflectionTestUtils.getField(service,"serviceRevisions");
+        var submissionMapper=(cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.ExamCollectionSubmissionMapper)ReflectionTestUtils.getField(service,"examSubmissions");
+        var revision=new cn.iocoder.yudao.module.zsjos.dal.dataobject.examcollection.StudentServiceArchiveRevisionDO();
+        revision.setServiceRelationId(1L);revision.setPersonId(2L);revision.setRevision(1);revision.setSubmissionId(9L);revision.setSource("exam_submission");
+        var value=new StudentInfoFormValueDO();value.setFieldKey("name");value.setValueText("考试提交姓名");
+        revision.setAnswersJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(List.of(value)));
+        revision.setAttachmentsJson("[]");
+        when(archiveMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(revision));
+        var submission=new cn.iocoder.yudao.module.zsjos.dal.dataobject.examcollection.ExamCollectionSubmissionDO();submission.setId(9L);submission.setSubmittedAt(java.time.LocalDateTime.of(2026,11,4,9,0));
+        when(submissionMapper.selectByIds(anyCollection())).thenReturn(List.of(submission));
+        var result=service.page(new Query()).getList().getFirst();assertEquals("考试提交姓名",result.values().get("info.name"));assertEquals("已填写",result.values().get("collectionStatus"));assertEquals("2026-11-04 09:00:00",result.values().get("submittedAt"));
+        when(bindings.bindings(anyList(),eq(1L))).thenReturn(List.of());
+        assertEquals("考试提交姓名",service.page(new Query()).getList().getFirst().values().get("info.name"));
+    }
     @Test void unsubmittedKeepsStudentWithoutDraftAnswers() {
         row(false);var values=service.page(new Query()).getList().getFirst().values();assertEquals("测试学员",values.get("student.name"));assertEquals("未填写",values.get("collectionStatus"));assertFalse(values.containsKey("info.id_card"));verifyNoInteractions(answers);
     }

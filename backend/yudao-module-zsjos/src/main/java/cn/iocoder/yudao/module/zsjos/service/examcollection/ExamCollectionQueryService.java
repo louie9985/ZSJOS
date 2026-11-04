@@ -63,6 +63,14 @@ public class ExamCollectionQueryService {
         result.setFields(JsonUtils.parseArray(tasks.selectById(taskId).getFieldsSnapshot(), StudentInfoVO.Field.class));
         var ids = JsonUtils.parseArray(row.getAttachmentIdsJson(), Long.class);
         result.setAttachments(ids.stream().map(fileId -> image(requireFile(row, fileId))).toList());
+        if(EXCEPTION.equals(row.getStatus())) {
+            result.setPendingGroupCount(submissions.selectCount(new LambdaQueryWrapperX<ExamCollectionSubmissionDO>()
+                .eq(ExamCollectionSubmissionDO::getTaskId,taskId).eq(ExamCollectionSubmissionDO::getIdentityHash,row.getIdentityHash()).eq(ExamCollectionSubmissionDO::getStatus,EXCEPTION)));
+            var latest=submissions.selectOne(new LambdaQueryWrapperX<ExamCollectionSubmissionDO>()
+                .eq(ExamCollectionSubmissionDO::getTaskId,taskId).eq(ExamCollectionSubmissionDO::getIdentityHash,row.getIdentityHash()).eq(ExamCollectionSubmissionDO::getStatus,EXCEPTION)
+                .orderByDesc(ExamCollectionSubmissionDO::getSequenceNo).last("LIMIT 1"));
+            if(latest!=null){result.setLatestPendingSubmissionId(latest.getId());result.setLatestPendingSubmittedAt(latest.getSubmittedAt());}
+        }
         return result;
     }
     @ZsjosPermission(bizType="exam-collection", bizId="#taskId", action="query")

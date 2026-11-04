@@ -73,4 +73,10 @@ class ExamCollectionMatchingTest {
         assertEquals("INVALID_BINDING", submission.getExceptionCode());
         verifyNoInteractions(archives); verify(members, never()).selectList(any(LambdaQueryWrapperX.class));
     }
+    @Test void closedTeachingServiceRetainsSubmissionAsExceptionWithoutArchiveWrite() {
+        var relation=relations.selectByIdForUpdate(10L,1L);relation.setTeachingClosed(true);
+        when(members.selectList(any(LambdaQueryWrapperX.class))).thenReturn(List.of(member(10)));
+        service.match(task,submission);assertEquals("SERVICE_CLOSED",submission.getExceptionCode());
+        verifyNoInteractions(archives);verify(bindings,never()).insert(any(ExamCollectionBindingDO.class));
+    }
 }
