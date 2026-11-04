@@ -22,6 +22,7 @@ public class StudentServiceArchiveRevisionDO extends TenantBaseDO {
     private String idempotencyKey;
     private String requestHash;
     private String fieldsSnapshot;
+    private String writtenKeysJson;
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class)
     @lombok.ToString.Exclude
     private String answersJson;

@@ -2,6 +2,8 @@
 -- Scope: eight new tenant-owned tables and exam collection menu metadata only.
 -- No business rows, role grants or historical form rewrites. Repeatable CREATE IF NOT EXISTS
 -- restores absent tables after partial DDL; incompatible existing columns fail postconditions.
+-- Development-only revision: nullable written_keys_json records new archive write intent;
+-- missing columns are added conditionally. Existing rows are not assigned invented intent.
 -- MySQL DDL commits implicitly. On failure retain tables, inspect structure and both ledgers,
 -- fix the prerequisite/structure and rerun. Never infer completion from a version marker.
 -- Rollback limitation: disable new menu/runtime; retain submissions and historical attachments.
@@ -299,6 +301,7 @@ BEGIN
   fields_snapshot longtext NOT NULL,
   answers_json longtext NOT NULL,
   attachments_json longtext NOT NULL,
+  written_keys_json longtext DEFAULT NULL COMMENT '本次显式写入字段，用于安全纠正归属',
   creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
   create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -307,8 +310,12 @@ BEGIN
   UNIQUE KEY uk_request (tenant_id,service_relation_id,idempotency_key),
   KEY idx_submission (tenant_id,submission_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_service_archive_revision' AND column_name='written_keys_json') THEN
+  ALTER TABLE zsjos_student_service_archive_revision ADD COLUMN written_keys_json longtext DEFAULT NULL COMMENT '本次显式写入字段，用于安全纠正归属';
+ END IF;
  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
-  AND table_name='zsjos_student_service_archive_revision' AND column_name IN ('id','service_relation_id','person_id','revision','task_id','submission_id','operator_user_id','source','reason','idempotency_key','request_hash','fields_snapshot','answers_json','attachments_json','creator','updater','create_time','update_time','deleted','tenant_id'))<>20 THEN
+  AND table_name='zsjos_student_service_archive_revision' AND column_name IN ('id','service_relation_id','person_id','revision','task_id','submission_id','operator_user_id','source','reason','idempotency_key','request_hash','fields_snapshot','answers_json','attachments_json','written_keys_json','creator','updater','create_time','update_time','deleted','tenant_id'))<>21 THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 incomplete zsjos_student_service_archive_revision';
  END IF;
  IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()

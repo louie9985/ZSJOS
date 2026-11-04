@@ -153,4 +153,31 @@ class StudentServiceArchiveStoreTest {
         var captor = ArgumentCaptor.forClass(StudentServiceArchiveRevisionDO.class); verify(revisions).insert(captor.capture());
         assertTrue(captor.getValue().getAnswersJson().contains("75"));
     }
+
+    StudentServiceArchiveRevisionDO revision(int number, String source, String intent, List<StudentInfoFormValueDO> values) {
+        var row = new StudentServiceArchiveRevisionDO(); row.setTenantId(1L); row.setServiceRelationId(10L); row.setPersonId(20L);
+        row.setRevision(number); row.setTaskId(1L); row.setSubmissionId(2L); row.setSource(source); row.setWrittenKeysJson(intent);
+        row.setFieldsSnapshot(JsonUtils.toJsonString(values.stream().map(v -> field(v.getFieldKey())).toList()));
+        row.setAnswersJson(JsonUtils.toJsonString(values)); row.setAttachmentsJson("[]"); return row;
+    }
+    @Test void restorationAppendsRevisionAndRetainsLaterExplicitWriteWithoutEditingHistory() {
+        var wrong = revision(1, "exam_submission", "[\"name\"]", List.of(answer("name", "wrong")));
+        var later = revision(2, "staff_edit", "[\"mobile\"]", List.of(answer("name", "wrong"), answer("mobile", "later")));
+        when(revisions.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(wrong, later));
+        var result = store.restore(task(), java.util.Set.of(2L), 10L, 2, 7L, "归属纠正", 3L, 4);
+        assertEquals(java.util.Set.of("name"), result.restoredKeys());
+        var captor = ArgumentCaptor.forClass(StudentServiceArchiveRevisionDO.class); verify(revisions).insert(captor.capture());
+        assertEquals(3, captor.getValue().getRevision());assertEquals("exam_correction_restore", captor.getValue().getSource());
+        assertFalse(captor.getValue().getAnswersJson().contains("wrong"));assertTrue(captor.getValue().getAnswersJson().contains("later"));
+        assertTrue(wrong.getAnswersJson().contains("wrong"));verify(revisions, never()).updateById(any(StudentServiceArchiveRevisionDO.class));
+    }
+    @Test void restorationRejectsMissingLaterIntentOrStalePreview() {
+        var wrong = revision(1, "exam_submission", "[\"name\"]", List.of(answer("name", "wrong")));
+        var unknown = revision(2, "staff_edit", null, List.of(answer("name", "wrong")));
+        when(revisions.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(wrong, unknown));
+        assertThrows(ServiceException.class, () -> store.restore(task(), java.util.Set.of(2L), 10L, 2, 7L, "纠正", 3L, 4));
+        unknown.setWrittenKeysJson("[\"name\"]");
+        assertThrows(ServiceException.class, () -> store.restore(task(), java.util.Set.of(2L), 10L, 1, 7L, "纠正", 3L, 4));
+        verify(revisions, never()).insert(any(StudentServiceArchiveRevisionDO.class));
+    }
 }

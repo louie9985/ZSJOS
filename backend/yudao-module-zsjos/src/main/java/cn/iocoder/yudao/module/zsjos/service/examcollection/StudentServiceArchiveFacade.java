@@ -200,6 +200,7 @@ public class StudentServiceArchiveFacade {
         var row = new StudentServiceArchiveRevisionDO(); row.setTenantId(relation.getTenantId()); row.setServiceRelationId(id); row.setPersonId(relation.getPersonId());
         row.setRevision(current.revision() + 1); row.setSource("staff_edit"); row.setOperatorUserId(getLoginUserId()); row.setReason(Objects.requireNonNullElse(request.getReason(), ""));
         row.setIdempotencyKey(key); row.setRequestHash(hash); row.setFieldsSnapshot(JsonUtils.toJsonString(current.fields()));
+        row.setWrittenKeysJson(JsonUtils.toJsonString(changes.keySet()));
         row.setAnswersJson(JsonUtils.toJsonString(values.values())); row.setAttachmentsJson(JsonUtils.toJsonString(selected)); revisions.insert(row); return row.getRevision();
     }
     @Transactional(rollbackFor=Exception.class)
