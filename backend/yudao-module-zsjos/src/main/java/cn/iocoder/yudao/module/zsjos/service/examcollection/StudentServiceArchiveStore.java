@@ -54,6 +54,10 @@ public class StudentServiceArchiveStore {
                     JsonUtils.parseArray(latest.getAnswersJson(), StudentInfoFormValueDO.class),
                     JsonUtils.parseArray(latest.getAttachmentsJson(), Attachment.class));
         }
+        return legacy(relation);
+    }
+    public Snapshot baseline(Long relationId) { return legacy(requireRelation(relations.selectById(relationId))); }
+    private Snapshot legacy(ServiceRelationDO relation) {
         var empty = new Snapshot(relation.getId(), relation.getPersonId(), 0, List.of(), List.of(), List.of());
         if (relation.getRegistrationCaseId() == null) return empty;
         var form = forms.byCase(relation.getRegistrationCaseId());

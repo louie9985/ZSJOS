@@ -139,6 +139,11 @@ if __name__ == '__main__':
         query(db, "INSERT INTO zsjos_exam_collection_binding (tenant_id,task_id,identity_hash,service_relation_id) VALUES (1,2,%s,11)", ('a' * 64,))
         assert query(db, 'SELECT COUNT(*) FROM zsjos_exam_collection_binding') == ((2,),)
         print('PASS identity uniqueness is scoped to task')
+        assert query(db, "SELECT JSON_CONTAINS(%s,%s),JSON_CONTAINS(%s,%s)",
+                     ('[{"source":"exam","id":7}]', '{"source":"exam","id":7}',
+                      '[{"source":"registration","id":7}]', '{"source":"exam","id":7}')) == ((1, 0),)
+        assert query(db, 'SELECT JSON_CONTAINS(%s,%s)', ('[7,8]', '7')) == ((1,),)
+        print('PASS historical attachment JSON membership distinguishes sources')
         assert original == ledgers(SOURCE)
         assert grants == query(SOURCE, 'SELECT * FROM system_role_menu ORDER BY id')
         assert menus == query(SOURCE, 'SELECT * FROM system_menu ORDER BY id')

@@ -114,6 +114,7 @@ public final class StudentInfoVO {
     }
     @Data public static class Image {
         private Long id;
+        private String source;
         private String fieldKey, side, contentType, name;
         private Long size;
     }

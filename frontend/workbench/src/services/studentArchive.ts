@@ -10,12 +10,17 @@ export interface StudentArchive {
   canMaintain: boolean;
   information: StudentInfoDetail;
   history: {
-    revision: number;
+    revision?: number;
+    source?: string;
+    taskTitle?: string;
+    taskId?: number;
+    submissionId?: number;
     operatorUserId: number;
     operatorName?: string;
     modifiedAt: string;
     reason: string;
   }[];
+  submissions?: StudentArchive['history'];
 }
 export interface ArchiveEdit {
   revision: number;
@@ -24,7 +29,12 @@ export interface ArchiveEdit {
   images: StudentInfoImage[];
 }
 const base = (id: number) => `/zsjos/student/service/${id}/archive`;
+export const archiveImageReference = (image: StudentInfoImage): string | number => image.source ? `${image.source}:${image.id}` : image.id;
 export const studentArchiveApi = {
+  history: async (id: number, revision: number, sensitive = false) =>
+    unwrap<StudentArchive>(await http.get(`${base(id)}/history/${revision}`, { params: { sensitive } })),
+  submission: async (id: number, submissionId: number, sensitive = false) =>
+    unwrap<StudentArchive>(await http.get(`${base(id)}/submissions/${submissionId}`, { params: { sensitive } })),
   detail: async (id: number, sensitive = false) =>
     unwrap<StudentArchive>(
       await http.get(base(id) + (sensitive ? "/sensitive" : "")),
@@ -63,6 +73,7 @@ export const studentArchiveApi = {
   },
   image: async (id: number, image: StudentInfoImage) => {
     const r = await http.get(base(id) + "/images/" + image.id, {
+      params: { source: image.source || 'registration' },
       responseType: "blob",
     });
     if (r.data.type.includes("json")) throw Error("图片读取失败或没有权限");

@@ -15,7 +15,7 @@ export interface StudentInfoLink {
   sentAt?: Timestamp; sentByUserId?: number; registrationVersion: number
   formId: number; status: string; url?: string; createdAt?: Timestamp; expiresAt?: Timestamp; canRegenerate: boolean; canRevoke: boolean
 }
-export interface StudentInfoImage { id: number; fieldKey: string; side: string; contentType: string; size: number; name: string }
+export interface StudentInfoImage { id: number; source?: 'registration' | 'exam' | 'service'; fieldKey: string; side: string; contentType: string; size: number; name: string }
 export interface StudentInfoCommand { version: number; idempotencyKey: string; formId?: number; sent?: boolean }
 const base = (caseId: number) => `/zsjos/registration/${caseId}/student-info-form`
 export const studentInfoApi = {

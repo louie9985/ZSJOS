@@ -1,5 +1,5 @@
 -- UTF-8. V361 -> V362 -> matching backend/Workbench/H5.
--- Scope: seven new tenant-owned tables and exam collection menu metadata only.
+-- Scope: eight new tenant-owned tables and exam collection menu metadata only.
 -- No business rows, role grants or historical form rewrites. Repeatable CREATE IF NOT EXISTS
 -- restores absent tables after partial DDL; incompatible existing columns fail postconditions.
 -- MySQL DDL commits implicitly. On failure retain tables, inspect structure and both ledgers,
@@ -318,6 +318,35 @@ BEGIN
   GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')='tenant_id,submission_id'
   AND MAX(non_unique)=1) THEN
   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 invalid zsjos_student_service_archive_revision idx_submission';
+ END IF;
+ CREATE TABLE IF NOT EXISTS zsjos_student_service_archive_attachment (
+  id bigint NOT NULL AUTO_INCREMENT,
+  service_relation_id bigint NOT NULL,
+  field_key varchar(64) NOT NULL,
+  side varchar(16) NOT NULL DEFAULT '',
+  infra_file_id bigint NOT NULL,
+  file_size bigint NOT NULL,
+  content_type varchar(100) NOT NULL,
+  original_name varchar(512) NOT NULL,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY(id), KEY idx_service (tenant_id, service_relation_id, field_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+ IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_service_archive_attachment' AND column_name IN ('id','service_relation_id','field_key','side','infra_file_id','file_size','content_type','original_name','creator','updater','create_time','update_time','deleted','tenant_id'))<>14 THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 incomplete service archive attachments';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_service_archive_attachment' AND index_name='PRIMARY'
+  GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')='id' AND MAX(non_unique)=0) THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 invalid service archive attachment primary key';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_service_archive_attachment' AND index_name='idx_service'
+  GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index SEPARATOR ',')='tenant_id,service_relation_id,field_key') THEN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V362 invalid service archive attachment index';
  END IF;
  START TRANSACTION;
  IF EXISTS(SELECT permission FROM system_menu WHERE permission LIKE 'zsjos:exam-collection:%' GROUP BY permission HAVING COUNT(*)>1)

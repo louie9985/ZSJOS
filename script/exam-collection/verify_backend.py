@@ -38,11 +38,15 @@ for directory in ('service/examcollection', 'dal/dataobject/examcollection', 'da
                   'dal/dataobject/studentinfo', 'dal/mysql/studentinfo', 'controller/admin/examcollection', 'controller/pub/examcollection'):
     sources.extend((main / directory).rglob('*.java'))
 sources.extend([main / 'service/studentinfo/StudentInfoFields.java',
+                main / 'service/studentinfo/StudentArchiveService.java',
+                main / 'controller/admin/studentinfo/StudentArchiveController.java',
+                main / 'controller/admin/studentinfo/vo/StudentArchiveVO.java',
                 main / 'service/studentinfo/StudentInfoImageService.java',
                 main / 'service/studentinfo/StudentInfoUploadRateLimit.java',
                 main / 'controller/admin/studentinfo/vo/StudentInfoVO.java'])
 tests = list((base / 'test' / package / 'service/examcollection').glob('*Test.java'))
 tests.append(base / 'test' / package / 'service/studentinfo/StudentInfoImagesAndRulesTest.java')
+tests.append(base / 'test' / package / 'service/studentinfo/StudentArchiveServiceTest.java')
 sources.extend(tests)
 runner = out / 'ExamBackendTests.java'
 runner.write_text('''import org.junit.platform.launcher.core.*;
