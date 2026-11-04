@@ -150,3 +150,26 @@ V362 前置为两本台账的 V361。新增以下表，均含租户、逻辑删�
 - `POST /acknowledge`：`{ids:[业务待办ID]}`，整批校验本人待办后记录已读；不完成业务任务、不修改收集状态。重新开启产生新待办 ID，因此重新提醒。
 
 V362 尚未部署，仅用于本分支开发：直接修订原迁移并以 `information_schema` 条件增加 `class_ids_json`，支持保留测试表的恢复。MySQL 8.4.11 重跑首次/重放/失败恢复/缺列恢复及约束验证通过；配置库菜单、权限和台账未改变。当前 Java 39 项测试通过；前端弹窗、首页醒目样式和真实服务联调尚未完成。
+
+## 异常、原始历史与名单调整 API
+
+以下均位于管理前缀 `/admin-api/zsjos/exam-collection`，读取累计 query 和任务对象检查，变更累计相应按钮权限：
+
+| 接口 | 请求及用途 |
+| --- | --- |
+| GET /{id}/members | 分页、active、filled、keyword；固定名单与班级/规划师快照、收齐状态 |
+| POST /{id}/members | members 权限；revision、addServiceIds、removeServiceIds、reason；显式增减应收服务 |
+| GET /{id}/submissions | 分页、status、serviceRelationId；正式提交倒序，支持按学员查看多次填写历史，不返回草稿 |
+| GET /{id}/submissions/{submissionId} | 当次完整原始内容、字段及附件；不以当前档案代替历史 |
+| GET /{id}/submissions/{submissionId}/attachments/{fileId} | 仅当次提交明确引用且绑定一致的附件字节 |
+| GET /{id}/candidates | 分页、keyword（学员姓名/手机号/学员编号）、classId；全租户候选服务 |
+| GET /{id}/archive/{relationId} | 候选的当前档案及修订号，用于人工核对及冲突检查 |
+| GET /{id}/events | 操作记录分页，显示真实操作者名称和原因 |
+| POST /{id}/submissions/{submissionId}/resolve | resolve 权限；提交 revision、serviceRelationId、目标 archiveRevision、reason |
+| POST /{id}/submissions/{submissionId}/invalidate | resolve 权限；revision、reason；仅异常提交可标无效，不删除内容或材料 |
+
+确认归属允许班级外服务，不比较姓名和手机号，不自动增加应收名单。锁定目标服务后校验其档案修订号；人工查看期间档案变化时拒绝覆盖。同任务同身份证的所有未处理异常一起关联，按提交序号倒序处理，最新一份生效，其余保留原始提交。原始字段值不因人工关联而修改。后续同身份证提交沿用绑定。
+
+任务完成后仍可处理既有异常，但不能新增公开提交，处理异常不会恢复已结束任务的待办。已成功写入其他服务的绑定目前拒绝静默改绑；显式归属纠正及原目标档案恢复仍待实现，不应以重新调用 resolve 代替纠正流程。
+
+名单调整不删除成员历史：移出置 inactive，重新加入已有成员保留冻结的班级/负责人及已收齐记录。首次加入新服务时要求有效服务中班级、可用规划师，记录本次档案身份证摘要；已作为额外人员归档的服务显式加入应收名单时保留其已收齐状态。名单调整保存原因并替换待办版本，不根据转班自动执行。

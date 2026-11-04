@@ -78,4 +78,16 @@ class ExamCollectionRosterTest {
         request.setRevision(0); assertThrows(ServiceException.class, () -> service.notifyClasses(1L, request));
         verify(members, never()).insert(any(ExamCollectionMemberDO.class)); verifyNoInteractions(todos);
     }
+    @Test void explicitRemovalAndRestorationPreserveFrozenOwnershipAndPriorCollection() {
+        task.setClassIdsJson("[4]");
+        var member = new ExamCollectionMemberDO(); member.setServiceRelationId(10L); member.setPlannerUserId(7L);
+        member.setClassId(4L); member.setClassNameSnapshot("原班级"); member.setLastSubmissionId(90L); member.setActive(true);
+        when(members.selectList(any(LambdaQueryWrapperX.class))).thenReturn(List.of(member));
+        var request = new RosterChange(); request.setRevision(0); request.setReason("名单调整"); request.setRemoveServiceIds(List.of(10L));
+        service.adjust(1L, request); assertFalse(member.getActive()); assertEquals(1, task.getRevision());
+        request.setRevision(1); request.setRemoveServiceIds(List.of()); request.setAddServiceIds(List.of(10L));
+        service.adjust(1L, request); assertTrue(member.getActive()); assertEquals(7L, member.getPlannerUserId());
+        assertEquals(90L, member.getLastSubmissionId()); assertEquals("原班级", member.getClassNameSnapshot());
+        verifyNoInteractions(classes, relations, archives); verify(todos, times(2)).synchronize(task, true);
+    }
 }

@@ -20,6 +20,69 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class ExamCollectionController {
     @Resource private ExamCollectionTaskService service;
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionRosterService roster;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionResolutionService resolution;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionQueryService queries;
+    @PostMapping("/{id}/members")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:members')")
+    public CommonResult<Boolean> adjust(@PathVariable Long id, @Valid @RequestBody RosterChange request) {
+        roster.adjust(id, request); return success(true);
+    }
+    @GetMapping("/{id}/members")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<PageResult<Member>> members(@PathVariable Long id, @Valid MemberQuery query, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(queries.members(id, query));
+    }
+    @GetMapping("/{id}/submissions")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<PageResult<Submission>> submissions(@PathVariable Long id, @Valid SubmissionQuery query, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(queries.submissions(id, query));
+    }
+    @GetMapping("/{id}/submissions/{submissionId}")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<SubmissionDetail> submission(@PathVariable Long id, @PathVariable Long submissionId, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(queries.submission(id, submissionId));
+    }
+    @GetMapping("/{id}/submissions/{submissionId}/attachments/{fileId}")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public byte[] attachment(@PathVariable Long id, @PathVariable Long submissionId, @PathVariable Long fileId, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setContentType("application/octet-stream"); return queries.attachment(id, submissionId, fileId);
+    }
+    @GetMapping("/{id}/candidates")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<PageResult<Candidate>> candidates(@PathVariable Long id, @Valid CandidateQuery query, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(queries.candidates(id, query));
+    }
+    @GetMapping("/{id}/archive/{relationId}")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<Archive> archive(@PathVariable Long id, @PathVariable Long relationId, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(queries.archive(id, relationId));
+    }
+    @GetMapping("/{id}/events")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<PageResult<Event>> events(@PathVariable Long id, @Valid PageParam query, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(queries.events(id, query));
+    }
+    @PostMapping("/{id}/submissions/{submissionId}/resolve")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:resolve')")
+    public CommonResult<Boolean> resolve(@PathVariable Long id, @PathVariable Long submissionId, @Valid @RequestBody Resolve request) {
+        resolution.resolve(id, submissionId, request); return success(true);
+    }
+    @PostMapping("/{id}/submissions/{submissionId}/invalidate")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:resolve')")
+    public CommonResult<Boolean> invalidate(@PathVariable Long id, @PathVariable Long submissionId, @Valid @RequestBody Invalidate request) {
+        resolution.invalidate(id, submissionId, request); return success(true);
+    }
     @GetMapping("/classes")
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")

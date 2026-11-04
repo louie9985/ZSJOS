@@ -25,6 +25,10 @@ public class ExamCollectionMatchingService {
 
     @Transactional(propagation=Propagation.MANDATORY)
     public void match(ExamCollectionTaskDO task, ExamCollectionSubmissionDO submission) {
+        match(task, submission, null, "学员提交考试资料");
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void match(ExamCollectionTaskDO task, ExamCollectionSubmissionDO submission, Long operatorUserId, String reason) {
         Long tenant = TenantContextHolder.getRequiredTenantId();
         if (!Objects.equals(task.getTenantId(), tenant) || !Objects.equals(submission.getTenantId(), tenant)
                 || !Objects.equals(task.getId(), submission.getTaskId()) || submission.getIdentityHash() == null)
@@ -50,7 +54,7 @@ public class ExamCollectionMatchingService {
             binding.setManual(false); binding.setRevision(0); bindings.insert(binding);
         }
         if (ExamCollectionPolicy.shouldApply(submission.getSequenceNo(), binding.getLastSequenceNo())) {
-            archives.apply(task, submission, relationId, null, "学员提交考试资料");
+            archives.apply(task, submission, relationId, operatorUserId, reason);
             binding.setLastSequenceNo(submission.getSequenceNo()); binding.setLastSubmissionId(submission.getId());
             binding.setRevision(binding.getRevision() + 1); bindings.updateById(binding);
             var member = members.selectOne(new LambdaQueryWrapperX<ExamCollectionMemberDO>()
@@ -58,6 +62,7 @@ public class ExamCollectionMatchingService {
             if (member != null) { member.setLastSubmissionId(submission.getId()); members.updateById(member); }
         }
         submission.setStatus(ARCHIVED); submission.setServiceRelationId(relationId); submission.setExceptionCode("");
+        submission.setRevision(submission.getRevision() == null ? 1 : submission.getRevision() + 1);
         submissions.updateById(submission);
         todos.synchronize(task, false);
     }

@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public final class ExamCollectionVO {
     private ExamCollectionVO() {}
@@ -41,4 +42,57 @@ public final class ExamCollectionVO {
         @Size(max=500) private String reason;
     }
     public record ClassOption(Long id, String name, Long plannerId, String plannerName) {}
+    @Data @EqualsAndHashCode(callSuper=true) public static class SubmissionQuery extends PageParam {
+        @Pattern(regexp="ARCHIVED|EXCEPTION|INVALID") private String status;
+        private Long serviceRelationId;
+    }
+    @Data public static class Submission {
+        private Long id, serviceRelationId, sequenceNo;
+        private Integer revision;
+        private String status, exceptionCode;
+        private LocalDateTime submittedAt;
+        private Map<String, String> values;
+    }
+    @Data @EqualsAndHashCode(callSuper=true) public static class SubmissionDetail extends Submission {
+        private List<Field> fields;
+        private List<cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Image> attachments;
+    }
+    @Data @EqualsAndHashCode(callSuper=true) public static class CandidateQuery extends PageParam {
+        @Size(max=200) private String keyword;
+        private Long classId;
+    }
+    public record Candidate(Long serviceRelationId, Long personId, String studentName, String mobile,
+                            Long classId, String className, String serviceStatus) {}
+    @Data public static class Resolve {
+        @NotNull @Min(0) private Integer revision;
+        @NotNull private Long serviceRelationId;
+        @NotNull @Min(0) private Integer archiveRevision;
+        @NotBlank @Size(max=500) private String reason;
+    }
+    @Data public static class Invalidate {
+        @NotNull @Min(0) private Integer revision;
+        @NotBlank @Size(max=500) private String reason;
+    }
+    @Data public static class Archive {
+        private Long serviceRelationId;
+        private Integer revision;
+        private List<Field> fields;
+        private Map<String, String> values;
+        private List<ArchiveAttachment> attachments;
+    }
+    public record ArchiveAttachment(String source, Long id, String fieldKey, String side, String name, String contentType, Long size) {}
+    public record Event(Long id, Long submissionId, String action, String reason, String operatorName, LocalDateTime time) {}
+    @Data public static class RosterChange {
+        @NotNull @Min(0) private Integer revision;
+        @NotNull @Size(max=500) private List<@NotNull Long> addServiceIds = List.of();
+        @NotNull @Size(max=500) private List<@NotNull Long> removeServiceIds = List.of();
+        @NotBlank @Size(max=500) private String reason;
+    }
+    @Data @EqualsAndHashCode(callSuper=true) public static class MemberQuery extends PageParam {
+        private Boolean active = true;
+        private Boolean filled;
+        @Size(max=200) private String keyword;
+    }
+    public record Member(Long serviceRelationId, Long personId, String studentName, String mobile,
+                         Long classId, String className, String plannerName, boolean active, Long lastSubmissionId) {}
 }

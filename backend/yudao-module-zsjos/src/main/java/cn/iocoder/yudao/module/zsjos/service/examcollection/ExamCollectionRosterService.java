@@ -29,6 +29,7 @@ public class ExamCollectionRosterService {
     @Resource private ExamCollectionMemberMapper members;
     @Resource private ExamCollectionEventMapper events;
     @Resource private ExamCollectionSubmissionMapper submissions;
+    @Resource private ExamCollectionBindingMapper bindings;
     @Resource private DeliveryClassMapper classes;
     @Resource private ServiceRelationMapper relations;
     @Resource private AdminUserApi users;
@@ -98,6 +99,53 @@ public class ExamCollectionRosterService {
         task.setStatus(OPEN); task.setRevision(task.getRevision() + 1); tasks.updateById(task);
         // Keep the last completion time/reason as history; status controls current public availability.
         record(task, "REOPEN", request.getReason(), Map.of()); todos.synchronize(task, true);
+    }
+    @ZsjosPermission(bizType="exam-collection", bizId="#id", action="members")
+    @Transactional(rollbackFor=Exception.class)
+    public void adjust(Long id, RosterChange request) {
+        objects.check(id, "members", getLoginUserId()); var task = lock(id, request.getRevision());
+        ExamCollectionPublicService.requireOpen(task);
+        if (task.getClassIdsJson() == null) throw exception(CONFLICT);
+        var additions = new TreeSet<>(request.getAddServiceIds()); var removals = new TreeSet<>(request.getRemoveServiceIds());
+        if (additions.isEmpty() && removals.isEmpty() || additions.stream().anyMatch(removals::contains)
+                || additions.size() != request.getAddServiceIds().size() || removals.size() != request.getRemoveServiceIds().size())
+            throw exception(FIELD_INVALID, "请明确选择加入或移出的学员，不能重复或交叉");
+        var existing = members.selectList(new LambdaQueryWrapperX<ExamCollectionMemberDO>().eq(ExamCollectionMemberDO::getTaskId, id))
+                .stream().collect(java.util.stream.Collectors.toMap(ExamCollectionMemberDO::getServiceRelationId, m -> m));
+        for (Long relationId : removals) {
+            var row = existing.get(relationId);
+            if (row == null || !Boolean.TRUE.equals(row.getActive())) throw exception(CONFLICT);
+            row.setActive(false); members.updateById(row);
+        }
+        var classIds = new TreeSet<>(JsonUtils.parseArray(task.getClassIdsJson(), Long.class));
+        for (Long relationId : additions) {
+            var row = existing.get(relationId);
+            if (row != null) {
+                if (Boolean.TRUE.equals(row.getActive())) throw exception(CONFLICT);
+                row.setActive(true); members.updateById(row); continue;
+            }
+            Long tenant = task.getTenantId(); var relation = relations.selectByIdForUpdate(relationId, tenant);
+            if (relation == null || !Objects.equals(relation.getTenantId(), tenant) || !Boolean.TRUE.equals(relation.getTeachingDelivery())
+                    || TeachingServiceLifecycle.closed(relation) || relation.getClassId() == null) throw exception(CLASS_INVALID);
+            var clazz = classes.selectById(relation.getClassId());
+            if (clazz == null || !Objects.equals(clazz.getTenantId(), tenant) || !"SERVING".equals(clazz.getStatus()) || !DeliveryClassKind.assignable(clazz)
+                    || clazz.getHomeroomUserId() == null) throw exception(CLASS_INVALID);
+            var planner = users.getUser(clazz.getHomeroomUserId());
+            if (planner == null || !Objects.equals(planner.getStatus(), 0)) throw exception(CLASS_INVALID);
+            row = new ExamCollectionMemberDO(); row.setTenantId(tenant); row.setTaskId(id); row.setServiceRelationId(relationId);
+            row.setPersonId(relation.getPersonId()); row.setClassId(clazz.getId()); row.setClassNameSnapshot(clazz.getClassName());
+            row.setPlannerUserId(clazz.getHomeroomUserId()); row.setActive(true);
+            var archive = archives.current(relationId);
+            String identity = archive.answers().stream().filter(a -> "id_card".equals(a.getFieldKey())).map(a -> a.getValueText())
+                    .filter(Objects::nonNull).findFirst().orElse(null); row.setIdentityHash(tokens.identityHash(identity));
+            var last = bindings.selectOne(new LambdaQueryWrapperX<ExamCollectionBindingDO>()
+                    .eq(ExamCollectionBindingDO::getTaskId, id).eq(ExamCollectionBindingDO::getServiceRelationId, relationId)
+                    .isNotNull(ExamCollectionBindingDO::getLastSubmissionId).orderByDesc(ExamCollectionBindingDO::getLastSequenceNo).last("LIMIT 1"));
+            if (last != null) row.setLastSubmissionId(last.getLastSubmissionId());
+            members.insert(row); classIds.add(clazz.getId());
+        }
+        task.setClassIdsJson(JsonUtils.toJsonString(classIds)); task.setRevision(task.getRevision() + 1); tasks.updateById(task);
+        record(task, "ADJUST_MEMBERS", request.getReason(), Map.of("added", additions, "removed", removals)); todos.synchronize(task, true);
     }
     private ExamCollectionTaskDO lock(Long id, Integer revision) {
         var task = tasks.lock(id);
