@@ -7,6 +7,7 @@ import { studentInfoError } from '../../services/studentInfo';
 import { formatTimestamp } from '../../services/time';
 import { ExamCandidatePicker, ExamReasonDialog } from './ExamCollectionDialogs';
 import ExamCorrectionDialog from './ExamCorrectionDialog';
+import { useExamLeaveGuard } from './useExamLeaveGuard';
 
 export default function ExamSubmissionViewer({taskId,submissionId,canResolve,onClose,onChanged}:{taskId:number;submissionId:number;canResolve:boolean;onClose:()=>void;onChanged:()=>void}){
   useBusinessOverlay(true);
@@ -15,6 +16,8 @@ export default function ExamSubmissionViewer({taskId,submissionId,canResolve,onC
   const [targetLoading,setTargetLoading]=useState(false),[targetError,setTargetError]=useState(''),[targetReload,setTargetReload]=useState(0);
   const [reason,setReason]=useState(''),[busy,setBusy]=useState(false),[operationError,setOperationError]=useState(''),[invalidating,setInvalidating]=useState(false);
   const [correcting,setCorrecting]=useState(false);
+  const leave=useExamLeaveGuard(!correcting&&!invalidating&&Boolean(target||reason.trim()),busy);
+  const close=()=>void leave.check().then(allowed=>{if(allowed)onClose()});
   useEffect(()=>{let active=true;setLoading(true);setError('');setData(undefined);setTarget(undefined);setArchive(undefined);setReason('');setOperationError('');
     void examCollectionApi.submission(taskId,viewId).then(v=>{if(active)setData(v)}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[taskId,viewId,reload]);
   useEffect(()=>{let active=true;setArchive(undefined);setTargetError('');if(!target)return;setTargetLoading(true);
@@ -31,11 +34,12 @@ export default function ExamSubmissionViewer({taskId,submissionId,canResolve,onC
     catch(e){setOperationError(studentInfoError(e))}finally{setBusy(false)}
   };
   return <>
+    {leave.guard}
     <Modal open title="原始填写资料" width={1040} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={{container:{maxHeight:'calc(100dvh - 32px)',display:'flex',flexDirection:'column'},body:{overflowY:'auto',minHeight:0},footer:{flexShrink:0}}}
-      onCancel={()=>{if(!busy)onClose()}} maskClosable={false} footer={<Space wrap>
+      onCancel={close} maskClosable={false} footer={<Space wrap>
         {canResolve&&data?.status==='ARCHIVED'&&<Button danger onClick={()=>setCorrecting(true)}>纠正归属</Button>}
         {canResolve&&data?.status==='EXCEPTION'&&<><Button danger disabled={busy} onClick={()=>setInvalidating(true)}>标记无效</Button><Button disabled={busy||!latest} onClick={()=>setPicker(true)}>{target?'重新选择归属':'选择学员归属'}</Button><Button type="primary" loading={busy} disabled={!archive||targetLoading||!latest} onClick={()=>void resolve()}>确认关联并更新档案</Button></>}
-        <Button disabled={busy} onClick={onClose}>关闭</Button>
+        <Button disabled={busy} onClick={close}>关闭</Button>
       </Space>}>
       <Space orientation="vertical" className="exam-collection-stack">
         {loading&&<Spin/>}{error&&<Alert type="error" title={error} action={<Button onClick={()=>setReload(v=>v+1)}>重试</Button>}/>}

@@ -6,6 +6,7 @@ import { useBusinessOverlay } from '../OverlayCoordinator';
 import { examCollectionApi, type ExamCandidate, type ExamClass, type ExamTaskDetail, type ExamCreateCommand } from '../../services/examCollection';
 import { ApiError } from '../../services/api';
 import { studentInfoError, type StudentInfoField } from '../../services/studentInfo';
+import { useExamLeaveGuard } from './useExamLeaveGuard';
 
 const modalStyles = { container:{maxHeight:'calc(100dvh - 32px)',display:'flex',flexDirection:'column' as const},body:{overflowY:'auto' as const,minHeight:0},footer:{flexShrink:0} };
 export function ExamCreateDialog({onClose,onCreated}:{onClose:()=>void;onCreated:(task:ExamTaskDetail)=>void}) {
@@ -18,7 +19,7 @@ export function ExamCreateDialog({onClose,onCreated}:{onClose:()=>void;onCreated
   const flight=useRef(false);
   const title=Form.useWatch('title',form),description=Form.useWatch('description',form);
   const dirty=Boolean(title?.trim()||description?.trim()||selected.length||pending);
-  useEffect(()=>{if(!dirty&&!busy)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty,busy]);
+  const leave=useExamLeaveGuard(dirty,busy,pending?'生成结果尚未确认，任务可能已创建。离开后请先在任务列表核对，避免再次发起。':undefined);
   const close=()=>{if(flight.current)return;if(dirty)setDiscard(true);else onClose()};
   useEffect(()=>{let active=true;setLoading(true);setError('');setReady(false);void examCollectionApi.fields().then(v=>{if(active){setFields(v);setReady(true)}}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[reload]);
   const create=async()=>{
@@ -34,7 +35,7 @@ export function ExamCreateDialog({onClose,onCreated}:{onClose:()=>void;onCreated
       if(e instanceof ApiError&&(e.code>=1_000_000_000||[400,401,403].includes(e.code)))setPending(undefined);
     }finally{flight.current=false;setBusy(false)}
   };
-  return <><Modal open title="发起考试资料收集" width={720} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles}
+  return <>{leave.guard}<Modal open title="发起考试资料收集" width={720} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles}
     onCancel={close} onOk={()=>void create()} okText={pending?'重试确认生成结果':'生成统一链接'} confirmLoading={busy} okButtonProps={{disabled:loading||!ready}} closable={!busy} maskClosable={false}>
     <Space orientation="vertical" className="exam-collection-stack">
       {error&&<Alert type="error" title={error} action={!fields.length?<Button onClick={()=>setReload(v=>v+1)}>重新加载字段</Button>:undefined}/>}
@@ -58,10 +59,11 @@ export function ExamNotifyDialog({task,onClose,onSaved}:{task:ExamTaskDetail;onC
   useBusinessOverlay(true);
   const [classes,setClasses]=useState<ExamClass[]>([]),[selected,setSelected]=useState<number[]>([]);
   const [loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[reload,setReload]=useState(0);
+  const leave=useExamLeaveGuard(selected.length>0,busy);
   useEffect(()=>{let active=true;setLoading(true);setError('');void examCollectionApi.classes().then(v=>{if(active)setClasses(v)}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[reload]);
   const notify=async()=>{if(busy||!selected.length)return;setBusy(true);setError('');try{await examCollectionApi.notify(task.id,task.revision,selected);onSaved()}catch(e){setError(studentInfoError(e))}finally{setBusy(false)}};
-  return <Modal open title="选择班级并通知学习规划师" width={640} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles} maskClosable={false}
-    onCancel={()=>{if(!busy)onClose()}} onOk={()=>void notify()} okText={`通知 ${selected.length} 个班级`} confirmLoading={busy} okButtonProps={{disabled:loading||!selected.length}}>
+  return <>{leave.guard}<Modal open title="选择班级并通知学习规划师" width={640} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles} maskClosable={false}
+    onCancel={()=>void leave.check().then(allowed=>{if(allowed)onClose()})} onOk={()=>void notify()} okText={`通知 ${selected.length} 个班级`} confirmLoading={busy} okButtonProps={{disabled:loading||!selected.length}}>
     <Space orientation="vertical" className="exam-collection-stack">
       <Typography.Text strong>{task.title}</Typography.Text>
       {error&&<Alert type="error" title={error} action={<Button onClick={()=>setReload(v=>v+1)}>重试加载</Button>}/>}
@@ -70,15 +72,16 @@ export function ExamNotifyDialog({task,onClose,onSaved}:{task:ExamTaskDetail;onC
       <Alert type="info" showIcon title="本次通知将固定应收名单" description="以后转班不会自动改变人数。规划师收齐其负责学员的资料后，待办自动移除；考务也可以结束整个任务。"/>
       {selected.length>0&&<ul className="exam-collection-selection">{classes.filter(c=>selected.includes(c.id)).map(c=><li key={c.id}>{c.name}<span>{c.plannerName}</span></li>)}</ul>}
     </Space>
-  </Modal>;
+  </Modal></>;
 }
 export function ExamReasonDialog({title,description,required=true,onClose,onConfirm}:{title:string;description:string;required?:boolean;onClose:()=>void;onConfirm:(reason:string)=>Promise<void>}){
   useBusinessOverlay(true);
   const [reason,setReason]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const leave=useExamLeaveGuard(Boolean(reason.trim()),busy);
   const confirm=async()=>{if(busy)return;if(required&&!reason.trim()){setError('请填写原因');return}setBusy(true);setError('');try{await onConfirm(reason.trim());onClose()}catch(e){setError(studentInfoError(e))}finally{setBusy(false)}};
-  return <Modal open title={title} onCancel={()=>{if(!busy)onClose()}} onOk={()=>void confirm()} confirmLoading={busy} maskClosable={false}>
+  return <>{leave.guard}<Modal open title={title} onCancel={()=>void leave.check().then(allowed=>{if(allowed)onClose()})} onOk={()=>void confirm()} confirmLoading={busy} maskClosable={false}>
     <Space orientation="vertical" className="exam-collection-stack"><p>{description}</p>{error&&<Alert type="error" title={error}/>}<Input.TextArea rows={3} value={reason} onChange={e=>setReason(e.target.value)} maxLength={500} showCount disabled={busy} aria-label="操作原因" placeholder={required?'请填写原因，记录将保留在任务历史中':'可填写操作说明'}/></Space>
-  </Modal>;
+  </Modal></>;
 }
 export function ExamCandidatePicker({taskId,onClose,onSelect}:{taskId:number;onClose:()=>void;onSelect:(candidate:ExamCandidate)=>void}){
   useBusinessOverlay(true);

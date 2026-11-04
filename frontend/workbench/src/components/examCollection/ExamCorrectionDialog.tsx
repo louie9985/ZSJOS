@@ -6,6 +6,7 @@ import { studentInfoError } from '../../services/studentInfo';
 import { ExamCandidatePicker } from './ExamCollectionDialogs';
 import '../../styles/components/student-info-panel.css';
 import '../../styles/pages/exam-collection.css';
+import { useExamLeaveGuard } from './useExamLeaveGuard';
 
 export default function ExamCorrectionDialog({taskId,submissionId,onClose,onSaved}:{taskId:number;submissionId:number;onClose:()=>void;onSaved:()=>void}) {
   useBusinessOverlay(true);
@@ -13,7 +14,7 @@ export default function ExamCorrectionDialog({taskId,submissionId,onClose,onSave
   const [reason,setReason]=useState(''),[confirmed,setConfirmed]=useState(false),[loading,setLoading]=useState(false),[busy,setBusy]=useState(false);
   const [error,setError]=useState(''),[reload,setReload]=useState(0),[discard,setDiscard]=useState(false);
   const dirty=Boolean(target||reason.trim());
-  useEffect(()=>{if(!dirty&&!busy)return;const guard=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=''};window.addEventListener('beforeunload',guard);return()=>window.removeEventListener('beforeunload',guard)},[dirty,busy]);
+  const leave=useExamLeaveGuard(dirty,busy);
   useEffect(()=>{let active=true;setPreview(undefined);setConfirmed(false);setError('');if(!target)return;setLoading(true);
     void examCollectionApi.correctionPreview(taskId,submissionId,target.serviceRelationId).then(value=>{if(active)setPreview(value)}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});
     return()=>{active=false};
@@ -28,6 +29,7 @@ export default function ExamCorrectionDialog({taskId,submissionId,onClose,onSave
     catch(e){setError(studentInfoError(e));setPreview(undefined);setConfirmed(false)}finally{setBusy(false)}
   };
   return <>
+    {leave.guard}
     <Modal open title="纠正已归档资料的归属" width={820} style={{maxWidth:'calc(100vw - 32px)',top:16}}
       styles={{container:{maxHeight:'calc(100dvh - 32px)',display:'flex',flexDirection:'column'},body:{overflowY:'auto',minHeight:0}}}
       onCancel={close} closable={!busy} maskClosable={false} footer={<Space wrap><Button disabled={busy} onClick={close}>取消</Button><Button danger type="primary" loading={busy} disabled={!preview||!confirmed||!reason.trim()||loading} onClick={()=>void save()}>确认纠正归属</Button></Space>}>

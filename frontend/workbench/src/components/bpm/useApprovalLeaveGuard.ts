@@ -2,6 +2,21 @@ import { useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useWorkbenchPageGuard } from '../WorkbenchPageNavigation'
 
+// Register before BrowserRouter creates its history listener. Window-target popstate listeners
+// can otherwise let the router unmount the editor before a component-level guard receives the event.
+const popGuards = new Set<(event: PopStateEvent) => void>()
+const dispatchPop = (event: PopStateEvent) => {
+  for (const guard of [...popGuards].reverse()) {
+    guard(event)
+    if (event.cancelBubble) break
+  }
+}
+if (typeof window !== 'undefined') window.addEventListener('popstate', dispatchPop, true)
+if (import.meta.hot) import.meta.hot.dispose(() => {
+  window.removeEventListener('popstate', dispatchPop, true)
+  popGuards.clear()
+})
+
 /** BrowserRouter has no data-router blocker. Restore a POP before asking, then replay only on consent. */
 export function useApprovalLeaveGuard(check: () => Promise<boolean>, blocked: () => boolean) {
   const location = useLocation()
@@ -42,8 +57,8 @@ export function useApprovalLeaveGuard(check: () => Promise<boolean>, blocked: ()
       event.preventDefault(); event.stopImmediatePropagation()
       void latest.current.check().then(allowed => { if (allowed && !disposed) navigateRef.current(anchor.pathname + anchor.search + anchor.hash) })
     }
-    window.addEventListener('popstate', pop, true)
+    popGuards.add(pop)
     document.addEventListener('click', click, true)
-    return () => { disposed = true; window.removeEventListener('popstate', pop, true); document.removeEventListener('click', click, true) }
+    return () => { disposed = true; popGuards.delete(pop); document.removeEventListener('click', click, true) }
   }, [])
 }
