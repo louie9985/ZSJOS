@@ -15,6 +15,7 @@ export interface StudentArchive {
     taskTitle?: string;
     taskId?: number;
     submissionId?: number;
+    submissionStatus?: string;
     operatorUserId: number;
     operatorName?: string;
     modifiedAt: string;

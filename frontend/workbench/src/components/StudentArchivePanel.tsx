@@ -382,8 +382,8 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
             items={[
               ...(data.submissions?.length ? [{
                 key: 'submissions', label: `填写历史（${data.submissions.length}）`,
-                children: data.submissions.map(h => <StudentArchiveHistoryRecord key={`submission:${h.submissionId}`}
-                  relationId={relationId} entry={h} sensitive={Boolean(data.information.canReadSensitive)} attachment={attachment} />),
+                children: data.submissions.map((h,index) => <StudentArchiveHistoryRecord key={`submission:${h.submissionId}`}
+                  relationId={relationId} entry={h} submissionNumber={data.submissions!.length-index} sensitive={Boolean(data.information.canReadSensitive)} attachment={attachment} />),
               }] : []),
               {
                 key: "history",

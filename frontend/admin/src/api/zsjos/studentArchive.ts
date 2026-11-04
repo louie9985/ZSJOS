@@ -15,6 +15,7 @@ export interface Archive {
     operatorUserId: number
     operatorName?: string
     reason: string
+    submissionStatus?: string
   }[]
 }
 export interface Edit {

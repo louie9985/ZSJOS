@@ -16,6 +16,7 @@ public interface StudentArchiveVO {
         private List<History> submissions = List.of();
     }
     @Data class History {
+        private String submissionStatus;
         private Integer revision;
         private String source;
         private String taskTitle;

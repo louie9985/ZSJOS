@@ -27,6 +27,7 @@ class ExamCollectionRosterTest {
     ExamCollectionTaskMapper tasks;
     ExamCollectionMemberMapper members;
     ExamCollectionSubmissionMapper submissions;
+    ExamCollectionBindingMapper bindings;
     ExamCollectionTodoService todos;
     DeliveryClassMapper classes;
     ServiceRelationMapper relations;
@@ -37,6 +38,7 @@ class ExamCollectionRosterTest {
         TenantContextHolder.setTenantId(1L); service = new ExamCollectionRosterService();
         tasks = inject("tasks", ExamCollectionTaskMapper.class); members = inject("members", ExamCollectionMemberMapper.class);
         submissions = inject("submissions", ExamCollectionSubmissionMapper.class); todos = inject("todos", ExamCollectionTodoService.class);
+        bindings = inject("bindings", ExamCollectionBindingMapper.class);
         classes = inject("classes", DeliveryClassMapper.class); relations = inject("relations", ServiceRelationMapper.class);
         users = inject("users", AdminUserApi.class); archives = inject("archives", StudentServiceArchiveStore.class);
         inject("objects", ExamCollectionPermissionProvider.class); inject("events", ExamCollectionEventMapper.class);
@@ -71,6 +73,13 @@ class ExamCollectionRosterTest {
         assertEquals(COMPLETED, task.getStatus()); assertNotNull(task.getCompletedAt()); assertEquals(1, task.getRevision());
         request.setRevision(1); service.reopen(1L, request);
         assertEquals(OPEN, task.getStatus()); assertEquals(2, task.getRevision()); verify(todos, times(2)).synchronize(task, true);
+    }
+    @Test void firstNotificationKeepsSubmissionsAlreadyManuallyArchivedBeforeRosterFreeze() {
+        var collected = new ExamCollectionBindingDO(); collected.setLastSubmissionId(90L);
+        when(bindings.selectOne(any(LambdaQueryWrapperX.class))).thenReturn(collected);
+        notificationFreezesClassPlannerAndIdentityWithoutReadingLaterClassChanges();
+        var row = ArgumentCaptor.forClass(ExamCollectionMemberDO.class); verify(members).insert(row.capture());
+        assertEquals(90L, row.getValue().getLastSubmissionId());
     }
     @Test void staleVersionAndUnavailableClassDoNotCreateMembers() {
         var request = new Notify(); request.setRevision(4); request.setClassIds(List.of(4L));

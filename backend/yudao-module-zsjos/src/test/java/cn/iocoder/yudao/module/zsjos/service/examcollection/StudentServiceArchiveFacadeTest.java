@@ -88,6 +88,7 @@ class StudentServiceArchiveFacadeTest {
     @Test void originalSubmissionHistoryRetainsOlderResolvedAnswersSeparatelyFromCurrentArchive() {
         var old = new ExamCollectionSubmissionDO(); old.setId(5L); old.setTaskId(1L); old.setTenantId(1L); old.setServiceRelationId(10L);
         old.setSubmittedAt(java.time.LocalDateTime.of(2026, 11, 4, 10, 0)); old.setAttachmentIdsJson("[]");
+        old.setStatus("ARCHIVED");
         old.setAnswersJson(JsonUtils.toJsonString(List.of(answer("name", "第一次原始姓名", false))));
         when(submissions.selectById(5L)).thenReturn(old); when(submissions.selectList(any(LambdaQueryWrapperX.class))).thenReturn(List.of(old));
         var task = new ExamCollectionTaskDO(); task.setId(1L); task.setTitle("考试任务"); task.setFieldsSnapshot(JsonUtils.toJsonString(current.fields()));
@@ -95,6 +96,7 @@ class StudentServiceArchiveFacadeTest {
         var detail = facade.detail(10L, false);
         assertEquals("原姓名", detail.getInformation().getValues().get("name"));
         assertEquals(5L, detail.getSubmissions().getFirst().getSubmissionId()); assertEquals("考试任务", detail.getSubmissions().getFirst().getTaskTitle());
+        assertEquals("ARCHIVED", detail.getSubmissions().getFirst().getSubmissionStatus());
         var original = facade.submission(10L, 5L, false);
         assertEquals("第一次原始姓名", original.getInformation().getValues().get("name")); assertFalse(original.getCanMaintain());
         old.setServiceRelationId(99L); assertThrows(ServiceException.class, () -> facade.submission(10L, 5L, false));

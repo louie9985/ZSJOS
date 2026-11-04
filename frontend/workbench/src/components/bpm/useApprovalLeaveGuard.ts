@@ -1,6 +1,7 @@
-import { useEffect, useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useWorkbenchPageGuard } from '../WorkbenchPageNavigation'
+import { useRetainedPageActive } from '../../layouts/RetainedReviewRoutes'
 
 // Register before BrowserRouter creates its history listener. Window-target popstate listeners
 // can otherwise let the router unmount the editor before a component-level guard receives the event.
@@ -20,13 +21,16 @@ if (import.meta.hot) import.meta.hot.dispose(() => {
 /** BrowserRouter has no data-router blocker. Restore a POP before asking, then replay only on consent. */
 export function useApprovalLeaveGuard(check: () => Promise<boolean>, blocked: () => boolean) {
   const location = useLocation()
+  const pageActive = useRetainedPageActive()
+  const active = useRef(pageActive)
+  active.current = pageActive
   const navigate = useNavigate()
   const navigateRef = useRef(navigate)
   navigateRef.current = navigate
   const latest = useRef({ check, blocked })
   latest.current = { check, blocked }
   const index = useRef<number>(window.history.state?.idx ?? 0)
-  useEffect(() => { index.current = window.history.state?.idx ?? index.current }, [location])
+  useLayoutEffect(() => { if (pageActive) index.current = window.history.state?.idx ?? index.current }, [location, pageActive])
   useWorkbenchPageGuard(location.pathname, check)
   useLayoutEffect(() => {
     let restoring = false
@@ -42,7 +46,7 @@ export function useApprovalLeaveGuard(check: () => Promise<boolean>, blocked: ()
         })
         return
       }
-      if (!latest.current.blocked()) return
+      if (!active.current || !latest.current.blocked()) return
       const target = event.state?.idx
       if (typeof target !== 'number' || target === index.current) return
       event.stopImmediatePropagation()
@@ -51,7 +55,7 @@ export function useApprovalLeaveGuard(check: () => Promise<boolean>, blocked: ()
       window.history.go(pendingDelta)
     }
     const click = (event: MouseEvent) => {
-      if (event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || !latest.current.blocked()) return
+      if (!active.current || event.button || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || !latest.current.blocked()) return
       const anchor = (event.target as Element).closest?.('a[href]') as HTMLAnchorElement | null
       if (!anchor || anchor.target || anchor.hasAttribute('download') || anchor.origin !== window.location.origin || anchor.href === window.location.href) return
       event.preventDefault(); event.stopImmediatePropagation()

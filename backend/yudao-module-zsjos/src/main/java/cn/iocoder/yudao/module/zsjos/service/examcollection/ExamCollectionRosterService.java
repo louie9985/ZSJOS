@@ -70,7 +70,13 @@ public class ExamCollectionRosterService {
                 var archive = archives.current(relation.getId());
                 String identity = archive.answers().stream().filter(a -> "id_card".equals(a.getFieldKey()))
                         .map(a -> a.getValueText()).filter(Objects::nonNull).findFirst().orElse(null);
-                row.setIdentityHash(tokens.identityHash(identity)); members.insert(row);
+                row.setIdentityHash(tokens.identityHash(identity));
+                // The shared link can already have manually resolved submissions before initial notification.
+                var collected = bindings.selectOne(new LambdaQueryWrapperX<ExamCollectionBindingDO>()
+                        .eq(ExamCollectionBindingDO::getTaskId, id).eq(ExamCollectionBindingDO::getServiceRelationId, relation.getId())
+                        .isNotNull(ExamCollectionBindingDO::getLastSubmissionId).orderByDesc(ExamCollectionBindingDO::getLastSequenceNo).last("LIMIT 1"));
+                if (collected != null) row.setLastSubmissionId(collected.getLastSubmissionId());
+                members.insert(row);
             }
         }
         task.setClassIdsJson(JsonUtils.toJsonString(selected)); task.setRevision(task.getRevision() + 1); tasks.updateById(task);

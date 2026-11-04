@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Button, Collapse, Spin } from 'antd';
+import { Alert, Button, Collapse, Spin, Tag } from 'antd';
 import { archiveImageReference, studentArchiveApi, type StudentArchive } from '../services/studentArchive';
 import type { StudentInfoImage } from '../services/studentInfo';
 import AttachmentCard, { type AttachmentResource } from './AttachmentCard';
 import { formatTimestamp } from '../services/time';
 import { archiveChanges } from '../services/studentArchiveDiff';
 
-export default function StudentArchiveHistoryRecord({ relationId, entry, sensitive, attachment }: {
+export default function StudentArchiveHistoryRecord({ relationId, entry, sensitive, attachment, submissionNumber }: {
   relationId: number;
   entry: StudentArchive['history'][number];
   sensitive: boolean;
+  submissionNumber?: number;
   attachment: (image: StudentInfoImage) => AttachmentResource;
 }) {
   const [data, setData] = useState<StudentArchive>();
@@ -41,7 +42,7 @@ export default function StudentArchiveHistoryRecord({ relationId, entry, sensiti
     : <span key={archiveImageReference(image)}>{image.name}</span>) : '未提交'}</div>;
   return <Collapse className="student-info-panel" activeKey={open ? ['record'] : []} onChange={keys => setOpen(Boolean(keys.length))} items={[{
     key: 'record',
-    label: <span>{label}{entry.modifiedAt ? ` · ${formatTimestamp(entry.modifiedAt)}` : ''}{entry.operatorName ? ` · ${entry.operatorName}` : ''}</span>,
+    label: <span>{submissionNumber ? `第 ${submissionNumber} 次填写 · ` : ''}{label}{entry.modifiedAt ? ` · ${formatTimestamp(entry.modifiedAt)}` : ''}{entry.operatorName ? ` · ${entry.operatorName}` : ''}{entry.source === 'submission' && <Tag color={entry.submissionStatus === 'ARCHIVED' ? 'success' : entry.submissionStatus === 'EXCEPTION' ? 'warning' : undefined}>{({ARCHIVED:'已归档',EXCEPTION:'待处理异常',INVALID:'已标记无效'} as Record<string,string>)[entry.submissionStatus || ''] || '历史状态未记录'}</Tag>}</span>,
     children: <>
       {entry.reason && <p>{entry.reason}</p>}
       {loading && <Spin aria-label="正在加载历史资料" />}

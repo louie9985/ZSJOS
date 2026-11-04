@@ -138,6 +138,7 @@ public class StudentServiceArchiveFacade {
                 .collect(java.util.stream.Collectors.toMap(ExamCollectionTaskDO::getId, ExamCollectionTaskDO::getTitle));
         result.setSubmissions(originals.stream().map(s -> {
             var item = new History(); item.setSource("submission"); item.setTaskId(s.getTaskId()); item.setTaskTitle(taskNames.get(s.getTaskId()));
+            item.setSubmissionStatus(s.getStatus());
             item.setSubmissionId(s.getId()); item.setOperatorName("学员填写"); item.setModifiedAt(s.getSubmittedAt()); return item;
         }).toList());
         for (var revision : rows) if (revision.getRevision() <= snapshot.revision() && "exam_submission".equals(revision.getSource())) {
