@@ -19,6 +19,31 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 @RequestMapping("/zsjos/exam-collection")
 public class ExamCollectionController {
     @Resource private ExamCollectionTaskService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionRosterService roster;
+    @GetMapping("/classes")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<List<ClassOption>> classes(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(roster.classes());
+    }
+    @PostMapping("/{id}/notify")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:notify')")
+    public CommonResult<Boolean> notifyClasses(@PathVariable Long id, @Valid @RequestBody Notify request) {
+        roster.notifyClasses(id, request); return success(true);
+    }
+    @PostMapping("/{id}/complete")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:complete')")
+    public CommonResult<Boolean> complete(@PathVariable Long id, @Valid @RequestBody Transition request) {
+        roster.complete(id, request); return success(true);
+    }
+    @PostMapping("/{id}/reopen")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:reopen')")
+    public CommonResult<Boolean> reopen(@PathVariable Long id, @Valid @RequestBody Transition request) {
+        roster.reopen(id, request); return success(true);
+    }
     @GetMapping("/fields")
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")

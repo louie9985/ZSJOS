@@ -21,6 +21,7 @@ public class ExamCollectionMatchingService {
     @Resource private ExamCollectionSubmissionMapper submissions;
     @Resource private ServiceRelationMapper relations;
     @Resource private StudentServiceArchiveStore archives;
+    @Resource private ExamCollectionTodoService todos;
 
     @Transactional(propagation=Propagation.MANDATORY)
     public void match(ExamCollectionTaskDO task, ExamCollectionSubmissionDO submission) {
@@ -58,6 +59,7 @@ public class ExamCollectionMatchingService {
         }
         submission.setStatus(ARCHIVED); submission.setServiceRelationId(relationId); submission.setExceptionCode("");
         submissions.updateById(submission);
+        todos.synchronize(task, false);
     }
     private void unmatched(ExamCollectionSubmissionDO submission, String code) {
         submission.setStatus(EXCEPTION); submission.setExceptionCode(code); submissions.updateById(submission);

@@ -29,6 +29,16 @@ public final class ExamCollectionVO {
     }
     @Data @EqualsAndHashCode(callSuper=true) public static class Detail extends Task {
         private List<Field> fields;
+        private List<Long> classIds = List.of();
         private String url;
     }
+    @Data public static class Notify {
+        @NotNull @Min(0) private Integer revision;
+        @NotNull @Size(min=1,max=100) private List<@NotNull Long> classIds;
+    }
+    @Data public static class Transition {
+        @NotNull @Min(0) private Integer revision;
+        @Size(max=500) private String reason;
+    }
+    public record ClassOption(Long id, String name, Long plannerId, String plannerName) {}
 }

@@ -16,6 +16,7 @@ public class ExamCollectionTaskDO extends TenantBaseDO {
     private String status;
     private Long configVersionId;
     private String fieldsSnapshot;
+    private String classIdsJson;
     private String tokenHash;
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class)
     @lombok.ToString.Exclude

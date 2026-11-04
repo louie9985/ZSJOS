@@ -79,6 +79,7 @@ public class ExamCollectionTaskService {
         var row = tasks.selectById(id);
         var result = BeanUtils.toBean(project(row), Detail.class);
         result.setFields(JsonUtils.parseArray(row.getFieldsSnapshot(), Field.class));
+        result.setClassIds(row.getClassIdsJson() == null ? List.of() : JsonUtils.parseArray(row.getClassIdsJson(), Long.class));
         result.setUrl(publicUrl(row.getTokenCiphertext())); return result;
     }
     private Task project(ExamCollectionTaskDO row) {
@@ -95,7 +96,7 @@ public class ExamCollectionTaskService {
                 .stream().map(ExamCollectionBindingDO::getServiceRelationId).distinct().filter(id -> !expected.contains(id)).count());
         return result;
     }
-    private String publicUrl(String token) {
+    String publicUrl(String token) {
         try {
             var uri = URI.create(publicBaseUrl == null ? "" : publicBaseUrl.trim());
             if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) || uri.getHost() == null

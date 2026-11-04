@@ -28,6 +28,7 @@ class ExamCollectionMatchingTest {
         members = inject("members", ExamCollectionMemberMapper.class); bindings = inject("bindings", ExamCollectionBindingMapper.class);
         submissions = inject("submissions", ExamCollectionSubmissionMapper.class); relations = inject("relations", ServiceRelationMapper.class);
         archives = inject("archives", StudentServiceArchiveStore.class);
+        inject("todos", ExamCollectionTodoService.class);
         task = new ExamCollectionTaskDO(); task.setId(1L); task.setTenantId(1L);
         submission = new ExamCollectionSubmissionDO(); submission.setId(2L); submission.setTaskId(1L); submission.setTenantId(1L);
         submission.setIdentityHash("synthetic-hash"); submission.setSequenceNo(2L);

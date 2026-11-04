@@ -8,6 +8,7 @@ public interface ExamCollectionConstants {
     String QUERY = PREFIX + "query", CREATE = PREFIX + "create", NOTIFY = PREFIX + "notify";
     String RESOLVE = PREFIX + "resolve", COMPLETE = PREFIX + "complete", REOPEN = PREFIX + "reopen";
     String EXPORT = PREFIX + "export", MEMBERS = PREFIX + "members";
+    String TASK_TYPE = "EXAM_MATERIAL_COLLECTION", BIZ_TYPE = "exam_material_collection", TASK_ACTION = "EXAM_MATERIAL_COLLECTION";
     String OPEN = "OPEN", COMPLETED = "COMPLETED", DRAFT = "DRAFT", SUBMITTED = "SUBMITTED";
     String ARCHIVED = "ARCHIVED", EXCEPTION = "EXCEPTION", INVALID = "INVALID";
     Set<String> ACTIONS = Set.of("query", "create", "notify", "resolve", "complete", "reopen", "export", "members");
