@@ -17,6 +17,19 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class ExamCollectionReminderController {
     @Resource private ExamCollectionReminderService service;
     public record Acknowledge(@NotNull @Size(min=1,max=100) List<@NotNull Long> ids) {}
+    @GetMapping("/state")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:business-task:query')")
+    public CommonResult<ExamCollectionReminderService.State> state(HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(service.state());
+    }
+    @GetMapping("/{taskId}/members")
+    @ApiAccessLog(requestEnable=false,responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:business-task:query')")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<cn.iocoder.yudao.module.zsjos.controller.admin.examcollection.vo.ExamCollectionPlannerVO.Member>> members(
+            @PathVariable Long taskId,@Valid cn.iocoder.yudao.module.zsjos.controller.admin.examcollection.vo.ExamCollectionPlannerVO.Query query,HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(service.members(taskId,query));
+    }
     @GetMapping("/pending")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @PreAuthorize("@ss.hasPermission('zsjos:business-task:query')")

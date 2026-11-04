@@ -13,6 +13,9 @@ export interface ExamMember extends Omit<ExamCandidate,'serviceStatus'> { planne
 export interface ExamArchive { serviceRelationId:number; revision:number; fields:StudentInfoField[]; values:Record<string,string>; attachments:(StudentInfoImage & {source:'registration'|'exam'|'service'})[] }
 export interface ExamEvent { id:number; submissionId?:number; action:string; reason:string; operatorName:string; time:Timestamp }
 export interface ExamTodo { todoId:number; collectionTaskId:number; title:string; classes:string[]; expected:number; collected:number; url:string }
+export interface ExamPlannerState { pending:ExamTodo[]; unreadTodoIds:number[] }
+export interface ExamPlannerMember { serviceRelationId:number; studentName:string; mobile?:string; className:string; filled:boolean }
+export const EXAM_COLLECTION_PROGRESS_EVENT='zsjos:exam-collection-progress';
 export interface Page<T> { list:T[]; total:number }
 export interface Paging { pageNo:number; pageSize:number }
 const base='/zsjos/exam-collection';
@@ -44,7 +47,12 @@ export const examCollectionApi={
   },
 };
 const planner='/zsjos/exam-collection-planner';
-export const examPlannerApi={pending:()=>get<ExamTodo[]>(`${planner}/pending`),reminders:()=>get<ExamTodo[]>(`${planner}/reminders`),acknowledge:(ids:number[])=>post<boolean>(`${planner}/acknowledge`,{ids})};
+export const examPlannerApi={
+  state:()=>get<ExamPlannerState>(`${planner}/state`),
+  pending:()=>get<ExamTodo[]>(`${planner}/pending`),reminders:()=>get<ExamTodo[]>(`${planner}/reminders`),
+  members:(id:number,params:Paging & {keyword?:string;filled?:boolean})=>get<Page<ExamPlannerMember>>(`${planner}/${id}/members`,params),
+  acknowledge:(ids:number[])=>post<boolean>(`${planner}/acknowledge`,{ids}),
+};
 export function examSummaryApi(id:number){
   const prefix=`${task(id)}/summary`;
   return {

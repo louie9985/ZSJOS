@@ -31,7 +31,7 @@ class ExamCollectionReminderTest {
         ReflectionTestUtils.setField(service, "events", events); ReflectionTestUtils.setField(service, "taskService", links);
         var task = new ExamCollectionTaskDO(); task.setId(1L); task.setTenantId(1L); task.setStatus(OPEN); task.setTitle("测试收集");
         when(tasks.selectById(1L)).thenReturn(task);
-        var todo = new BusinessTaskDO(); todo.setId(9L); todo.setBizId(1L); todo.setTaskType(TASK_TYPE); todo.setAssigneeId(7L); todo.setTenantId(1L);
+        var todo = new BusinessTaskDO(); todo.setId(9L); todo.setBizId(1L); todo.setBizType(BIZ_TYPE); todo.setStatus("pending"); todo.setTaskType(TASK_TYPE); todo.setAssigneeId(7L); todo.setTenantId(1L);
         when(business.selectMyPendingByBusiness(7L, BIZ_TYPE, null)).thenReturn(List.of(todo));
         var member = new ExamCollectionMemberDO(); member.setClassNameSnapshot("测试班");
         when(members.selectList(any(LambdaQueryWrapperX.class))).thenReturn(List.of(member));
@@ -40,6 +40,7 @@ class ExamCollectionReminderTest {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(7L);
             assertThrows(ServiceException.class, service::pending);
             when(permissions.hasAnyPermissions(7L, "zsjos:business-task:query")).thenReturn(true);
+            assertEquals(List.of(9L),service.state().unreadTodoIds());
             assertEquals(1, service.reminders().size());
             assertThrows(ServiceException.class, () -> service.acknowledge(List.of(9L, 99L)));
             verify(events, never()).insert(any(ExamCollectionEventDO.class));
@@ -47,6 +48,7 @@ class ExamCollectionReminderTest {
             var seen = new ExamCollectionEventDO(); seen.setDetailsJson(JsonUtils.toJsonString(new ExamCollectionReminderService.Seen(9L)));
             when(events.selectList(any(LambdaQueryWrapperX.class))).thenReturn(List.of(seen));
             assertTrue(service.reminders().isEmpty()); assertEquals(1, service.pending().size());
+            assertTrue(service.state().unreadTodoIds().isEmpty());assertEquals(1,service.state().pending().size());
             service.acknowledge(List.of(9L)); verify(events, times(1)).insert(any(ExamCollectionEventDO.class));
             verify(tasks, never()).updateById(any(ExamCollectionTaskDO.class));
             verify(business, never()).updateById(any(BusinessTaskDO.class));

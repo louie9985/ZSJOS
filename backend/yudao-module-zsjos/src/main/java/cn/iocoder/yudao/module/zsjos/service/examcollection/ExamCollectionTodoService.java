@@ -22,7 +22,7 @@ public class ExamCollectionTodoService {
     /** Changes of roster/lifecycle replace pending generations; submissions update the current generation. */
     @Transactional(propagation=Propagation.MANDATORY)
     public void synchronize(ExamCollectionTaskDO task, boolean replaceGeneration) {
-        var all = members.selectList(new LambdaQueryWrapperX<ExamCollectionMemberDO>().eq(ExamCollectionMemberDO::getTaskId, task.getId()));
+        var all = members.selectList(new LambdaQueryWrapperX<ExamCollectionMemberDO>().eq(ExamCollectionMemberDO::getTaskId, task.getId()).orderByAsc(ExamCollectionMemberDO::getId));
         var byPlanner = all.stream().filter(m -> m.getPlannerUserId() != null)
                 .collect(Collectors.groupingBy(ExamCollectionMemberDO::getPlannerUserId));
         var now = ExamCollectionPublicService.now();
@@ -36,7 +36,9 @@ public class ExamCollectionTodoService {
             if (collected == active.size()) {
                 commands.complete(TASK_TYPE, task.getId(), planner, now); continue;
             }
-            String classes = active.stream().map(ExamCollectionMemberDO::getClassNameSnapshot).distinct().collect(Collectors.joining("、"));
+            var classNames=active.stream().map(ExamCollectionMemberDO::getClassNameSnapshot).distinct().toList();
+            // BusinessTask.summary_snapshot is bounded; full frozen names remain in the planner read model.
+            String classes = classNames.stream().limit(2).collect(Collectors.joining("、"))+(classNames.size()>2?" 等 "+classNames.size()+" 个班级":"");
             String summary = "已收齐 " + collected + "/" + active.size() + " 人 · " + classes;
             var payload = new LinkedHashMap<String, Object>(); payload.put("collectionTaskId", task.getId());
             payload.put("revision", task.getRevision()); payload.put("classIds", active.stream().map(ExamCollectionMemberDO::getClassId).distinct().toList());

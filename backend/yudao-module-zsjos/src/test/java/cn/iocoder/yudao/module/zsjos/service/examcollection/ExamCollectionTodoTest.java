@@ -14,6 +14,17 @@ import static cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectio
 
 @SuppressWarnings("unchecked")
 class ExamCollectionTodoTest {
+    @Test void manyClassesKeepGenericSummaryWithinStorageLimitWithoutChangingSnapshots(){
+        var service=new ExamCollectionTodoService();var members=mock(ExamCollectionMemberMapper.class);var commands=mock(BusinessTaskCommandService.class);
+        ReflectionTestUtils.setField(service,"members",members);ReflectionTestUtils.setField(service,"commands",commands);
+        var task=new ExamCollectionTaskDO();task.setId(1L);task.setRevision(1);task.setStatus(OPEN);task.setTitle("合成任务");
+        var rows=new java.util.ArrayList<ExamCollectionMemberDO>();
+        for(int i=0;i<100;i++){var row=new ExamCollectionMemberDO();row.setId((long)i+1);row.setPlannerUserId(7L);row.setActive(true);row.setClassId((long)i+1);row.setClassNameSnapshot("长班级名称".repeat(30)+i);rows.add(row);}
+        when(members.selectList(any(LambdaQueryWrapperX.class))).thenReturn(rows);service.synchronize(task,true);
+        var created=ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);verify(commands).create(created.capture());
+        assertTrue(created.getValue().summary().length()<1000);assertTrue(created.getValue().summary().contains("等 100 个班级"));
+        assertEquals("长班级名称".repeat(30)+99,rows.get(99).getClassNameSnapshot());
+    }
     @Test void plannerGenerationProgressCompletionAndReopenUseExistingCommands() {
         var service = new ExamCollectionTodoService();
         var members = mock(ExamCollectionMemberMapper.class); var commands = mock(BusinessTaskCommandService.class);

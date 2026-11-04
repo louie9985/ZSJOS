@@ -38,6 +38,7 @@ for directory in ('service/examcollection', 'dal/dataobject/examcollection', 'da
                   'dal/dataobject/studentinfo', 'dal/mysql/studentinfo', 'controller/admin/examcollection', 'controller/pub/examcollection'):
     sources.extend((main / directory).rglob('*.java'))
 sources.extend([main / 'service/studentinfo/StudentInfoFields.java',
+                main / 'service/task/BusinessTaskCancellationService.java',
                 main / 'service/studentinfo/StudentSummaryService.java',
                 main / 'service/studentinfo/StudentArchiveService.java',
                 main / 'controller/admin/studentinfo/StudentArchiveController.java',
