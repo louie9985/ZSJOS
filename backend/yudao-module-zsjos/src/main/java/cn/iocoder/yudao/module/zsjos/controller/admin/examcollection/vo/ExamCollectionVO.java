@@ -76,6 +76,19 @@ public final class ExamCollectionVO {
         @NotNull @Min(0) private Integer revision;
         @NotBlank @Size(max=500) private String reason;
     }
+    @Data public static class Correction {
+        @NotNull @Min(0) private Integer revision, taskRevision, bindingRevision, sourceArchiveRevision, targetArchiveRevision;
+        @NotNull private Long serviceRelationId, latestSubmissionId;
+        @NotBlank @Size(max=500) private String reason;
+    }
+    @Data public static class CorrectionPreview {
+        private String sourceStudentName, targetStudentName;
+        private Integer revision, taskRevision, bindingRevision;
+        private Long latestSubmissionId;
+        private long submissionCount;
+        private Archive sourceArchive, restoredArchive, targetArchive;
+        private List<String> restoredFields, retainedFields;
+    }
     @Data public static class Archive {
         private Long serviceRelationId;
         private Integer revision;

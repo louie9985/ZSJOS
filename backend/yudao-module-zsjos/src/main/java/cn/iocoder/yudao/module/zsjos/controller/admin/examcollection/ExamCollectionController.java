@@ -22,6 +22,20 @@ public class ExamCollectionController {
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionRosterService roster;
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionResolutionService resolution;
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionQueryService queries;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionCorrectionService correction;
+    @GetMapping("/{id}/submissions/{submissionId}/correction-preview")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:resolve')")
+    public CommonResult<CorrectionPreview> correctionPreview(@PathVariable Long id, @PathVariable Long submissionId,
+            @RequestParam Long serviceRelationId, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(correction.preview(id, submissionId, serviceRelationId));
+    }
+    @PostMapping("/{id}/submissions/{submissionId}/correct")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:resolve')")
+    public CommonResult<Boolean> correct(@PathVariable Long id, @PathVariable Long submissionId, @Valid @RequestBody Correction request) {
+        correction.correct(id, submissionId, request); return success(true);
+    }
     @PostMapping("/{id}/members")
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:members')")

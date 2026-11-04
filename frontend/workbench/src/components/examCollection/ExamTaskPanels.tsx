@@ -49,7 +49,7 @@ export function ExamMembers({task,canAdjust,canResolve,onChanged}:{task:ExamTask
       onClose={()=>setChange(undefined)} onConfirm={async reason=>{await examCollectionApi.adjust(task.id,{revision:task.revision,addServiceIds:change.remove?[]:[change.candidate.serviceRelationId],removeServiceIds:change.remove?[change.candidate.serviceRelationId]:[],reason});setReload(v=>v+1);onChanged()}}/>}
   </>;
 }
-const eventLabels:Record<string,string>={NOTIFY:'通知班级',COMPLETE:'完成任务',REOPEN:'重新开启',ADJUST_MEMBERS:'调整名单',RESOLVE:'人工关联',INVALIDATE:'标记无效',REMINDER_SEEN:'已读提醒'};
+const eventLabels:Record<string,string>={NOTIFY:'通知班级',COMPLETE:'完成任务',REOPEN:'重新开启',ADJUST_MEMBERS:'调整名单',RESOLVE:'人工关联',CORRECT_BINDING:'纠正归属',INVALIDATE:'标记无效',REMINDER_SEEN:'已读提醒'};
 export function ExamEvents({taskId}:{taskId:number}){
   const [page,setPage]=useState(1),[rows,setRows]=useState<ExamEvent[]>([]),[total,setTotal]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState(''),[reload,setReload]=useState(0);
   useEffect(()=>{let active=true;setLoading(true);setError('');void examCollectionApi.events(taskId,{pageNo:page,pageSize:20}).then(v=>{if(active){setRows(v.list);setTotal(v.total)}}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[taskId,page,reload]);

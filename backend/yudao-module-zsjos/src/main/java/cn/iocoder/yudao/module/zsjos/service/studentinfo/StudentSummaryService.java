@@ -156,11 +156,11 @@ public class StudentSummaryService {
             .stream().collect(Collectors.toMap(StudentServiceArchiveRevisionDO::getServiceRelationId,Function.identity()));
         var lastExamRevisions=serviceRevisionMap.isEmpty()?List.<StudentServiceArchiveRevisionDO>of():serviceRevisions.selectList(new LambdaQueryWrapperX<StudentServiceArchiveRevisionDO>()
             .in(StudentServiceArchiveRevisionDO::getServiceRelationId,serviceRevisionMap.keySet()).eq(StudentServiceArchiveRevisionDO::getSource,"exam_submission")
-            .apply("revision=(SELECT MAX(r.revision) FROM zsjos_student_service_archive_revision r WHERE r.service_relation_id=zsjos_student_service_archive_revision.service_relation_id AND r.tenant_id=zsjos_student_service_archive_revision.tenant_id AND r.deleted=0 AND r.source='exam_submission')"));
+            .apply("revision=(SELECT MAX(r.revision) FROM zsjos_student_service_archive_revision r WHERE r.service_relation_id=zsjos_student_service_archive_revision.service_relation_id AND r.tenant_id=zsjos_student_service_archive_revision.tenant_id AND r.deleted=0 AND r.source='exam_submission' AND EXISTS (SELECT 1 FROM zsjos_exam_collection_submission s WHERE s.id=r.submission_id AND s.tenant_id=r.tenant_id AND s.task_id=r.task_id AND s.service_relation_id=r.service_relation_id AND s.status='ARCHIVED' AND s.deleted=0))"));
         var submissionIds=lastExamRevisions.stream().map(StudentServiceArchiveRevisionDO::getSubmissionId).filter(Objects::nonNull).toList();
         var submissionMap=submissionIds.isEmpty()?Map.<Long,ExamCollectionSubmissionDO>of():examSubmissions.selectByIds(submissionIds).stream().collect(Collectors.toMap(ExamCollectionSubmissionDO::getId,Function.identity()));
         var submittedTimes=new HashMap<Long,java.time.LocalDateTime>();
-        for(var revision:lastExamRevisions) { var submission=submissionMap.get(revision.getSubmissionId()); if(submission!=null) submittedTimes.put(revision.getServiceRelationId(),submission.getSubmittedAt()); }
+        for(var revision:lastExamRevisions) { var submission=submissionMap.get(revision.getSubmissionId()); if(submission!=null && Objects.equals(submission.getServiceRelationId(),revision.getServiceRelationId())) submittedTimes.put(revision.getServiceRelationId(),submission.getSubmittedAt()); }
         var bindings=summaryMapper.bindings(relationIds,TenantContextHolder.getRequiredTenantId()).stream()
             .filter(b->b.getFormId()!=null).collect(Collectors.toMap(StudentSummaryMapper.Binding::getServiceId,StudentSummaryMapper.Binding::getFormId));
         var formIds=new ArrayList<>(new HashSet<>(bindings.values()));

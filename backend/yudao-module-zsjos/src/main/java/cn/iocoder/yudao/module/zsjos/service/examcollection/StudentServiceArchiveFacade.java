@@ -140,11 +140,13 @@ public class StudentServiceArchiveFacade {
             var item = new History(); item.setSource("submission"); item.setTaskId(s.getTaskId()); item.setTaskTitle(taskNames.get(s.getTaskId()));
             item.setSubmissionId(s.getId()); item.setOperatorName("学员填写"); item.setModifiedAt(s.getSubmittedAt()); return item;
         }).toList());
-        rows.stream().filter(r -> r.getRevision() <= snapshot.revision() && "exam_submission".equals(r.getSource()))
-                .findFirst().ifPresent(r -> {
-                    var original = r.getSubmissionId() == null ? null : submissions.selectById(r.getSubmissionId());
-                    if (original != null && Objects.equals(original.getTaskId(), r.getTaskId())) info.setSubmittedAt(original.getSubmittedAt());
-                });
+        for (var revision : rows) if (revision.getRevision() <= snapshot.revision() && "exam_submission".equals(revision.getSource())) {
+            var original = revision.getSubmissionId() == null ? null : submissions.selectById(revision.getSubmissionId());
+            if (original != null && Objects.equals(original.getTaskId(), revision.getTaskId())
+                    && (!current || Objects.equals(original.getServiceRelationId(), relation.getId()))) {
+                info.setSubmittedAt(original.getSubmittedAt()); break;
+            }
+        }
         return result;
     }
     public Edit edit(Long id) {

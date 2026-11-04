@@ -178,6 +178,15 @@ if __name__ == '__main__':
         assert query(db, 'SELECT sr.id FROM fixture_exam_relations sr WHERE sr.tenant_id=1 '+condition+' ORDER BY sr.id') == ((1,), (2,))
         assert query(db, 'SELECT sr.id FROM fixture_exam_relations sr WHERE sr.tenant_id=1 '+condition.replace('AND EXISTS','AND NOT EXISTS',1)+' ORDER BY sr.id') == ((3,), (4,), (5,))
         print('PASS actual summary SQL recognizes exam archives, excludes draft/cross-tenant/wrong-person rows')
+        timestamp_condition = re.search(r'\.apply\("([^"\n]*r\.source=\'exam_submission\'[^"\n]*)"\)', java_source).group(1)
+        for sid, revision in [(900, 1), (901, 2)]:
+            query(db, "INSERT INTO zsjos_exam_collection_submission(id,task_id,session_token_hash,status,service_relation_id,expires_at,tenant_id) VALUES (%s,1,%s,'ARCHIVED',90,NOW(),1)", (sid, 'timestamp-fixture-'+str(sid)))
+            query(db, "INSERT INTO zsjos_student_service_archive_revision(service_relation_id,person_id,tenant_id,revision,task_id,submission_id,source,idempotency_key,request_hash,fields_snapshot,answers_json,attachments_json) VALUES (90,900,1,%s,1,%s,'exam_submission',%s,'synthetic','[]','synthetic-encrypted','[]')", (revision,sid,'timestamp-'+str(sid)))
+        timestamp_sql = "SELECT revision FROM zsjos_student_service_archive_revision WHERE service_relation_id=90 AND tenant_id=1 AND source='exam_submission' AND "+timestamp_condition
+        assert query(db, timestamp_sql) == ((2,),)
+        query(db, 'UPDATE zsjos_exam_collection_submission SET service_relation_id=91 WHERE id=901 AND tenant_id=1')
+        assert query(db, timestamp_sql) == ((1,),)
+        print('PASS corrected-away submission timestamp falls back to earlier valid archive')
         assert original == ledgers(SOURCE)
         assert grants == query(SOURCE, 'SELECT * FROM system_role_menu ORDER BY id')
         assert menus == query(SOURCE, 'SELECT * FROM system_menu ORDER BY id')

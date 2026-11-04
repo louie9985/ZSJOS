@@ -122,8 +122,10 @@ class StudentServiceArchiveFacadeTest {
         var revision=new StudentServiceArchiveRevisionDO();revision.setRevision(2);revision.setTaskId(1L);revision.setSubmissionId(5L);revision.setSource("exam_submission");
         revision.setCreateTime(java.time.LocalDateTime.of(2026,11,5,12,0));
         when(revisions.selectList(any(LambdaQueryWrapperX.class))).thenReturn(List.of(revision));
-        var original=new ExamCollectionSubmissionDO();original.setId(5L);original.setTaskId(1L);original.setSubmittedAt(java.time.LocalDateTime.of(2026,11,4,9,0));
+        var original=new ExamCollectionSubmissionDO();original.setId(5L);original.setTaskId(1L);original.setServiceRelationId(10L);original.setSubmittedAt(java.time.LocalDateTime.of(2026,11,4,9,0));
         when(submissions.selectById(5L)).thenReturn(original);
         assertEquals(original.getSubmittedAt(),facade.detail(10L,false).getInformation().getSubmittedAt());
+        original.setServiceRelationId(99L);
+        assertNotEquals(original.getSubmittedAt(),facade.detail(10L,false).getInformation().getSubmittedAt());
     }
 }

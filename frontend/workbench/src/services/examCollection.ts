@@ -11,6 +11,8 @@ export interface ExamSubmissionDetail extends ExamSubmission { fields:StudentInf
 export interface ExamCandidate { serviceRelationId:number; personId:number; studentName:string; mobile?:string; classId?:number; className?:string; serviceStatus:string }
 export interface ExamMember extends Omit<ExamCandidate,'serviceStatus'> { plannerName?:string; active:boolean; lastSubmissionId?:number }
 export interface ExamArchive { serviceRelationId:number; revision:number; fields:StudentInfoField[]; values:Record<string,string>; attachments:(StudentInfoImage & {source:'registration'|'exam'|'service'})[] }
+export interface ExamCorrectionPreview {sourceStudentName?:string;targetStudentName?:string;revision:number;taskRevision:number;bindingRevision:number;latestSubmissionId:number;submissionCount:number;sourceArchive:ExamArchive;restoredArchive:ExamArchive;targetArchive:ExamArchive;restoredFields:string[];retainedFields:string[]}
+export interface ExamCorrectionCommand {revision:number;taskRevision:number;bindingRevision:number;latestSubmissionId:number;sourceArchiveRevision:number;targetArchiveRevision:number;serviceRelationId:number;reason:string}
 export interface ExamEvent { id:number; submissionId?:number; action:string; reason:string; operatorName:string; time:Timestamp }
 export interface ExamTodo { todoId:number; collectionTaskId:number; title:string; classes:string[]; expected:number; collected:number; url:string }
 export interface ExamPlannerState { pending:ExamTodo[]; unreadTodoIds:number[] }
@@ -38,6 +40,8 @@ export const examCollectionApi={
   candidates:(id:number,params:Paging & {keyword?:string;classId?:number})=>get<Page<ExamCandidate>>(`${task(id)}/candidates`,params),
   archive:(id:number,relationId:number)=>get<ExamArchive>(`${task(id)}/archive/${relationId}`),
   resolve:(id:number,submissionId:number,data:{revision:number;serviceRelationId:number;archiveRevision:number;reason:string})=>post<boolean>(`${task(id)}/submissions/${submissionId}/resolve`,data),
+  correctionPreview:(id:number,submissionId:number,serviceRelationId:number)=>get<ExamCorrectionPreview>(`${task(id)}/submissions/${submissionId}/correction-preview`,{serviceRelationId}),
+  correct:(id:number,submissionId:number,data:ExamCorrectionCommand)=>post<boolean>(`${task(id)}/submissions/${submissionId}/correct`,data),
   invalidate:(id:number,submissionId:number,data:{revision:number;reason:string})=>post<boolean>(`${task(id)}/submissions/${submissionId}/invalidate`,data),
   events:(id:number,params:Paging)=>get<Page<ExamEvent>>(`${task(id)}/events`,params),
   attachment:async(id:number,submissionId:number,file:StudentInfoImage)=>{

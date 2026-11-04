@@ -6,6 +6,7 @@ import { examCollectionApi, examExceptionLabels, examSubmissionLabels, type Exam
 import { studentInfoError } from '../../services/studentInfo';
 import { formatTimestamp } from '../../services/time';
 import { ExamCandidatePicker, ExamReasonDialog } from './ExamCollectionDialogs';
+import ExamCorrectionDialog from './ExamCorrectionDialog';
 
 export default function ExamSubmissionViewer({taskId,submissionId,canResolve,onClose,onChanged}:{taskId:number;submissionId:number;canResolve:boolean;onClose:()=>void;onChanged:()=>void}){
   useBusinessOverlay(true);
@@ -13,6 +14,7 @@ export default function ExamSubmissionViewer({taskId,submissionId,canResolve,onC
   const [picker,setPicker]=useState(false),[target,setTarget]=useState<ExamCandidate>(),[archive,setArchive]=useState<ExamArchive>();
   const [targetLoading,setTargetLoading]=useState(false),[targetError,setTargetError]=useState(''),[targetReload,setTargetReload]=useState(0);
   const [reason,setReason]=useState(''),[busy,setBusy]=useState(false),[operationError,setOperationError]=useState(''),[invalidating,setInvalidating]=useState(false);
+  const [correcting,setCorrecting]=useState(false);
   useEffect(()=>{let active=true;setLoading(true);setError('');setData(undefined);setTarget(undefined);setArchive(undefined);setReason('');setOperationError('');
     void examCollectionApi.submission(taskId,viewId).then(v=>{if(active)setData(v)}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[taskId,viewId,reload]);
   useEffect(()=>{let active=true;setArchive(undefined);setTargetError('');if(!target)return;setTargetLoading(true);
@@ -31,6 +33,7 @@ export default function ExamSubmissionViewer({taskId,submissionId,canResolve,onC
   return <>
     <Modal open title="原始填写资料" width={1040} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={{container:{maxHeight:'calc(100dvh - 32px)',display:'flex',flexDirection:'column'},body:{overflowY:'auto',minHeight:0},footer:{flexShrink:0}}}
       onCancel={()=>{if(!busy)onClose()}} maskClosable={false} footer={<Space wrap>
+        {canResolve&&data?.status==='ARCHIVED'&&<Button danger onClick={()=>setCorrecting(true)}>纠正归属</Button>}
         {canResolve&&data?.status==='EXCEPTION'&&<><Button danger disabled={busy} onClick={()=>setInvalidating(true)}>标记无效</Button><Button disabled={busy||!latest} onClick={()=>setPicker(true)}>{target?'重新选择归属':'选择学员归属'}</Button><Button type="primary" loading={busy} disabled={!archive||targetLoading||!latest} onClick={()=>void resolve()}>确认关联并更新档案</Button></>}
         <Button disabled={busy} onClick={onClose}>关闭</Button>
       </Space>}>
@@ -52,5 +55,6 @@ export default function ExamSubmissionViewer({taskId,submissionId,canResolve,onC
     </Modal>
     {picker&&<ExamCandidatePicker taskId={taskId} onClose={()=>setPicker(false)} onSelect={v=>{setTarget(v);setPicker(false);setOperationError('')}}/>}
     {invalidating&&data&&<ExamReasonDialog title="标记为无效提交" description="原始填写内容和材料仍会保留，此提交不再计入待处理异常。" onClose={()=>setInvalidating(false)} onConfirm={async reason=>{await examCollectionApi.invalidate(taskId,data.id,{revision:data.revision,reason});onChanged();onClose()}}/>}
+    {correcting&&data&&<ExamCorrectionDialog taskId={taskId} submissionId={data.id} onClose={()=>setCorrecting(false)} onSaved={()=>{onChanged();onClose()}}/>}
   </>;
 }
