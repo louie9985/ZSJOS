@@ -21,6 +21,7 @@ public class SalesOrderSnapshot {
     private Map<String, Selection> selections = new LinkedHashMap<>();
     private Actor submitter;
     private Actor formalSales;
+    private Long associatedLeadId;
     private SalesOrderRespVO.LeadProfileVO leadProfile;
 
     public record Actor(String subjectType, Long id, String name, String identity) {}
@@ -175,6 +176,7 @@ public class SalesOrderSnapshot {
     }
 
     public void apply(SalesOrderRespVO target) {
+        target.setAssociatedLeadId(associatedLeadId);
         target.setLeadProfile(leadProfile);
         target.setSubmitterUserName(submitter == null ? null : submitter.name());
         target.setFormalSalesUserName(formalSales == null ? null : formalSales.name());

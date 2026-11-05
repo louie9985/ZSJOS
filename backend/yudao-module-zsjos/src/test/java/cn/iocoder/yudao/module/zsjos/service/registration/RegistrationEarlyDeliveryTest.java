@@ -64,9 +64,18 @@ class RegistrationEarlyDeliveryTest {
         var req=new RegistrationVersionReqVO();req.setVersion(3);req.setIdempotencyKey("unsent");
         assertThrows(ServiceException.class,()->service.complete(1L,7L,req));
         var form=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
-        form.setStatus("SUBMITTED");when(informationForms.byCase(1L)).thenReturn(form);
+        form.setStatus("DRAFT");when(informationForms.byCase(1L)).thenReturn(form);
         assertThrows(ServiceException.class,()->service.complete(1L,7L,req));
         verifyNoInteractions(serviceRelationMapper);
+    }
+
+    @Test void submittedWithoutManualSentConfirmationCanComplete() {
+        var form = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
+        form.setStatus("SUBMITTED"); form.setSubmitSource("public");
+        when(informationForms.byCase(1L)).thenReturn(form);
+        completionPreservesAcceptedOrTransferredService("active");
+        assertNull(form.getSentAt());
+        assertNull(form.getSentByUserId());
     }
 
     @ParameterizedTest @ValueSource(strings={"active","paused","completed"})

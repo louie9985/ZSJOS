@@ -1131,3 +1131,8 @@ Sales/education self-sourced create permissions authorize the explicitly confirm
 ## Employee provider customer order history (2026-11-04)
 
 Within existing feature and Lead sales-history-read authorization, the system-user provider of that Lead may read every order for its current Person, including repurchases from merged origins. Assisted-entry submitters and Partner identities do not inherit this relationship. Other viewers retain original-origin/independent-order checks. This read-only exception does not expand general order scopes, commands, exports or performance attribution. See [order contract](../api/zsjos-sales-order.md).
+
+
+## Order Lead association projection (2026-11-05)
+
+Explicit user-approved exception: existing order-create permission plus exact customer identity verification permits the order-entry candidate projection to read all non-deleted Leads for that same Person in the current tenant, including otherwise unreadable and closed Leads. Lead/student repurchase contexts retain their original command/object scopes. The candidate API returns the complete order customer-profile projection and current Lead status; it grants no ordinary Lead route/list/write access. Both Workbench and the existing Admin customer-entry consumer use it. No role assignments change. The association and captured profile live in the order approval snapshot, independently of transaction leadId, ownership, cashback and Lead lifecycle. First purchase is unchanged. See [order contract](../api/zsjos-sales-order.md).

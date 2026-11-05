@@ -80,6 +80,8 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipDO;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
@@ -249,6 +251,77 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 "education".equals(identity) ? SUBMITTER_CENTER_STUDENT_DELIVERY : SUBMITTER_CENTER_SALES, identity);
     }
 
+    @Override
+    public List<OrderLeadCandidateRespVO> customerLeadCandidates(Long userId, RepurchaseCustomerCheckReqVO req) {
+        var checked = repurchaseCustomers.checkCustomer(userId, req);
+        if (!checked.isCanRepurchase()) {
+            if ("REPURCHASE_BLOCKED".equals(checked.getMatchStatus())) throw exception(SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE);
+            if ("MULTIPLE_MATCH".equals(checked.getMatchStatus())) throw exception(SALES_ORDER_REPURCHASE_MULTIPLE_MATCH);
+            throw exception(SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT);
+        }
+        return checked.getPersonId() == null ? List.of() : associationCandidates(checked.getPersonId());
+    }
+
+    @Override
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "enter-deal")
+    public List<OrderLeadCandidateRespVO> leadRepurchaseCandidates(Long leadId, Long userId) {
+        return associationCandidates(requireRepurchaseLead(leadId, userId).getPersonId());
+    }
+
+    @Override
+    @ZsjosPermission(bizType = "student", bizId = "#personId", action = "repurchase")
+    public List<OrderLeadCandidateRespVO> studentRepurchaseCandidates(Long personId, Long userId) {
+        if (serviceRelationMapper.selectOwnedRepurchaseEligibleByPersonForUpdate(userId, personId,
+                TenantContextHolder.getRequiredTenantId()).isEmpty()) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        return associationCandidates(personId);
+    }
+
+    private List<OrderLeadCandidateRespVO> associationCandidates(Long personId) {
+        var leads = leadMapper.selectOrderAssociationCandidates(personId, TenantContextHolder.getRequiredTenantId());
+        if (leads.isEmpty()) return List.of();
+        Set<Long> partnerIds = new LinkedHashSet<>();
+        Set<Long> userIds = new LinkedHashSet<>();
+        for (LeadDO lead : leads) {
+            if (lead.getSourceUserId() != null) userIds.add(lead.getSourceUserId());
+            if (lead.getOwnerUserId() != null) userIds.add(lead.getOwnerUserId());
+            if (SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null) partnerIds.add(lead.getPartnerId());
+        }
+        var partners = partnerIds.isEmpty() ? Map.<Long, PartnerDO>of() : partnerMapper.selectBatchIds(partnerIds).stream()
+                .collect(Collectors.toMap(PartnerDO::getId, partner -> partner));
+        var ownerships = partnerIds.isEmpty() ? Map.<Long, PartnerOwnershipDO>of() : partnerOwnershipService.getByPartnerIds(partnerIds).stream()
+                .collect(Collectors.toMap(PartnerOwnershipDO::getPartnerId, owner -> owner));
+        for (var owner : ownerships.values()) {
+            if (owner.getEmployeeUserId() != null) userIds.add(owner.getEmployeeUserId());
+        }
+        var users = userIds.isEmpty() ? Map.<Long, AdminUserRespDTO>of() : adminUserApi.getUserMap(userIds);
+        return leads.stream().map(lead -> new OrderLeadCandidateRespVO(lead.getId(), lead.getStatus(),
+                buildLeadProfile(lead, users, lead.getPartnerId() == null ? null : partners.get(lead.getPartnerId()),
+                        lead.getPartnerId() == null ? null : ownerships.get(lead.getPartnerId())))).toList();
+    }
+
+    private SalesOrderSnapshot resolveAssociation(Long personId, Long selectedId, Long contextLeadId) {
+        var candidates = leadMapper.selectOrderAssociationCandidates(personId, TenantContextHolder.getRequiredTenantId());
+        if (contextLeadId != null && selectedId != null && !Objects.equals(contextLeadId, selectedId))
+            throw exception(SALES_ORDER_ASSOCIATION_CHANGED);
+        Long requested = contextLeadId != null ? contextLeadId : selectedId;
+        LeadDO selected = selectAssociation(candidates, requested);
+        var snapshot = new SalesOrderSnapshot();
+        if (selected != null) {
+            // Capture the relation at query time. Locking Lead here after Person reverses
+            // the existing Lead-entry lock order and can deadlock concurrent repurchases.
+            snapshot.setAssociatedLeadId(selected.getId());
+            snapshot.setLeadProfile(buildLeadProfile(selected));
+        }
+        return snapshot;
+    }
+
+    static LeadDO selectAssociation(List<LeadDO> candidates, Long requested) {
+        if (requested != null) return candidates.stream().filter(lead -> Objects.equals(lead.getId(), requested))
+                .findFirst().orElseThrow(() -> exception(SALES_ORDER_ASSOCIATION_CHANGED));
+        if (candidates.size() > 1) throw exception(SALES_ORDER_ASSOCIATION_REQUIRED);
+        return candidates.isEmpty() ? null : candidates.getFirst();
+    }
+
     private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
                                   SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder) {
         return createRepurchase(personId, sourceLeadId, formalSalesUserId, userId, reason, submission,
@@ -294,6 +367,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (orderMapper.selectActiveRepurchaseByPersonId(personId, ACTIVE_ORDER_STATUSES) != null) {
             throw exception(SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE);
         }
+        // Capture before profile updates; this association never becomes the transaction lead.
+        SalesOrderSnapshot association = resolveAssociation(personId, submission.getAssociatedLeadId(), contactLeadId);
         ValidatedSubmission validated = validateSubmission(submission, userId, List.of());
         repurchaseDuplicateGuard.check(personId, submission);
         PaymentIntentDO paymentIntent = validatePurchaseIntent(submission, validated.total(), personId, null);
@@ -319,7 +394,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         createDealCashbacks(sourceLeadId, order.getId(), createdItems, validated.items());
         if (submission.getProfileUpdate() != null) orderProfileService.apply(order, submission.getProfileUpdate(), userId);
         else contactCompletionService.complete(order, contactLeadId, userId);
-        startRound(order, null, userId, submission.getIdempotencyKey(), validated, 1, now);
+        startRound(order, null, userId, submission.getIdempotencyKey(), validated, 1, now, association);
         return order.getId();
     }
 
@@ -421,7 +496,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         createDealCashbacks(successor.getLeadId(), successor.getId(), createdItems, validated.items());
         if (reqVO.getProfileUpdate() != null) orderProfileService.apply(successor, reqVO.getProfileUpdate(), userId);
         else contactCompletionService.complete(successor, successor.getLeadId(), userId);
-        startRound(successor, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
+        startRound(successor, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now,
+                ORDER_TYPE_REPURCHASE.equals(order.getOrderType()) && latest != null
+                        ? SalesOrderSnapshot.read(latest.getOrderSnapshot(), order) : null);
         if (latest != null) businessTaskCommandService.completeByKey(TASK_REVISION_KEY_PREFIX + latest.getId(), now);
         if (lead != null) publicSeaPoolService.markDealPending(lead.getId(), userId, now);
         return successor.getId();
@@ -1226,6 +1303,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,
                             ValidatedSubmission validated, int roundNo, LocalDateTime now) {
+        startRound(order, opportunity, userId, idempotencyKey, validated, roundNo, now, null);
+    }
+
+    private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,
+                            ValidatedSubmission validated, int roundNo, LocalDateTime now, SalesOrderSnapshot association) {
         // Collection starts with the order's review round, independently of approval and fulfillment.
         studentInfoTaskService.ensureForOrder(order.getId());
         SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
@@ -1254,7 +1336,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
         round.setOrderId(order.getId()); round.setRoundNo(roundNo); round.setStatus(ROUND_PENDING);
-        round.setOrderSnapshot(buildOrderSnapshot(order, validated)); round.setProcessInstanceId(processInstanceId);
+        String orderSnapshot = buildOrderSnapshot(order, validated);
+        if (association != null && ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
+            var captured = SalesOrderSnapshot.read(orderSnapshot);
+            captured.setAssociatedLeadId(association.getAssociatedLeadId());
+            captured.setLeadProfile(association.getLeadProfile());
+            orderSnapshot = JsonUtils.toJsonString(captured);
+        }
+        round.setOrderSnapshot(orderSnapshot); round.setProcessInstanceId(processInstanceId);
         round.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); round.setSubmittedByUserId(userId);
         round.setSubmittedAt(now); round.setSubmissionIdempotencyKey(idempotencyKey);
         round.setSupervisorConfirmationEnabled(true); round.setVersion(0); roundMapper.insert(round);
@@ -1695,6 +1784,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setStudentSpecialRequirements(order.getStudentSpecialRequirements()); result.setMaterialDeliveryContact(order.getMaterialDeliveryContact());
         result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
         history.apply(result);
+        applyLeadSubmittedAtFallback(result);
         applyRecordedFeeModeLabel(result, order);
         applyRecordedPaymentMethodLabel(result, order);
         result.setGiftItems(order.getGiftItems()); result.setGiftShippingAddress(order.getGiftShippingAddress());
@@ -1748,6 +1838,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return result;
     }
 
+    private void applyLeadSubmittedAtFallback(SalesOrderRespVO result) {
+        var profile = result.getLeadProfile();
+        if (profile == null || profile.getSubmittedAt() != null || result.getLeadId() == null) return;
+        // Legacy snapshots predate this field. Read only the original Lead creation time;
+        // never rebuild mutable profile facts or persist changes to the approval snapshot.
+        LeadDO lead = leadMapper.selectById(result.getLeadId());
+        if (lead != null) profile.setSubmittedAt(lead.getCreateTime());
+    }
+
     private String dictLabel(String type, String value) {
         if (StrUtil.isBlank(value)) return null;
         List<DictDataRespDTO> data = dictDataApi.getDictDataList(type);
@@ -1759,13 +1858,32 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (order.getLeadId() == null) return null;
         LeadDO lead = leadMapper.selectById(order.getLeadId());
         if (lead == null) return null;
+        return buildLeadProfile(lead);
+    }
+
+    private SalesOrderRespVO.LeadProfileVO buildLeadProfile(LeadDO lead) {
         Set<Long> userIds = new LinkedHashSet<>();
         if (lead.getSourceUserId() != null) userIds.add(lead.getSourceUserId());
         if (lead.getOwnerUserId() != null) userIds.add(lead.getOwnerUserId());
         Map<Long, AdminUserRespDTO> users = userIds.isEmpty() ? Map.of() : adminUserApi.getUserMap(userIds);
 
+        PartnerDO partner = SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null
+                ? partnerMapper.selectById(lead.getPartnerId()) : null;
+        var ownership = SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null
+                ? partnerOwnershipService.getByPartnerId(lead.getPartnerId()) : null;
+        if (ownership != null && ownership.getEmployeeUserId() != null) {
+            users = new HashMap<>(users);
+            AdminUserRespDTO employee = adminUserApi.getUser(ownership.getEmployeeUserId());
+            if (employee != null) users.put(ownership.getEmployeeUserId(), employee);
+        }
+        return buildLeadProfile(lead, users, partner, ownership);
+    }
+
+    private SalesOrderRespVO.LeadProfileVO buildLeadProfile(LeadDO lead, Map<Long, AdminUserRespDTO> users,
+            PartnerDO partner, PartnerOwnershipDO ownership) {
         SalesOrderRespVO.LeadProfileVO result = new SalesOrderRespVO.LeadProfileVO();
         result.setLeadNo(lead.getLeadNo());
+        result.setSubmittedAt(lead.getCreateTime());
         result.setSubmittedName(lead.getSubmittedName());
         result.setSubmittedMobile(lead.getSubmittedMobile());
         result.setSubmittedWechatId(lead.getSubmittedWechatId());
@@ -1785,7 +1903,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setSelfSourcedWithoutProvider(Boolean.TRUE.equals(lead.getSourceProviderRecorded())
                 ? selfSourcedWithoutProvider : null);
         if (SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null) {
-            PartnerDO partner = partnerMapper.selectById(lead.getPartnerId());
             result.setSourceUserName(partner == null ? null : partner.getName());
         } else if (!selfSourcedWithoutProvider) {
             result.setSourceUserName(userName(users, lead.getSourceUserId()));
@@ -1793,10 +1910,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (SOURCE_PARTNER.equals(lead.getSourceType())) {
             // Capture only on submission; reads must never reconstruct historical ownership.
             SalesOrderRespVO.PartnerOwnerSnapshotVO owner = new SalesOrderRespVO.PartnerOwnerSnapshotVO();
-            var ownership = lead.getPartnerId() == null ? null : partnerOwnershipService.getByPartnerId(lead.getPartnerId());
             if (ownership != null && ownership.getEmployeeUserId() != null) {
                 owner.setEmployeeUserId(ownership.getEmployeeUserId());
-                AdminUserRespDTO employee = adminUserApi.getUser(ownership.getEmployeeUserId());
+                AdminUserRespDTO employee = users.get(ownership.getEmployeeUserId());
                 owner.setEmployeeName(employee == null ? ownership.getEmployeeNameSnapshot() : employee.getNickname());
             }
             result.setPartnerOwnerSnapshot(owner);
@@ -2097,7 +2213,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     private String userName(Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users, Long userId) {
-        var user = users.get(userId);
+        var user = userId == null ? null : users.get(userId);
         return user == null ? null : user.getNickname();
     }
 

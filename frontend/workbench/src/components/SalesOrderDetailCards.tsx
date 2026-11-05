@@ -1,12 +1,12 @@
+import OrderLeadProfile from './OrderLeadProfile'
 import { giftSummary } from '../services/orderGifts'
 import BusinessTable from './BusinessTable'
 import ProductSpecs from './ProductSpecs'
-import { useState } from 'react'
 import { Alert, Button, Empty, Image, Space, Tag, Timeline, Typography } from 'antd'
-import { CheckOutlined, CloseOutlined, CopyOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem, type SalesOrderSupervisorApproval, type SalesOrderSupervisorConfirmation } from '../services/api'
 import { formatTimestamp } from '../services/time'
-import { canReviewSalesOrderTask, orderPartnerOwnerText, orderSourcePersonText } from '../services/salesOrder'
+import { canReviewSalesOrderTask } from '../services/salesOrder'
 import DetailFieldGrid from './DetailFieldGrid'
 import SalesOrderInformationTable from './SalesOrderInformationTable'
 import SalesOrderVoucherAttachments from './SalesOrderVoucherAttachments'
@@ -23,18 +23,6 @@ export const SALES_ORDER_TASK_LABELS: Record<string, string> = {
 const TASK_STATUS_LABELS: Record<number, string> = { 1: '审批中', 2: '审批通过', 3: '审批不通过', 4: '已取消', 5: '已退回', 7: '审批通过中' }
 const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消' }
 const APPROVAL_NODE_STATUS_COLORS: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', cancelled: 'default' }
-
-function CopyButton({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false)
-  const copy = async () => {
-    await navigator.clipboard.writeText(value)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1500)
-  }
-  return <button type="button" className={`lead-field-copy-btn ${copied ? 'copied' : ''}`} onClick={copy} title="复制">
-    <CopyOutlined/>
-  </button>
-}
 
 type ApprovalNode = {
   key: 'registration' | 'finance'
@@ -151,11 +139,6 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
     }
   ]
   const leadProfile = order.leadProfile
-  const sourceDispatchTag = leadProfile?.sourceType === 'internal_new_media' && leadProfile.dispatchMode === 'auto'
-    ? { label: '自动分配', color: 'blue' as const }
-    : leadProfile?.sourceType === 'internal_new_media' && leadProfile.dispatchMode === 'specified'
-      ? { label: '指定派单', color: 'orange' as const }
-      : undefined
   const hasApprovalActions = Boolean((mode === 'mine' && (
     ((order.status === 'revision_required') && order.canRevise && onRevise)
     || (order.canTerminate && onTerminate)
@@ -195,26 +178,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
         <section className="sales-order-information">
       {leadProfile && <section className="sales-order-info-block sales-order-info-block-wide">
         <div className="sales-order-section-heading"><Typography.Text strong>客户档案</Typography.Text></div>
-        <div className="lead-profile-fields">
-          <div className="lead-profile-row"><span className="lead-field-label">姓名</span><span className="lead-field-value">{leadProfile.submittedName}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">客资编号</span><span className="lead-field-value">{leadProfile.leadNo}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">手机号</span>{leadProfile.submittedMobile
-            ? <span className="lead-field-copyable"><span className="lead-field-value">{leadProfile.submittedMobile}</span><CopyButton value={leadProfile.submittedMobile}/></span>
-            : <span className="lead-field-value lead-field-empty">未填写</span>}</div>
-          <div className="lead-profile-row"><span className="lead-field-label">微信号</span>{leadProfile.submittedWechatId
-            ? <span className="lead-field-copyable"><span className="lead-field-value">{leadProfile.submittedWechatId}</span><CopyButton value={leadProfile.submittedWechatId}/></span>
-            : <span className="lead-field-value lead-field-empty">未填写</span>}</div>
-        </div>
-        <div className="lead-profile-meta">
-          <div className="lead-profile-row"><span className="lead-field-label">成交归属身份</span><span className="lead-field-value">{order.formalOwnerIdentityLabel || '未记录'}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">业务来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
-          <div className="lead-profile-row sales-order-source-person"><span className="lead-field-label">来源人员</span><span className="lead-field-value">{orderSourcePersonText(leadProfile.sourceType, leadProfile.sourceUserName, leadProfile.selfSourcedWithoutProvider)}</span></div>
-          {leadProfile.sourceType === 'partner' && <div className="lead-profile-row sales-order-partner-owner"><span className="lead-field-label">兼职归属新媒体员工</span><span className="lead-field-value">{orderPartnerOwnerText(leadProfile.sourceType, leadProfile.partnerOwnerSnapshot)}</span></div>}
-          <div className="lead-profile-row"><span className="lead-field-label">负责人</span><span className="lead-field-value">{leadProfile.ownerUserName || '历史未记录'}{leadProfile.ownerIdentity && ` · ${leadProfile.ownerIdentityLabel}`}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || "历史未记录"}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">渠道</span><span className="lead-field-value">{leadProfile.sourceChannelLabelSnapshot || "历史未记录"}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">地区</span><span className="lead-field-value">{[leadProfile.provinceName, leadProfile.cityName].filter(Boolean).join(' / ') || '-'}</span></div>
-        </div>
+        <OrderLeadProfile leadProfile={leadProfile} formalOwnerIdentityLabel={order.formalOwnerIdentityLabel} table={tableLayout}/>
       </section>}
       <section className="sales-order-info-block">
         <div className="sales-order-section-heading"><Typography.Text strong>订单概览</Typography.Text></div>

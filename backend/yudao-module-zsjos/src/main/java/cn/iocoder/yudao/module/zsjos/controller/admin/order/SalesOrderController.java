@@ -32,6 +32,25 @@ public class SalesOrderController {
     @Resource private cn.iocoder.yudao.module.zsjos.service.lead.PersonMergeIdentityService mergedIdentity;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.RepurchaseSubmissionService repurchaseSubmission;
 
+    @PostMapping("/repurchase/lead-candidates")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<java.util.List<OrderLeadCandidateRespVO>> customerLeadCandidates(@Valid @RequestBody RepurchaseCustomerCheckReqVO req) {
+        return success(orderService.customerLeadCandidates(WebFrameworkUtils.getLoginUserId(), req));
+    }
+
+    @GetMapping("/lead/{leadId}/repurchase/lead-candidates")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<java.util.List<OrderLeadCandidateRespVO>> leadCandidates(@PathVariable Long leadId) {
+        return success(orderService.leadRepurchaseCandidates(leadId, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/student/{personId}/repurchase/lead-candidates")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:student-repurchase')")
+    public CommonResult<java.util.List<OrderLeadCandidateRespVO>> studentCandidates(@PathVariable Long personId) {
+        return success(orderService.studentRepurchaseCandidates(mergedIdentity.resolve(personId), WebFrameworkUtils.getLoginUserId()));
+    }
+
     @PostMapping("/repurchase/check-customer")
     @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "复购录单前精确识别客户及校验资格")

@@ -15,6 +15,8 @@ import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import PaymentQrCard from './PaymentQrCardModal'
 import OrderProfileConfirmModal, { profileDifferences } from './OrderProfileConfirmModal'
+import OrderLeadSelectionModal from './OrderLeadSelectionModal'
+import type { OrderLeadCandidate } from '../services/api'
 import type { OrderProfile, OrderProfileField } from '../services/api'
 
 type Values = {
@@ -68,9 +70,10 @@ export type SalesOrderEntryLead = {
   primaryProduct?: { spuRef?: string; skuRef?: string }
 }
 
-export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, customerRepurchase, studentRepurchase, open, onClose, onSubmitted }: {
+export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, customerRepurchase, studentRepurchase, associationChecked = false, selectedLeadId, open, onClose, onSubmitted }: {
   lead: SalesOrderEntryLead; orderId?: number; repurchase?: boolean
   externalCustomer?: { customerName: string; customerMobile?: string; customerWechatId?: string; expectedPersonId?: number }
+  associationChecked?: boolean; selectedLeadId?: number
   customerRepurchase?: boolean
   studentRepurchase?: boolean
   open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
@@ -86,6 +89,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [loadError, setLoadError] = useState('')
   const [vouchers, setVouchers] = useState<DeferredUploadItem<SalesOrderVoucher>[]>([])
+  const [candidates, setCandidates] = useState<OrderLeadCandidate[]>([])
+  const [associatedLeadId, setAssociatedLeadId] = useState<number>()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [profile, setProfile] = useState<OrderProfile>()
   const [profileFields, setProfileFields] = useState<OrderProfileField[]>([])
@@ -185,7 +190,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     setProfileLoading(false); setProfile(undefined)
     if (!open) return
     resetIntent(); submittedDraft.current = undefined
-    setConfirmOpen(false); setPendingValues(undefined)
+    setConfirmOpen(false); setPendingValues(undefined); setAssociatedLeadId(undefined); setCandidates([])
     form.resetFields(); setVouchers([]); void load()
   }, [open, lead.id, orderId, resetIntent])
 
@@ -249,6 +254,16 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       if (requestId !== profileRequest.current) return
       setProfile(current)
       setProfileFields(profileDifferences(current, { name: values.studentName, mobile: values.mobile, wechatId: values.wechatId }).map(f => f.key))
+      if (repurchase && !orderId && studentRepurchase) {
+        const matches = await api.orderLeadCandidates(externalCustomer ? { identity: externalCustomer }
+          : studentRepurchase ? { personId: lead.id } : { leadId: lead.id })
+        if (requestId !== profileRequest.current) return
+        setCandidates(matches)
+        const selected = !externalCustomer && !studentRepurchase ? matches.find(item => item.id === lead.id)?.id
+          : matches.length === 1 ? matches[0].id : undefined
+        setAssociatedLeadId(selected)
+        setPendingValues(values)
+      }
       setPendingValues(values); setConfirmOpen(true)
     } catch (error) { if (requestId === profileRequest.current) message.error(errorText(error)) }
     finally { if (requestId === profileRequest.current) setProfileLoading(false) }
@@ -262,7 +277,11 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     const region = findRegion(areas, values.regionPath)
     if (!region.provinceName) { message.warning('请选择有效省市'); return }
     await runSubmission(async ({ idempotencyKey, complete }) => {
+      let submissionLeadId = associatedLeadId
+      if (associationChecked) submissionLeadId = selectedLeadId
+      else if (!studentRepurchase && !externalCustomer) submissionLeadId = lead.id
       const request: SalesOrderSubmitRequest = {
+        associatedLeadId: repurchase && !orderId ? submissionLeadId : undefined,
         profileUpdate: profile ? { fingerprint: profile.fingerprint, fields: profileFields } : undefined,
         refreshedDictionaryFields, buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
         studentMobile: values.mobile.trim(), studentWechatId: values.wechatId.trim(),
@@ -402,6 +421,10 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   </Modal><OrderProfileConfirmModal open={open && confirmOpen} profile={profile}
     incoming={{ name: pendingValues?.studentName || '', mobile: pendingValues?.mobile || '', wechatId: pendingValues?.wechatId || '' }}
     fields={profileFields} onFieldsChange={setProfileFields} loading={saving}
-    onCancel={() => setConfirmOpen(false)} onConfirm={() => void submit()}/></>
+    confirmDisabled={candidates.length > 0 && associatedLeadId === undefined}
+    onCancel={() => setConfirmOpen(false)} onConfirm={() => void submit()}>
+    {candidates.length > 0 && <OrderLeadSelectionModal candidates={candidates} selectedId={associatedLeadId}
+      onSelect={setAssociatedLeadId} disabled={saving}/>}
+  </OrderProfileConfirmModal></>
 }
 

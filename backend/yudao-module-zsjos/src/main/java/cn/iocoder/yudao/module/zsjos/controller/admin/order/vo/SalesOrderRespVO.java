@@ -81,6 +81,7 @@ public class SalesOrderRespVO {
     private Boolean canRequestSupervisorConfirmation;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
+    private Long associatedLeadId;
     private LeadProfileVO leadProfile;
     private ApprovalStatusVO registrationApproval;
     private ApprovalStatusVO financeApproval;
@@ -90,6 +91,8 @@ public class SalesOrderRespVO {
 
     @Data
     public static class LeadProfileVO {
+        /** Lead creation time captured at order submission; absent in older snapshots. */
+        private LocalDateTime submittedAt;
         private String leadNo;
         private String submittedName;
         private String submittedMobile;

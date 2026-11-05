@@ -29,7 +29,9 @@
       <el-button :loading="checking" @click="checkCustomer">校验客户</el-button>
       <el-alert v-if="identityError" :title="identityError" type="error" show-icon class="mt-12px" />
       <el-alert v-if="checked" :title="checked.reason" :description="[checked.customerName, checked.maskedMobile].filter(Boolean).join(' · ')" :type="checked.canRepurchase ? 'success' : 'warning'" show-icon class="mt-12px" />
-      <el-alert v-if="checked?.canRepurchase && !readyForOrder" type="info" title="请补齐手机号和微信号后重新校验，再填写复购订单" show-icon />
+      <el-alert v-if="checked?.canRepurchase && (!form.customerMobile.trim() || !form.customerWechatId.trim())" type="info" title="请补齐手机号和微信号后重新校验，再填写复购订单" show-icon />
+      <OrderLeadSelectionDialog v-if="checked?.canRepurchase && leadCandidates.length" v-model="associatedLeadId" :candidates="leadCandidates" />
+      <el-alert v-if="checked?.canRepurchase && leadCandidates.length && associatedLeadId === undefined" type="info" title="请选择本次订单关联的客资，再填写订单" show-icon />
       <template v-if="readyForOrder">
       <el-row :gutter="16"
         ><el-col :xs="24" :sm="12"
@@ -172,6 +174,7 @@
   <OrderProfileConfirmDialog ref="profileConfirm" />
 </template>
 <script setup lang="ts">
+import OrderLeadSelectionDialog from './OrderLeadSelectionDialog.vue'
 import OrderProfileConfirmDialog from './OrderProfileConfirmDialog.vue'
 import { catalogSpecs, specText } from '@/utils/productSpecs'
 import type { FormInstance, FormRules, UploadFile } from 'element-plus'
@@ -188,17 +191,19 @@ const checked = ref<MenuApi.RepurchaseCustomerCheck>()
 const identityError = ref('')
 let identitySequence = 0
 let submissionKey = crypto.randomUUID()
+let pendingSubmission: { fingerprint: string; request: Parameters<typeof MenuApi.createCustomerRepurchase>[0] } | undefined
 const checkCustomer = async () => {
   const current = ++identitySequence
-  checked.value = undefined; identityError.value = ''
-  if (!form.customerName.trim() || !form.customerMobile.trim() && !form.customerWechatId.trim()) {
-    identityError.value = '请填写姓名及至少一项联系方式进行核验；正式录单需手机号和微信号'; return
+  checked.value = undefined; identityError.value = ''; leadCandidates.value = []; associatedLeadId.value = undefined
+  if (!form.customerName.trim() || (!form.customerMobile.trim() || !form.customerWechatId.trim())) {
+    identityError.value = '请填写姓名、手机号和微信号后校验客户'; return
   }
   if (form.customerMobile.trim() && !/^1\d{10}$/.test(form.customerMobile.trim())) { identityError.value = '手机号格式不正确'; return }
   checking.value = true
   try {
     const result = await MenuApi.checkRepurchaseCustomer({ customerName: form.customerName.trim(), customerMobile: form.customerMobile.trim() || undefined, customerWechatId: form.customerWechatId.trim() || undefined })
-    if (current === identitySequence) { checked.value = result; if (result.canRepurchase) { form.studentName = form.customerName.trim(); void loadOptions() } }
+    const matches = result.canRepurchase ? await MenuApi.orderLeadCandidates({ customerName: form.customerName.trim(), customerMobile: form.customerMobile.trim(), customerWechatId: form.customerWechatId.trim() }) : []
+    if (current === identitySequence) { leadCandidates.value = matches; associatedLeadId.value = matches.length === 1 ? matches[0].id : undefined; checked.value = result; if (result.canRepurchase) { form.studentName = form.customerName.trim(); void loadOptions() } }
   } catch (e: any) { if (current === identitySequence) identityError.value = e?.msg || e?.message || '客户校验失败，请重试' }
   finally { if (current === identitySequence) checking.value = false }
 }
@@ -241,9 +246,9 @@ const empty = () => ({
   repurchaseReason: ''
 })
 const form = reactive(empty())
-const readyForOrder = computed(() => Boolean(checked.value?.canRepurchase && form.customerMobile.trim() && form.customerWechatId.trim()))
+const readyForOrder = computed(() => Boolean(checked.value?.canRepurchase && form.customerMobile.trim() && form.customerWechatId.trim() && (!leadCandidates.value.length || associatedLeadId.value !== undefined)))
 watch(() => [form.customerName, form.customerMobile, form.customerWechatId], () => {
-  identitySequence++; checked.value = undefined; identityError.value = ''; checking.value = false; submissionKey = crypto.randomUUID()
+  identitySequence++; leadCandidates.value = []; associatedLeadId.value = undefined; checked.value = undefined; identityError.value = ''; checking.value = false; submissionKey = crypto.randomUUID()
 }, { flush: 'sync' })
 const rules: FormRules = {
   customerName: [{ required: true }],
@@ -288,6 +293,7 @@ const loadOptions = async () => {
   }
 }
 const open = () => {
+  pendingSubmission = undefined
   Object.assign(form, empty())
   vouchers.value = []
   visible.value = true
@@ -336,8 +342,11 @@ const handleVoucherSelect = (file: UploadFile) => {
   vouchers.value.push(item)
   if (item.status === 'uploading') void uploadVoucher(item)
 }
+const leadCandidates = ref<MenuApi.OrderLeadCandidate[]>([])
+const associatedLeadId = ref<number>()
 const profileConfirm = ref<InstanceType<typeof OrderProfileConfirmDialog>>()
 const submit = async () => {
+  if (saving.value) return
   if (!checked.value || !readyForOrder.value || checking.value) { message.warning('请补齐手机号和微信号并重新校验客户身份'); return }
   await formRef.value?.validate()
   if (hasUploading.value) {
@@ -354,44 +363,55 @@ const submit = async () => {
   }
   saving.value = true
   try {
-    const profileUpdate = await profileConfirm.value?.confirm(await MenuApi.customerOrderProfile({
-      customerName: form.customerName.trim(), customerMobile: form.customerMobile.trim(), customerWechatId: form.customerWechatId.trim()
-    }), { name: form.studentName.trim(), mobile: form.customerMobile.trim(), wechatId: form.customerWechatId.trim() })
-    if (!profileUpdate) return
-    const [provinceCode, cityCode] = form.region
-    const province = areas.value.find((i) => i.selectionCode === provinceCode)
-    const city = province?.children?.find((i: any) => i.selectionCode === cityCode)
-    await MenuApi.createCustomerRepurchase({
-      expectedPersonId: checked.value.personId,
-      customerName: form.customerName.trim(),
-      customerMobile: form.customerMobile.trim() || undefined,
-      customerWechatId: form.customerWechatId.trim() || undefined,
-      repurchaseReason: form.repurchaseReason.trim(),
-      order: {
-        profileUpdate,
-        buyerName: form.customerName.trim(),
-        studentName: form.studentName.trim(),
-        studentNature: form.studentNature,
-        studentMobile: form.customerMobile.trim(),
-        studentWechatId: form.customerWechatId.trim(),
-        provinceCode,
-        provinceName: province?.name || '',
-        cityCode,
-        cityName: city?.name || '',
-        servicePeriod: form.servicePeriod,
-        studentSource: form.studentSource,
-        customerPaidAt: form.customerPaidAt.getTime(),
-        feeMode: form.feeMode,
-        paymentMethod: form.paymentMethod,
-        items: [{ spuRef: form.spuRef, skuRef: form.skuRef, actualAmount: form.actualAmount }],
-        paymentVouchers: vouchers.value.map((item) => ({ infraFileId: item.infraFileId })),
-        idempotencyKey: submissionKey
+    const fingerprint = JSON.stringify([form, associatedLeadId.value, vouchers.value.map(item => item.infraFileId)])
+    if (!pendingSubmission || pendingSubmission.fingerprint !== fingerprint) {
+      if (pendingSubmission) submissionKey = crypto.randomUUID()
+      pendingSubmission = undefined
+      const profileUpdate = await profileConfirm.value?.confirm(await MenuApi.customerOrderProfile({
+        customerName: form.customerName.trim(), customerMobile: form.customerMobile.trim(), customerWechatId: form.customerWechatId.trim()
+      }), { name: form.studentName.trim(), mobile: form.customerMobile.trim(), wechatId: form.customerWechatId.trim() })
+      if (!profileUpdate) return
+      const [provinceCode, cityCode] = form.region
+      const province = areas.value.find((i) => i.selectionCode === provinceCode)
+      const city = province?.children?.find((i: any) => i.selectionCode === cityCode)
+      const request: Parameters<typeof MenuApi.createCustomerRepurchase>[0] = {
+        expectedPersonId: checked.value.personId,
+        customerName: form.customerName.trim(),
+        customerMobile: form.customerMobile.trim() || undefined,
+        customerWechatId: form.customerWechatId.trim() || undefined,
+        repurchaseReason: form.repurchaseReason.trim(),
+        order: {
+          associatedLeadId: associatedLeadId.value,
+          profileUpdate,
+          buyerName: form.customerName.trim(),
+          studentName: form.studentName.trim(),
+          studentNature: form.studentNature,
+          studentMobile: form.customerMobile.trim(),
+          studentWechatId: form.customerWechatId.trim(),
+          provinceCode,
+          provinceName: province?.name || '',
+          cityCode,
+          cityName: city?.name || '',
+          servicePeriod: form.servicePeriod,
+          studentSource: form.studentSource,
+          customerPaidAt: form.customerPaidAt.getTime(),
+          feeMode: form.feeMode,
+          paymentMethod: form.paymentMethod,
+          items: [{ spuRef: form.spuRef, skuRef: form.skuRef, actualAmount: form.actualAmount }],
+          paymentVouchers: vouchers.value.map((item) => ({ infraFileId: item.infraFileId })),
+          idempotencyKey: submissionKey
+        }
       }
-    })
+      // Keep the exact command across lost responses so preflight cannot block idempotent replay.
+      pendingSubmission = { fingerprint, request }
+    }
+    await MenuApi.createCustomerRepurchase(pendingSubmission.request)
+    pendingSubmission = undefined
     message.success('复购订单已提交')
     visible.value = false
     emit('success')
   } catch (e: any) {
+    if (typeof e?.code === 'number') pendingSubmission = undefined
     if (e) message.error(e?.msg || e?.message || '复购提交失败')
   } finally {
     saving.value = false

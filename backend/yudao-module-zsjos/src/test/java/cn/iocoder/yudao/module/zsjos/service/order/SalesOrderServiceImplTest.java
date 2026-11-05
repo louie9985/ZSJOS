@@ -1407,6 +1407,7 @@ class SalesOrderServiceImplTest {
     @Test
     void systemRepurchasePersistsCustomerOnlyAndStartsDualApproval() {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus(STATUS_WON);
+        when(leadMapper.selectOrderAssociationCandidates(10L, 1L)).thenReturn(List.of(lead));
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         when(personMapper.selectByIdForUpdate(10L, 1L)).thenReturn(new PersonDO().setId(10L));
         when(orderMapper.hasEffectiveOrder(10L)).thenReturn(true);
@@ -1422,6 +1423,10 @@ class SalesOrderServiceImplTest {
         SalesOrderRepurchaseReqVO req = new SalesOrderRepurchaseReqVO(); req.setRepurchaseReason("继续学习");
         req.setOrder(request(BigDecimal.ZERO, "13800138000", "test-wechat"));
 
+        req.getOrder().setAssociatedLeadId(999L);
+        assertEquals(SALES_ORDER_ASSOCIATION_CHANGED.getCode(),
+                assertThrows(ServiceException.class, () -> service.createSystemRepurchase(1L, 20L, req)).getCode());
+        req.getOrder().setAssociatedLeadId(null);
         Long id = service.createSystemRepurchase(1L, 20L, req);
         verify(studentInfoTaskService).ensureForOrder(id);
 
@@ -1430,6 +1435,11 @@ class SalesOrderServiceImplTest {
         verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(order -> ORDER_TYPE_REPURCHASE.equals(order.getOrderType())
                 && order.getLeadId() == null && order.getOpportunityId() == null && Objects.equals(order.getPersonId(), 10L)
                 && Objects.equals(order.getFormalSalesUserId(), 20L)));
+        verify(roundMapper).insert(org.mockito.Mockito.<SalesOrderApprovalRoundDO>argThat(round -> {
+            var snapshot = SalesOrderSnapshot.read(round.getOrderSnapshot());
+            return Objects.equals(snapshot.getAssociatedLeadId(), 1L) && snapshot.getLeadProfile() != null;
+        }));
+        verifyNoInteractions(cashbackService);
         verifyNoInteractions(opportunityMapper, lifecycleTaskService);
     }
 
@@ -1437,7 +1447,7 @@ class SalesOrderServiceImplTest {
     @org.junit.jupiter.params.provider.CsvSource({"false,false", "true,false", "false,true", "true,true"})
     void matchedRepurchaseBelongsToCurrentSalesOrEducationWithOrWithoutEffectiveOrder(boolean education, boolean effectiveOrder) {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(77L); lead.setStatus(STATUS_WON);
-        lenient().when(leadMapper.selectLatestByPersonId(10L)).thenReturn(lead);
+        when(leadMapper.selectOrderAssociationCandidates(10L, 1L)).thenReturn(List.of(lead));
         if (education) doThrow(cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(LEAD_SUBMITTER_IDENTITY_INVALID)).when(submissionIdentityService).requireSales(20L);
         when(personMapper.selectByIdForUpdate(10L, 1L)).thenReturn(new PersonDO().setId(10L));
         lenient().when(orderMapper.hasEffectiveOrder(10L)).thenReturn(effectiveOrder);
@@ -1457,6 +1467,12 @@ class SalesOrderServiceImplTest {
         String originalRequest = JsonUtils.toJsonString(req);
         Long id = service.createMatchedRepurchase(10L, 20L, req);
 
+        verify(leadMapper, never()).selectByIdForUpdate(anyLong(), anyLong());
+        verify(roundMapper).insert(org.mockito.Mockito.<SalesOrderApprovalRoundDO>argThat(round -> {
+            SalesOrderSnapshot snapshot = SalesOrderSnapshot.read(round.getOrderSnapshot());
+            return Objects.equals(snapshot.getAssociatedLeadId(), lead.getId())
+                    && snapshot.getLeadProfile() != null;
+        }));
         assertEquals(101L, id);
         verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(order -> ORDER_TYPE_REPURCHASE.equals(order.getOrderType())
                 && order.getLeadId() == null && order.getOpportunityId() == null && Objects.equals(order.getPersonId(), 10L)

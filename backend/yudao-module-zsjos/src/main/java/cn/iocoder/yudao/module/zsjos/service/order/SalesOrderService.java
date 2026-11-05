@@ -9,6 +9,9 @@ import java.io.IOException;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 
 public interface SalesOrderService {
+    java.util.List<OrderLeadCandidateRespVO> customerLeadCandidates(Long userId, RepurchaseCustomerCheckReqVO req);
+    java.util.List<OrderLeadCandidateRespVO> leadRepurchaseCandidates(Long leadId, Long userId);
+    java.util.List<OrderLeadCandidateRespVO> studentRepurchaseCandidates(Long personId, Long userId);
     Long createAndSubmit(Long leadId, Long userId, SalesOrderSubmitReqVO reqVO);
     Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO);
     Long createMatchedRepurchase(Long personId, Long userId, SalesOrderRepurchaseReqVO reqVO);

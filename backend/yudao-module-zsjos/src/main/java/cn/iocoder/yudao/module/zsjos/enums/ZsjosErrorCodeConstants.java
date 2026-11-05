@@ -362,6 +362,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_GIFT_SNAPSHOT_INVALID = new ErrorCode(1_900_006_083, "历史礼品快照无法解析，请联系管理员核实，不能直接重提");
     ErrorCode SALES_ORDER_GIFT_SELECTION_INVALID = new ErrorCode(1_900_006_084, "礼品不存在、已停用或不是可选叶子项目，请重新选择");
     ErrorCode SALES_ORDER_GIFT_ADDRESS_REQUIRED = new ErrorCode(1_900_006_085, "选择礼品后邮寄地址必填且不超过1000字");
+    ErrorCode SALES_ORDER_ASSOCIATION_REQUIRED = new ErrorCode(1_900_006_110, "该客户存在多条客资，请重新打开提交确认并选择关联客资");
+    ErrorCode SALES_ORDER_ASSOCIATION_CHANGED = new ErrorCode(1_900_006_111, "关联客资已变化或不属于该客户，请重新选择");
     ErrorCode SALES_ORDER_REPURCHASE_IDENTITY_CONFLICT = new ErrorCode(1_900_006_080, "复购客户身份已变化或姓名、联系方式不一致，请重新核实");
     ErrorCode SALES_ORDER_REPURCHASE_MULTIPLE_MATCH = new ErrorCode(1_900_006_081, "联系方式对应多个客户，请联系管理员核实");
     ErrorCode SALES_ORDER_REPURCHASE_DUPLICATE = new ErrorCode(1_900_006_082, "该客户已有相同缴费记录，请核实是否重复录单");

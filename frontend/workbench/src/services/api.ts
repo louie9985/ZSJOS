@@ -1867,6 +1867,7 @@ export type OrderProfileField = 'name' | 'mobile' | 'wechatId';
 export type OrderProfile = { personId?: number; name?: string; mobile?: string; wechatId?: string; fingerprint: string };
 export type OrderProfileUpdate = { fingerprint: string; fields: OrderProfileField[] };
 export type SalesOrderSubmitRequest = {
+  associatedLeadId?: number;
   profileUpdate?: OrderProfileUpdate;
   refreshedDictionaryFields?: string[];
   purchaseIntentId?: number;
@@ -2053,7 +2054,9 @@ export type SalesOrder = {
   canRequestSupervisorConfirmation?: boolean;
   submittedAt: Timestamp;
   effectiveAt?: Timestamp;
+  associatedLeadId?: number;
   leadProfile?: {
+    submittedAt?: Timestamp;
     leadNo: string;
     submittedName: string;
     submittedMobile?: string;
@@ -4862,6 +4865,12 @@ export const api = {
         order,
       }),
     ),
+  orderLeadCandidates: async (source: { identity?: RepurchaseCustomerIdentity; leadId?: number; personId?: number }) =>
+    unwrap<OrderLeadCandidate[]>(source.identity
+      ? await http.post('/zsjos/sales-order/repurchase/lead-candidates', source.identity)
+      : await http.get(source.personId
+        ? `/zsjos/sales-order/student/${source.personId}/repurchase/lead-candidates`
+        : `/zsjos/sales-order/lead/${source.leadId}/repurchase/lead-candidates`)),
   checkRepurchaseCustomer: async (data: RepurchaseCustomerIdentity) =>
     unwrap<RepurchaseCustomerCheck>(await http.post('/zsjos/sales-order/repurchase/check-customer', data)),
   submitCustomerRepurchase: async (data: RepurchaseCustomerIdentity & { expectedPersonId?: number; repurchaseReason: string; order: SalesOrderSubmitRequest }) =>
@@ -6324,6 +6333,7 @@ export const api = {
     ),
 };
 
+export type OrderLeadCandidate = { id: number; status: string; profile: NonNullable<SalesOrder["leadProfile"]> }
 export type RepurchaseCustomerIdentity = { customerName: string; customerMobile?: string; customerWechatId?: string }
 export type RepurchaseCustomerCheck = {
   matchStatus: 'NO_MATCH' | 'EXISTING_CUSTOMER' | 'MULTIPLE_MATCH' | 'IDENTITY_CONFLICT' | 'REPURCHASE_BLOCKED'

@@ -490,7 +490,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (STATUS_REVISION_REQUIRED.equals(order.getStatus())) throw exception(REGISTRATION_FINANCE_REVISION_REQUIRED);
         if (!STATUS_EFFECTIVE.equals(order.getStatus())) throw exception(REGISTRATION_ORDER_NOT_EFFECTIVE);
         var information=informationForms.byCase(caseId);
-        if (information==null || information.getSentAt()==null && !"reuse".equals(information.getSubmitSource())) throw exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中确认已发送或完成资料复用");
+        if (information==null || information.getSentAt()==null && !"SUBMITTED".equals(information.getStatus()) && !"reuse".equals(information.getSubmitSource())) throw exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID,"请在报名资料收集任务中确认已发送或完成资料复用");
         List<RegistrationCaseChecklistItemDO> items = caseItemMapper.selectByCaseId(caseId);
         if (items.isEmpty() || items.stream().anyMatch(item -> ITEM_TYPE_CHECKBOX.equals(item.getItemType())
                 && !Boolean.TRUE.equals(item.getChecked()))) {
@@ -868,7 +868,8 @@ public class RegistrationServiceImpl implements RegistrationService {
         result.setCompletedAt(registrationCase.getCompletedAt()); result.setCancelledAt(registrationCase.getCancelledAt());
         result.setCancelReason(registrationCase.getCancelReason()); result.setVersion(registrationCase.getVersion());
         var information=informationForms.byCase(registrationCase.getId());
-        result.setInformationSent(information!=null && information.getSentAt()!=null);
+        // 学员成功提交即证明已收到链接；兼容未手工确认发送的历史表单，保留真实发送审计字段。
+        result.setInformationSent(information!=null && (information.getSentAt()!=null || "SUBMITTED".equals(information.getStatus())));
         result.setInformationSentAt(information==null ? null : information.getSentAt());
         result.setInformationSentByUserId(information==null ? null : information.getSentByUserId());
         result.setInformationSubmissionStatus(information==null ? "NONE" : "reuse".equals(information.getSubmitSource()) ? "REUSED" : "DRAFT".equals(information.getStatus()) &&

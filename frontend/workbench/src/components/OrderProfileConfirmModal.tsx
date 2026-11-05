@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Alert, Button, Checkbox, Divider, Modal, Space, Typography } from 'antd'
 import type { OrderProfile, OrderProfileField } from '../services/api'
 
@@ -8,16 +9,17 @@ export function profileDifferences(profile: OrderProfile, incoming: Record<Order
   return profile.personId ? profileFields.filter(({ key }) => (profile[key]?.trim() || '') !== incoming[key].trim()) : []
 }
 
-export default function OrderProfileConfirmModal({ open, profile, incoming, fields, onFieldsChange, onCancel, onConfirm, loading }: {
+export default function OrderProfileConfirmModal({ open, profile, incoming, fields, onFieldsChange, onCancel, onConfirm, loading, children, confirmDisabled = false }: {
   open: boolean; profile?: OrderProfile; incoming: Record<OrderProfileField, string>; fields: OrderProfileField[]
-  onFieldsChange: (fields: OrderProfileField[]) => void; onCancel: () => void; onConfirm: () => void; loading: boolean
+  onFieldsChange: (fields: OrderProfileField[]) => void; onCancel: () => void; onConfirm: () => void; loading: boolean; children?: ReactNode; confirmDisabled?: boolean
 }) {
   const differences = profile ? profileDifferences(profile, incoming) : []
   const replacements = differences.filter(({ key }) => profile?.[key]?.trim())
   const updates = differences.filter(({ key }) => !profile?.[key]?.trim() || fields.includes(key))
-  return <Modal open={open} title="确认提交订单" width={640} onCancel={onCancel} mask={{ closable: false }}
+  return <Modal open={open} title="确认提交订单" width={children ? 980 : 640} styles={{ body: { maxHeight: 'calc(100dvh - 220px)', overflowY: 'auto' } }} onCancel={onCancel} mask={{ closable: false }}
     closable={!loading} keyboard={!loading} footer={<Space wrap><Button disabled={loading} onClick={onCancel}>返回修改</Button>
-      <Button type="primary" loading={loading} disabled={!profile} onClick={onConfirm}>确认提交审批</Button></Space>}>
+      <Button type="primary" loading={loading} disabled={!profile || confirmDisabled} onClick={onConfirm}>确认提交审批</Button></Space>}>
+    {children && <>{children}<Divider/></>}
     <Typography.Paragraph>{differences.length ? '以下信息与客户档案不同，请核对要更新的项目。'
       : profile?.personId ? '本次学员信息与客户档案一致，无需更新。' : '将使用本次填写的信息建立客户档案。'}</Typography.Paragraph>
     {differences.map(({ key, label }) => <div key={key}>

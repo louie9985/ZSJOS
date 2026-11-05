@@ -1,5 +1,7 @@
 <template>
-  <el-dialog v-model="visible" title="确认提交订单" width="min(640px, calc(100vw - 24px))" append-to-body :close-on-click-modal="false" @closed="onClosed">
+  <el-dialog v-model="visible" title="确认提交订单" :width="$slots.default ? 'min(980px, calc(100vw - 24px))' : 'min(640px, calc(100vw - 24px))'" append-to-body :close-on-click-modal="false" @closed="onClosed">
+    <slot />
+    <el-divider v-if="$slots.default" />
     <p>{{ differences.length ? '以下信息与客户档案不同，请核对要更新的项目。' : profile?.personId ? '本次学员信息与客户档案一致，无需更新。' : '将使用本次填写的信息建立客户档案。' }}</p>
     <div v-for="field in differences" :key="field.key" class="profile-difference">
       <strong>{{ field.label }}</strong>
@@ -10,12 +12,13 @@
     <div v-if="replacements.length" class="mb-12px"><el-button @click="selected = replacements.map(f => f.key)">全部更新档案</el-button><el-button @click="selected = []">保留已有值</el-button></div>
     <p>订单保存本次填写的信息；原客资及历史订单保持原样。</p>
     <el-alert :closable="false" type="info" :title="!profile?.personId ? '提交时建立客户档案' : updates.length ? `提交成功后，档案将更新：${updates.map(f => f.label).join('、')}。` : '提交成功后，档案保持原样。'" />
-    <template #footer><el-button @click="cancel">返回修改</el-button><el-button type="primary" @click="finish">确认提交审批</el-button></template>
+    <template #footer><el-button @click="cancel">返回修改</el-button><el-button type="primary" :disabled="confirmDisabled" @click="finish">确认提交审批</el-button></template>
   </el-dialog>
 </template>
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import type { OrderProfile, OrderProfileField, OrderProfileUpdate } from '@/api/zsjos/workbenchMenus'
+const props = defineProps<{ confirmDisabled?: boolean }>()
 const visible = ref(false)
 const profile = ref<OrderProfile>()
 const incoming = ref<Record<OrderProfileField, string>>({ name: '', mobile: '', wechatId: '' })
@@ -27,7 +30,7 @@ const updates = computed(() => differences.value.filter(f => !profile.value?.[f.
 let resolve: ((choice: OrderProfileUpdate | undefined) => void) | undefined
 const cancel = () => { visible.value = false; resolve?.(undefined); resolve = undefined }
 const onClosed = () => { if (!visible.value) cancel() }
-const finish = () => { resolve?.({ fingerprint: profile.value!.fingerprint, fields: [...selected.value] }); resolve = undefined; visible.value = false }
+const finish = () => { if (props.confirmDisabled) return; resolve?.({ fingerprint: profile.value!.fingerprint, fields: [...selected.value] }); resolve = undefined; visible.value = false }
 const confirm = (current: OrderProfile, values: Record<OrderProfileField, string>) => {
   cancel(); profile.value = current; incoming.value = values; selected.value = differences.value.map(f => f.key); visible.value = true
   return new Promise<OrderProfileUpdate | undefined>(done => { resolve = done })
@@ -36,5 +39,6 @@ onBeforeUnmount(cancel)
 defineExpose({ confirm })
 </script>
 <style scoped>
+:deep(.el-dialog__body) { max-height: calc(100dvh - 220px); overflow-y: auto; }
 .profile-difference { padding: 12px 0; border-bottom: 1px solid var(--el-border-color); margin-bottom: 12px; overflow-wrap: anywhere; }
 </style>

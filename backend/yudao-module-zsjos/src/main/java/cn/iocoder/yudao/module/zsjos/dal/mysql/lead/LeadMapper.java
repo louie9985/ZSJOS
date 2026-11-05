@@ -869,6 +869,12 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .in(LeadDO::getPersonId, personIds).ne(LeadDO::getStatus, "closed").orderByAsc(LeadDO::getId));
     }
 
+    // Includes closed historical leads: association is a read-only identity relation.
+    default List<LeadDO> selectOrderAssociationCandidates(Long personId, Long tenantId) {
+        return selectList(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getPersonId, personId)
+                .eq(LeadDO::getTenantId, tenantId).orderByDesc(LeadDO::getId));
+    }
+
     default List<LeadDO> selectByPersonIds(List<Long> personIds) {
         if (personIds == null || personIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<LeadDO>()

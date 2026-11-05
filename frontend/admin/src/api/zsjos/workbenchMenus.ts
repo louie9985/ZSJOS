@@ -121,3 +121,16 @@ export interface LeadArchiveCandidate {
 }
 export const querySelfSourcedArchive = (education: boolean, data: { mobile?: string; wechatId?: string; idempotencyKey: string }): Promise<LeadArchiveCandidate[]> =>
   request.post({ url: education ? '/zsjos/lead/education-self-sourced/archive-query' : '/zsjos/lead/self-sourced/archive-query', data, preserveBusinessError: true })
+
+export interface OrderLeadCandidate {
+  id: number; status: string; statusLabel: string
+  profile: {
+    leadNo: string; submittedName: string; submittedMobile?: string; submittedWechatId?: string; submittedAt?: number
+    sourceType?: string; sourceLabel?: string; sourceUserName?: string; selfSourcedWithoutProvider?: boolean
+    partnerOwnerSnapshot?: import('./orderPartnerOwner').OrderPartnerOwnerSnapshot
+    ownerUserName?: string; ownerIdentityLabel?: string; leadCategoryLabelSnapshot?: string
+    sourceChannelLabelSnapshot?: string; provinceName?: string; cityName?: string; dispatchMode?: string
+  }
+}
+export const orderLeadCandidates = (data: RepurchaseCustomerIdentity): Promise<OrderLeadCandidate[]> =>
+  request.post({ url: '/zsjos/sales-order/repurchase/lead-candidates', data, preserveBusinessError: true })

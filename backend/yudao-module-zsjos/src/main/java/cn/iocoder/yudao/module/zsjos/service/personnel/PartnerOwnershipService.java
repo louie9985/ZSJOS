@@ -47,6 +47,12 @@ public class PartnerOwnershipService {
         return ownershipMapper.selectByPartnerId(partnerId);
     }
 
+    public List<PartnerOwnershipDO> getByPartnerIds(java.util.Collection<Long> partnerIds) {
+        if (partnerIds.isEmpty()) return List.of();
+        return ownershipMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PartnerOwnershipDO>()
+                .in(PartnerOwnershipDO::getPartnerId, partnerIds));
+    }
+
     public List<PartnerOwnershipDO> getByEmployeeUserId(Long employeeUserId) {
         if (!canQuery(employeeUserId)) return List.of();
         return ownershipMapper.selectByEmployeeUserId(employeeUserId);

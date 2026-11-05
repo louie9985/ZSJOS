@@ -16,7 +16,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES;
 
-/** Exact identity grants only a purchase operation, never a customer-list or Lead read grant. */
+/** Exact identity grants purchase and the approved same-customer order association projection, not general Lead access. */
 @Service
 public class RepurchaseCustomerService implements ZsjosObjectPermissionProvider {
     @Resource private PersonMapper personMapper;
