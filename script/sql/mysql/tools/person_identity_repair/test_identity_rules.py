@@ -1,5 +1,5 @@
 import unittest
-from identity_rules import classify_group
+from identity_rules import classify_group, contacts, contact_value
 
 def p(i,name='甲',mobile='13800000001',wechat='wx'):
     return dict(id=i,name=name,mobile=mobile,wechat_id=wechat)
@@ -9,6 +9,20 @@ def lead(i,pid,status,deleted=False):
     return dict(id=i,person_id=pid,status=status,deleted=deleted)
 
 class Rules(unittest.TestCase):
+    def test_placeholder_only_never_merges_even_with_consistent_order_name(self):
+        for value in ('无', ' 暂无 ', 'NULL', '-', '/', '...', '', '0', '1'):
+            people=[p(1,mobile='13800000001',wechat=value),p(2,name='乙',mobile='13900000002',wechat=value)]
+            self.assertEqual('REVIEW',classify_group(people,[o(1,1,'甲')])['identityDecision'])
+    def test_placeholder_is_absent_when_valid_phone_matches(self):
+        result=classify_group([p(1,wechat='无'),p(2,wechat='')],[])
+        self.assertEqual('SAME_NAME_COMPATIBLE_CONTACTS',result['identityRule'])
+    def test_placeholder_cannot_bridge_two_real_contact_groups(self):
+        people=[p(1,mobile='13800000001',wechat='无'),p(2,mobile='13800000001',wechat='wx-one'),
+                p(3,mobile='13900000002',wechat='无')]
+        self.assertEqual('NO_VALID_CONTACT_CONNECTION',classify_group(people,[o(1,1,'甲')])['identityRule'])
+    def test_real_identifier_containing_placeholder_word_is_preserved(self):
+        self.assertEqual('wx_none_123',contact_value(' wx_none_123 '))
+        self.assertEqual({'13800000001'},contacts(p(1,wechat='无')))
     def test_exact(self):
         r=classify_group([p(1),p(2)],[])
         self.assertEqual(('AUTO_MERGE','EXACT_NAME_MOBILE_WECHAT',[]),(r['identityDecision'],r['identityRule'],r['executionBlockers']))

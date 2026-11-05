@@ -6,7 +6,7 @@ import json
 import re
 from pathlib import Path
 from repair import helpers,fetch,LIVE,HISTORICAL
-from identity_rules import classify_group,text
+from identity_rules import classify_group,text,contact_value,contact_connected
 
 ALIAS='zsjos_person_contact_alias'
 CLAIM='zsjos_person_contact_claim'
@@ -54,6 +54,8 @@ def confirmed_rule(state,confirmation):
     ids=sorted(p['id'] for p in state['zsjos_person'])
     helpers.check(sorted(confirmation['memberIds'])==ids,'Confirmation belongs to another group')
     helpers.check(confirmation['targetPersonId'] in ids and text(confirmation.get('canonicalName')) and text(confirmation.get('reviewReference')),'Explicit name, target and review reference required')
+    helpers.check(contact_connected(state['zsjos_person']),
+                  'Name confirmation cannot replace valid contact evidence; independent identity review required')
     return {'identityDecision':'AUTO_MERGE','identityRule':'USER_CONFIRMED_NAME',
             'canonicalName':text(confirmation['canonicalName']),'targetPersonId':confirmation['targetPersonId'],
             'reviewReference':confirmation['reviewReference'],'executionBlockers':[]}
@@ -86,6 +88,9 @@ def apply_group(conn,plan,execute=False,fail_after=None,before_commit=None):
                 helpers.check(all(not alive(p) if p['id'] in sources else alive(p) for p in current['zsjos_person']),'Replay identity state inconsistent')
                 conn.rollback();return {'replay':True,'committed':False}
             helpers.check(helpers.digest(current)==plan['fingerprint'],'Group data changed; prepare again')
+            helpers.check(all(contact_value(r['contact_value']) for r in
+                              list(current[CLAIM])+list(current.get(ALIAS,[])) if alive(r)),
+                          'Placeholder claims/aliases require scoped cleanup before merge')
             current_rule=confirmed_rule(current,plan['confirmation']) if plan.get('confirmation') else classify(current)
             helpers.check(current_rule==plan['rule'],'Group identity decision changed')
             person={p['id']:p for p in current['zsjos_person']}
@@ -93,12 +98,13 @@ def apply_group(conn,plan,execute=False,fail_after=None,before_commit=None):
             for pid,p in person.items():
                 for field,kind in [('mobile','mobile'),('wechat_id','wechat')]:
                     value=text(p.get(field))
-                    if not value:continue
+                    if not contact_value(value):continue
                     aliases.add((pid,kind,value))
                     # Phone-looking values in a historical WeChat field remain available in both roles.
                     if re.fullmatch(r'1[3-9]\d{9}',value):aliases.add((pid,'mobile',value))
                     elif field=='mobile':aliases.add((pid,'wechat',value))
-            values=sorted({a[2] for a in aliases}|{r['contact_value'] for r in current[CLAIM]})
+            values=sorted({a[2] for a in aliases}|{r['contact_value'] for r in current[CLAIM]
+                                                 if contact_value(r['contact_value'])})
             for value in values:
                 outsiders=fetch(cur,f'SELECT id FROM zsjos_person WHERE tenant_id=1 AND deleted=0 AND id NOT IN ({all_marks}) AND (mobile=%s OR LOWER(wechat_id)=LOWER(%s)) FOR UPDATE',ids+[value,value])
                 helpers.check(not outsiders,'Contact matches an identity outside the complete group')

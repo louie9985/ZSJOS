@@ -3,7 +3,7 @@ import datetime as dt
 from decimal import Decimal
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from types import SimpleNamespace
 from server_target import ServerTarget, encode, decode, environment
 from server_audit import components, decide
@@ -15,6 +15,29 @@ def person(i, no=None, **kwargs):
 
 
 class ServerSafetyTest(unittest.TestCase):
+    def test_standalone_writer_refuses_placeholder_metadata_before_writing(self):
+        import repair
+        people=[person(1,mobile='13800000001'),person(2,mobile='13800000001')]
+        decision={'sourcePersonId':1,'targetPersonId':2,'evidence':'synthetic-reviewed',
+                  'personFingerprint':repair.helpers.digest(people)}
+        for contacts in (([{'contact_value':'无'}],), ([],[{'contact_value':'1'}])):
+            connection=MagicMock()
+            with patch('repair.fetch',side_effect=[[],people,*contacts]):
+                with self.assertRaisesRegex(ValueError,'Placeholder claims/aliases'):
+                    repair.repair(connection,decision,execute=True)
+            connection.cursor.return_value.__enter__.return_value.execute.assert_not_called()
+            connection.commit.assert_not_called()
+            connection.rollback.assert_called_once()
+
+    def test_placeholder_people_claims_and_aliases_do_not_connect(self):
+        p=[person(1,mobile='13800000001',wechat_id='无'),person(2,mobile='13900000002',wechat_id='无')]
+        claims=[{'person_id':1,'contact_value':'暂无'},{'person_id':2,'contact_value':'暂无'}]
+        aliases=[{'person_id':1,'contact_value':'-'},{'person_id':2,'contact_value':'-'}]
+        self.assertEqual([],components(p,claims,aliases,[])[0])
+    def test_manual_name_does_not_override_missing_real_contact(self):
+        p=[person(1,'A',mobile='13800000001',wechat_id='无'),person(2,'B',mobile='13900000002',wechat_id='无')]
+        c={'deferPersonNos':[],'names':[{'personNos':['A','B'],'canonicalName':'合成确认'}],'reviewReference':'test'}
+        self.assertEqual('NO_VALID_CONTACT_CONNECTION',decide([1,2],p,[],[],c)['reason'])
     def test_invalid_explicit_environment_does_not_fall_back(self):
         for v in ('','prod','invalid'):
             with patch.dict(os.environ,{'ZSJOS_AGENT_ENV':v}):
