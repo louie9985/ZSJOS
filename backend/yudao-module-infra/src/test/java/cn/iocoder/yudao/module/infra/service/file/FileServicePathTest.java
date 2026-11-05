@@ -21,6 +21,20 @@ class FileServicePathTest {
     @InjectMocks FileServiceImpl service;
     @TempDir Path temporary;
 
+    @Test void rollbackCleanupUsesOriginalLocatorAndKeepsRegisteredObjects() throws Exception {
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getFileClient(7L)).thenReturn(client);
+        when(fileMapper.selectCount(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(0L, 1L);
+        assertTrue(service.deleteUnregisteredFile(7L, "exam-private/new.bin"));
+        assertFalse(service.deleteUnregisteredFile(7L, "exam-private/registered.bin"));
+        verify(client).delete("exam-private/new.bin");
+        verify(client, never()).delete("exam-private/registered.bin");
+        assertThrows(RuntimeException.class, () -> service.deleteUnregisteredFile(7L, "../escape"));
+        var annotation = FileServiceImpl.class.getMethod("deleteUnregisteredFile", Long.class, String.class)
+                .getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+        assertEquals(org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, annotation.propagation());
+    }
+
     @Test void storesMetadataUsingTheRepeatableSourceAndLeavesSourceOwnershipToCaller() throws Exception {
         Path source = Files.writeString(temporary.resolve("source.txt"), "synthetic content");
         FileClient client = mock(FileClient.class);

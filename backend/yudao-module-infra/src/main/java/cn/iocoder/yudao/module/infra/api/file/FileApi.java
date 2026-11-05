@@ -83,6 +83,9 @@ public interface FileApi {
      */
     boolean deleteFileIfExists(@NotNull(message = "文件编号不能为空") Long fileId) throws Exception;
 
+    /** Compensate a rolled-back upload using the trusted locator returned by createFileInfo. */
+    boolean deleteUnregisteredFile(@NotNull Long configId, @NotEmpty String path) throws Exception;
+
     /**
      * 生成文件预签名地址，用于读取
      *

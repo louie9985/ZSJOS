@@ -35,7 +35,7 @@ class ExamCollectionAttachmentTest {
         doAnswer(call->((BiFunction<ExamCollectionTaskDO,ExamCollectionSubmissionDO,Object>)call.getArgument(3)).apply(task,session))
                 .when(sessions).withSession(anyString(),anyString(),eq(true),any());
         when(sessions.definitions(task)).thenReturn(new StudentInfoFields().presets());
-        var stored=new FileInfoRespDTO();stored.setId(100L);when(files.createFileInfo(any(byte[].class),anyString(),anyString(),anyString())).thenReturn(stored);
+        var stored=new FileInfoRespDTO();stored.setId(100L);stored.setConfigId(7L);stored.setPath("exam-collection-private/1/2/synthetic.bin");when(files.createFileInfo(any(byte[].class),anyString(),anyString(),anyString())).thenReturn(stored);
         var image=new java.awt.image.BufferedImage(2,2,java.awt.image.BufferedImage.TYPE_INT_RGB);var bytes=new java.io.ByteArrayOutputStream();javax.imageio.ImageIO.write(image,"png",bytes);
         file=new MockMultipartFile("file","identity.png","image/png",bytes.toByteArray());
         TransactionSynchronizationManager.initSynchronization();
@@ -59,7 +59,7 @@ class ExamCollectionAttachmentTest {
         doThrow(new IllegalStateException("synthetic persistence failure")).when(attachments).insert(any(ExamCollectionAttachmentDO.class));
         assertThrows(ServiceException.class,()->service.upload("token","session","portrait","",file,"request-two"));
         for(var callback:TransactionSynchronizationManager.getSynchronizations())callback.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK);
-        verify(files).deleteFileIfExists(100L);
+        verify(files).deleteUnregisteredFile(7L,"exam-collection-private/1/2/synthetic.bin");
     }
     @Test void missingRequestKeyAndUnselectedFieldNeverStoreFile() {
         assertThrows(ServiceException.class,()->service.upload("token","session","portrait","",file,null));

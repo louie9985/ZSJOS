@@ -34,8 +34,10 @@ export default function StudentArchiveHistoryRecord({ relationId, entry, sensiti
   }, [relationId, entry.source, entry.submissionId, entry.revision, sensitive]);
   useEffect(() => { sequence.current++; setData(undefined); setPrevious(undefined); setError(''); setLoading(false); return () => { sequence.current++; }; }, [load]);
   useEffect(() => { if (open) void load(); }, [open, load]);
+  const revisionSource = entry.operatorUserId ? '人工归档' : '学员提交';
+  const revisionLabel = entry.submissionId ? revisionSource : '人工维护';
   const label = entry.source === 'submission' ? entry.taskTitle || '考试资料填写'
-    : entry.revision === 0 ? '原报名档案' : `V${entry.revision} · ${entry.submissionId ? '学员提交' : '人工维护'}`;
+    : entry.revision === 0 ? '原报名档案' : `V${entry.revision} · ${revisionLabel}`;
   const difference = data && previous ? archiveChanges(previous, data, sensitive) : undefined;
   const files = (items: StudentInfoImage[]) => <div className="student-info-attachments">{items.length ? items.map(image => sensitive
     ? <AttachmentCard key={archiveImageReference(image)} name={image.name} load={async () => attachment(image)} />

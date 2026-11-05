@@ -55,7 +55,7 @@ public class ExamCollectionAttachmentService {
                         "exam-collection-private/" + task.getId() + "/" + submission.getId(), "application/octet-stream");
                 TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                     @Override public void afterCompletion(int status) {
-                        if (status != STATUS_COMMITTED) try { files.deleteFileIfExists(stored.getId()); } catch (Exception ignored) { }
+                        if (status != STATUS_COMMITTED) try { files.deleteUnregisteredFile(stored.getConfigId(), stored.getPath()); } catch (Exception ignored) { }
                     }
                 });
                 var row = new ExamCollectionAttachmentDO(); row.setTenantId(task.getTenantId()); row.setTaskId(task.getId());

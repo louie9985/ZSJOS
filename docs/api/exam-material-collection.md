@@ -1,6 +1,6 @@
-# 考试资料收集（开发设计）
+# 考试资料收集
 
-状态：开发中。后端主流程、档案接入、考务页面、任务汇总、公开 H5、规划师首页提醒及显式归属纠正已有实现；完整联调与验收仍待完成。环境为 local，独立分支 codex/exam-material-collection。
+开发与隔离验收已完成。环境为 local，独立分支 codex/exam-material-collection。最终验收范围、证据及上线前提见 [交付记录](../operations/exam-material-collection-delivery.md)。本文后续实施阶段记录中的测试数量和待办反映当时进度，最终结论以交付记录为准。
 
 ## 业务契约
 

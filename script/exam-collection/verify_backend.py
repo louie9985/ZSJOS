@@ -51,6 +51,11 @@ tests.append(base / 'test' / package / 'service/studentinfo/StudentInfoImagesAnd
 tests.append(base / 'test' / package / 'service/studentinfo/StudentArchiveServiceTest.java')
 tests.append(base / 'test' / package / 'service/studentinfo/StudentSummaryServiceTest.java')
 sources.extend(tests)
+infra = ROOT / 'backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra'
+sources.extend(infra / name for name in ['api/file/FileApi.java', 'api/file/FileApiImpl.java',
+    'service/file/FileService.java', 'service/file/FileServiceImpl.java'])
+infra_test = ROOT / 'backend/yudao-module-infra/src/test/java/cn/iocoder/yudao/module/infra/service/file/FileServicePathTest.java'
+sources.append(infra_test)
 runner = out / 'ExamBackendTests.java'
 runner.write_text('''import org.junit.platform.launcher.core.*;
 import org.junit.platform.launcher.listeners.*;
@@ -71,4 +76,5 @@ def run(command, values):
     subprocess.run([command, '@' + str(path)], cwd=ROOT, check=True)
 
 run('javac', ['-proc:full', '-parameters', '-encoding', 'UTF-8', '-cp', cp, '-d', out, *sources, runner])
-run('java', ['-cp', cp, 'ExamBackendTests', *['cn.iocoder.yudao.module.zsjos.service.' + t.parent.name + '.' + t.stem for t in tests]])
+run('java', ['-cp', cp, 'ExamBackendTests', *['cn.iocoder.yudao.module.zsjos.service.' + t.parent.name + '.' + t.stem for t in tests],
+    'cn.iocoder.yudao.module.infra.service.file.FileServicePathTest'])
