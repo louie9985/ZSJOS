@@ -22,6 +22,9 @@
 - `POST /zsjos/sales-order/lead/{leadId}/submit`：创建首购订单。服务端要求客户、主客资和商机属于同一客户，且客户尚无生效订单。
 - 当前首购订单入口以既有 `leadId` 为前置上下文，不重新执行客资提交查重；未来若新增“订单同时创建客资”的直接入口，应复用客资提交查重服务，强重复硬拦截、疑似重复进入复核。
 - `POST /zsjos/sales-order/lead/{leadId}/repurchase`：从系统客户客资详情创建复购；客资只用于发起与权限上下文，订单持久化仅关联客户。
+- 存量例外（2026-11-05）：用户明确授权 test 租户 1 的指定已通过复购订单补充同客户客资关联，采用同录单人优先、唯一候选、正常状态优先及明确裁定；不改变新复购创建规则、订单归属或历史审批快照。既有对象读取关系会按补充关联生效，历史 `leadProfile` 不补造。范围、影响及验证见[已通过复购订单关联客资](../operations/repurchase-lead-link-20261105.md)。
+- 后续明确授权的快照回填（同日）：上述 24 条新关联订单的当前已通过审批轮次，按当前关联 Lead 资料和当前 System 人员名称补齐缺失 `leadProfile`；分类/渠道使用 Lead 已保存标签。此定向修复覆盖上一条“历史快照不补写”的边界，额外保存 `leadProfileBackfill` 的来源、时间及 `historicalAtSubmission=false`，不声称还原录单时资料。原有五条客资快照及其他快照字段不变，运行时仍不自动回查当前主档补历史。详情见同一操作记录的快照回填节。
+- 同日身份纠错：原客户因微信占位值 `无` 误归并，已拆分并将 `OD202610150855120003` 的关联和当前轮次回填资料更正为 `KZ202610130845270001`，保留更正来源。金额、审批、归属及新复购接口不变；见[误归并修复与全量审计](../operations/false-person-merge-20261105.md)。
 - `POST /zsjos/sales-order/external-repurchase`：录入系统外历史客户复购。唯一命中无主客资客户时复用客户，无命中时创建客户主档；多客户命中、身份冲突或已有主客资时拒绝。
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders`：要求 `zsjos:lead-detail:order-read`，并以统一 Lead 详情对象关系按客户聚合首购与复购订单。
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders/{orderId}`：同样累计标签 feature 权限、Lead 对象关系和订单与客资 `personId` 一致性校验。

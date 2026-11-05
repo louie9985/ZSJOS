@@ -8,7 +8,7 @@ import json
 import re
 import subprocess
 from pathlib import Path
-from identity_rules import classify_group
+from identity_rules import classify_group, contacts
 
 
 def query(database, sql):
@@ -23,8 +23,20 @@ def query(database, sql):
 
 
 def audit(database):
-    # Use the application's candidate predicate; group transitive overlaps, not contact values.
-    rows = query(database, "SELECT p.id,q.id,(TRIM(p.name)=TRIM(q.name)) FROM zsjos_person p JOIN zsjos_person q ON p.id<q.id AND q.tenant_id=1 AND q.deleted=0 WHERE p.tenant_id=1 AND p.deleted=0 AND ((NULLIF(TRIM(p.mobile),'') IS NOT NULL AND (CAST(p.mobile AS BINARY)=CAST(q.mobile AS BINARY) OR LOWER(p.mobile)=LOWER(q.wechat_id))) OR (NULLIF(TRIM(p.wechat_id),'') IS NOT NULL AND (LOWER(p.wechat_id)=LOWER(q.wechat_id) OR CAST(p.wechat_id AS BINARY)=CAST(q.mobile AS BINARY))));")
+    # Audit must use the same placeholder exclusion as classification/execution.
+    all_people = [json.loads(r[0]) for r in query(database,
+        "SELECT JSON_OBJECT('id',id,'name',name,'mobile',mobile,'wechat_id',wechat_id) "
+        "FROM zsjos_person WHERE tenant_id=1 AND deleted=0 ORDER BY id;")]
+    owners = collections.defaultdict(list)
+    for person in all_people:
+        for value in contacts(person):
+            owners[value].append(person)
+    rows = []
+    for matches in owners.values():
+        for person in matches[1:]:
+            first = matches[0]
+            rows.append((str(first['id']), str(person['id']),
+                         '1' if (first['name'] or '').strip() == (person['name'] or '').strip() else '0'))
     parent = {}
     def root(value):
         parent.setdefault(value,value)

@@ -1,16 +1,38 @@
 # -*- coding: utf-8 -*-
 """User-confirmed identity rules; identity decisions are distinct from write readiness."""
 from itertools import combinations
+import re
 
 SEED_CREATORS = {'seed-liudandan','seed-students','seed-llyilin','seed-batch4'}
+
+# Missing-value labels are not identity evidence, including across mobile/WeChat.
+CONTACT_PLACEHOLDERS = frozenset({'无', '暂无', '未知', '未填写', '未提供', '没有',
+    '无微信', '无手机号', '不详', '待补充', 'null', 'none', 'n/a', 'na', '0', '1'})
 
 
 def text(value):
     return (value or '').strip()
 
 
+def contact_value(value):
+    value = text(value).lower()
+    return '' if not value or value in CONTACT_PLACEHOLDERS or re.fullmatch(r'[\W_]+', value) else value
+
+
 def contacts(person):
-    return {text(person.get(k)).lower() for k in ('mobile','wechat_id') if text(person.get(k))}
+    return {contact_value(person.get(k)) for k in ('mobile','wechat_id')} - {''}
+
+
+def contact_connected(people):
+    if not people:
+        return False
+    reached = {people[0]['id']}
+    while True:
+        expanded = reached | {p['id'] for p in people if any(
+            contacts(p) & contacts(q) for q in people if q['id'] in reached)}
+        if expanded == reached:
+            return len(reached) == len(people)
+        reached = expanded
 
 
 def classify_group(people, orders, leads=()):
@@ -21,6 +43,8 @@ def classify_group(people, orders, leads=()):
     result={'identityDecision':'REVIEW','identityRule':'UNRESOLVED','canonicalName':None,'targetPersonId':None,'executionBlockers':[]}
     if len(people)<2 or len(ids)!=len(people):
         result['identityRule']='INVALID_GROUP';return result
+    if not contact_connected(people):
+        result['identityRule']='NO_VALID_CONTACT_CONNECTION';return result
     if len(names)>1:
         result['identityRule']='CONFLICTING_ORDER_NAMES';return result
     live_orders=[o for o in orders if o.get('person_id') in ids and not o.get('deleted')]
@@ -38,13 +62,13 @@ def classify_group(people, orders, leads=()):
     if primary:
         rule='SINGLE_OPEN_LEAD_NO_ORDER'
     elif same_name and pairwise:
-        values={(text(p.get('mobile')),text(p.get('wechat_id'))) for p in people}
-        compatible=lambda a,b: all(not text(a.get(k)) or not text(b.get(k)) or text(a.get(k))==text(b.get(k)) for k in ('mobile','wechat_id'))
-        cross=lambda a,b: bool(text(a.get('mobile')) and text(a.get('mobile')).lower()==text(b.get('wechat_id')).lower() or text(a.get('wechat_id')) and text(a.get('wechat_id')).lower()==text(b.get('mobile')).lower())
+        values={(contact_value(p.get('mobile')),contact_value(p.get('wechat_id'))) for p in people}
+        compatible=lambda a,b: all(not contact_value(a.get(k)) or not contact_value(b.get(k)) or contact_value(a.get(k))==contact_value(b.get(k)) for k in ('mobile','wechat_id'))
+        cross=lambda a,b: bool(contact_value(a.get('mobile')) and contact_value(a.get('mobile'))==contact_value(b.get('wechat_id')) or contact_value(a.get('wechat_id')) and contact_value(a.get('wechat_id'))==contact_value(b.get('mobile')))
         if not all(compatible(a,b) or cross(a,b) for a,b in combinations(people,2)):
             result['identityRule']='CONFLICTING_NONEMPTY_CONTACTS';return result
         if len(values)==1 and all(next(iter(values))): rule='EXACT_NAME_MOBILE_WECHAT'
-        elif all(any(text(a.get(k)) and text(a.get(k))==text(b.get(k)) for k in ('mobile','wechat_id')) for a,b in combinations(people,2)):
+        elif all(any(contact_value(a.get(k)) and contact_value(a.get(k))==contact_value(b.get(k)) for k in ('mobile','wechat_id')) for a,b in combinations(people,2)):
             rule='SAME_NAME_COMPATIBLE_CONTACTS'
         else:rule='SAME_NAME_CROSS_CONTACTS'
     elif len(names)==1 and real and all(text(o.get('student_name')) for o in real):

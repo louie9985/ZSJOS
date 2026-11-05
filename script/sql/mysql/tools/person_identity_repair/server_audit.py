@@ -9,7 +9,7 @@ from pathlib import Path
 from server_target import ServerTarget, require, read, save, digest
 from group_repair import alive, generated_column
 from repair import LIVE, HISTORICAL
-from identity_rules import classify_group, SEED_CREATORS
+from identity_rules import classify_group, SEED_CREATORS, contact_value, contact_connected
 import zsjos_db
 
 
@@ -34,12 +34,13 @@ def components(people, claims, aliases, events):
         pid = resolve(p['id'])
         if pid:
             for field in ('mobile', 'wechat_id'):
-                value = (p.get(field) or '').strip().lower()
+                value = contact_value(p.get(field))
                 if value: owners[value].add(pid)
     for row in (*claims, *aliases):
         pid = resolve(row['person_id'])
-        if alive(row) and pid and (row.get('contact_value') or '').strip():
-            owners[row['contact_value'].strip().lower()].add(pid)
+        value = contact_value(row.get('contact_value'))
+        if alive(row) and pid and value:
+            owners[value].add(pid)
     for ids in owners.values():
         ids = sorted(ids)
         for pid in ids[1:]: parent[root(pid)] = root(ids[0])
@@ -59,6 +60,8 @@ def decide(members, people, orders, leads, confirmations):
         if numbers & confirmed:
             if numbers != confirmed:
                 return {'status': 'REVIEW', 'reason': 'MANUAL_MEMBER_SET_CHANGED'}
+            if not contact_connected(selected):
+                return {'status': 'REVIEW', 'reason': 'NO_VALID_CONTACT_CONNECTION'}
             name = entry['canonicalName']
             matching = [o for o in orders if o['person_id'] in members and alive(o)
                         and o.get('creator') not in SEED_CREATORS and (o.get('student_name') or '').strip() == name]

@@ -9,7 +9,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
-from identity_rules import classify_group,SEED_CREATORS
+from identity_rules import classify_group,SEED_CREATORS,contact_value,contact_connected
 
 ROOT = Path(__file__).resolve().parents[5]
 spec = importlib.util.spec_from_file_location('identity_import_helpers', ROOT / 'script/historical-student-import/import_students.py')
@@ -59,6 +59,11 @@ def repair(conn, decision, execute=False, inject_failure=False):
             people=fetch(cur,'SELECT * FROM zsjos_person WHERE tenant_id=1 AND id IN (%s,%s) ORDER BY id FOR UPDATE',(source,target))
             helpers.check(len(people)==2 and all(not int.from_bytes(p['deleted'],'big') if isinstance(p['deleted'],bytes) else not p['deleted'] for p in people), 'Both identities must be live')
             helpers.check(helpers.digest(people)==decision['personFingerprint'], 'Identity state changed; prepare again')
+            helpers.check(contact_connected(people), 'Valid contact evidence is required; placeholder-only matching refused')
+            for table in ('zsjos_person_contact_claim', 'zsjos_person_contact_alias'):
+                existing_contacts=fetch(cur,f'SELECT contact_value FROM `{table}` WHERE tenant_id=1 AND deleted=0 AND person_id IN (%s,%s) FOR UPDATE',(source,target))
+                helpers.check(all(contact_value(r['contact_value']) for r in existing_contacts),
+                              'Placeholder claims/aliases require scoped cleanup before merge')
             by_id={p['id']:p for p in people}
             if decision.get('automaticIdentity'):
                 current_orders=fetch(cur,'SELECT id,person_id,student_name,creator FROM zsjos_order WHERE tenant_id=1 AND deleted=0 AND person_id IN (%s,%s) ORDER BY id FOR UPDATE',(source,target))
@@ -106,7 +111,7 @@ def repair(conn, decision, execute=False, inject_failure=False):
             # Claims keep their original values; refuse third-party ownership rather than stealing it.
             for field in ('mobile','wechat_id'):
                 value=(by_id[source].get(field) or by_id[target].get(field) or '').strip()
-                if not value: continue
+                if not contact_value(value): continue
                 outsiders=fetch(cur,'SELECT id FROM zsjos_person WHERE tenant_id=1 AND deleted=0 AND id NOT IN (%s,%s) AND (mobile=%s OR LOWER(wechat_id)=LOWER(%s)) FOR UPDATE',(source,target,value,value))
                 helpers.check(not outsiders, 'Contact also matches another live identity')
                 owners=fetch(cur,'SELECT * FROM zsjos_person_contact_claim WHERE tenant_id=1 AND contact_value=%s FOR UPDATE',(value,))
