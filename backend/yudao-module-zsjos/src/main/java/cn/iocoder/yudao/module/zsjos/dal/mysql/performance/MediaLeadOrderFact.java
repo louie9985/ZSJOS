@@ -8,4 +8,5 @@ import java.time.LocalDateTime;
 public class MediaLeadOrderFact {
     private Long leadId;
     private LocalDateTime effectiveAt;
+    private java.math.BigDecimal totalAmount;
 }

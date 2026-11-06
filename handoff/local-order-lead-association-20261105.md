@@ -61,3 +61,11 @@ Admin pnpm ts:check 唯一报错为既有 src/views/mes/pro/task/edit/index.vue:
 续办登记（3与5候选测试）：沿用明确授权的开发库造数范围，local环境，现有main工作区。目标192.168.2.17:3306/ruoyi-vue-pro租户1，源KZ202610291544560042新增2条THREE测试客资，源KZ202610291428350032新增4条MANY测试客资，均closed。领取script/sql/mysql/fixtures/local-order-lead-cards-3-and-5.sql、本记录。验证候选3/5、待处理复购0、源行一致、重放0和中文HEX。恢复需按测试编号检查引用后定向清理。
 
 3/5候选造数交付：脚本事务内新增6行并提交，重放新增0行。两客户分别3条、5条候选，待处理复购均0。源Lead全行前后一致，备注UTF-8 HEX校验通过。测试编号THREE01/02、MANY01..04，均KZTEST20261106前缀；原客资均won。未提交订单，保留给用户实际录单验证。git diff检查通过，所有权释放。
+
+续办登记（多来源候选）：local环境main既有工作区。用户授权开发库准备新媒体/兼职/自拓同客户候选。目标192.168.2.17:3306/ruoyi-vue-pro租户1，以KZ202610291226500027的Person为测试客户，保留销售自拓原客资；分别借用KZ202610301138250012新媒体来源、KZ202610301306260017兼职来源的真实来源关系和显示资料，新增KZTEST20261106SOURCE01/02（closed）。仅新增2条Lead，不改原来源归属。领取script/sql/mysql/fixtures/local-order-lead-mixed-sources.sql、本记录。验证3种来源、同客户身份一致、活动复购0、重放0、源行一致及UTF8HEX。恢复需检查引用后精确清理两测试编号。
+
+多来源造数交付：事务提交新增2条，目标客户3候选分别sales_self_sourced/won、internal_new_media/closed、partner/closed。逐条身份与目标Person一致，活动复购0，重放新增0，3条原样本全行一致，中文备注HEX验证通过。新媒体来源对应有效System用户并带auto派单方式；兼职对应有效Partner及其员工归属关系。复用关系仅用于本地测试展示。未执行实际录单，用户可直接校验比较3卡。所有权释放。
+
+续办登记（兼职归属对齐）：用户截图指出兼职归属员工值偏左。local现有工作区，领取order-lead-selection.css、本记录及既有tmp隔离fixture验证。根因为span-2通用长文本规则justify-items:start沿用到单列卡牌，修复仅覆盖卡牌内该值的对齐。验证桌面/手机computed style与截图、diff检查。
+
+兼职归属对齐交付：卡牌范围覆盖.detail-field.span-2 dd为justify-items:end，修复姓名与其他值不共右边界。保留其他详情长文本跨列语义。ego-browser空间40隔离真实组件验证1440/390宽下align=end、姓名右边距差0、无页面横向溢出，截图已生成并检查桌面，空间finish。纯CSS修改，未增加测试依赖或业务数据变更。git diff --check通过。所有权释放。

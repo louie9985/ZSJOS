@@ -19,7 +19,7 @@ const overview = {
   periods: [
     ['yesterday', '昨日'], ['today', '今日'], ['lastWeek', '上周'], ['week', '本周'],
     ['lastTwoMonth', '上上月'], ['lastMonth', '上月'], ['month', '本月'], ['year', '本年'], ['all', '全部']
-  ].map(([key, label], index) => ({ key, label, total: 20 + index, valid: 13, invalid: 3, converted: 6, validRate: .65, convertedRate: 6 / 13 })),
+  ].map(([key, label], index) => ({ key, label, total: 20 + index, valid: 13, invalid: 3, converted: 6, validRate: .65, convertedRate: 6 / 13, performanceContribution: index === 0 ? 0 : 1234567.89 })),
   members: [{ userId: 1, name: '测试运营', targetCount: 15, yesterday: 2, yesterdayConverted: 1, today: 3, todayConverted: 1, week: 5, weekValid: 4, weekConverted: 2, lastWeek: 6, lastWeekValid: 4, lastWeekConverted: 1, month: 19, monthValid: 13, monthConverted: 6, lastMonth: 18, lastMonthValid: 12, lastMonthConverted: 5, monthProgress: 13 / 15 }],
   calendar: [{ date: '2026-09-10', total: 17, valid: 11, invalid: 3, pending: 3 }, { date: '2026-09-28', total: 3, valid: 2, invalid: 0, pending: 1 }],
   funnel: { submitted: 20, valid: 13, converted: 6 },

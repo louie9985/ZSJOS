@@ -66,4 +66,37 @@ public interface MediaLeadFactMapper {
         """)
     List<MediaLeadOrderFact> firstOrders(@Param("tenantId") Long tenantId, @Param("scopeType") String scopeType,
                                          @Param("scopeId") Long scopeId, @Param("centerDeptIds") List<Long> centerDeptIds);
+
+    @Select("""
+        <script>
+        SELECT ranked.leadId,ranked.effectiveAt,ranked.totalAmount
+        FROM (
+          SELECT o.lead_id leadId,o.effective_at effectiveAt,o.total_amount totalAmount,
+                 ROW_NUMBER() OVER (PARTITION BY o.lead_id ORDER BY o.effective_at,o.id) orderRank
+          FROM zsjos_order o
+          JOIN zsjos_lead l ON l.id=o.lead_id AND l.tenant_id=o.tenant_id AND l.deleted=0
+          WHERE o.tenant_id=#{tenantId} AND o.deleted=0 AND o.status='effective'
+            AND o.order_type &lt;&gt; 'repurchase' AND o.lead_id IS NOT NULL
+            AND o.effective_at IS NOT NULL AND o.effective_at &lt;= #{now}
+          AND l.contribution_user_id_snapshot IS NOT NULL AND l.submitted_at IS NOT NULL
+        <choose>
+          <when test="scopeType == 'USER'">AND l.contribution_user_id_snapshot=#{scopeId}</when>
+          <when test="scopeType == 'DEPT'">AND l.contribution_dept_id_snapshot=#{scopeId}</when>
+          <when test="scopeType == 'CENTER'">
+            <choose>
+              <when test="centerDeptIds != null and centerDeptIds.size() > 0">
+                AND l.contribution_dept_id_snapshot IN
+                <foreach collection="centerDeptIds" item="deptId" open="(" separator="," close=")">#{deptId}</foreach>
+              </when>
+              <otherwise>AND 1=0</otherwise>
+            </choose>
+          </when>
+        </choose>
+        ) ranked
+        WHERE ranked.orderRank=1
+        </script>
+        """)
+    List<MediaLeadOrderFact> firstContributionOrders(@Param("tenantId") Long tenantId,
+            @Param("scopeType") String scopeType, @Param("scopeId") Long scopeId,
+            @Param("centerDeptIds") List<Long> centerDeptIds, @Param("now") java.time.LocalDateTime now);
 }

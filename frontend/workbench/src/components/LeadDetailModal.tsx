@@ -87,7 +87,7 @@ export default function LeadDetailModal({
         <Button onClick={() => { setCancelReason(''); setCancelError(''); setCancelOpen(true) }}>取消跟进时间</Button> : undefined}
       destroyOnClose
     >
-      <Modal title="取消跟进时间" open={cancelOpen} confirmLoading={cancelling}
+      <Modal title="确认取消下次跟进任务" open={cancelOpen} confirmLoading={cancelling}
         okText="确认取消" cancelText="返回" okButtonProps={{ disabled: !cancelReason.trim() }}
         onCancel={() => { if (!cancelling) setCancelOpen(false) }}
         onOk={async () => {
@@ -99,7 +99,7 @@ export default function LeadDetailModal({
           } catch (e) { setCancelError(e instanceof Error ? e.message : '取消失败，请重试') }
           finally { setCancelling(false) }
         }}>
-        <p>取消当前跟进提醒，保留历史跟进记录。</p>
+        <p>请确认该客资没有继续跟进的必要，再取消下次跟进任务</p>
         <Input.TextArea aria-label="取消原因" placeholder="请填写取消原因" maxLength={500}
           value={cancelReason} onChange={e => setCancelReason(e.target.value)} disabled={cancelling} />
         {cancelError && <Alert type="error" showIcon message={cancelError} />}

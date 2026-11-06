@@ -1218,21 +1218,20 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
             round.setStatus(ROUND_APPROVED); order.setStatus(STATUS_EFFECTIVE); order.setEffectiveAt(now);
             createGiftPurchaseIfNeeded(order, now);
+            // 成交后保留下次跟进时间及提醒，由用户确认后手动取消。
             if (opportunity != null) {
                 opportunity.setStatus(OPPORTUNITY_STATUS_WON); opportunity.setWonAt(now);
-                opportunity.setNextFollowUpAt(null); opportunityMapper.updateById(opportunity);
+                opportunityMapper.updateById(opportunity);
             }
             LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
             if (lead != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
                 lead.setStatus(STATUS_WON);
-                lead.setNextFollowUpAt(null);
                 LeadMapper.advanceActivity(lead, now);
                 leadMapper.updateById(lead);
             }
             if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
                 publicSeaPoolService.completeConversion(order.getLeadId(), order.getSubmitterUserId(), now);
                 lifecycleTaskService.cancelFirstFollowUpTasks(order.getLeadId(), now, "成交订单已生效");
-                lifecycleTaskService.cancelFollowUpReminders(order.getLeadId(), now, "成交订单已生效");
             }
         } else if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
             round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
