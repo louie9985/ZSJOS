@@ -6,6 +6,12 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/exam-collection',
+      name: 'ExamMaterialCollection',
+      component: () => import('@/pages/examCollection/index.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/notice/share',
       name: 'PublicNoticeShare',
       component: () => import('@/pages/notice/share.vue'),

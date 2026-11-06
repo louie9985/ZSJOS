@@ -91,6 +91,9 @@ public interface FileService {
      */
     boolean deleteFileIfExists(Long id) throws Exception;
 
+    /** Internal rollback cleanup. A registered locator is retained. */
+    boolean deleteUnregisteredFile(Long configId, String path) throws Exception;
+
     /**
      * 删除文件
      *

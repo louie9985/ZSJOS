@@ -13,7 +13,7 @@ const data = ref<Api.Archive>(),
   changes = ref<Record<string, unknown>>({}),
   areas = ref<AreaVO[]>([]),
   images = ref<CollectionImage[]>([]),
-  urls = ref<Record<number, string>>({})
+  urls = ref<Record<string, string>>({})
 let sequence = 0,
   key = ''
 const message = (e: unknown) => (e instanceof Error ? e.message : '操作失败，请重试')
@@ -92,10 +92,10 @@ const renewKey = () => {
 const value = (field: string) =>
   Object.hasOwn(changes.value, field) ? changes.value[field] : editor.value?.values[field]
 const remove = (item: CollectionImage) => {
-  images.value = images.value.filter((i) => i.id !== item.id)
+  images.value = images.value.filter((i) => Api.imageReference(i) !== Api.imageReference(item))
   change(
     item.fieldKey,
-    images.value.filter((i) => i.fieldKey === item.fieldKey).map((i) => i.id)
+    images.value.filter((i) => i.fieldKey === item.fieldKey).map(Api.imageReference)
   )
 }
 const upload = async (fieldKey: string, side: string, file: File, maxSizeMb: number, allowed = ['jpg', 'jpeg', 'png']) => {
@@ -110,7 +110,7 @@ const upload = async (fieldKey: string, side: string, file: File, maxSizeMb: num
     images.value.push(i)
     change(
       fieldKey,
-      images.value.filter((x) => x.fieldKey === fieldKey).map((x) => x.id)
+      images.value.filter((x) => x.fieldKey === fieldKey).map(Api.imageReference)
     )
   } catch (e) {
     error.value = message(e)
@@ -139,7 +139,7 @@ const preview = async () => {
   try {
     const entries = await Promise.all(
       data.value.information.images.map(
-        async (i) => [i.id, await Api.image(props.relationId, i)] as const
+        async (i) => [Api.imageReference(i), await Api.image(props.relationId, i)] as const
       )
     )
     Object.values(urls.value).forEach(URL.revokeObjectURL)
@@ -179,13 +179,13 @@ const preview = async () => {
             ><template v-if="f.type === 'images'"
               ><template
                 v-for="i in data.information.images.filter((x) => x.fieldKey === f.key)"
-                :key="i.id"
+                :key="Api.imageReference(i)"
                 ><el-image
-                  v-if="urls[i.id] && i.contentType.startsWith('image/')"
-                  :src="urls[i.id]"
+                  v-if="urls[Api.imageReference(i)] && i.contentType.startsWith('image/')"
+                  :src="urls[Api.imageReference(i)]"
                   :preview-src-list="Object.values(urls)"
                   style="width: 80px"
-                /><a v-else-if="urls[i.id]" :href="urls[i.id]" :download="i.name">{{ i.name }}</a><span v-else>{{ i.name }} </span></template
+                /><a v-else-if="urls[Api.imageReference(i)]" :href="urls[Api.imageReference(i)]" :download="i.name">{{ i.name }}</a><span v-else>{{ i.name }} </span></template
               ></template
             ><span v-else>{{ data.information.values[f.key] || '—' }}</span></el-descriptions-item
           ></el-descriptions
@@ -222,7 +222,7 @@ const preview = async () => {
           :required="f.required"
         >
           <template v-if="f.type === 'images'"
-            ><div v-for="i in images.filter((x) => x.fieldKey === f.key)" :key="i.id"
+            ><div v-for="i in images.filter((x) => x.fieldKey === f.key)" :key="Api.imageReference(i)"
               >{{ i.side === 'front' ? '身份证正面' : i.side === 'back' ? '身份证反面' : i.name }}
               <el-button :disabled="busy || !data?.information.canReadSensitive" @click="remove(i)"
                 >移除</el-button

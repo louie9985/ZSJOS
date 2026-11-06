@@ -1,5 +1,8 @@
 import { useMetricSourceApi } from '../services/metricPageScope'
 import HomeTodoSummary from '../components/HomeTodoSummary'
+import { ExamPlannerNotice, useExamPlanner } from '../components/examCollection/ExamPlannerProvider'
+import { EXAM_COLLECTION_PROGRESS_EVENT } from '../services/examCollection'
+import { hasPermission } from '../services/managementAccess'
 import HomeMetricCards from '../components/HomeMetricCards'
 import { useWorkbenchPageNavigation } from '../components/WorkbenchPageNavigation'
 import HomeCalendarPanel from '../components/HomeCalendarPanel'
@@ -39,24 +42,27 @@ const emptySummary: BusinessTaskSummary = {
   future: 0,
   unscheduled: 0
 }
-function BusinessTaskPanel({
+export function BusinessTaskPanel({
   summaryError,
   summary,
   onOpenAssignment,
   onRefreshSummary,
   tenantReadAll,
   canCancel,
-  other = false
+  other = false,
+  examNoticeEnabled = false
 }: {
   summaryError?: string
   summary?: BusinessTaskSummary
   canCancel: boolean
   other?: boolean
+  examNoticeEnabled?: boolean
   tenantReadAll: boolean
   onOpenAssignment: () => void
   onRefreshSummary: () => Promise<void>
 }) {
   const navigate = useNavigate()
+  const examPlanner = useExamPlanner()
   const metricApi = useMetricSourceApi('business_todo', api)
   const navigation = useWorkbenchPageNavigation()
   const [readScope, setReadScope] = useState<BusinessReadScopeValue>({ readScope: 'SELF' })
@@ -110,13 +116,24 @@ function BusinessTaskPanel({
   useEffect(() => {
     void load()
   }, [load])
+  useEffect(() => {
+    if(!other||!examNoticeEnabled||readOnly)return
+    const update=()=>{void Promise.all([load(),onRefreshSummary()])}
+    window.addEventListener(EXAM_COLLECTION_PROGRESS_EVENT,update)
+    return()=>window.removeEventListener(EXAM_COLLECTION_PROGRESS_EVENT,update)
+  },[other,examNoticeEnabled,readOnly,load,onRefreshSummary])
 
   const refresh = async () => {
-    await Promise.all([load(), onRefreshSummary()])
+    await Promise.all([load(), onRefreshSummary(), other ? examPlanner?.refresh() : undefined])
   }
 
   const open = async (task: BusinessTask) => {
     if (readOnly || !task.actionable) return
+    if(task.actionCode==='EXAM_MATERIAL_COLLECTION') {
+      if(examPlanner)examPlanner.openTask(task.bizId)
+      else setError('考试收集待办暂不可用，请刷新页面')
+      return
+    }
     if (task.actionCode === 'MEDIA_ACCOUNT_DIAGNOSIS') {
       void diagnosisApi.tasks(task.bizId).then(items => { const item = items.find(x => x.taskId === task.id); if (item) navigate(diagnosisTaskUrl(item)); else setError("该诊断任务已处理或不再可用"); }).catch(e => setError(errorText(e, "诊断任务加载失败")))
       return
@@ -222,6 +239,7 @@ function BusinessTaskPanel({
       </header>
       {summaryError && <Alert type="error" title={summaryError} action={<Button onClick={() => void onRefreshSummary()}>重试</Button>} />}
       {tenantReadAll && <BusinessReadScope value={readScope} onChange={value => { setPageNo(1); setReadScope(value) }} />}
+      {other&&examNoticeEnabled&&!readOnly&&<ExamPlannerNotice/>}
       <div className="home-task-controls">
         {!other && (
           <Segmented
@@ -258,7 +276,7 @@ function BusinessTaskPanel({
           <div className="task-panel-list" role="list">
             {page.list.length ? (
               page.list.map((task) => (
-                <div className="task-panel-item" role="listitem" key={task.id}>
+                <div className={`task-panel-item${task.actionCode==='EXAM_MATERIAL_COLLECTION'?' task-panel-item--exam':''}`} role="listitem" key={task.id}>
                   <span className="task-panel-item-icon"><ClockCircleOutlined /></span>
                   <div className="task-panel-item-copy">
                     <Space wrap>
@@ -275,7 +293,9 @@ function BusinessTaskPanel({
                   {!readOnly && canCancel && task.cancellable && <Button type="text" onClick={() => {
                     cancelForm.resetFields(); setCancelError(''); setCancelTask(task)
                   }}>取消待办</Button>}
-                  {!readOnly && task.actionCode && workPlanActions.has(task.actionCode) ? (
+                  {!readOnly&&task.actionable&&task.actionCode==='EXAM_MATERIAL_COLLECTION'?(
+                    <Button type="primary" ghost size="small" onClick={()=>void open(task)}>跟进收集</Button>
+                  ):!readOnly && task.actionCode && workPlanActions.has(task.actionCode) ? (
                     <Tag>已搁置</Tag>
                   ) : !readOnly && task.actionCode && ['COMPLETE_BIRTHDAY_CARE', 'COMPLETE_EMPLOYEE_CONTRACT_EXPIRY', 'COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY'].includes(task.actionCode) ? (
                     <Button type="text" icon={<CheckCircleOutlined />} aria-label="完成员工提醒" onClick={() => void completeEmployeeReminder(task)} />
@@ -332,7 +352,7 @@ export default function TodayTasksPage({ permissions, onOpenAssignment, tenantRe
         <section className="home-summary-region" aria-label="首页指标"><HomeTodoSummary permissions={permissions} summary={businessSummary} loading={summaryLoading} error={businessError} refreshVersion={metricRefreshVersion} onRefresh={() => loadSummary()} /><HomeMetricCards permissions={permissions} refreshVersion={metricRefreshVersion} slots={9} /></section>
         <HomeCalendarPanel permissions={permissions} />
         <BusinessTaskPanel summaryError={businessError} canCancel={permissions.includes('zsjos:business-task:cancel')} tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
-        <BusinessTaskPanel summaryError={businessError} canCancel={permissions.includes('zsjos:business-task:cancel')} other tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
+        <BusinessTaskPanel summaryError={businessError} canCancel={permissions.includes('zsjos:business-task:cancel')} other examNoticeEnabled={hasPermission(permissions,'zsjos:business-task:query')} tenantReadAll={tenantReadAll} summary={businessSummary} onOpenAssignment={onOpenAssignment} onRefreshSummary={loadSummary} />
         <HomeAnnouncementPanel enabled={canReadAnnouncements(permissions)} />
       </div>
     </section>

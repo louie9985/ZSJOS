@@ -29,6 +29,7 @@ class StudentArchiveServiceTest {
     StudentInfoFormDO form;
     @BeforeEach void setup(){
         service=new StudentArchiveService();
+        ReflectionTestUtils.setField(service,"serviceArchive",mock(cn.iocoder.yudao.module.zsjos.service.examcollection.StudentServiceArchiveFacade.class));
         ReflectionTestUtils.setField(service,"configs",mock(StudentInfoFormConfigMapper.class));
         ReflectionTestUtils.setField(service,"users",mock(cn.iocoder.yudao.module.system.api.user.AdminUserApi.class));
         for(var entry:Map.of("relations",relations,"forms",forms,"answers",answers,"revisions",revisions,"imageMapper",imageMapper,"collection",collection,"fields",fields,"images",images,"permissions",permissions).entrySet()) ReflectionTestUtils.setField(service,entry.getKey(),entry.getValue());
@@ -39,6 +40,13 @@ class StudentArchiveServiceTest {
         when(answers.byForm(40L)).thenReturn(List.of());when(images.list(40L)).thenReturn(List.of());
     }
     StudentInfoVO.Field field(String key,String type){var f=new StudentInfoVO.Field();f.setKey(key);f.setLabel(key);f.setType(type);f.setEnabled(true);f.setRequired(false);f.setSensitive(false);return f;}
+    @Test void examArchiveUsesServiceProjectionWithoutBypassingSensitiveGate() {
+        var facade=(cn.iocoder.yudao.module.zsjos.service.examcollection.StudentServiceArchiveFacade)ReflectionTestUtils.getField(service,"serviceArchive");
+        when(facade.hasRevision(5L)).thenReturn(true); var projected=new Detail(); projected.setRevision(7);
+        when(facade.detail(5L,false)).thenReturn(projected);
+        assertSame(projected,service.detail(5L,false)); verifyNoInteractions(forms,answers,revisions);
+        assertThrows(RuntimeException.class,()->service.detail(5L,true)); verify(facade,never()).detail(5L,true);
+    }
     Save request(int revision){var r=new Save();r.setRevision(revision);r.setReason("correct");r.setIdempotencyKey("command");r.setChanges(Map.of("job","teacher"));return r;}
     @org.junit.jupiter.api.BeforeEach void teachingTenant() {
         cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);

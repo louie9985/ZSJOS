@@ -21,7 +21,7 @@ class StudentInfoRequestValidationTest {
         }
     }
 
-    @Test void answerRequestsAccept33ButReject34Entries() {
+    @Test void registrationAllows33FieldsAndServiceArchiveAllowsAdditionalWechatField() {
         try (var factory = Validation.buildDefaultValidatorFactory()) {
             var validator = factory.getValidator();
             var values = new LinkedHashMap<String, Object>();
@@ -34,7 +34,10 @@ class StudentInfoRequestValidationTest {
             var archive = new StudentArchiveVO.Save(); archive.setRevision(0); archive.setIdempotencyKey("validation-test"); archive.setChanges(values);
             for (var request : List.of(submit, draft, archive)) assertTrue(validator.validate(request).isEmpty());
             values.put("unknown", ""); draftValues.put("unknown", "");
-            for (var request : List.of(submit, draft, archive)) assertFalse(validator.validate(request).isEmpty());
+            for (var request : List.of(submit, draft)) assertFalse(validator.validate(request).isEmpty());
+            assertTrue(validator.validate(archive).isEmpty());
+            values.put("one_more", "");
+            assertFalse(validator.validate(archive).isEmpty());
         }
     }
 }

@@ -1,5 +1,7 @@
 # Ownership and Change Boundaries
 
+Exam material collection is a separate ZSJOS task/submission domain. Its service-archive adapter appends service-owned revisions and preserves original order forms/answers; historical students do not require synthetic orders or forms. Infra retains encrypted file storage ownership, System retains permissions/dictionaries/notification delivery, and planner follow-up uses existing business-task scenes. Workbench owns management and summary views; H5 owns the anonymous fragment-token form and adapts the existing attachment component through an optional typed client. Upload keys are scoped to a submission session, not shared across the cohort. Homepage reminder UI and full runtime verification remain pending. See [exam collection](../api/exam-material-collection.md).
+
 Homepage metrics are owned by ZSJOS: versioned configuration, bounded arithmetic, source adapters and expiring query contexts. System exposes enabled permission metadata through its public PermissionApi; BPM exposes all-current-user todo pagination through BpmProcessTaskApi. Neither API grants new access or permits cross-module DAL queries. Vue Admin owns configuration, React owns cards and drill-down. See [home metrics](../api/home-metrics.md).
 
 Lead sales-to-submitter feedback belongs to the ZSJOS Lead domain, with immutable reply

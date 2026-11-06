@@ -73,8 +73,24 @@ public class StudentArchiveController {
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @GetMapping("/images/{imageId}")
     @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read') && @ss.hasPermission('zsjos:student-archive:sensitive-read')")
-    public byte[] image(@PathVariable Long relationId,@PathVariable Long imageId,HttpServletResponse response) {
+    public byte[] image(@PathVariable Long relationId,@PathVariable Long imageId,@RequestParam(defaultValue="registration") String source,HttpServletResponse response) {
         response.setHeader("Cache-Control","no-store"); response.setHeader("X-Content-Type-Options","nosniff");
-        response.setContentType("application/octet-stream"); return service.image(relationId,imageId);
+        response.setContentType("application/octet-stream"); return service.image(relationId,imageId,source);
+    }
+    @GetMapping("/history/{revision}")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read')")
+    public CommonResult<Detail> history(@PathVariable Long relationId, @PathVariable Integer revision,
+            @RequestParam(defaultValue="false") boolean sensitive, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(service.history(relationId, revision, sensitive));
+    }
+    @GetMapping("/submissions/{submissionId}")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @ZsjosAudit(mode=ZsjosAudit.Mode.SENSITIVE_READ)
+    @PreAuthorize("@ss.hasPermission('zsjos:student-archive:read')")
+    public CommonResult<Detail> submission(@PathVariable Long relationId, @PathVariable Long submissionId,
+            @RequestParam(defaultValue="false") boolean sensitive, HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store"); return success(service.submission(relationId, submissionId, sensitive));
     }
 }

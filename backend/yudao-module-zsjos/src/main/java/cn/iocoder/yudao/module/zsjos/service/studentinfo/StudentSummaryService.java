@@ -8,6 +8,8 @@ import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentSummaryVO.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentArchiveExtraVO.Value;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.*;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.examcollection.*;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.*;
@@ -41,6 +43,9 @@ public class StudentSummaryService {
     @Resource private StudentInfoImageMapper images;
     @Resource private StudentArchiveExtraRevisionMapper extras;
     @Resource private StudentArchiveAttachmentMapper attachments;
+    @Resource private StudentServiceArchiveRevisionMapper serviceRevisions;
+    @Resource private ExamCollectionSubmissionMapper examSubmissions;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionPermissionProvider examPermissions;
 
     private void require(String code) {
         TenantContextHolder.getRequiredTenantId();
@@ -49,6 +54,19 @@ public class StudentSummaryService {
     }
     public List<Column> columns() {
         require(QUERY);
+        return catalog();
+    }
+    @cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission(bizType="exam-collection", bizId="#taskId", action="query")
+    public List<Column> columnsForExam(Long taskId) {
+        examPermissions.check(taskId, "query", getLoginUserId()); return catalog();
+    }
+    @cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission(bizType="exam-collection", bizId="#taskId", action="query")
+    public List<Row> projectForExam(Long taskId, List<ServiceRelationDO> selected) {
+        examPermissions.check(taskId, "query", getLoginUserId());
+        if (selected.stream().anyMatch(r -> !Objects.equals(r.getTenantId(), TenantContextHolder.getRequiredTenantId()))) throw exception(LINK_INVALID);
+        return project(selected);
+    }
+    private List<Column> catalog() {
         var result=new ArrayList<Column>();
         var published=configs.state("PUBLISHED");
         var definitions=new LinkedHashMap<String,cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Field>();
@@ -61,6 +79,7 @@ public class StudentSummaryService {
             if(field!=null) result.add(new Column("info."+key,field.getLabel(),"报名资料"));
         }
         definitions.values().forEach(f->result.add(new Column("info."+f.getKey(),f.getLabel(),"报名资料")));
+        result.add(new Column("info.wechat","微信号","报名资料"));
         StudentArchiveExtraService.definitions().forEach(f->result.add(new Column("extra."+f.key(),f.label(),"扩展档案")));
         result.add(4,new Column("collectionStatus","填写状态","档案状态",List.of(new StatusOption("已填写","true"),new StatusOption("未填写","false"))));
         result.add(new Column("submittedAt","资料提交时间","档案状态"));
@@ -99,7 +118,9 @@ public class StudentSummaryService {
             (SELECT 1 FROM zsjos_student_info_task t JOIN zsjos_registration_case c
              ON c.order_item_id=t.order_item_id AND c.tenant_id=t.tenant_id AND c.deleted=0
              WHERE c.id=sr.registration_case_id AND t.form_id=f.id AND t.tenant_id=f.tenant_id
-               AND t.person_id=f.person_id AND t.deleted=0))))
+               AND t.person_id=f.person_id AND t.deleted=0)))
+          UNION ALL SELECT 1 FROM zsjos_student_service_archive_revision ar
+          WHERE ar.service_relation_id=sr.id AND ar.person_id=sr.person_id AND ar.tenant_id=sr.tenant_id AND ar.deleted=0)
           """,base.getParameters());
     }
     private AdvancedFilterQuery filteredQuery(Query request,int offset,int limit) {
@@ -129,6 +150,17 @@ public class StudentSummaryService {
         var personMap=people.selectByIds(relations.stream().map(ServiceRelationDO::getPersonId).distinct().toList()).stream()
             .collect(Collectors.toMap(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO::getId,Function.identity()));
         var relationIds=relations.stream().map(ServiceRelationDO::getId).toList();
+        var serviceRevisionMap=serviceRevisions.selectList(new LambdaQueryWrapperX<StudentServiceArchiveRevisionDO>()
+            .in(StudentServiceArchiveRevisionDO::getServiceRelationId,relationIds)
+            .apply("revision=(SELECT MAX(r.revision) FROM zsjos_student_service_archive_revision r WHERE r.service_relation_id=zsjos_student_service_archive_revision.service_relation_id AND r.tenant_id=zsjos_student_service_archive_revision.tenant_id AND r.deleted=0)"))
+            .stream().collect(Collectors.toMap(StudentServiceArchiveRevisionDO::getServiceRelationId,Function.identity()));
+        var lastExamRevisions=serviceRevisionMap.isEmpty()?List.<StudentServiceArchiveRevisionDO>of():serviceRevisions.selectList(new LambdaQueryWrapperX<StudentServiceArchiveRevisionDO>()
+            .in(StudentServiceArchiveRevisionDO::getServiceRelationId,serviceRevisionMap.keySet()).eq(StudentServiceArchiveRevisionDO::getSource,"exam_submission")
+            .apply("revision=(SELECT MAX(r.revision) FROM zsjos_student_service_archive_revision r WHERE r.service_relation_id=zsjos_student_service_archive_revision.service_relation_id AND r.tenant_id=zsjos_student_service_archive_revision.tenant_id AND r.deleted=0 AND r.source='exam_submission' AND EXISTS (SELECT 1 FROM zsjos_exam_collection_submission s WHERE s.id=r.submission_id AND s.tenant_id=r.tenant_id AND s.task_id=r.task_id AND s.service_relation_id=r.service_relation_id AND s.status='ARCHIVED' AND s.deleted=0))"));
+        var submissionIds=lastExamRevisions.stream().map(StudentServiceArchiveRevisionDO::getSubmissionId).filter(Objects::nonNull).toList();
+        var submissionMap=submissionIds.isEmpty()?Map.<Long,ExamCollectionSubmissionDO>of():examSubmissions.selectByIds(submissionIds).stream().collect(Collectors.toMap(ExamCollectionSubmissionDO::getId,Function.identity()));
+        var submittedTimes=new HashMap<Long,java.time.LocalDateTime>();
+        for(var revision:lastExamRevisions) { var submission=submissionMap.get(revision.getSubmissionId()); if(submission!=null && Objects.equals(submission.getServiceRelationId(),revision.getServiceRelationId())) submittedTimes.put(revision.getServiceRelationId(),submission.getSubmittedAt()); }
         var bindings=summaryMapper.bindings(relationIds,TenantContextHolder.getRequiredTenantId()).stream()
             .filter(b->b.getFormId()!=null).collect(Collectors.toMap(StudentSummaryMapper.Binding::getServiceId,StudentSummaryMapper.Binding::getFormId));
         var formIds=new ArrayList<>(new HashSet<>(bindings.values()));
@@ -169,6 +201,17 @@ public class StudentSummaryService {
                     .collect(Collectors.groupingBy(StudentInfoImageDO::getFieldKey,Collectors.mapping(i->i.getOriginalName()==null || i.getOriginalName().isBlank()?i.getFieldKey()+"-"+i.getId()+StudentInfoAttachmentValidator.extension(i.getContentType()):i.getOriginalName(),Collectors.joining("；"))))
                     .forEach((key,value)->values.put("info."+key,value));
             }
+            var serviceRevision=serviceRevisionMap.get(relation.getId());
+            if(serviceRevision!=null) {
+                if(!Objects.equals(serviceRevision.getPersonId(),relation.getPersonId())) throw exception(LINK_INVALID);
+                values.keySet().removeIf(key->key.startsWith("info."));
+                JsonUtils.parseArray(serviceRevision.getAnswersJson(),StudentInfoFormValueDO.class).forEach(a->values.put("info."+a.getFieldKey(),answerText(a)));
+                JsonUtils.parseArray(serviceRevision.getAttachmentsJson(),cn.iocoder.yudao.module.zsjos.service.examcollection.StudentServiceArchiveStore.Attachment.class)
+                    .stream().collect(Collectors.groupingBy(cn.iocoder.yudao.module.zsjos.service.examcollection.StudentServiceArchiveStore.Attachment::fieldKey,
+                        Collectors.mapping(a->a.name()==null||a.name().isBlank()?a.fieldKey()+"-"+a.id()+StudentInfoAttachmentValidator.extension(a.contentType()):a.name(),Collectors.joining("；"))))
+                    .forEach((key,value)->values.put("info."+key,value));
+                values.put("collectionStatus","已填写"); values.put("submittedAt",text(submittedTimes.get(relation.getId())));
+            }
             var extra=extraMap.get(relation.getId());
             if(extra!=null) {
                 var content=JsonUtils.parseObject(extra.getValuesJson(),new tools.jackson.core.type.TypeReference<Map<String,Value>>(){});
@@ -189,7 +232,7 @@ public class StudentSummaryService {
         }
         return result;
     }
-    static List<Column> selectedColumns(List<Column> catalog,List<String> keys) {
+    public static List<Column> selectedColumns(List<Column> catalog,List<String> keys) {
         var map=catalog.stream().collect(Collectors.toMap(Column::key,Function.identity()));
         if(keys==null || keys.isEmpty() || new HashSet<>(keys).size()!=keys.size() || !map.keySet().containsAll(keys)) throw exception(FIELD_INVALID,"导出列无效，请刷新列设置");
         return keys.stream().map(map::get).toList();

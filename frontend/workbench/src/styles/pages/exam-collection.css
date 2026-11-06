@@ -1,0 +1,25 @@
+/* UTF-8. Exam collection reuses system form, table and archive surfaces. */
+.exam-collection-stack { width: 100%; gap: var(--crm-sp-4) !important; overflow-wrap: anywhere; }
+.exam-collection-stack > .ant-space-item { min-width: 0; max-width: 100%; }
+.exam-collection-full { width: 100%; }
+.exam-collection-field-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--crm-sp-4); width: 100%; }
+.exam-collection-selection { margin: 0; padding-inline-start: var(--crm-sp-5); }
+.exam-collection-selection li { padding-block: var(--crm-sp-2); }
+.exam-collection-selection li span { margin-inline-start: var(--crm-sp-4); color: var(--crm-text-secondary); }
+.exam-collection-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--crm-sp-4); }
+.exam-collection-title { margin: 0 !important; overflow-wrap: anywhere; }
+.exam-collection-header > .ant-space, .exam-collection-header .ant-space-item { min-width: 0; max-width: 100%; }
+.exam-collection-stats { display: flex; flex-wrap: wrap; gap: var(--crm-sp-5); color: var(--crm-text-secondary); }
+.exam-collection-stats strong { color: var(--crm-text); margin-inline-end: var(--crm-sp-2); }
+.exam-collection-link { padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); overflow-wrap: anywhere; }
+.exam-collection-link .ant-typography { margin-bottom: 0; }
+.exam-collection-detail { display: flex; flex-direction: column; gap: var(--crm-sp-4); min-width: 0; }
+.exam-collection-target { padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); }
+.exam-collection-target dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0,1fr); gap: var(--crm-sp-2) var(--crm-sp-4); }
+.exam-collection-target dt { color: var(--crm-text-secondary); }
+.exam-collection-target dd { margin: 0; overflow-wrap: anywhere; }
+.exam-planner-notice { margin-bottom: var(--crm-sp-3); }
+.exam-planner-reminder-item { padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
+.exam-planner-reminder-item p { margin: var(--crm-sp-2) 0 var(--crm-sp-3); color: var(--crm-text-secondary); overflow-wrap: anywhere; }
+.home-other-panel .task-panel-item--exam { border-inline-start: 3px solid var(--crm-color-primary); background: var(--crm-color-primary-bg); }
+.home-other-panel .task-panel-item--exam .task-panel-item-icon { color: var(--crm-color-primary); }

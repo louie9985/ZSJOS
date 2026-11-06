@@ -4,7 +4,11 @@ import { showImagePreview, showToast } from 'vant'
 import 'vant/es/image-preview/style'
 import { collectionApi, type CollectionImage, type CollectionField } from '@/api/studentInfo'
 import { createIdempotencyKey } from '@/utils/idempotency'
-const props = defineProps<{ token: string; field: CollectionField; images: CollectionImage[]; disabled: boolean }>()
+type ImageClient = Pick<typeof collectionApi, 'removeImage' | 'image'> & {
+  upload: (token: string, field: string, side: string, file: File, progress: (value: number) => void, requestKey?: string) => Promise<CollectionImage>
+}
+const props = defineProps<{ token: string; field: CollectionField; images: CollectionImage[]; disabled: boolean; client?: ImageClient }>()
+const client = (): ImageClient => props.client || collectionApi
 const emit = defineEmits<{ change: [CollectionImage[]]; busy: [boolean]; failed: [boolean] }>()
 type Pending = { uid: string; file: File; side: string; status: 'uploading' | 'error'; progress: number; error?: string }
 const pending = ref<Pending[]>([])
@@ -20,7 +24,7 @@ function status() { emit('busy', deleting.value || pending.value.some(x => x.sta
 async function send(item: Pending) {
   const current = generation; item.status = 'uploading'; item.error = ''; status()
   try {
-    const image = await collectionApi.upload(props.token, props.field.key, item.side, item.file, value => { item.progress = value })
+    const image = await client().upload(props.token, props.field.key, item.side, item.file, value => { item.progress = value }, item.uid)
     if (generation !== current) return
     localImages.value = [...localImages.value, image]; emit('change', localImages.value); pending.value = pending.value.filter(x => x.uid !== item.uid)
   } catch (e) { if (generation === current) { item.status = 'error'; item.error = e instanceof Error ? e.message : '上传失败，请重试' } }
@@ -40,7 +44,7 @@ function choose(event: Event, side: string, max: number) {
 }
 async function remove(image: CollectionImage) {
   deleting.value = true; status()
-  try { await collectionApi.removeImage(props.token, image.id); localImages.value=localImages.value.filter(x => x.id !== image.id); emit('change', localImages.value) }
+  try { await (props.client || collectionApi).removeImage(props.token, image.id); localImages.value=localImages.value.filter(x => x.id !== image.id); emit('change', localImages.value) }
   catch (e) { showToast(e instanceof Error ? e.message : '删除失败') }
   finally { deleting.value = false; status() }
 }
@@ -48,11 +52,11 @@ function discard(uid: string) { pending.value = pending.value.filter(x => x.uid 
 watch(() => props.images, async images => {
   const current = generation
   for (const image of images) if (image.contentType.startsWith('image/') && !urls.value[image.id]) {
-    try { const url = await collectionApi.image(props.token, image); if (current === generation) urls.value[image.id] = url; else URL.revokeObjectURL(url) } catch { /* attachment metadata remains visible with a retry action */ }
+    try { const url = await (props.client || collectionApi).image(props.token, image); if (current === generation) urls.value[image.id] = url; else URL.revokeObjectURL(url) } catch { /* attachment metadata remains visible with a retry action */ }
   }
 }, { immediate: true, deep: true })
 async function preview(image: CollectionImage) {
-  try { if (!urls.value[image.id]) urls.value[image.id] = await collectionApi.image(props.token, image); if (image.contentType.startsWith('image/')) showImagePreview({ images: [urls.value[image.id]], closeable: true, className: 'collection-image-preview norem' }); else { const a = document.createElement('a'); a.href = urls.value[image.id]; a.download = image.name; a.click() } }
+  try { if (!urls.value[image.id]) urls.value[image.id] = await (props.client || collectionApi).image(props.token, image); if (image.contentType.startsWith('image/')) showImagePreview({ images: [urls.value[image.id]], closeable: true, className: 'collection-image-preview norem' }); else { const a = document.createElement('a'); a.href = urls.value[image.id]; a.download = image.name; a.click() } }
   catch (e) { showToast(e instanceof Error ? e.message : '图片加载失败') }
 }
 onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revokeObjectURL) })

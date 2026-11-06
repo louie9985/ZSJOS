@@ -1,4 +1,5 @@
 import RegistrationArchiveCard from './RegistrationArchiveCard';
+import StudentArchiveHistoryRecord from './StudentArchiveHistoryRecord';
 import { useEffect, useRef, useState } from "react";
 import StudentArchiveExtraPanel from './StudentArchiveExtraPanel';
 import { useStudentArchiveEditor } from './StudentArchiveEditGuard';
@@ -18,6 +19,7 @@ import {
 import { EditOutlined } from "@ant-design/icons";
 import {
   studentArchiveApi,
+  archiveImageReference,
   type StudentArchive,
   type ArchiveEdit,
 } from "../services/studentArchive";
@@ -123,7 +125,7 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
     setImages((all) => [...all.filter((i) => i.fieldKey !== field), ...next]);
     change(
       field,
-      next.map((i) => i.id),
+      next.map(archiveImageReference),
     );
   };
   const attachment = (image: StudentInfoImage): AttachmentResource => {
@@ -176,14 +178,14 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
       return (
         <Space orientation="vertical">
           {selected.map((i) => (
-            <div className="archive-edit-attachment" key={i.id}>
+            <div className="archive-edit-attachment" key={archiveImageReference(i)}>
               <AttachmentCard name={i.name} load={async () => attachment(i)} />
               <Button
                 disabled={locked || busy}
                 onClick={() =>
                   selectImages(
                     f.key,
-                    selected.filter((x) => x.id !== i.id),
+                    selected.filter((x) => archiveImageReference(x) !== archiveImageReference(i)),
                   )
                 }
               >
@@ -227,7 +229,7 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
                           ...c,
                           [f.key]: next
                             .filter((x) => x.fieldKey === f.key)
-                            .map((x) => x.id),
+                            .map(archiveImageReference),
                         }));
                         return next;
                       });
@@ -353,8 +355,8 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
                       </Space>
                     </div> : f.type === 'images' ? files.length ? <>
                       <div className="student-info-attachments">{files.map(image => data.information.canReadSensitive
-                        ? <AttachmentCard key={`${relationId}:${data.revision}:${image.id}`} name={image.name} load={async () => attachment(image)} />
-                        : <span key={image.id}>{image.name}</span>)}</div>
+                        ? <AttachmentCard key={`${relationId}:${data.revision}:${archiveImageReference(image)}`} name={image.name} load={async () => attachment(image)} />
+                        : <span key={archiveImageReference(image)}>{image.name}</span>)}</div>
                       {!data.information.canReadSensitive && <span className="archive-sensitive-hint">暂无材料附件查看权限</span>}
                     </> : <span className="archive-empty">未提交附件</span>
                       : value == null || value === '' ? <span className="archive-empty">未填写</span>
@@ -378,11 +380,18 @@ function StudentArchivePanelContent({ relationId }: { relationId: number }) {
           </div>
           <Collapse
             items={[
+              ...(data.submissions?.length ? [{
+                key: 'submissions', label: `填写历史（${data.submissions.length}）`,
+                children: data.submissions.map((h,index) => <StudentArchiveHistoryRecord key={`submission:${h.submissionId}`}
+                  relationId={relationId} entry={h} submissionNumber={data.submissions!.length-index} sensitive={Boolean(data.information.canReadSensitive)} attachment={attachment} />),
+              }] : []),
               {
                 key: "history",
                 label: "维护记录",
                 children: data.history.length
-                  ? data.history.map((h) => (
+                  ? data.history.map((h) => h.source === 'service' ? <StudentArchiveHistoryRecord
+                      key={`service:${h.revision}`} relationId={relationId} entry={h}
+                      sensitive={Boolean(data.information.canReadSensitive)} attachment={attachment} /> : (
                       <p key={h.revision}>
                         第 {h.revision} 次修改 · {formatTimestamp(h.modifiedAt)} · {h.operatorName}
                         {h.reason && <> · {h.reason}</>}
