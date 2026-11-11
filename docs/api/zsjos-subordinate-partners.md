@@ -49,6 +49,10 @@ Partner Leads created after V143 snapshot `partnerOwnerUserIdSnapshot` and
 `partnerOwnerNameSnapshot` at submission. Older null snapshots display `未记录`; current ownership is
 never substituted as historical fact.
 
+2026-11-06 用户明确授权的单次数据修正，将当日刚改派兼职的 8 条本月客资运营及贡献人快照
+同步到新运营；不改变上述日常改派规则，也不追溯改写往月客资。
+范围与验证见[本月客资归属同步记录](../operations/partner-month-attribution-20261106.md)。
+
 ## Workbench presentation
 
 兼职管理提供收件箱和表格两种视图，复用相同的服务端搜索与分页结果。收件箱沿用学员管理的
