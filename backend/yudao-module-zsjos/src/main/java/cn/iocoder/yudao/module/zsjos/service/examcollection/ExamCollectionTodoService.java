@@ -18,6 +18,8 @@ import static cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectio
 public class ExamCollectionTodoService {
     @Resource private ExamCollectionMemberMapper members;
     @Resource private BusinessTaskCommandService commands;
+    @Resource private ExamCollectionRecipientScope recipientScope;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper businessTasks;
 
     /** Changes of roster/lifecycle replace pending generations; submissions update the current generation. */
     @Transactional(propagation=Propagation.MANDATORY)
@@ -25,16 +27,33 @@ public class ExamCollectionTodoService {
         var all = members.selectList(new LambdaQueryWrapperX<ExamCollectionMemberDO>().eq(ExamCollectionMemberDO::getTaskId, task.getId()).orderByAsc(ExamCollectionMemberDO::getId));
         var byPlanner = all.stream().filter(m -> m.getPlannerUserId() != null)
                 .collect(Collectors.groupingBy(ExamCollectionMemberDO::getPlannerUserId));
+        // A manager who is also a planner receives one combined todo per generation.
+        recipientScope.managers(all).forEach((user, visible) -> {
+            var combined = new LinkedHashSet<>(byPlanner.getOrDefault(user, List.of()));
+            combined.addAll(visible);
+            byPlanner.put(user, new ArrayList<>(combined));
+        });
         var now = ExamCollectionPublicService.now();
+        for (var pending : businessTasks.selectList(new LambdaQueryWrapperX<cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO>()
+                .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getTaskType, TASK_TYPE)
+                .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getBizId, task.getId())
+                .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO::getStatus, "pending"))) {
+            if (!byPlanner.containsKey(pending.getAssigneeId()))
+                commands.cancel(TASK_TYPE, task.getId(), pending.getAssigneeId(), now, "考试资料收集可见范围已更新");
+        }
+        // Cancel before grouping: older buggy updates may have changed an old generation's assignee.
+        if (replaceGeneration || !OPEN.equals(task.getStatus()))
+            commands.cancel(TASK_TYPE, task.getId(), null, now, "考试资料收集任务或名单已更新");
         for (var entry : byPlanner.entrySet()) {
             Long planner = entry.getKey();
             var active = entry.getValue().stream().filter(m -> Boolean.TRUE.equals(m.getActive())).toList();
-            if (replaceGeneration || !OPEN.equals(task.getStatus()) || active.isEmpty())
+            if (!replaceGeneration && OPEN.equals(task.getStatus()) && active.isEmpty())
                 commands.cancel(TASK_TYPE, task.getId(), planner, now, "考试资料收集任务或名单已更新");
             if (!OPEN.equals(task.getStatus()) || active.isEmpty()) continue;
+            String key = "exam-collection:" + task.getId() + ":" + task.getRevision() + ":" + planner;
             long collected = active.stream().filter(m -> m.getLastSubmissionId() != null).count();
             if (collected == active.size()) {
-                commands.complete(TASK_TYPE, task.getId(), planner, now); continue;
+                commands.completeByKey(key, now); continue;
             }
             var classNames=active.stream().map(ExamCollectionMemberDO::getClassNameSnapshot).distinct().toList();
             // BusinessTask.summary_snapshot is bounded; full frozen names remain in the planner read model.
@@ -42,10 +61,10 @@ public class ExamCollectionTodoService {
             String summary = "已收齐 " + collected + "/" + active.size() + " 人 · " + classes;
             var payload = new LinkedHashMap<String, Object>(); payload.put("collectionTaskId", task.getId());
             payload.put("revision", task.getRevision()); payload.put("classIds", active.stream().map(ExamCollectionMemberDO::getClassId).distinct().toList());
-            commands.create(new BusinessTaskCreateCommand(TASK_TYPE, BIZ_TYPE, task.getId(), planner,
+            Long todoId = commands.create(new BusinessTaskCreateCommand(TASK_TYPE, BIZ_TYPE, task.getId(), planner,
                     "考试资料收集：" + task.getTitle(), summary, TASK_ACTION, null, now,
-                    JsonUtils.toJsonString(payload), "exam-collection:" + task.getId() + ":" + task.getRevision() + ":" + planner));
-            commands.updatePending(TASK_TYPE, task.getId(), planner, "考试资料收集：" + task.getTitle(), summary, null, now);
+                    JsonUtils.toJsonString(payload), key));
+            commands.updatePendingById(todoId, planner, "考试资料收集：" + task.getTitle(), summary, null, now);
         }
     }
 }

@@ -71,6 +71,18 @@ class StudentServiceArchiveStoreTest {
         assertEquals("submitted", JsonUtils.parseArray(captor.getValue().getAnswersJson(), StudentInfoFormValueDO.class).getFirst().getValueText());
         verifyNoInteractions(forms, answers, legacyRevisions, images);
     }
+    @Test void legacyWechatSubmissionDoesNotReplaceExistingArchiveOrMutateRawHistory() {
+        var current = revision(1,"staff_edit","[\"wechat\"]",List.of(answer("name","old"),answer("wechat","preserved")));
+        when(revisions.latest(10L)).thenReturn(current);
+        var task = task(); task.setFieldsSnapshot(JsonUtils.toJsonString(List.of(field("name"),field("wechat"))));
+        var input = submission(); input.setAnswersJson(JsonUtils.toJsonString(List.of(answer("name","new"),answer("wechat","ignored"))));
+        store.apply(task,input,10L,null,"");
+        var written = ArgumentCaptor.forClass(StudentServiceArchiveRevisionDO.class); verify(revisions).insert(written.capture());
+        assertTrue(written.getValue().getAnswersJson().contains("preserved"));
+        assertFalse(written.getValue().getAnswersJson().contains("ignored"));
+        assertTrue(input.getAnswersJson().contains("ignored"));
+        assertFalse(written.getValue().getWrittenKeysJson().contains("wechat"));
+    }
     @Test void mergesLatestRevisionWithoutOverwritingUncollectedValuesOrOldFiles() {
         var current = new StudentServiceArchiveRevisionDO(); current.setPersonId(20L); current.setRevision(3);
         current.setFieldsSnapshot(JsonUtils.toJsonString(List.of(field("name"), field("mobile"))));

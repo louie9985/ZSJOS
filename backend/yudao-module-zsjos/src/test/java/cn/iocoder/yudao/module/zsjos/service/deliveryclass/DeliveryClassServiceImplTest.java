@@ -62,6 +62,35 @@ class DeliveryClassServiceImplTest {
     @Mock private DeliveryClassNumberService numberService;
     @Mock private DeliveryClassObjectPermissionProvider objectPermissions;
 
+    @Test void classOptionsResolveRenamedUsersWithoutChangingStoredSnapshot() {
+        var row = new DeliveryClassDO().setId(1L).setClassKind("NORMAL")
+                .setHomeroomUserId(7L).setHomeroomUserNameSnapshot("旧姓名");
+        when(classMapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
+                .thenReturn(java.util.List.of(row));
+        when(adminUserApi.getUserMap(java.util.Set.of(7L)))
+                .thenReturn(java.util.Map.of(7L, new AdminUserRespDTO().setId(7L).setNickname("新姓名")))
+                .thenReturn(java.util.Map.of(7L, new AdminUserRespDTO().setId(7L).setNickname("再次改名")))
+                .thenReturn(java.util.Map.of());
+        assertEquals("新姓名", service.options(null, false).getFirst().getHomeroomUserName());
+        assertEquals("再次改名", service.options(null, false).getFirst().getHomeroomUserName());
+        org.junit.jupiter.api.Assertions.assertNull(service.options(null, false).getFirst().getHomeroomUserName());
+        assertEquals("旧姓名", row.getHomeroomUserNameSnapshot());
+        verify(adminUserApi, times(3)).getUserMap(java.util.Set.of(7L));
+        verifyNoMoreInteractions(adminUserApi);
+    }
+
+    @Test void classDetailUsesCurrentNameAndHandlesMissingUsers() {
+        var row = new DeliveryClassDO().setId(1L).setSystemClass(true)
+                .setHomeroomUserId(7L).setHomeroomUserNameSnapshot("旧姓名");
+        when(classMapper.selectById(1L)).thenReturn(row);
+        when(adminUserApi.getUserMap(java.util.Set.of(7L)))
+                .thenReturn(java.util.Map.of(7L, new AdminUserRespDTO().setId(7L).setNickname("新姓名")))
+                .thenReturn(java.util.Map.of());
+        assertEquals("新姓名", service.get(1L, 9L).getHomeroomUserNameSnapshot());
+        org.junit.jupiter.api.Assertions.assertNull(service.get(1L, 9L).getHomeroomUserNameSnapshot());
+        assertEquals("旧姓名", row.getHomeroomUserNameSnapshot());
+    }
+
     @Test void classQueryAllExpandsManagedPageButNotPersonalPageOrWrites() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
         when(permissionApi.hasAnyPermissions(9L, DeliveryClassService.PERMISSION_QUERY_ALL)).thenReturn(true);

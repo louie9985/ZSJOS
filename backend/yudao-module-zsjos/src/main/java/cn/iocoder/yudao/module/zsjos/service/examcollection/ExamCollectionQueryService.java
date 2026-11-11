@@ -31,6 +31,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INV
 
 @Service
 public class ExamCollectionQueryService {
+    @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentSummaryService summary;
     @Resource private ExamCollectionTaskMapper tasks;
     @Resource private ExamCollectionSubmissionMapper submissions;
     @Resource private ExamCollectionAttachmentMapper attachments;
@@ -140,16 +141,20 @@ public class ExamCollectionQueryService {
         var page = members.selectPage(query, filter);
         if (page.getList().isEmpty()) return new PageResult<>(List.of(), page.getTotal());
         var relationIds = page.getList().stream().map(ExamCollectionMemberDO::getServiceRelationId).toList();
-        var personIds = page.getList().stream().map(ExamCollectionMemberDO::getPersonId).distinct().toList();
         var plannerIds = page.getList().stream().map(ExamCollectionMemberDO::getPlannerUserId).filter(Objects::nonNull).distinct().toList();
         var serviceMap = relations.selectByIds(relationIds).stream().collect(Collectors.toMap(r -> r.getId(), Function.identity()));
-        var personMap = people.selectByIds(personIds).stream().collect(Collectors.toMap(p -> p.getId(), Function.identity()));
+        // One batch projection for this page preserves formal-archive precedence and excludes drafts.
+        var archiveRows = summary.projectForExam(taskId, new ArrayList<>(serviceMap.values())).stream()
+                .collect(Collectors.toMap(r -> r.serviceRelationId(), r -> r.values()));
         var planners = plannerIds.isEmpty() ? Map.<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO>of() : users.getUserMap(plannerIds);
         return new PageResult<>(page.getList().stream().map(m -> new Member(m.getServiceRelationId(), m.getPersonId(),
                 serviceMap.containsKey(m.getServiceRelationId()) ? serviceMap.get(m.getServiceRelationId()).getStudentNameSnapshot() : "已删除学员服务",
-                personMap.containsKey(m.getPersonId()) ? personMap.get(m.getPersonId()).getMobile() : null,
+                archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("student.mobile"),
                 m.getClassId(), m.getClassNameSnapshot(), m.getPlannerUserId() != null && planners.containsKey(m.getPlannerUserId()) ? planners.get(m.getPlannerUserId()).getNickname() : "未分配或不可用",
-                Boolean.TRUE.equals(m.getActive()), m.getLastSubmissionId())).toList(), page.getTotal());
+                Boolean.TRUE.equals(m.getActive()), m.getLastSubmissionId(),
+                archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.name"),
+                archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.mobile"),
+                archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.id_card"))).toList(), page.getTotal());
     }
     static Map<String, String> display(List<StudentInfoFormValueDO> answers) {
         var values = new LinkedHashMap<String, String>();

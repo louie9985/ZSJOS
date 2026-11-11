@@ -3,7 +3,7 @@ import { Image } from 'antd'
 
 const SAFE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:'])
 
-export function sanitizeRichText(html: string, announcementTables = false) {
+export function sanitizeRichText(html: string, announcementTables = false, previewImages = announcementTables) {
   const document = new DOMParser().parseFromString(html, 'text/html')
   document.querySelectorAll('script,iframe,object,embed,form').forEach(node => node.remove())
   document.querySelectorAll<HTMLElement>('*').forEach(node => {
@@ -23,23 +23,29 @@ export function sanitizeRichText(html: string, announcementTables = false) {
       const url = new URL(image.src, window.location.origin)
       if (!SAFE_PROTOCOLS.has(url.protocol) && url.protocol !== 'data:') image.removeAttribute('src')
       image.loading = 'lazy'
-      if (announcementTables && image.getAttribute('src')) {
+      if (previewImages && image.getAttribute('src')) {
         image.tabIndex = 0
         image.setAttribute('role', 'button')
-        image.setAttribute('aria-label', `预览图片：${image.alt || '公告图片'}`)
+        image.setAttribute('aria-label', `预览图片：${image.alt || (announcementTables ? '公告图片' : '正文图片')}`)
         image.style.cursor = 'zoom-in'
       }
     } catch { image.removeAttribute('src') }
   })
-  // Keep wide tables inside the reading surface without squeezing their columns.
-  // This wrapper is a display projection; the saved editor HTML stays unchanged.
+  // Adapt the display projection only. The saved editor HTML retains its dimensions.
+  if (announcementTables) document.querySelectorAll('p').forEach(paragraph => {
+    const images = Array.from(paragraph.querySelectorAll('img'))
+    const widths = images.map(image => image.style.width || image.getAttribute('width') || '')
+    if (images.length < 2 || widths.some(width => !/^\d+(?:\.\d+)?(?:px)?$/.test(width))) return
+    const pixels = widths.map(Number.parseFloat)
+    if (pixels.some(width => width <= 0) || pixels.reduce((sum, width) => sum + width, 0) > 1352) return
+    images.forEach((image, index) => { image.style.width = `${pixels[index] / 1352 * 100}%`; image.removeAttribute('width') })
+  })
   if (announcementTables) document.querySelectorAll('table').forEach(table => {
     const pixelWidth = (node: HTMLElement) => {
       const width = node.style.width || node.getAttribute('width') || ''
       return /^\d+(?:\.\d+)?(?:px)?$/.test(width) ? Number.parseFloat(width) : undefined
     }
-    // CSS width alone is only a preference in automatic table layout. Keep authored
-    // pixel columns as a lower bound, including wangEditor's exported colgroup.
+    // Use authored widths as ratios, including wangEditor's exported colgroup.
     const columns = Array.from(table.querySelectorAll<HTMLTableColElement>(':scope > colgroup > col, :scope > col'))
     let minimumWidth = pixelWidth(table) || 0
     if (columns.length) {
@@ -49,12 +55,23 @@ export function sanitizeRichText(html: string, announcementTables = false) {
       let rowWidth = 0
       Array.from(row.cells).forEach(cell => {
         const width = pixelWidth(cell)
-        if (width != null && !cell.style.minWidth) cell.style.minWidth = `${width}px`
         rowWidth += width ?? 80 * cell.colSpan
       })
       if (!columns.length) minimumWidth = Math.max(minimumWidth, rowWidth)
     })
-    if (minimumWidth && !table.style.minWidth) table.style.minWidth = `${minimumWidth}px`
+    table.querySelectorAll<HTMLElement>('col,td,th').forEach(node => {
+      if (node.closest('table') !== table) return
+      const width = pixelWidth(node)
+      node.style.removeProperty('min-width')
+      if (width && minimumWidth) {
+        node.style.width = `${width / minimumWidth * 100}%`
+        node.removeAttribute('width')
+      }
+    })
+    table.style.removeProperty('min-width')
+    table.removeAttribute('width')
+    table.style.width = '100%'
+    table.style.tableLayout = 'fixed'
     const wrapper = document.createElement('div')
     wrapper.className = 'announcement-table-scroll'
     wrapper.tabIndex = 0
@@ -66,15 +83,15 @@ export function sanitizeRichText(html: string, announcementTables = false) {
   return document.body.innerHTML
 }
 
-export default function SafeRichText({ html, announcementTables = false }: { html: string; announcementTables?: boolean }) {
-  const safeHtml = useMemo(() => sanitizeRichText(html, announcementTables), [html, announcementTables])
-  return <RichTextContent key={safeHtml} safeHtml={safeHtml} announcementTables={announcementTables} />
+export default function SafeRichText({ html, announcementTables = false, previewImages = announcementTables }: { html: string; announcementTables?: boolean; previewImages?: boolean }) {
+  const safeHtml = useMemo(() => sanitizeRichText(html, announcementTables, previewImages), [html, announcementTables, previewImages])
+  return <RichTextContent key={safeHtml} safeHtml={safeHtml} announcementTables={announcementTables} previewImages={previewImages} />
 }
 
-function RichTextContent({ safeHtml, announcementTables }: { safeHtml: string; announcementTables: boolean }) {
+function RichTextContent({ safeHtml, announcementTables, previewImages }: { safeHtml: string; announcementTables: boolean; previewImages: boolean }) {
   const [preview, setPreview] = useState<{ items: string[]; current: number }>()
   const openImage = (event: MouseEvent<HTMLDivElement> | KeyboardEvent<HTMLDivElement>) => {
-    if (!announcementTables || !(event.target instanceof HTMLImageElement) || !event.target.getAttribute('src')) return
+    if (!previewImages || !(event.target instanceof HTMLImageElement) || !event.target.getAttribute('src')) return
     if ('key' in event && event.key !== 'Enter' && event.key !== ' ') return
     const images = Array.from(event.currentTarget.querySelectorAll<HTMLImageElement>('img[src]')).filter(image => image.getAttribute('src'))
     event.preventDefault()

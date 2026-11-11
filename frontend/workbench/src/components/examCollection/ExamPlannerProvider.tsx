@@ -1,9 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import { Alert, Button, Empty, Input, Modal, Select, Space, Spin, Tag, Typography } from 'antd';
 import { FileTextOutlined } from '@ant-design/icons';
-import type { ProColumns } from '@ant-design/pro-components';
+import { examMemberColumns } from './ExamMemberColumns';
 import { ApiError, AuthenticationError } from '../../services/api';
 import { examPlannerApi, EXAM_COLLECTION_PROGRESS_EVENT, type ExamPlannerMember, type ExamPlannerState, type ExamTodo } from '../../services/examCollection';
+import ExamCollectionShare from './ExamCollectionShare';
 import BusinessTable from '../BusinessTable';
 import { useBusinessOverlay } from '../OverlayCoordinator';
 import { useExamReminderVisibility } from './useExamReminderVisibility';
@@ -24,14 +25,18 @@ function PlannerDialog({initialTaskId,onClose}:{initialTaskId?:number;onClose:()
   const [keyword,setKeyword]=useState(''),[searchText,setSearchText]=useState(''),[filled,setFilled]=useState<boolean>(),[page,setPage]=useState(1),[size,setSize]=useState(20);
   const [rows,setRows]=useState<ExamPlannerMember[]>([]),[total,setTotal]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState(''),[reload,setReload]=useState(0);
   const [receiptError,setReceiptError]=useState('');
+  const [sort,setSort]=useState<{sortField?:string;sortOrder?:'asc'|'desc'}>({});
   useEffect(()=>{setPage(1);setKeyword('');setSearchText('');setFilled(undefined)},[selected?.todoId]);
   useEffect(()=>{let active=true;setReceiptError('');if(selected)void planner.markSeen([selected.todoId]).catch(e=>{if(active){setReceiptError(errorText(e));if(isDenied(e))void planner.refresh()}});return()=>{active=false}},[selected?.todoId,planner.markSeen,planner.refresh]);
   useEffect(()=>{let active=true;setRows([]);setTotal(0);setError('');if(!selected){setLoading(false);return}setLoading(true);
-    void examPlannerApi.members(selected.collectionTaskId,{pageNo:page,pageSize:size,keyword,filled})
+    void examPlannerApi.members(selected.collectionTaskId,{pageNo:page,pageSize:size,keyword,filled,...sort})
       .then(v=>{if(active){setRows(v.list);setTotal(v.total)}}).catch(e=>{if(active)setError(errorText(e))}).finally(()=>{if(active)setLoading(false)});
     return()=>{active=false};
-  },[selected?.todoId,selected?.collectionTaskId,selected?.collected,selected?.expected,page,size,keyword,filled,reload]);
-  const columns:ProColumns<ExamPlannerMember>[]=[{title:'学员姓名',dataIndex:'studentName',width:150},{title:'联系手机号',dataIndex:'mobile',width:160},{title:'通知时班级',dataIndex:'className',width:220},{title:'本次填写',dataIndex:'filled',width:120,render:(_,r)=><Tag color={r.filled?'success':'warning'}>{r.filled?'已填写':'未填写'}</Tag>}];
+  },[selected?.todoId,selected?.collectionTaskId,selected?.collected,selected?.expected,page,size,keyword,filled,sort,reload]);
+  const columns = examMemberColumns<ExamPlannerMember>(row => row.filled).map(column => ({
+    ...column, sorter: true,
+    sortOrder: sort.sortField === (column.key || column.dataIndex) ? (sort.sortOrder === 'asc' ? 'ascend' as const : 'descend' as const) : null,
+  }));
   return <Modal open title="我的考试资料收集待办" width={940} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles} onCancel={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
     <Space orientation="vertical" className="exam-collection-stack">
       {planner.error&&<Alert type="error" title={planner.error} action={<Button onClick={()=>void planner.refresh()}>重试</Button>}/>}
@@ -40,10 +45,11 @@ function PlannerDialog({initialTaskId,onClose}:{initialTaskId?:number;onClose:()
         <Typography.Title level={5}>{selected.title}</Typography.Title>
         <Typography.Text>本次负责班级：{selected.classes.join('、')}</Typography.Text>
         {receiptError&&<Alert type="warning" title="提醒已读状态尚未保存" description={receiptError} action={<Button size="small" onClick={()=>void planner.markSeen([selected.todoId]).then(()=>setReceiptError('')).catch(e=>setReceiptError(errorText(e)))}>重试</Button>}/>}
-        <Space wrap><Tag color="processing">已收齐 {selected.collected}/{selected.expected} 人</Tag><Button loading={planner.loading||loading} onClick={()=>{void planner.refresh();setReload(v=>v+1)}}>刷新进度</Button></Space>
-        <section className="exam-collection-link"><Typography.Text strong>转发给学员的统一链接</Typography.Text><Typography.Paragraph copyable={{text:selected.url}}>{selected.url}</Typography.Paragraph></section>
-        <BusinessTable<ExamPlannerMember> mode="compact" tableKey="exam-planner-members" rowKey="serviceRelationId" columns={columns} dataSource={rows} loading={loading} error={error} onReload={()=>setReload(v=>v+1)}
-          filters={<><Input.Search aria-label="搜索本人应收学员" placeholder="姓名、手机号" allowClear value={searchText} maxLength={200} onChange={e=>setSearchText(e.target.value)} onSearch={v=>{setKeyword(v);setPage(1)}}/><Select aria-label="填写状态" placeholder="全部填写状态" allowClear value={filled===undefined?undefined:String(filled)} options={[{value:'false',label:'未填写'},{value:'true',label:'已填写'}]} onChange={v=>{setFilled(v===undefined?undefined:v==='true');setPage(1)}}/></>}
+        <Space wrap><Tag color="processing">已收齐 {selected.collected}/{selected.expected} 人</Tag></Space>
+        <ExamCollectionShare key={selected.url} url={selected.url}/>
+        <BusinessTable<ExamPlannerMember> mode="full" options={{reload:false}} tableKey="exam-planner-members" rowKey="serviceRelationId" columns={columns} dataSource={rows} loading={loading} error={error}
+          onChange={(_, __, sorter, extra)=>{if(extra.action!=='sort')return;const current=Array.isArray(sorter)?sorter[0]:sorter;setSort(current.order?{sortField:String(current.columnKey),sortOrder:current.order==='ascend'?'asc':'desc'}:{});setPage(1)}} onReload={()=>setReload(v=>v+1)}
+          filters={<div className="exam-collection-filters"><Input.Search aria-label="搜索本人应收学员" placeholder="姓名、手机号" allowClear value={searchText} maxLength={200} onChange={e=>setSearchText(e.target.value)} onSearch={v=>{setKeyword(v);setPage(1)}}/><Select aria-label="填写状态" placeholder="全部填写状态" allowClear value={filled===undefined?undefined:String(filled)} options={[{value:'false',label:'未填写'},{value:'true',label:'已填写'}]} onChange={v=>{setFilled(v===undefined?undefined:v==='true');setPage(1)}}/></div>}
           pagination={{current:page,pageSize:size,total,showSizeChanger:true,onChange:(p,s)=>{setPage(s!==size?1:p);setSize(s)}}}/>
         <Typography.Text type="secondary">仅列出本次分配给你的学员。收齐后待办自动移除；关闭窗口不会完成任务。</Typography.Text>
       </>}
@@ -120,7 +126,7 @@ export default function ExamPlannerProvider({enabled,children}:PropsWithChildren
         <Typography.Paragraph>请通知所负责班级填写，并跟进收齐。关闭提醒不会完成任务。</Typography.Paragraph>
         {unread.length>100&&<Typography.Text type="secondary">当前显示前 100 个提醒，确认后继续显示其余提醒。</Typography.Text>}
         {activeAckError&&<Alert type="error" title={activeAckError} action={<Button onClick={()=>void dismiss()}>重试</Button>}/>}
-        {unread.slice(0,100).map(todo=><section key={todo.todoId} className="exam-planner-reminder-item"><Typography.Text strong>{todo.title}</Typography.Text><p>{todo.classes.join('、')}</p><Space wrap><Tag color="processing">已收齐 {todo.collected}/{todo.expected} 人</Tag><Button disabled={acknowledging} onClick={()=>void dismiss(todo.collectionTaskId)}>查看并跟进</Button><Typography.Text copyable={{text:todo.url}}>复制收集链接</Typography.Text></Space></section>)}
+        {unread.slice(0,100).map(todo=><section key={todo.todoId} className="exam-planner-reminder-item"><Typography.Text strong>{todo.title}</Typography.Text><p>{todo.classes.join('、')}</p><Space wrap><Tag color="processing">已收齐 {todo.collected}/{todo.expected} 人</Tag><Button disabled={acknowledging} onClick={()=>void dismiss(todo.collectionTaskId)}>查看并跟进</Button></Space><ExamCollectionShare key={todo.url} url={todo.url}/></section>)}
       </Space>
     </Modal>
     {enabled&&opened&&<PlannerDialog initialTaskId={opened.taskId} onClose={()=>setOpened(undefined)}/>}

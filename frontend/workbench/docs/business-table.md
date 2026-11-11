@@ -121,3 +121,7 @@ import BusinessTable from '../components/BusinessTable'
 ## 业务列表全局排序
 
 我的学员、订单管理、返现管理、提现管理的排序参数、复杂展示值规则和卡片游标见 [排序契约](../../../docs/api/business-list-sorting.md)。页面通过列头声明远程排序，学员与订单另提供卡片排序菜单；BusinessTable 不对分页数据作本地排序。
+
+### 学习规划师收集待办
+
+收集待办使用 BusinessTable 完整模式，提供列显隐、列顺序、列宽、密度和全屏。列偏好以 `crm-table:exam-planner-members:columns` 独立保存。七个业务列支持服务端全局升降序，排序变化回到第一页，取消排序恢复名单顺序。档案字段先按既有档案投影规则解析，再排序分页，空值始终置后，同值保持名单顺序。自动轮询更新进度，失败提供重试。

@@ -59,17 +59,24 @@ public class ExamCollectionTaskService {
         String key = DigestUtil.sha256Hex(tenant + ":" + actor + ":" + request.getIdempotencyKey());
         String hash = DigestUtil.sha256Hex(JsonUtils.toJsonString(List.of(request.getTitle().trim(),
                 request.getDescription() == null ? "" : request.getDescription().trim(), request.getSelectedFields().stream().sorted().toList())));
+        if (request.getContent() != null && !request.getContent().isBlank()) {
+            hash = DigestUtil.sha256Hex(hash + ":" + request.getContent());
+        }
+        if (request.getUploadLimits() != null && !request.getUploadLimits().isEmpty()) {
+            hash = DigestUtil.sha256Hex(hash + ":" + JsonUtils.toJsonString(new java.util.TreeMap<>(request.getUploadLimits())));
+        }
         var previous = tasks.byCreateRequest(key, false);
         if (previous != null) return replay(previous, tenant, key, hash);
         var config = configs.state("PUBLISHED");
         if (config == null) throw exception(CONFIG_MISSING);
-        var snapshot = ExamCollectionFields.snapshot(JsonUtils.parseArray(config.getFieldsJson(), Field.class), request.getSelectedFields());
+        var snapshot = ExamCollectionFields.snapshot(JsonUtils.parseArray(config.getFieldsJson(), Field.class), request.getSelectedFields(), request.getUploadLimits());
         String token = tokens.create();
         publicUrl(token); // Fail configuration checks before creating an unusable task.
         tokens.identityHash("configuration-check");
         var row = new ExamCollectionTaskDO();
         row.setTenantId(TenantContextHolder.getRequiredTenantId()); row.setTitle(request.getTitle().trim());
         row.setDescription(request.getDescription() == null ? "" : request.getDescription().trim());
+        row.setContent(ExamCollectionContent.clean(request.getContent()));
         row.setStatus(OPEN); row.setConfigVersionId(config.getId()); row.setFieldsSnapshot(JsonUtils.toJsonString(snapshot));
         row.setTokenHash(tokens.hash(token)); row.setTokenCiphertext(token); row.setRevision(0); row.setSequenceNo(0L);
         row.setCreateRequestKey(key); row.setCreateRequestHash(hash);
@@ -87,7 +94,7 @@ public class ExamCollectionTaskService {
         if (!Objects.equals(row.getTenantId(), tenant) || Boolean.TRUE.equals(row.getDeleted())
                 || !Objects.equals(row.getCreateRequestKey(), key) || !Objects.equals(row.getCreateRequestHash(), hash)) throw exception(CONFLICT);
         var result = BeanUtils.toBean(project(row), Detail.class);
-        result.setFields(JsonUtils.parseArray(row.getFieldsSnapshot(), Field.class));
+        result.setFields(ExamCollectionFields.liveFields(JsonUtils.parseArray(row.getFieldsSnapshot(), Field.class)));
         result.setClassIds(row.getClassIdsJson() == null ? List.of() : JsonUtils.parseArray(row.getClassIdsJson(), Long.class));
         result.setUrl(publicUrl(row.getTokenCiphertext())); return result;
     }
@@ -104,7 +111,7 @@ public class ExamCollectionTaskService {
         objectPermissions.check(id, "query", getLoginUserId());
         var row = tasks.selectById(id);
         var result = BeanUtils.toBean(project(row), Detail.class);
-        result.setFields(JsonUtils.parseArray(row.getFieldsSnapshot(), Field.class));
+        result.setFields(ExamCollectionFields.liveFields(JsonUtils.parseArray(row.getFieldsSnapshot(), Field.class)));
         result.setClassIds(row.getClassIdsJson() == null ? List.of() : JsonUtils.parseArray(row.getClassIdsJson(), Long.class));
         result.setUrl(publicUrl(row.getTokenCiphertext())); return result;
     }

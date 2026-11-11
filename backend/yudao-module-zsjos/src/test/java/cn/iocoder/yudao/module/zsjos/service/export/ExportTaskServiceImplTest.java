@@ -200,6 +200,45 @@ class ExportTaskServiceImplTest {
         verify(mapper).deleteInactiveTerminal(argThat(value -> value.isBefore(LocalDateTime.now().minusDays(89))));
     }
 
+    @Test
+    void privateResultIsEncryptedAndStoredWithOpaqueName() throws Exception {
+        when(mapper.transition(anyLong(), anyInt(), anyList(), any())).thenReturn(1);
+        when(provider.privateResult()).thenReturn(true);
+        when(provider.generate(any())).thenReturn(new ExportTypeProvider.ExportResult(new byte[]{1}, "测试(202611111800).zip", 0));
+        when(provider.encodeResult(any())).thenReturn(new byte[]{9,8});
+        when(fileApi.createFileInfo(any(), anyString(), anyString(), anyString()))
+                .thenReturn(new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO().setId(20L));
+        service.processOne(task());
+        verify(fileApi).createFileInfo(org.mockito.AdditionalMatchers.aryEq(new byte[]{9,8}), endsWith(".bin"), anyString(), eq("application/octet-stream"));
+        var values = ArgumentCaptor.forClass(ExportTaskDO.class);
+        verify(mapper).transition(eq(10L), eq(4), eq(List.of(GENERATING)), values.capture());
+        assertEquals(READY, values.getValue().getStatus());
+        assertEquals("测试(202611111800).zip", values.getValue().getResultFileName());
+    }
+
+    @Test
+    void privateDownloadChecksOwnershipScopeExpiryAndNeverPresigns() throws Exception {
+        var ready = task().setStatus(READY).setResultFileId(20L).setResultFileName("测试.zip")
+                .setExpiresAt(LocalDateTime.now().plusDays(1));
+        when(mapper.selectById(10L)).thenReturn(ready);
+        when(provider.privateResult()).thenReturn(true);
+        assertThrows(ServiceException.class, () -> service.download(2L, 10L));
+        assertThrows(ServiceException.class, () -> service.getDownloadUrl(1L, 10L));
+        verifyNoInteractions(fileApi);
+        when(fileApi.getFileContent(20L)).thenReturn(new byte[]{9});
+        when(provider.decodeResult(any())).thenReturn(new byte[]{1});
+        assertArrayEquals(new byte[]{1}, service.download(1L, 10L).content());
+        verify(provider, atLeast(2)).checkDownload(ready);
+        clearInvocations(fileApi);
+        ready.setExpiresAt(LocalDateTime.now().minusDays(1));
+        assertThrows(ServiceException.class, () -> service.download(1L, 10L));
+        verifyNoInteractions(fileApi);
+        ready.setExpiresAt(LocalDateTime.now().plusDays(1));
+        doThrow(new ServiceException(403, "denied")).when(provider).checkDownload(ready);
+        assertThrows(ServiceException.class, () -> service.download(1L, 10L));
+        verifyNoInteractions(fileApi);
+    }
+
     private static ExportTaskDO task() {
         ExportTaskDO task = new ExportTaskDO().setId(10L).setTaskNo("EXP001").setExportType("lead")
                 .setStatus(PRECHECKING).setCreatorUserId(1L).setCreatorRoleSnapshot("zsjos:export:lead")

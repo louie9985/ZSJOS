@@ -14,6 +14,8 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMappe
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassKind;
 import cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassGroupDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassGroupMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,7 @@ public class ExamCollectionRosterService {
     @Resource private ExamCollectionSubmissionMapper submissions;
     @Resource private ExamCollectionBindingMapper bindings;
     @Resource private DeliveryClassMapper classes;
+    @Resource private DeliveryClassGroupMapper groups;
     @Resource private ServiceRelationMapper relations;
     @Resource private AdminUserApi users;
     @Resource private PermissionApi permissions;
@@ -41,10 +44,97 @@ public class ExamCollectionRosterService {
 
     public List<ClassOption> classes() {
         if (!permissions.hasAnyPermissions(getLoginUserId(), QUERY)) throw exception(DENIED);
-        TenantContextHolder.getRequiredTenantId();
-        return classes.selectList(new LambdaQueryWrapperX<DeliveryClassDO>().eq(DeliveryClassDO::getStatus, "SERVING")
-                .orderByDesc(DeliveryClassDO::getId)).stream().filter(DeliveryClassKind::assignable)
-                .map(c -> new ClassOption(c.getId(), c.getClassName(), c.getHomeroomUserId(), c.getHomeroomUserNameSnapshot())).toList();
+        Long tenant = TenantContextHolder.getRequiredTenantId();
+        var available = classes.selectList(new LambdaQueryWrapperX<DeliveryClassDO>().eq(DeliveryClassDO::getStatus, "SERVING")
+                .orderByDesc(DeliveryClassDO::getId)).stream().filter(DeliveryClassKind::assignable).toList();
+        var groupIds = available.stream().map(DeliveryClassDO::getGroupId).filter(Objects::nonNull).distinct().toList();
+        var groupRows = groupIds.isEmpty() ? List.<DeliveryClassGroupDO>of()
+                : groups.selectByIds(groupIds);
+        var groupMap = new HashMap<Long, DeliveryClassGroupDO>();
+        for (var group : groupRows) if (Objects.equals(group.getTenantId(), tenant) && !Boolean.TRUE.equals(group.getDeleted())) groupMap.put(group.getId(), group);
+        if (!groupMap.keySet().containsAll(groupIds)) throw exception(FIELD_INVALID, "班级组已变化，请刷新班级配置后重试");
+        var orderedGroups = groupMap.values().stream().sorted(Comparator
+                .comparing(DeliveryClassGroupDO::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(DeliveryClassGroupDO::getId, Comparator.reverseOrder())).toList();
+        var groupOrder = new HashMap<Long, Integer>();
+        for (int index = 0; index < orderedGroups.size(); index++) groupOrder.put(orderedGroups.get(index).getId(), index);
+        // Sort is stable: children keep the authoritative class-ID order, ungrouped classes remain independent.
+        return available.stream().sorted(Comparator.comparingInt(c -> groupOrder.getOrDefault(c.getGroupId(), Integer.MAX_VALUE)))
+                .map(c -> new ClassOption(c.getId(), c.getClassName(), c.getHomeroomUserId(), c.getHomeroomUserNameSnapshot(),
+                        c.getGroupId(), c.getGroupId() == null ? null : groupMap.get(c.getGroupId()).getName(), c.getHomeroomUserId() != null)).toList();
+    }
+    @ZsjosPermission(bizType="exam-collection", bizId="#id", action="query")
+    public List<ClassOption> classOptions(Long id) {
+        objects.check(id,"query",getLoginUserId());
+        var task = tasks.selectById(id);
+        if (task == null || !Objects.equals(task.getTenantId(),TenantContextHolder.getRequiredTenantId())) throw exception(NOT_FOUND);
+        var options = new LinkedHashMap<Long,ClassOption>(); classes().forEach(option -> options.put(option.id(),option));
+        var selected = task.getClassIdsJson() == null ? List.<Long>of() : JsonUtils.parseArray(task.getClassIdsJson(),Long.class);
+        var missing = selected.stream().filter(classId -> !options.containsKey(classId)).toList();
+        if (!missing.isEmpty()) {
+            var frozen = members.selectList(new LambdaQueryWrapperX<ExamCollectionMemberDO>().eq(ExamCollectionMemberDO::getTaskId,id));
+            var historical = classes.selectByIds(missing).stream().collect(java.util.stream.Collectors.toMap(DeliveryClassDO::getId,c -> c));
+            for (Long classId : missing) {
+                var clazz = historical.get(classId);
+                String name = clazz == null ? frozen.stream().filter(m -> classId.equals(m.getClassId())).map(ExamCollectionMemberDO::getClassNameSnapshot)
+                        .filter(Objects::nonNull).findFirst().orElse("已不可用班级") : clazz.getClassName();
+                options.put(classId,new ClassOption(classId,name,null,null,null,null,false));
+            }
+        }
+        var plannerIds = options.values().stream().map(ClassOption::plannerId).filter(Objects::nonNull).distinct().toList();
+        var planners = plannerIds.isEmpty() ? Map.<Long,cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO>of() : users.getUserMap(plannerIds);
+        return options.values().stream().map(option -> new ClassOption(option.id(),option.name(),option.plannerId(),option.plannerName(),option.groupId(),option.groupName(),
+                option.selectable() && planners.containsKey(option.plannerId()) && Objects.equals(planners.get(option.plannerId()).getStatus(),0))).toList();
+    }
+
+    @ZsjosPermission(bizType="exam-collection", bizId="#id", action="members")
+    @Transactional(rollbackFor=Exception.class)
+    public void adjustClasses(Long id, ClassChange request) {
+        objects.check(id,"members",getLoginUserId());
+        var task = lock(id,request.getRevision()); ExamCollectionPublicService.requireOpen(task);
+        if (task.getClassIdsJson() == null) throw exception(CONFLICT);
+        if (request.getClassIds() == null || request.getClassIds().isEmpty() || request.getClassIds().size()>100
+                || request.getReason() == null || request.getReason().isBlank() || request.getReason().length()>500) throw exception(FIELD_INVALID,"请选择班级并填写调整原因");
+        var selected = new TreeSet<>(request.getClassIds());
+        if (selected.size()!=request.getClassIds().size()) throw exception(FIELD_INVALID,"重复班级");
+        var previous = new TreeSet<>(JsonUtils.parseArray(task.getClassIdsJson(),Long.class));
+        var additions = new TreeSet<>(selected); additions.removeAll(previous);
+        var removals = new TreeSet<>(previous); removals.removeAll(selected);
+        if (additions.isEmpty() && removals.isEmpty()) return;
+        var existing = members.selectList(new LambdaQueryWrapperX<ExamCollectionMemberDO>().eq(ExamCollectionMemberDO::getTaskId,id))
+                .stream().collect(java.util.stream.Collectors.toMap(ExamCollectionMemberDO::getServiceRelationId,m -> m));
+        for (var member : existing.values()) if (removals.contains(member.getClassId()) && Boolean.TRUE.equals(member.getActive())) {
+            member.setActive(false); members.updateById(member);
+        }
+        for (Long classId : additions) {
+            var clazz = classes.selectByIdForUpdate(classId,task.getTenantId());
+            if (clazz == null || !Objects.equals(clazz.getTenantId(),task.getTenantId()) || !"SERVING".equals(clazz.getStatus())
+                    || !DeliveryClassKind.assignable(clazz) || clazz.getHomeroomUserId()==null) throw exception(CLASS_INVALID);
+            var planner = users.getUser(clazz.getHomeroomUserId());
+            if (planner == null || !Objects.equals(planner.getStatus(),0)) throw exception(CLASS_INVALID);
+            // Re-adding a class restores its original frozen rows, including prior collected state.
+            for (var member : existing.values()) if (classId.equals(member.getClassId()) && !Boolean.TRUE.equals(member.getActive())) {
+                member.setActive(true); members.updateById(member);
+            }
+            for (var relation : relations.selectClassRelationsForUpdate(classId,task.getTenantId())) {
+                if (TeachingServiceLifecycle.closed(relation)) continue;
+                var member = existing.get(relation.getId());
+                if (member != null) continue;
+                member = new ExamCollectionMemberDO(); member.setTenantId(task.getTenantId());member.setTaskId(id);
+                member.setServiceRelationId(relation.getId());member.setPersonId(relation.getPersonId());member.setClassId(classId);
+                member.setPlannerUserId(clazz.getHomeroomUserId());member.setClassNameSnapshot(clazz.getClassName());member.setActive(true);
+                String identity = archives.current(relation.getId()).answers().stream().filter(a -> "id_card".equals(a.getFieldKey()))
+                        .map(a -> a.getValueText()).filter(Objects::nonNull).findFirst().orElse(null);
+                member.setIdentityHash(tokens.identityHash(identity));
+                var collected = bindings.selectOne(new LambdaQueryWrapperX<ExamCollectionBindingDO>().eq(ExamCollectionBindingDO::getTaskId,id)
+                        .eq(ExamCollectionBindingDO::getServiceRelationId,relation.getId()).isNotNull(ExamCollectionBindingDO::getLastSubmissionId)
+                        .orderByDesc(ExamCollectionBindingDO::getLastSequenceNo).last("LIMIT 1"));
+                if (collected != null) member.setLastSubmissionId(collected.getLastSubmissionId());
+                members.insert(member);existing.put(relation.getId(),member);
+            }
+        }
+        task.setClassIdsJson(JsonUtils.toJsonString(selected));task.setRevision(task.getRevision()+1);tasks.updateById(task);
+        record(task,"ADJUST_CLASSES",request.getReason(),Map.of("addedClassIds",additions,"removedClassIds",removals));todos.synchronize(task,true);
     }
     @ZsjosPermission(bizType="exam-collection", bizId="#id", action="notify")
     @Transactional(rollbackFor=Exception.class)
@@ -128,7 +218,7 @@ public class ExamCollectionRosterService {
             var row = existing.get(relationId);
             if (row != null) {
                 if (Boolean.TRUE.equals(row.getActive())) throw exception(CONFLICT);
-                row.setActive(true); members.updateById(row); continue;
+                row.setActive(true); members.updateById(row); classIds.add(row.getClassId()); continue;
             }
             Long tenant = task.getTenantId(); var relation = relations.selectByIdForUpdate(relationId, tenant);
             if (relation == null || !Objects.equals(relation.getTenantId(), tenant) || !Boolean.TRUE.equals(relation.getTeachingDelivery())

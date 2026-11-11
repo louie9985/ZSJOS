@@ -20,6 +20,18 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class ExamCollectionController {
     @Resource private ExamCollectionTaskService service;
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionRosterService roster;
+    @GetMapping("/{id}/class-options")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
+    public CommonResult<List<ClassOption>> classOptions(@PathVariable Long id, HttpServletResponse response) {
+        response.setHeader("Cache-Control","no-store"); return success(roster.classOptions(id));
+    }
+    @PostMapping("/{id}/classes")
+    @ApiAccessLog(requestEnable=false, responseEnable=false)
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:members')")
+    public CommonResult<Boolean> adjustClasses(@PathVariable Long id,@Valid @RequestBody ClassChange request) {
+        roster.adjustClasses(id,request); return success(true);
+    }
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionResolutionService resolution;
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionQueryService queries;
     @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionCorrectionService correction;

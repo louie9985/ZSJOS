@@ -69,6 +69,7 @@ import SalesDispatchStatusAlert from './components/SalesDispatchStatusAlert'
 import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/EmployeeAvatar'
 import ThemeProvider from './components/Theme/ThemeProvider'
 import SettingsDrawer from './components/SettingsDrawer'
+import VersionUpdateEntry from './components/versionUpdates/VersionUpdateEntry'
 import { getNavigationPreference } from './services/navigationPreference'
 import { applyNavigationOrder, NAVIGATION_QUERY, type NavigationOrder } from './services/navigationOrder'
 import TabBar, { type TabItem } from './components/TabBar'
@@ -492,6 +493,7 @@ function ShellContent({ info, navigationOrder, authPlatform, onLogout, onUserCha
         <Space size={8} className="header-actions">
           <span className="header-dispatch-control"><SalesDispatchStatusControl/></span>
           <SettingsDrawer menus={navigationSource} permissions={info.permissions || []}/>
+          {hasPermission(info.permissions || [], 'zsjos:version-update:read') && <VersionUpdateEntry key={JSON.stringify([authPlatform, readSharedTenantId(), info.user.id])} canAcknowledge={hasPermission(info.permissions || [], 'zsjos:version-update:acknowledge')} />}
           <Tooltip title="全局刷新">
             <Button type="text" aria-label="全局刷新" icon={<ReloadOutlined/>} onClick={() => window.location.reload()}/>
           </Tooltip>

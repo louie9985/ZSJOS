@@ -947,6 +947,9 @@ public class RegistrationServiceImpl implements RegistrationService {
                 Map<Long, RegistrationClassAssignmentDO> assignmentMap = classAssignmentMapper
                         .selectByCaseId(registrationCase.getId()).stream()
                         .collect(Collectors.toMap(RegistrationClassAssignmentDO::getOrderItemId, Function.identity()));
+                Map<Long, AdminUserRespDTO> homeroomUsers = adminUserApi.getUserMap(assignmentMap.values().stream()
+                        .map(RegistrationClassAssignmentDO::getHomeroomUserId).filter(Objects::nonNull)
+                        .collect(Collectors.toSet()));
                 result.setClassAssignments(caseOrderItems(registrationCase, orderItemMapper.selectListByOrderId(order.getId())).stream().map(orderItem -> {
                     RegistrationCaseRespVO.ClassAssignmentVO row = new RegistrationCaseRespVO.ClassAssignmentVO();
                     row.setOrderItemId(orderItem.getId()); row.setProductId(orderItem.getProductId());
@@ -969,7 +972,9 @@ public class RegistrationServiceImpl implements RegistrationService {
                         row.setCategoryPath(assignment.getCategoryPathSnapshot()); row.setClassId(assignment.getClassId());
                         row.setClassNo(assignment.getClassNoSnapshot()); row.setClassName(assignment.getClassNameSnapshot());
                         row.setHomeroomUserId(assignment.getHomeroomUserId());
-                        row.setHomeroomUserName(assignment.getHomeroomUserNameSnapshot());
+                        AdminUserRespDTO homeroom = assignment.getHomeroomUserId() == null ? null
+                                : homeroomUsers.get(assignment.getHomeroomUserId());
+                        row.setHomeroomUserName(homeroom == null ? null : homeroom.getNickname());
                         DeliveryClassDO currentClass = deliveryClassMapper.selectById(assignment.getClassId());
                         row.setSystemClass(currentClass != null && Boolean.TRUE.equals(currentClass.getSystemClass()));
                         row.setClassKind(currentClass == null ? null : currentClass.getClassKind());

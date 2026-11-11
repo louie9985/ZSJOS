@@ -22,6 +22,7 @@ public class ExamCollectionMatchingService {
     @Resource private ServiceRelationMapper relations;
     @Resource private StudentServiceArchiveStore archives;
     @Resource private ExamCollectionTodoService todos;
+    @Resource private ExamCollectionTokens tokens;
 
     @Transactional(propagation=Propagation.MANDATORY)
     public void match(ExamCollectionTaskDO task, ExamCollectionSubmissionDO submission) {
@@ -38,9 +39,15 @@ public class ExamCollectionMatchingService {
         Long relationId = binding == null ? null : binding.getServiceRelationId();
         if (binding == null) {
             var candidates = members.selectList(new LambdaQueryWrapperX<ExamCollectionMemberDO>()
-                    .eq(ExamCollectionMemberDO::getTaskId, task.getId()).eq(ExamCollectionMemberDO::getActive, true)
-                    .eq(ExamCollectionMemberDO::getIdentityHash, submission.getIdentityHash()));
-            var ids = candidates.stream().map(ExamCollectionMemberDO::getServiceRelationId).distinct().toList();
+                    .eq(ExamCollectionMemberDO::getTaskId, task.getId()).eq(ExamCollectionMemberDO::getActive, true));
+            // Member hashes are notification-time snapshots and may predate a completed archive.
+            var ids = candidates.stream().map(ExamCollectionMemberDO::getServiceRelationId).distinct()
+                    .filter(id -> {
+                        String identity = archives.current(id).answers().stream()
+                                .filter(answer -> "id_card".equals(answer.getFieldKey()))
+                                .map(answer -> answer.getValueText()).filter(Objects::nonNull).findFirst().orElse(null);
+                        return Objects.equals(submission.getIdentityHash(), tokens.identityHash(identity));
+                    }).toList();
             if (ids.size() != 1) { unmatched(submission, ids.isEmpty() ? "UNMATCHED" : "AMBIGUOUS"); return; }
             relationId = ids.getFirst();
         }

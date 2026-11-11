@@ -24,7 +24,7 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 @Component
 public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermissionProvider {
     private static final Set<String> OWNER_ACTIONS = Set.of(
-            "read", "accept", "contact", "assign", "update-basic-info", "delivery-stage");
+            "read", "accept", "contact", "assign", "update-basic-info");
 
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private DeliveryClassMapper deliveryClassMapper;
@@ -83,10 +83,10 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
         if ("archive-update".equals(action)) return !TeachingServiceLifecycle.closed(relation)
                 && hasPermission(bizId, "read", userId);
         if (TeachingServiceLifecycle.closed(relation)
-                && Set.of("accept", "contact", "update-basic-info", "delivery-stage", "direct-transfer", "class-transfer", "update-exam-date").contains(action)) return false;
+                && Set.of("accept", "contact", "update-basic-info", "direct-transfer", "class-transfer").contains(action)) return false;
         if (!StudentDeliveryParticipation.includes(relation)
                 && (OWNER_ACTIONS.contains(action) && !Set.of("read", "assign").contains(action)
-                    || Set.of("direct-transfer", "class-transfer", "update-exam-date").contains(action))) return false;
+                    || Set.of("direct-transfer", "class-transfer").contains(action))) return false;
         if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
         if ("read".equals(action) && StudentReadScope.canReadAll(permissionApi, userId)
                 && StudentDeliveryParticipation.includes(relation)

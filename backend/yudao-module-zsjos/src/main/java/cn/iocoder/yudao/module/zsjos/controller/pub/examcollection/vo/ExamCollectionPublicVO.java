@@ -9,7 +9,7 @@ import java.util.Map;
 public final class ExamCollectionPublicVO {
     private ExamCollectionPublicVO() {}
     @Data public static class Runtime {
-        private String title, description, status;
+        private String title, description, content, status;
         private List<Field> fields = List.of();
     }
     @Data public static class Session {

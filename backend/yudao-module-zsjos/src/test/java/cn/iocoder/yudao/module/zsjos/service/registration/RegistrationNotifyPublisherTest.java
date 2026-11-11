@@ -23,6 +23,21 @@ class RegistrationNotifyPublisherTest {
     @InjectMocks private RegistrationNotifyPublisher publisher;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
 
+    @Test void informationSubmittedUsesFormIdentityAndSubmittedName() {
+        var now = java.time.LocalDateTime.now();
+        TenantContextHolder.setTenantId(1L);
+        try { publisher.publishInformationSubmitted(12L, "合成学员", now); }
+        finally { TenantContextHolder.clear(); }
+        var capture = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        verify(notifyBusinessEventApi).publish(capture.capture());
+        var event = capture.getValue();
+        assertEquals(1L, event.getTenantId());
+        assertEquals(RegistrationConstants.NOTIFY_SCENE_INFO_SUBMITTED, event.getSceneCode());
+        assertEquals("registration-info-submitted:12", event.getSourceEventKey());
+        assertEquals("合成学员", event.getPayload().get("studentName"));
+        assertEquals(now, event.getOccurredAt());
+    }
+
     @Test void itemAssignmentTargetsExactService() {
         var task = new RegistrationCaseDO(); task.setId(5L);
         TenantContextHolder.setTenantId(1L);

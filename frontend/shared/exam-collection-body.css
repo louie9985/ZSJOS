@@ -1,0 +1,8 @@
+/* UTF-8. Shared public document and preview presentation. */
+.exam-collection-body.norem { color: #20242b; font: 16px/1.5 system-ui, sans-serif; overflow-wrap: anywhere; max-width: 100%; }
+.exam-collection-body.norem p { margin: 15px 0; }
+.exam-collection-body.norem img, .exam-collection-body.norem video { max-width: 100%; height: auto; }
+.exam-collection-body.norem table { border-collapse: collapse; }
+.exam-collection-body.norem td, .exam-collection-body.norem th { box-sizing: border-box; border: 1px solid #ddd; padding: 8px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
+.exam-collection-body.norem pre, .exam-collection-body.norem .exam-body-table { max-width: 100%; overflow-x: auto; }
+.exam-collection-body.norem th { background: #f7f7f7; }

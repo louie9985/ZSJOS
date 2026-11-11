@@ -9,6 +9,21 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class StudentContactControllerPermissionTest {
 
     @Test
+    void onlyActiveCommandRoutesAreExposed() {
+        java.util.Set<String> routes = java.util.Arrays.stream(StudentContactController.class.getMethods())
+                .flatMap(method -> {
+                    var post = method.getAnnotation(org.springframework.web.bind.annotation.PostMapping.class);
+                    var put = method.getAnnotation(org.springframework.web.bind.annotation.PutMapping.class);
+                    return java.util.stream.Stream.concat(
+                            post == null ? java.util.stream.Stream.empty() : java.util.Arrays.stream(post.value()),
+                            put == null ? java.util.stream.Stream.empty() : java.util.Arrays.stream(put.value()));
+                }).collect(java.util.stream.Collectors.toSet());
+        org.junit.jupiter.api.Assertions.assertFalse(routes.contains("/{relationId}/delivery-stage"));
+        org.junit.jupiter.api.Assertions.assertFalse(routes.contains("/{relationId}/exam-date"));
+        org.junit.jupiter.api.Assertions.assertTrue(routes.contains("/{relationId}/contacts"));
+    }
+
+    @Test
     void collaboratorCandidatesAllowsAssignmentAndCorrectionPermissions() throws NoSuchMethodException {
         PreAuthorize authorization = StudentContactController.class
                 .getMethod("getCollaboratorCandidates", Long.class, String.class)
@@ -19,12 +34,14 @@ class StudentContactControllerPermissionTest {
     }
 
     @Test
-    void attachmentUploadAllowsDeliveryStageSubmitPermission() throws NoSuchMethodException {
+    void attachmentUploadUsesOnlyActiveCommandPermissions() throws NoSuchMethodException {
         PreAuthorize authorization = StudentContactController.class
                 .getMethod("uploadAttachment", Long.class, MultipartFile.class)
                 .getAnnotation(PreAuthorize.class);
 
-        assertEquals(true, authorization.value().contains("zsjos:student-contact:delivery-stage-submit"));
+        assertEquals("@ss.hasAnyPermissions('zsjos:student-contact:first-submit', 'zsjos:student-contact:study-plan-submit', "
+                + "'zsjos:student-contact:submit', 'zsjos:student-contact:checklist-update', "
+                + "'zsjos:student-contact-extension:apply')", authorization.value());
     }
 
     @Test

@@ -27,10 +27,10 @@ class NoticeShareContentTest {
         String clean = NoticeShareContent.clean(FIXED);
         var doc = Jsoup.parseBodyFragment(clean);
         var table = doc.selectFirst("table");
-        assertTrue(table.attr("style").contains("width:900px"));
         assertTrue(table.attr("style").contains("table-layout:fixed"));
-        assertTrue(table.attr("style").contains("min-width:900.0px"));
-        assertEquals(List.of("200", "180", "140", "380"), doc.select("col").eachAttr("width"));
+        assertFalse(table.attr("style").contains("min-width"));
+        assertTrue(table.attr("style").contains("width:100%"));
+        assertTrue(doc.select("col").eachAttr("style").stream().allMatch(style -> style.contains("%")));
         assertEquals("2", doc.selectFirst("[colspan]").attr("colspan"));
         assertEquals("2", doc.selectFirst("[rowspan]").attr("rowspan"));
         assertEquals("height:56px", doc.selectFirst("tr").attr("style"));
@@ -69,9 +69,28 @@ class NoticeShareContentTest {
         var doc = Jsoup.parseBodyFragment(clean);
         assertEquals(4, doc.select(".notice-table-scroll > table").size());
         assertTrue(doc.select("table").get(0).attr("style").contains("width:100%"));
-        assertTrue(doc.select("table").get(1).attr("style").contains("min-width:280.0px"));
-        assertTrue(doc.select("table").get(2).attr("style").contains("min-width:80.0px"));
+        assertFalse(doc.select("table").get(1).attr("style").contains("min-width"));
+        assertFalse(doc.select("table").get(2).attr("style").contains("min-width"));
         assertEquals(clean, NoticeShareContent.clean(clean));
+    }
+
+    @Test void keepsInlineImageWidthsAndParagraphAlignmentWithoutUnsafeCss() {
+        String input = "<p style='text-align:center;position:fixed'>"
+                + "<img src='https://example.test/1.png' style='width:32%;height:auto;position:absolute'>"
+                + "<img src='https://example.test/2.png' style='width:32%'>"
+                + "<img src='https://example.test/3.png' style='width:32%'></p>";
+        String clean = NoticeShareContent.clean(input);
+        var doc = Jsoup.parseBodyFragment(clean);
+        assertEquals("text-align:center", doc.selectFirst("p").attr("style"));
+        assertEquals(3, doc.select("img[style*=32%]").size());
+        assertFalse(clean.contains("position"));
+        assertEquals(clean, NoticeShareContent.clean(clean));
+        String pixels = "<p>" + "<img src='https://example.test/a.png' width='200'>".repeat(3) + "</p>";
+        String fitted = NoticeShareContent.clean(pixels);
+        var pixelImages = Jsoup.parseBodyFragment(fitted).select("img");
+        assertEquals(3, pixelImages.size());
+        assertTrue(pixelImages.stream().allMatch(image -> image.attr("style").contains((200.0 / 1352 * 100) + "%")));
+        assertEquals(fitted, NoticeShareContent.clean(fitted));
     }
 
     @Test void exportsRealSanitizedFixturesForBothPublicReaders() throws Exception {
@@ -79,6 +98,7 @@ class NoticeShareContentTest {
                 "fixed", FIXED,
                 "percent", "<table style='width:100%'><tr><td style='width:25%'>第一列</td><td style='width:75%'>第二列可换行的长中文内容，用来验证百分比列宽。</td></tr></table>",
                 "cells", "<table><tr><th style='width:200px'>第一列</th><th style='width:300px'>第二列</th><th style='width:240px'>第三列</th></tr><tr><td>中文</td><td>English_abcdefghijklmnopqrstuvwxyz_0123456789</td><td>最后一列</td></tr></table>",
+                "images", "<p><img src='https://example.test/1.png' style='width:32%'><img src='https://example.test/2.png' style='width:32%'><img src='https://example.test/3.png' style='width:32%'></p>",
                 "plain", "<p>无表格正文，保留<strong>加粗</strong>和普通段落。</p>");
         Path output = Path.of("target", "notice-share-tables");
         Files.createDirectories(output);

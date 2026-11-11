@@ -15,6 +15,7 @@ import { createIdempotencyKey } from '../services/idempotency'
 
 import type { Dayjs } from 'dayjs'
 import { formatTimestamp } from '../services/time'
+import { applyFollowUpTimeShortcut, FOLLOW_UP_TIME_SHORTCUTS } from '../services/leadFollowUp'
 
 const { Title, Text } = Typography
 type Option = { label: string; value: string }
@@ -50,9 +51,13 @@ export default function LeadSubmissionPage({
   const wechatId = Form.useWatch('wechatId', form)
   const providerId = Form.useWatch('newMediaProviderUserId', form)
   const nextFollowUpAt = Form.useWatch('selfSourcedNextFollowUpAt', form)
+  const [timeShortcut, setTimeShortcut] = useState<{ key: string; time: number }>()
   const automatic = selfSourced && providerId == null
   useEffect(() => {
-    if (!automatic) form.setFieldValue('selfSourcedNextFollowUpAt', undefined)
+    if (!automatic) {
+      form.setFieldValue('selfSourcedNextFollowUpAt', undefined)
+      setTimeShortcut(undefined)
+    }
     form.setFields([{ name: 'remark', errors: [] }])
   }, [automatic, form])
   const { message, modal } = App.useApp()
@@ -445,9 +450,18 @@ export default function LeadSubmissionPage({
                 </div>)}
               </Radio.Group>
             </Form.Item></>}
-          {automatic && <Form.Item name="selfSourcedNextFollowUpAt" label="下次跟进时间" preserve={false} extra="请选择晚于当前时间的下次跟进时间" rules={[{ required: true, message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.valueOf() > Date.now() ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
-            <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%', maxWidth: 360 }} />
-          </Form.Item>}
+          {automatic && <div>
+            <Form.Item name="selfSourcedNextFollowUpAt" label="下次跟进时间" preserve={false} extra="请选择晚于当前时间的下次跟进时间" rules={[{ required: true, message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.valueOf() > Date.now() ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
+              <DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: '100%', maxWidth: 360 }} onChange={() => setTimeShortcut(undefined)} />
+            </Form.Item>
+            <div className="follow-up-time-shortcuts">
+              {FOLLOW_UP_TIME_SHORTCUTS.map(item => <Button size="small" key={item.key} disabled={submitting} aria-pressed={timeShortcut?.key === item.key && nextFollowUpAt?.valueOf() === timeShortcut.time} onClick={() => {
+                const next = applyFollowUpTimeShortcut(item)
+                form.setFieldValue('selfSourcedNextFollowUpAt', next)
+                setTimeShortcut({ key: item.key, time: next.valueOf() })
+              }}>{item.label}</Button>)}
+            </div>
+          </div>}
           <Title level={5}>信息确认</Title>
           <Descriptions className="lead-form-summary" column={{ xs: 1, md: 2 }} size="small" bordered
             items={[

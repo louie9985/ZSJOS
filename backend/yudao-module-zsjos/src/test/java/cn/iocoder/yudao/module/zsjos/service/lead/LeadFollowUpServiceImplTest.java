@@ -330,89 +330,72 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void wonFollowUpSupportsBothRecordScopesAndOptionalTimeWithoutReopeningDeal() {
+    void wonFollowUpSupportsBothRecordScopesWithRequiredTimeWithoutReopeningDeal() {
         for (Class<?> entity : List.of(LeadDO.class, OpportunityDO.class)) {
             com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
                     new org.apache.ibatis.builder.MapperBuilderAssistant(
                             new com.baomidou.mybatisplus.core.MybatisConfiguration(), ""), entity);
         }
         for (boolean hasOpportunity : List.of(false, true)) {
-            for (boolean scheduled : List.of(false, true)) {
-                reset(leadMapper, recordMapper, opportunityMapper, opportunityRecordMapper, dictDataApi,
-                        adminUserApi, attachmentService, imageMapper, opportunityImageMapper, lifecycleTaskService);
-                LeadDO lead = validLead().setStatus("won").setFollowUpCount(3)
-                        .setSalesStage("contacted").setSalesStageLabelSnapshot("旧阶段")
-                        .setNextFollowUpAt(LocalDateTime.now().minusDays(1));
-                stubSuccessfulCreate(lead);
-                when(dictDataApi.getDictDataList(LeadSalesStageSnapshot.DICT_TYPE))
-                        .thenReturn(List.of(dict("intent_customer", "新阶段")));
-                OpportunityDO opportunity = new OpportunityDO().setId(30L).setStatus("won")
-                        .setWonAt(LocalDateTime.now().minusDays(2));
-                LocalDateTime wonAt = opportunity.getWonAt();
-                when(opportunityMapper.selectByLeadId(1L)).thenReturn(hasOpportunity ? opportunity : null);
-                if (hasOpportunity) {
-                    doAnswer(inv -> { inv.<OpportunityFollowUpRecordDO>getArgument(0).setId(50L); return 1; })
-                            .when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
-                } else {
-                    doAnswer(inv -> { inv.<LeadFollowUpRecordDO>getArgument(0).setId(40L); return 1; })
-                            .when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
-                }
-                LocalDateTime next = scheduled ? LocalDateTime.now().plusDays(1) : null;
-                var req = request(next); req.setSalesStage("intent_customer");
-                var result = withTenant(() -> service.create(1L, 20L, req));
-                assertEquals(hasOpportunity ? "opportunity" : "lead", result.getRecordScope());
-                assertEquals("won", lead.getStatus());
-                assertEquals("won", opportunity.getStatus());
-                assertEquals(wonAt, opportunity.getWonAt());
-                assertEquals(4, lead.getFollowUpCount());
-                assertEquals(next, lead.getNextFollowUpAt());
-                assertEquals(next, result.getNextFollowUpAt());
-                assertEquals("intent_customer", lead.getSalesStage());
-                assertEquals("旧阶段", result.getSalesStageBeforeLabelSnapshot());
-                assertEquals("新阶段", result.getSalesStageAfterLabelSnapshot());
-                assertNull(lead.getCurrentAssignmentFirstFollowUpAt());
-                verify(lifecycleTaskService, never()).completeFirstFollowUpTask(any(), any());
-                verify(lifecycleTaskService, never()).createQualificationTask(any(), any(), any());
-                verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L),
-                        eq(result.getRecordScope()), eq(result.getId()), eq(next), any());
-                if (!scheduled) {
-                    var update = ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper.class);
-                    verify(leadMapper).update(isNull(), update.capture());
-                    assertTrue(update.getValue().getSqlSet().contains("next_follow_up_at="));
-                    assertTrue(update.getValue().getSqlSegment().contains("id ="));
-                    assertTrue(update.getValue().getParamNameValuePairs().containsValue(null));
-                    assertTrue(update.getValue().getParamNameValuePairs().containsValue(1L));
-                    if (hasOpportunity) {
-                        verify(opportunityMapper).update(isNull(), update.capture());
-                        assertTrue(update.getValue().getSqlSet().contains("next_follow_up_at="));
-                        assertTrue(update.getValue().getSqlSegment().contains("id ="));
-                        assertTrue(update.getValue().getParamNameValuePairs().containsValue(null));
-                        assertTrue(update.getValue().getParamNameValuePairs().containsValue(30L));
-                    }
-                }
-                if (hasOpportunity) {
-                    var saved = ArgumentCaptor.forClass(OpportunityFollowUpRecordDO.class);
-                    verify(opportunityRecordMapper).insert(saved.capture());
-                    when(opportunityRecordMapper.selectByIdempotencyKey("request-1")).thenReturn(saved.getValue());
-                } else {
-                    var saved = ArgumentCaptor.forClass(LeadFollowUpRecordDO.class);
-                    verify(recordMapper).insert(saved.capture());
-                    when(recordMapper.selectByIdempotencyKey("request-1")).thenReturn(saved.getValue());
-                }
-                withTenant(() -> service.create(1L, 20L, req));
-                assertEquals(4, lead.getFollowUpCount());
-                verify(leadMapper, times(1)).updateById(lead);
-                verify(lifecycleTaskService, times(1)).replaceFollowUpReminder(any(), any(), any(), any(), eq(next), any());
+            reset(leadMapper, recordMapper, opportunityMapper, opportunityRecordMapper, dictDataApi,
+                    adminUserApi, attachmentService, imageMapper, opportunityImageMapper, lifecycleTaskService);
+            LeadDO lead = validLead().setStatus("won").setFollowUpCount(3)
+                    .setSalesStage("contacted").setSalesStageLabelSnapshot("旧阶段")
+                    .setNextFollowUpAt(LocalDateTime.now().minusDays(1));
+            stubSuccessfulCreate(lead);
+            when(dictDataApi.getDictDataList(LeadSalesStageSnapshot.DICT_TYPE))
+                    .thenReturn(List.of(dict("intent_customer", "新阶段")));
+            OpportunityDO opportunity = new OpportunityDO().setId(30L).setStatus("won")
+                    .setWonAt(LocalDateTime.now().minusDays(2));
+            LocalDateTime wonAt = opportunity.getWonAt();
+            when(opportunityMapper.selectByLeadId(1L)).thenReturn(hasOpportunity ? opportunity : null);
+            if (hasOpportunity) {
+                doAnswer(inv -> { inv.<OpportunityFollowUpRecordDO>getArgument(0).setId(50L); return 1; })
+                        .when(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
+            } else {
+                doAnswer(inv -> { inv.<LeadFollowUpRecordDO>getArgument(0).setId(40L); return 1; })
+                        .when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
             }
+            LocalDateTime next = LocalDateTime.now().plusDays(1);
+            var req = request(next); req.setSalesStage("intent_customer");
+            var result = withTenant(() -> service.create(1L, 20L, req));
+            assertEquals(hasOpportunity ? "opportunity" : "lead", result.getRecordScope());
+            assertEquals("won", lead.getStatus());
+            assertEquals("won", opportunity.getStatus());
+            assertEquals(wonAt, opportunity.getWonAt());
+            assertEquals(4, lead.getFollowUpCount());
+            assertEquals(next, lead.getNextFollowUpAt());
+            assertEquals(next, result.getNextFollowUpAt());
+            assertEquals("intent_customer", lead.getSalesStage());
+            assertEquals("旧阶段", result.getSalesStageBeforeLabelSnapshot());
+            assertEquals("新阶段", result.getSalesStageAfterLabelSnapshot());
+            assertNull(lead.getCurrentAssignmentFirstFollowUpAt());
+            verify(lifecycleTaskService, never()).completeFirstFollowUpTask(any(), any());
+            verify(lifecycleTaskService, never()).createQualificationTask(any(), any(), any());
+            verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L),
+                    eq(result.getRecordScope()), eq(result.getId()), eq(next), any());
+            if (hasOpportunity) {
+                var saved = ArgumentCaptor.forClass(OpportunityFollowUpRecordDO.class);
+                verify(opportunityRecordMapper).insert(saved.capture());
+                when(opportunityRecordMapper.selectByIdempotencyKey("request-1")).thenReturn(saved.getValue());
+            } else {
+                var saved = ArgumentCaptor.forClass(LeadFollowUpRecordDO.class);
+                verify(recordMapper).insert(saved.capture());
+                when(recordMapper.selectByIdempotencyKey("request-1")).thenReturn(saved.getValue());
+            }
+            withTenant(() -> service.create(1L, 20L, req));
+            assertEquals(4, lead.getFollowUpCount());
+            verify(leadMapper, times(1)).updateById(lead);
+            verify(lifecycleTaskService, times(1)).replaceFollowUpReminder(any(), any(), any(), any(), eq(next), any());
         }
     }
 
     @Test
-    void missingTimeRemainsInvalidBeforeDealAndPastTimeRemainsInvalidAfterDeal() {
+    void missingTimeIsInvalidForEveryManualFollowUpStatus() {
         for (String status : List.of("submitted", "valid", "won")) {
             LeadDO lead = validLead().setStatus(status);
             when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
-            var req = request("won".equals(status) ? LocalDateTime.now().minusSeconds(1) : null);
+            var req = request(null);
             ServiceException error = assertThrows(ServiceException.class,
                     () -> withTenant(() -> service.create(1L, 20L, req)));
             assertEquals(LEAD_FOLLOW_UP_TIME_INVALID.getCode(), error.getCode());

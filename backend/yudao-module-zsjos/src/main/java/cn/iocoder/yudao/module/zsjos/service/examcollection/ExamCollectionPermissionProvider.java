@@ -21,7 +21,7 @@ public class ExamCollectionPermissionProvider implements ZsjosObjectPermissionPr
         return task != null && !Boolean.TRUE.equals(task.getDeleted())
                 && Objects.equals(task.getTenantId(), TenantContextHolder.getTenantId())
                 && permissions.hasAnyPermissions(userId, QUERY)
-                && ("query".equals(action) || permissions.hasAnyPermissions(userId, PREFIX + action));
+                && ("query".equals(action) || "export".equals(action) || permissions.hasAnyPermissions(userId, PREFIX + action));
     }
     public void check(Long id, String action, Long userId) {
         if (!hasPermission(id, action, userId)) throw exception(DENIED);

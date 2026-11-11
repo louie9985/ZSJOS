@@ -151,7 +151,7 @@ export default forwardRef<ClassGroupListHandle, { query: Query; managed: boolean
       {r.availableActions?.includes('UPDATE') && <Button type="link" onClick={() => onEdit(r)}>编辑</Button>}
       {r.availableActions?.includes('MOVE_GROUP') && <Button type="link" onClick={() => setOrganizer({ open: true, single: r })}>调整归组</Button>}
     </>}
-    {r.availableActions?.includes('COMPLETE') && hasClassPermission(permissions, 'zsjos:delivery-class:complete') && <Popconfirm title="确认结课该班级？" onConfirm={() => onComplete(r)}><Button type="link" danger>结课</Button></Popconfirm>}
+    {!isSystemClass(r) && <Button type="link" onClick={() => void onComplete(r)}>考试进度</Button>}
   </Space>
   const groupActions = (n: ClassGroupNode) => <Space wrap>
     <Button type="link" onClick={() => toggle(n.key)}>{expanded.includes(n.key) ? '收起' : '展开'}</Button>

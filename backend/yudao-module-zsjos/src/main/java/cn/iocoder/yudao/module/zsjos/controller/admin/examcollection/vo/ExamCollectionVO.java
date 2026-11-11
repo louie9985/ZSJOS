@@ -9,13 +9,21 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
+import jakarta.validation.Valid;
+
 public final class ExamCollectionVO {
     private ExamCollectionVO() {}
+    @Data public static class UploadLimit {
+        @NotNull @Min(1) @Max(100) private Integer maxSizeMb;
+        @NotNull @Min(1) @Max(9) private Integer maxImages;
+    }
     @Data public static class Create {
         @NotBlank @Pattern(regexp="[A-Za-z0-9_-]{16,64}") private String idempotencyKey;
         @NotBlank @Size(max=200) private String title;
         @Size(max=2000) private String description;
+        @Size(max=200000) private String content;
         @NotNull @Size(max=12) private List<@NotBlank String> selectedFields;
+        @Size(max=12) private Map<String, @NotNull @Valid UploadLimit> uploadLimits;
     }
     @Data @EqualsAndHashCode(callSuper=true) public static class Query extends PageParam {
         @Size(max=200) private String keyword;
@@ -23,7 +31,7 @@ public final class ExamCollectionVO {
     }
     @Data public static class Task {
         private Long id;
-        private String title, description, status;
+        private String title, description, content, status;
         private Integer revision;
         private LocalDateTime createdAt, completedAt;
         private String completionReason;
@@ -42,7 +50,12 @@ public final class ExamCollectionVO {
         @NotNull @Min(0) private Integer revision;
         @Size(max=500) private String reason;
     }
-    public record ClassOption(Long id, String name, Long plannerId, String plannerName) {}
+    public record ClassOption(Long id, String name, Long plannerId, String plannerName, Long groupId, String groupName, boolean selectable) {}
+    @Data public static class ClassChange {
+        @NotNull @Min(0) private Integer revision;
+        @NotNull @Size(min=1,max=100) private List<@NotNull Long> classIds;
+        @NotBlank @Size(max=500) private String reason;
+    }
     @Data @EqualsAndHashCode(callSuper=true) public static class SubmissionQuery extends PageParam {
         @Pattern(regexp="ARCHIVED|EXCEPTION|INVALID") private String status;
         private Long serviceRelationId;
@@ -111,5 +124,6 @@ public final class ExamCollectionVO {
         @Size(max=200) private String keyword;
     }
     public record Member(Long serviceRelationId, Long personId, String studentName, String mobile,
-                         Long classId, String className, String plannerName, boolean active, Long lastSubmissionId) {}
+                         Long classId, String className, String plannerName, boolean active, Long lastSubmissionId,
+                         String archiveName, String archiveMobile, String archiveIdCard) {}
 }

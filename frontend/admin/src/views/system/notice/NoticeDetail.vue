@@ -1,5 +1,5 @@
 <template>
-  <el-dialog v-model="visible" title="公告详情" width="min(800px, 94vw)" destroy-on-close>
+  <el-dialog v-model="visible" title="公告详情" width="min(1384px, 94vw)" destroy-on-close>
     <div v-loading="loading">
       <el-alert v-if="error" type="error" :title="error" :closable="false" show-icon>
         <el-button link type="primary" @click="load">重试</el-button>
@@ -73,5 +73,5 @@ defineExpose({ open })
 <style scoped>
 .notice-detail-content { padding: 16px 0; overflow-wrap: anywhere; }
 .notice-detail-content :deep(img), .notice-detail-content :deep(video) { max-width: 100%; height: auto; }
-.notice-detail-content :deep(table) { display: block; max-width: 100%; overflow-x: auto; }
+
 </style>

@@ -13,6 +13,8 @@ public class ExamCollectionTaskDO extends TenantBaseDO {
     @TableId private Long id;
     private String title;
     private String description;
+    private String content;
+    private String exportSettingsJson;
     private String status;
     private Long configVersionId;
     private String fieldsSnapshot;

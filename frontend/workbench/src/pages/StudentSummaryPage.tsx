@@ -17,7 +17,7 @@ const isDenied = (error: unknown) => error instanceof AuthenticationError || err
 const errorText = (error: unknown) => error instanceof Error ? error.message : '加载失败，请重试'
 export default function StudentSummaryPage({ permissions, examTaskId, initialClassIds, taskTitle, onBack }: { permissions: string[]; examTaskId?: number; initialClassIds?: number[]; taskTitle?: string; onBack?:()=>void }) {
   const allowed = hasPermission(permissions, examTaskId ? 'zsjos:exam-collection:query' : 'zsjos:student-summary:query')
-  const canExport = allowed && hasPermission(permissions, examTaskId ? 'zsjos:exam-collection:export' : 'zsjos:student-summary:export')
+  const canExport = allowed && (Boolean(examTaskId) || hasPermission(permissions, 'zsjos:student-summary:export'))
   const client = useMemo(()=>examTaskId ? examSummaryApi(examTaskId) : studentSummaryApi,[examTaskId])
   const [denied, setDenied] = useState(false)
   const [catalog, setCatalog] = useState<SummaryColumn[]>([])

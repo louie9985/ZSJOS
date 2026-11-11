@@ -27,6 +27,7 @@ import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import LeadSubmitterFeedbackPanel from './LeadSubmitterFeedbackPanel'
 import LeadSubmitterAssistHistoryPanel from './LeadSubmitterAssistHistoryPanel'
 import SubjectAvatar from './SubjectAvatar'
+import { canCancelLeadNextFollowUp, LeadNextFollowUpCancelDialog } from './LeadNextFollowUpCancelButton'
 
 type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release' | 'releasePublicSea'
 
@@ -34,8 +35,9 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, navigationKey, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant, appealReview, readOnly: forcedReadOnly = false }: {
+export default function LeadDetail({ lead, permissions = [], refreshVersion = 0, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, navigationKey, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner, profileVariant, appealReview, readOnly: forcedReadOnly = false }: {
   lead: ManagedLead
+  permissions?: string[]
   refreshVersion?: number
   categories: DictData[]
   categoryLabel: (value?: string) => string
@@ -86,6 +88,8 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
   const { submitting: qualificationSaving, run: runQualification, resetIntent: resetQualificationIntent } = useSubmissionGuard()
   const [followUpOpen, setFollowUpOpen] = useState(true)
   const [followUpModalOpen, setFollowUpModalOpen] = useState(false)
+  const [cancelFollowUpOpen, setCancelFollowUpOpen] = useState(false)
+  useEffect(() => { setCancelFollowUpOpen(false) }, [lead.id])
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
   const [basicInfoOpen, setBasicInfoOpen] = useState(false)
   const [basicInfoDirty, setBasicInfoDirty] = useState(false)
@@ -300,6 +304,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     actions.has('SUBMITTER_URGE') && { key: 'submitter-urge', icon: <BellOutlined/>, label: '催促', onClick: () => setUrgeOpen(true) },
     actions.has('SUBMITTER_COMPLAINT') && { key: 'submitter-complaint', icon: <WarningOutlined/>, label: '投诉', danger: true, onClick: () => setComplaintOpen(true) },
     actions.has('ENTER_REPURCHASE') && { key: 'enter-repurchase', icon: <FileAddOutlined/>, label: '录入复购', disabled: !actions.get('ENTER_REPURCHASE')?.enabled, onClick: () => setRepurchaseOpen(true) },
+    !readOnly && !studentContext && canCancelLeadNextFollowUp(lead, permissions) && { key: 'cancel-next-follow-up', icon: <CloseOutlined/>, label: '取消跟进时间', onClick: () => setCancelFollowUpOpen(true) },
     ...qualificationAlertActions,
     ...contextToolbarActions,
     ...studentToolbarActions,
@@ -338,6 +343,7 @@ export default function LeadDetail({ lead, refreshVersion = 0, categories, categ
     {contextHeader}
     <Tabs className="lead-detail-tabs" activeKey={activeTab} onChange={key => { setInternalActiveTab(key); onTabChange?.(key) }} items={tabItems}/>
     {!readOnly && <>
+      {cancelFollowUpOpen && canCancelLeadNextFollowUp(lead, permissions) && <LeadNextFollowUpCancelDialog key={lead.id} leadId={lead.id} onClose={() => setCancelFollowUpOpen(false)} onChanged={onChanged} />}
       {overturnToken && <SupervisorLeadOverturnModal key={lead.id} lead={lead} token={overturnToken} onClose={() => setOverturnToken(undefined)} onChanged={onChanged}/>}
       <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={() => void judgeInvalid()}>确认判无效</Button></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>

@@ -58,7 +58,7 @@ class ZsjkqtReviewRegressionTest {
         var snapshot = snapshot(); var request = new Save("same-request", "原稿", 0, snapshot);
         when(mapper.insert(any(ZsjkqtDraftDO.class))).thenThrow(new DuplicateKeyException("duplicate uk_zsjkqt_client"));
         var changed = winner(snapshot); changed.setName("其他内容");
-        when(mapper.selectByClientIdForUpdate("same-request", 1L)).thenReturn(changed, null);
+        when(mapper.selectByClientIdForUpdate("same-request", 1L)).thenReturn(changed).thenReturn(null);
         assertEquals(ZsjkqtErrors.CONFLICT.getCode(), assertThrows(ServiceException.class, () -> service.create(request)).getCode());
         assertEquals(ZsjkqtErrors.CONFLICT.getCode(), assertThrows(ServiceException.class, () -> service.create(request)).getCode());
         var unrelated = new DuplicateKeyException("duplicate PRIMARY");

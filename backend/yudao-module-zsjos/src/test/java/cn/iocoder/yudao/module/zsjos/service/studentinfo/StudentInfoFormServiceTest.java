@@ -23,6 +23,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class StudentInfoFormServiceTest {
  @InjectMocks StudentInfoFormService service;
+ @Mock cn.iocoder.yudao.module.zsjos.service.registration.RegistrationNotifyPublisher registrationNotifications;
  @Mock StudentInfoFormMapper forms; @Mock StudentInfoFormValueMapper values; @Mock StudentInfoFormConfigMapper configs;
  @Mock StudentInfoConfigService configService; @Spy StudentInfoFields fields=new StudentInfoFields();
  @Mock RegistrationCaseMapper cases; @Mock SalesOrderMapper orders; @Mock RegistrationCommandMapper commands;
@@ -86,14 +87,14 @@ class StudentInfoFormServiceTest {
  Command command(){var c=new Command();c.setVersion(2);c.setFormId(12L);c.setIdempotencyKey("test-key");return c;}
  @Test void terminalResponseOmitsAnswers(){when(forms.byToken(anyString())).thenReturn(form("SUBMITTED"));var r=service.publicDetail(token);assertEquals("SUBMITTED",r.getStatus());assertTrue(r.getFields().isEmpty());assertTrue(r.getImages().isEmpty());assertNull(r.getTenantId());assertEquals(1L,TenantContextHolder.getTenantId());assertFalse(TenantContextHolder.isIgnore());}
  @Test void lookupFailureRestoresContext(){assertThrows(ServiceException.class,()->service.publicDetail(token));assertFalse(TenantContextHolder.isIgnore());assertEquals(1L,TenantContextHolder.getTenantId());assertThrows(ServiceException.class,()->service.publicDetail("short"));}
- @Test void duplicateSubmitIsSuccessfulWithoutWrites(){context("completed");var f=form("SUBMITTED");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);service.submit(token,new Submit());verifyNoInteractions(values,images);}
- @Test void completedFulfillmentStillAcceptsSubmission(){context("completed");var f=form("DRAFT");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);var req=new Submit();req.setRevision(0L);req.setValues(Map.of("name","合成测试"));service.submit(token,req);verify(values).insert(any(StudentInfoFormValueDO.class));var order=inOrder(orders,cases,forms,values);order.verify(orders).selectByIdForUpdate(10L,1L);order.verify(cases).selectByIdForUpdate(5L,1L);order.verify(forms).lock(12L);assertEquals(1L,TenantContextHolder.getTenantId());}
+ @Test void duplicateSubmitIsSuccessfulWithoutWrites(){context("completed");var f=form("SUBMITTED");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);service.submit(token,new Submit());verifyNoInteractions(values,images,registrationNotifications);}
+ @Test void completedFulfillmentStillAcceptsSubmission(){context("completed");var f=form("DRAFT");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);var req=new Submit();req.setRevision(0L);req.setValues(Map.of("name","合成测试"));service.submit(token,req);verify(registrationNotifications).publishInformationSubmitted(eq(12L),eq("合成测试"),any(LocalDateTime.class));verify(values).insert(any(StudentInfoFormValueDO.class));var order=inOrder(orders,cases,forms,values);order.verify(orders).selectByIdForUpdate(10L,1L);order.verify(cases).selectByIdForUpdate(5L,1L);order.verify(forms).lock(12L);assertEquals(1L,TenantContextHolder.getTenantId());}
  @Test void staleTabCannotSubmitOrClearNewerSavedDraft(){
   context("completed");var f=form("DRAFT");f.setDraftRevision(2L);
   when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);
   var req=new Submit();req.setRevision(1L);req.setValues(Map.of("name","older fixture"));
   assertEquals(1900090011,assertThrows(ServiceException.class,()->service.submit(token,req)).getCode());
-  verifyNoInteractions(values,images);verify(forms,never()).update(isNull(),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
+  verifyNoInteractions(values,images,registrationNotifications);verify(forms,never()).update(isNull(),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));
  }
  @Test void endedTaskRejectsSubmission(){context("ended");var f=form("DRAFT");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);assertThrows(ServiceException.class,()->service.submit(token,new Submit()));verifyNoInteractions(values);}
  @Test void generationRetryKeepsToken(){context("processing");when(forms.byCase(5L)).thenReturn(form("DRAFT"));ReflectionTestUtils.setField(service,"publicBaseUrl","https://h5.example.test");assertEquals(12L,service.generate(5L,command()).getFormId());verifyNoInteractions(configService);verify(forms,never()).insert(any(StudentInfoFormDO.class));}

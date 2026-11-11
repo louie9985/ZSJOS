@@ -66,6 +66,14 @@ public class StudentSummaryService {
         if (selected.stream().anyMatch(r -> !Objects.equals(r.getTenantId(), TenantContextHolder.getRequiredTenantId()))) throw exception(LINK_INVALID);
         return project(selected);
     }
+    @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectionPlannerPermissionProvider examPlannerPermissions;
+
+    @cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission(bizType="exam-collection-planner", bizId="#taskId", action="query")
+    public List<Row> projectForExamPlanner(Long taskId, List<ServiceRelationDO> selected) {
+        examPlannerPermissions.check(taskId, "query", getLoginUserId());
+        if (selected.stream().anyMatch(r -> !Objects.equals(r.getTenantId(), TenantContextHolder.getRequiredTenantId()))) throw exception(LINK_INVALID);
+        return project(selected);
+    }
     private List<Column> catalog() {
         var result=new ArrayList<Column>();
         var published=configs.state("PUBLISHED");

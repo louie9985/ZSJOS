@@ -1,5 +1,5 @@
 <template>
-  <el-dialog :model-value="true" title="对外分享" width="min(680px, 94vw)" :close-on-click-modal="!busy" :show-close="!busy" :close-on-press-escape="!busy" @close="emit('close')">
+  <el-dialog :model-value="true" title="对外分享" width="min(1384px, 94vw)" :close-on-click-modal="!busy" :show-close="!busy" :close-on-press-escape="!busy" @close="emit('close')">
     <el-alert type="warning" title="获得链接的人均可查看及转发；正文内图片、视频也会公开。" :closable="false" show-icon />
     <p v-if="notice.audienceType === 'TARGET'">此公告原为指定部门／人员可见，开启后外部访问不受原接收范围限制。</p>
     <p v-if="notice.audienceType === 'TARGET'">原内部接收范围：{{ notice.targetDeptIds?.length || 0 }} 个部门，{{ notice.targetUserIds?.length || 0 }} 名指定人员<span v-if="notice.recipientCount != null">，发布时接收人数 {{ notice.recipientCount }}</span>。</p>
@@ -82,6 +82,6 @@ onBeforeUnmount(() => generation++)
 .share-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .share-preview { overflow-wrap: anywhere; }
 .share-preview :deep(img), .share-preview :deep(video) { max-width: 100%; height: auto; }
-.share-preview :deep(table) { display: block; max-width: 100%; overflow-x: auto; }
+
 :deep(.el-checkbox) { height: auto; white-space: normal; padding: 6px 0; }
 </style>

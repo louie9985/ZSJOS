@@ -35,6 +35,7 @@ public class ExamCollectionPublicService {
     public ExamCollectionPublicVO.Runtime detail(String token) {
         return withTask(token, false, task -> {
             var result = new ExamCollectionPublicVO.Runtime(); result.setTitle(task.getTitle());
+            result.setContent(ExamCollectionContent.clean(task.getContent()));
             result.setDescription(task.getDescription()); result.setStatus(task.getStatus());
             if (OPEN.equals(task.getStatus())) result.setFields(definitions(task));
             return result;
@@ -54,18 +55,20 @@ public class ExamCollectionPublicService {
     @Transactional(rollbackFor=Exception.class)
     public void submit(String token, String sessionToken, ExamCollectionPublicVO.Submit request) {
         withSession(token, sessionToken, false, (task, row) -> {
-            String fingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(new TreeMap<>(request.getValues())));
+            var input = ExamCollectionFields.liveValues(request.getValues());
+            String fingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(new TreeMap<>(input)));
+            String legacyFingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(new TreeMap<>(request.getValues())));
             if (!DRAFT.equals(row.getStatus())) {
                 if (Objects.equals(row.getIdempotencyKey(), request.getIdempotencyKey())
-                        && Objects.equals(row.getRequestHash(), fingerprint)) return null;
+                        && (Objects.equals(row.getRequestHash(), fingerprint) || Objects.equals(row.getRequestHash(), legacyFingerprint))) return null;
                 throw exception(CONFLICT);
             }
             requireOpen(task);
             var previous = submissions.byRequest(task.getId(), request.getIdempotencyKey());
             if (previous != null) throw exception(CONFLICT);
             var definitions = definitions(task);
-            var values = fields.validateCollectionValues(definitions, request.getValues());
-            var fileIds = validateAttachments(task, row, definitions, request.getValues());
+            var values = fields.validateCollectionValues(definitions, input);
+            var fileIds = validateAttachments(task, row, definitions, input);
             String identity = values.stream().filter(v -> "id_card".equals(v.getFieldKey())).findFirst()
                     .orElseThrow(() -> exception(FIELD_INVALID, "身份证号码")).getValueText();
             long sequence = Math.addExact(task.getSequenceNo(), 1);
@@ -100,7 +103,7 @@ public class ExamCollectionPublicService {
         }
         return result;
     }
-    public List<Field> definitions(ExamCollectionTaskDO task) { return JsonUtils.parseArray(task.getFieldsSnapshot(), Field.class); }
+    public List<Field> definitions(ExamCollectionTaskDO task) { return ExamCollectionFields.liveFields(JsonUtils.parseArray(task.getFieldsSnapshot(), Field.class)); }
     static LocalDateTime now() { return LocalDateTime.now(ZoneId.of("Asia/Shanghai")); }
     static void requireOpen(ExamCollectionTaskDO task) { if (!OPEN.equals(task.getStatus())) throw exception(CLOSED); }
 

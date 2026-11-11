@@ -1,0 +1,15 @@
+# Adjust exam collection classes
+
+- Local main D:/ZSJ-OS, base 7a7cf5e14b. Owner /root/backend_acceptance under /root. Frontend separate owner frontend_acceptance.
+- Root cause initial notify rejects non-null classIdsJson and the existing adjust command only addresses individual services.
+- Scope examcollection RosterService/Controller/VO/tests, this record. Preserve prior pending group/member/WeChat changes and other workstreams.
+- New class-options query includes historical selected classes. New classes command accepts final nonempty classIds, revision and reason under query+members permission, OPEN only. Retained classes keep frozen membership, removed frozen class rows become inactive, re-added classes restore original rows; only unseen current valid services create new rows. Existing transferred service keeps frozen class ownership, restored only when that frozen class remains selected. Individual restore adds frozen class back to selected IDs.
+- All class IDs, membership, audit and todo generations change in one task-locked transaction. No submission/archive deletion, DB mutation, deployment or commit. Verify targeted isolated Java suite and contracts.
+
+## Delivery
+- Added GET /{id}/class-options under query permission, returning serving class options plus already-selected historical/unavailable classes. Each includes selectable; current enabled planner is checked in a batch. Historical unavailable choices retain entity/frozen names and can be kept or removed by the frontend.
+- Added POST /{id}/classes under members permission and object check. Requires current revision, nonempty unique classIds (up to100), reason and OPEN state. Unchanged selection is a no-op. Retained classes are not re-read for membership, removals only deactivate frozen rows, additions validate current class/planner and restore prior frozen rows before inserting unseen valid services. Already-archived new rows inherit progress.
+- A service now belonging to an added class but already frozen under another class retains its old membership. In particular, adding a class cannot reactivate individually removed rows of retained classes. Personal roster restore now re-adds the frozen class ID to preserve class-list consistency.
+- ADJUST_CLASSES audit includes added/removed class IDs and reason. Task revision advances once and existing todo synchronization replaces generations atomically. Removed planner tasks cancel, fully collected restored planners get no new pending todo.
+- Current-source isolated Java compile and 129/129 tests passed, 27 containers and no skips. Added coverage for retained/inactive transferred members, source historical states, new pre-collected rows, stale/closed/empty/unnotified rejection, no-op, old class restore consistency, historical option labels and removed/collected/missing planner generations. Scoped diff check passed.
+- Existing pending grouping, five-column, WeChat and unrelated work preserved. Frontend independently consumes the agreed endpoints. No real HTTP restart, database write, staging or commit. Backend ownership released.

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import '../../../../shared/exam-collection-body.css'
+import { examCollectionBodyHtml } from '../../../../shared/examCollectionBody'
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute } from 'vue-router'
 import { showConfirmDialog, showToast } from 'vant'
@@ -6,7 +8,7 @@ import CollectionImages from '../studentInfo/CollectionImages.vue'
 import { CollectionError, type CollectionImage } from '@/api/studentInfo'
 import { examCollectionApi, type ExamCollectionRuntime, type ExamCollectionSession, type ExamSubmissionCommand } from '@/api/examCollection'
 import { createIdempotencyKey } from '@/utils/idempotency'
-import { validateExamCollection } from '@/utils/examCollectionValidation'
+import { effectiveExamFields, validateExamCollection } from '@/utils/examCollectionValidation'
 
 const route = useRoute()
 const token = computed(() => new URLSearchParams(route.hash.slice(1)).get('token') || '')
@@ -25,7 +27,7 @@ const hasUploadErrors = computed(() => Object.values(uploadFailed.value).some(Bo
 const dirty = computed(() => !success.value && (Object.values(answers.value).some(v => v.trim()) || images.value.length > 0 || hasUploads.value || hasUploadErrors.value))
 const locked = computed(() => saving.value || Boolean(command.value) || expired.value)
 const groups = computed(() => {
-  const fields = (runtime.value?.fields || []).filter(f => f.enabled)
+  const fields = effectiveExamFields(runtime.value?.fields || [])
   return [
     { key: 'basic', title: '基本信息', fields: fields.filter(f => f.type !== 'images') },
     { key: 'materials', title: '本次收集材料', fields: fields.filter(f => f.type === 'images') },
@@ -148,6 +150,7 @@ onBeforeUnmount(() => { generation++; window.removeEventListener('beforeunload',
 <template>
   <main class="exam-public norem">
     <header class="exam-public__header norem"><p>中世健 · 考试资料收集</p><h1>{{ runtime?.title || '考试资料收集' }}</h1><p v-if="runtime?.description" class="exam-public__description norem">{{ runtime.description }}</p></header>
+    <div v-if="runtime?.content" class="exam-collection-body norem" v-html="examCollectionBodyHtml(runtime.content)"></div>
     <div v-if="loading" class="exam-public__state norem" role="status"><van-loading vertical>正在加载收集表</van-loading></div>
     <section v-else-if="success" class="exam-public__state norem" aria-live="polite"><van-icon name="passed" size="44"/><h2>资料提交成功</h2><p>资料已收到，请以考务老师的通知为准。</p><p>如需补充或更正，可以重新填写；每次提交均会保留记录。</p><van-button type="primary" @click="initialize()">再填写一份</van-button></section>
     <section v-else-if="runtime?.status === 'COMPLETED'" class="exam-public__state norem"><van-icon name="clock-o" size="40"/><h2>收集已结束</h2><p>本任务暂不接收新的提交，如有疑问请联系考务老师。</p><van-button plain type="primary" @click="initialize(true)">刷新任务状态</van-button></section>
@@ -158,7 +161,7 @@ onBeforeUnmount(() => { generation++; window.removeEventListener('beforeunload',
         <section v-if="expired" class="exam-public__error norem" role="alert"><p>{{ submitError || '填写会话已失效，请重新建立会话' }}</p><van-button size="small" plain type="primary" :disabled="hasUploads" @click="restartSession">重新建立填写会话</van-button></section>
         <section v-for="group in groups" :key="group.key" class="exam-public__section norem"><h2>{{ group.title }}</h2><div class="exam-public__grid norem">
           <div v-for="field in group.fields" :key="field.key" :id="`exam-field-${field.key}`" tabindex="-1" class="exam-public__field norem" :class="{ 'is-wide': field.type !== 'text' }">
-            <label :for="`exam-input-${field.key}`"><span v-if="field.required" class="exam-public__required norem" aria-hidden="true">*</span>{{ field.label }}</label>
+            <label :for="`exam-input-${field.key}`"><span v-if="field.required" class="exam-public__required norem" aria-hidden="true">*</span>{{ field.label }}<span v-if="field.type === 'images'" class="exam-public__hint norem" aria-live="polite">（{{ images.filter(image => image.fieldKey === field.key).length }}/{{ field.key === 'identity_images' ? 2 : field.maxImages || 9 }}）</span></label>
             <CollectionImages v-if="field.type === 'images'" :key="`${sessionGeneration}:${field.key}`" :token="token" :client="imageClient" :field="field" :images="images.filter(i => i.fieldKey === field.key)" :disabled="locked"
               @change="updateImages(field.key, $event)" @busy="uploadBusy[field.key] = $event" @failed="uploadFailed[field.key] = $event"/>
             <textarea v-else-if="field.type === 'textarea'" :id="`exam-input-${field.key}`" v-model="answers[field.key]" rows="3" maxlength="2000" :required="field.required" :disabled="locked" :aria-invalid="Boolean(fieldErrors[field.key])" :aria-describedby="fieldErrors[field.key] ? `exam-error-${field.key}` : undefined" @input="inputChanged(field.key)"/>
@@ -176,27 +179,4 @@ onBeforeUnmount(() => { generation++; window.removeEventListener('beforeunload',
   </main>
 </template>
 
-<style scoped>
-.exam-public.norem { max-width: 940px; min-height: 100vh; margin: 0 auto; padding: 24px 20px 40px; box-sizing: border-box; background: var(--h5-app-background); color: var(--h5-text-primary); font-size: 14px; }
-:global(#app:has(.exam-public.norem)) { max-width: none; }
-.exam-public__header.norem { margin-bottom: 24px; }
-.exam-public__header.norem h1 { margin: 8px 0; font-size: 24px; font-weight: 600; overflow-wrap: anywhere; }
-.exam-public__header.norem p, .exam-public__hint.norem, .exam-public__submit.norem p { color: var(--h5-text-secondary); line-height: 1.6; }
-.exam-public__description.norem { white-space: pre-wrap; overflow-wrap: anywhere; }
-.exam-public__section.norem, .exam-public__state.norem { background: var(--h5-card-bg); border: 1px solid var(--h5-content-border); border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: var(--h5-content-shadow); }
-.exam-public__section.norem h2, .exam-public__state.norem h2 { font-size: 18px; margin: 0 0 16px; }
-.exam-public__grid.norem { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 28px; }
-.exam-public__field.norem { min-width: 0; }
-.exam-public__field.is-wide.norem { grid-column: 1 / -1; }
-.exam-public__field.norem label { display: block; margin-bottom: 8px; font-weight: 500; }
-.exam-public__field.norem input, .exam-public__field.norem textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--h5-border); border-radius: 8px; font: inherit; background: var(--h5-card-bg); color: var(--h5-text-primary); }
-.exam-public__field.norem input:focus, .exam-public__field.norem textarea:focus { outline: 2px solid var(--h5-primary); outline-offset: 1px; }
-.exam-public__required.norem { margin-right: 4px; color: var(--h5-danger); }
-.exam-public__field-error.norem { margin: 8px 0 0; color: color-mix(in srgb,var(--h5-danger) 75%,var(--h5-text-primary)); line-height: 1.6; }
-.exam-public__error.norem { padding: 16px; border: 1px solid var(--h5-danger); border-radius: 10px; background: var(--h5-card-bg); margin: 16px 0; }
-.exam-public__error.norem p { margin: 0 0 12px; }
-.exam-public__state.norem { padding: 32px 20px; text-align: center; }
-.exam-public__state.norem p { line-height: 1.6; color: var(--h5-text-secondary); }
-.exam-public__submit.norem { max-width: 420px; margin: 24px auto 0; text-align: center; }
-@media(max-width:600px) { .exam-public.norem { padding: 20px 14px 32px; } .exam-public__grid.norem { grid-template-columns: 1fr; gap: 18px; } .exam-public__section.norem { padding: 18px; } .exam-public__field.norem input, .exam-public__field.norem textarea { font-size: 16px; } }
-</style>
+<style scoped src="../../../../shared/exam-public-form.css"></style>

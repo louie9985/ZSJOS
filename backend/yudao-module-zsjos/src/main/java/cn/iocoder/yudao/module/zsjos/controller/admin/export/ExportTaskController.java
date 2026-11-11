@@ -51,4 +51,17 @@ public class ExportTaskController {
     public CommonResult<String> downloadUrl(@PathVariable Long id) {
         return success(service.getDownloadUrl(WebFrameworkUtils.getLoginUserId(), id));
     }
+    @GetMapping("/{id}/download")
+    @PreAuthorize("@ss.hasPermission('zsjos:export:query')")
+    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable=false, responseEnable=false)
+    public void download(@PathVariable Long id, jakarta.servlet.http.HttpServletResponse response) throws Exception {
+        var result = service.download(WebFrameworkUtils.getLoginUserId(), id);
+        response.setHeader("Cache-Control", "no-store");
+        response.setContentType("application/octet-stream");
+        response.setHeader("Content-Disposition", "attachment;filename*=UTF-8''" +
+                org.springframework.web.util.UriUtils.encode(result.fileName(), java.nio.charset.StandardCharsets.UTF_8));
+        response.setContentLengthLong(result.content().length);
+        response.getOutputStream().write(result.content());
+    }
+
 }

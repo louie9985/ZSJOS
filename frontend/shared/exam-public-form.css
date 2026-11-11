@@ -1,0 +1,22 @@
+.exam-public.norem { max-width: 1384px; min-height: 100vh; margin: 0 auto; padding: 24px 16px 40px; box-sizing: border-box; background: var(--h5-app-background); color: var(--h5-text-primary); font-size: 14px; }
+:global(#app:has(.exam-public.norem)) { max-width: none; }
+.exam-public__header.norem { margin-bottom: 24px; }
+.exam-public__header.norem h1 { margin: 8px 0; font-size: 24px; font-weight: 600; overflow-wrap: anywhere; }
+.exam-public__header.norem p, .exam-public__hint.norem, .exam-public__submit.norem p { color: var(--h5-text-secondary); line-height: 1.6; }
+.exam-public__description.norem { white-space: pre-wrap; overflow-wrap: anywhere; }
+.exam-public__section.norem, .exam-public__state.norem { background: var(--h5-card-bg); border: 1px solid var(--h5-content-border); border-radius: 12px; padding: 20px; margin: 16px 0; box-shadow: var(--h5-content-shadow); }
+.exam-public__section.norem h2, .exam-public__state.norem h2 { font-size: 18px; margin: 0 0 16px; }
+.exam-public__grid.norem { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 20px 28px; }
+.exam-public__field.norem { min-width: 0; }
+.exam-public__field.is-wide.norem { grid-column: 1 / -1; }
+.exam-public__field.norem label { display: block; margin-bottom: 8px; font-weight: 500; }
+.exam-public__field.norem input, .exam-public__field.norem textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--h5-border); border-radius: 8px; font: inherit; background: var(--h5-card-bg); color: var(--h5-text-primary); }
+.exam-public__field.norem input:focus, .exam-public__field.norem textarea:focus { outline: 2px solid var(--h5-primary); outline-offset: 1px; }
+.exam-public__required.norem { margin-right: 4px; color: var(--h5-danger); }
+.exam-public__field-error.norem { margin: 8px 0 0; color: color-mix(in srgb,var(--h5-danger) 75%,var(--h5-text-primary)); line-height: 1.6; }
+.exam-public__error.norem { padding: 16px; border: 1px solid var(--h5-danger); border-radius: 10px; background: var(--h5-card-bg); margin: 16px 0; }
+.exam-public__error.norem p { margin: 0 0 12px; }
+.exam-public__state.norem { padding: 32px 20px; text-align: center; }
+.exam-public__state.norem p { line-height: 1.6; color: var(--h5-text-secondary); }
+.exam-public__submit.norem { max-width: 420px; margin: 24px auto 0; text-align: center; }
+@media(max-width:600px) { .exam-public.norem { padding: 20px 14px 32px; } .exam-public__grid.norem { grid-template-columns: 1fr; gap: 18px; } .exam-public__section.norem { padding: 18px; } .exam-public__field.norem input, .exam-public__field.norem textarea { font-size: 16px; } }

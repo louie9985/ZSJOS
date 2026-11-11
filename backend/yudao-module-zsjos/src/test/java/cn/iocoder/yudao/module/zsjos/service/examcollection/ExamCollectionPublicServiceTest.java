@@ -66,6 +66,26 @@ class ExamCollectionPublicServiceTest {
         var changed = request(); changed.setValues(new HashMap<>(changed.getValues())); changed.getValues().put("name", "另一次填写");
         assertThrows(ServiceException.class, () -> service.submit(taskToken, sessionToken, changed));
     }
+    @Test void issuedTaskDropsWechatAndAcceptsOldClientWithoutPersistingIt() {
+        var definitions = new ArrayList<>(service.definitions(task));
+        var legacy = new cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoVO.Field();
+        legacy.setKey("wechat"); legacy.setType("text"); legacy.setEnabled(true); legacy.setRequired(true); definitions.add(legacy);
+        task.setFieldsSnapshot(JsonUtils.toJsonString(definitions));
+        assertFalse(service.detail(taskToken).getFields().stream().anyMatch(f -> "wechat".equals(f.getKey())));
+        service.submit(taskToken, sessionToken, request());
+        assertFalse(session.getAnswersJson().contains("wechat"));
+        var retry = request(); retry.setValues(new HashMap<>(retry.getValues())); retry.getValues().remove("wechat");
+        service.submit(taskToken, sessionToken, retry);
+        verify(matching, times(1)).match(task, session);
+        assertTrue(task.getFieldsSnapshot().contains("wechat"));
+    }
+    @Test void originalSubmittedCommandStillReplaysItsHistoricalFingerprint() {
+        var request = request(); session.setStatus(ARCHIVED); session.setIdempotencyKey(request.getIdempotencyKey());
+        session.setRequestHash(cn.hutool.crypto.digest.DigestUtil.sha256Hex(JsonUtils.toJsonString(new TreeMap<>(request.getValues()))));
+        session.setAnswersJson("historical snapshot remains");
+        service.submit(taskToken,sessionToken,request);
+        assertEquals("historical snapshot remains",session.getAnswersJson()); verifyNoInteractions(matching);
+    }
     @Test void closedTaskDoesNotExposeFieldsOrAcceptNewSessionsAndSubmissions() {
         task.setStatus(COMPLETED);
         assertTrue(service.detail(taskToken).getFields().isEmpty());

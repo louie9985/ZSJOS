@@ -114,7 +114,7 @@ public class TeachingServiceLifecycleService {
             }).map(c -> {
                 var result = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassOptionRespVO();
                 result.setId(c.getId()); result.setClassName(c.getClassName()); result.setClassNo(c.getClassNo());
-                result.setSystemClass(c.getSystemClass()); result.setClassKind(c.getClassKind()); result.setHomeroomUserId(c.getHomeroomUserId()); result.setHomeroomUserName(c.getHomeroomUserNameSnapshot());
+                result.setSystemClass(c.getSystemClass()); result.setClassKind(c.getClassKind()); result.setHomeroomUserId(c.getHomeroomUserId()); result.setHomeroomUserName(classService.validateHomeroom(c.getHomeroomUserId()).getNickname());
                 return result;
             }).toList();
     }

@@ -20,12 +20,15 @@ class ExamCollectionPermissionTest {
         var row = new ExamCollectionTaskDO(); row.setId(1L); row.setTenantId(1L); row.setDeleted(false);
         when(tasks.selectById(1L)).thenReturn(row);
         assertFalse(provider.hasPermission(1L, "query", 7L));
+        assertFalse(provider.hasPermission(1L, "export", 7L));
         when(permissions.hasAnyPermissions(7L, QUERY)).thenReturn(true);
         assertTrue(provider.hasPermission(1L, "query", 7L));
+        assertTrue(provider.hasPermission(1L, "export", 7L));
         assertFalse(provider.hasPermission(1L, "resolve", 7L));
         when(permissions.hasAnyPermissions(7L, RESOLVE)).thenReturn(true);
         assertTrue(provider.hasPermission(1L, "resolve", 7L));
         row.setTenantId(2L); assertFalse(provider.hasPermission(1L, "resolve", 7L));
+        assertFalse(provider.hasPermission(1L, "export", 7L));
         row.setTenantId(1L); row.setDeleted(true); assertFalse(provider.hasPermission(1L, "query", 7L));
         assertFalse(provider.hasPermission(1L, "unknown", 7L));
         assertFalse(provider.hasPermission(1L, null, 7L));

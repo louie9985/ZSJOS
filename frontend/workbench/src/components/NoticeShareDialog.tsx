@@ -47,7 +47,7 @@ export default function NoticeShareDialog({ notice, onClose }: { notice: Managed
     const link = document.createElement('a')
     link.download = '中世健公告二维码.png'; link.href = canvas.toDataURL('image/png'); link.click()
   }
-  return <Modal title="对外分享" open width={680} onCancel={() => !busy && onClose()} closable={!busy} maskClosable={!busy} footer={<Button disabled={busy} onClick={onClose}>返回公告</Button>}>
+  return <Modal title="对外分享" open width="min(1400px, calc(100vw - 32px))" onCancel={() => !busy && onClose()} closable={!busy} maskClosable={!busy} footer={<Button disabled={busy} onClick={onClose}>返回公告</Button>}>
     <Space orientation="vertical" style={{ width: '100%' }}>
       <Alert type="warning" showIcon title="获得链接的人均可查看及转发；正文内图片、视频也会公开。" description={notice.audienceType === 'TARGET' ? '此公告原为指定部门／人员可见，开启后外部访问不受原接收范围限制。' : undefined} />
       {notice.audienceType === 'TARGET' && <Typography.Text>原内部接收范围：{notice.targetDeptIds?.length || 0} 个部门，{notice.targetUserIds?.length || 0} 名指定人员{notice.recipientCount != null ? `，发布时接收人数 ${notice.recipientCount}` : ''}。</Typography.Text>}

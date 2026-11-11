@@ -44,10 +44,13 @@ class ExamCollectionTaskServiceTest {
             when(permissions.hasAnyPermissions(7L, QUERY)).thenReturn(true);
             when(permissions.hasAnyPermissions(7L, CREATE)).thenReturn(true);
             doAnswer(call -> { ((ExamCollectionTaskDO) call.getArgument(0)).setId(4L); return 1; }).when(tasks).insert(any(ExamCollectionTaskDO.class));
+            request.setContent("<p style=\"text-align:center\"><strong>Instructions</strong></p><script>bad()</script>");
             var result = service.create(request);
+            assertEquals("<p style=\"text-align:center\"><strong>Instructions</strong></p>", result.getContent());
             assertEquals(4L, result.getId()); assertEquals("test task", result.getTitle());
-            assertEquals(5, result.getFields().size()); assertTrue(result.getUrl().startsWith("https://example.invalid/h5/exam-collection#token="));
+            assertEquals(4, result.getFields().size()); assertTrue(result.getUrl().startsWith("https://example.invalid/h5/exam-collection#token="));
             var row = ArgumentCaptor.forClass(ExamCollectionTaskDO.class); verify(tasks).insert(row.capture());
+            assertEquals(result.getContent(), row.getValue().getContent());
             assertEquals(1L, row.getValue().getTenantId()); assertEquals(3L, row.getValue().getConfigVersionId());
             assertEquals(tokens.hash(row.getValue().getTokenCiphertext()), row.getValue().getTokenHash());
             var json = JsonUtils.toJsonString(result);

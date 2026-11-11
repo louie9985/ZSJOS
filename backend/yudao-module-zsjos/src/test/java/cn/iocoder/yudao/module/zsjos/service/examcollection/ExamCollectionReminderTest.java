@@ -23,6 +23,9 @@ class ExamCollectionReminderTest {
     @Test void popupAcknowledgementIsOwnedIdempotentAndNeverCompletesCollection() {
         TenantContextHolder.setTenantId(1L);
         var service = new ExamCollectionReminderService();
+        var recipientScope = new ExamCollectionRecipientScope();
+        ReflectionTestUtils.setField(recipientScope, "permissions", mock(PermissionApi.class));
+        ReflectionTestUtils.setField(service, "recipientScope", recipientScope);
         var permissions = mock(PermissionApi.class); var business = mock(BusinessTaskMapper.class);
         var tasks = mock(ExamCollectionTaskMapper.class); var members = mock(ExamCollectionMemberMapper.class);
         var events = mock(ExamCollectionEventMapper.class); var links = mock(ExamCollectionTaskService.class);

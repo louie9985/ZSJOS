@@ -7,6 +7,7 @@ import argparse
 import dataclasses
 import datetime as dt
 import hashlib
+import gzip
 import json
 import os
 import re
@@ -501,8 +502,9 @@ class MysqlClient:
         if not self.mysqldump:
             fail("mysqldump was not found; migration cannot continue without a backup")
         self.config.backup_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        target = self.config.backup_dir / f"{self.config.database}-{timestamp}.sql"
+        timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+        target = self.config.backup_dir / f"{self.config.database}-{timestamp}.sql.gz"
+        partial = target.with_suffix(target.suffix + ".partial")
         command = [
             self.mysqldump,
             f"--host={self.config.host}",
@@ -516,11 +518,37 @@ class MysqlClient:
             "--default-character-set=utf8mb4",
             self.config.database,
         ]
-        with target.open("wb") as stream:
-            result = subprocess.run(command, cwd=ROOT, env=self.env(), stdout=stream, stderr=subprocess.PIPE)
-        if result.returncode != 0:
-            target.unlink(missing_ok=True)
-            fail(f"mysqldump failed: {result.stderr.decode(errors='replace').strip()}")
+        try:
+            # Keep stderr off the pipe so a large diagnostic cannot deadlock the dump.
+            with tempfile.TemporaryFile() as errors:
+                with subprocess.Popen(command, cwd=ROOT, env=self.env(), stdout=subprocess.PIPE,
+                                      stderr=errors) as process:
+                    try:
+                        with gzip.open(partial, "wb", compresslevel=6) as stream:
+                            shutil.copyfileobj(process.stdout, stream)
+                    except BaseException:
+                        process.kill()
+                        raise
+                    if process.wait() != 0:
+                        fail("mysqldump failed; previous backup retained")
+            # Read to EOF to validate gzip CRC and reject truncated/incomplete SQL.
+            tail = b""
+            with gzip.open(partial, "rb") as stream:
+                while chunk := stream.read(1024 * 1024):
+                    tail = (tail + chunk)[-4096:]
+            if b"-- Dump completed on " not in tail:
+                fail("Backup lacks mysqldump completion marker; previous backup retained")
+            partial.replace(target)
+        finally:
+            partial.unlink(missing_ok=True)
+        # Recognize only this database's managed dumps, including legacy plain SQL.
+        pattern = re.compile(re.escape(self.config.database)
+                             + r"-\d{8}-\d{6}(?:-\d{6})?\.sql(?:\.gz)?")
+        for previous in self.config.backup_dir.iterdir():
+            if (previous != target and pattern.fullmatch(previous.name)
+                    and previous.is_file() and not previous.is_symlink()):
+                previous.unlink()
+
         return target
 
 
@@ -1350,9 +1378,13 @@ def migrate_database(environment: str) -> None:
         pending, blockers = migration_preflight(client, manifests)
         if blockers:
             fail("Migration preflight failed before backup or execution:\n" + "\n".join(blockers))
-        backup = client.backup()
-        info(f"Backup created: {backup}")
-        if client.table_count() == 0:
+        empty_database = client.table_count() == 0
+        if pending or empty_database:
+            backup = client.backup()
+            info(f"Backup created and verified: {backup}")
+        else:
+            info("No pending database changes; backup skipped.")
+        if empty_database:
             info("Empty database detected; applying the reviewed fresh bootstrap.")
             client.execute_file(SQL_ROOT / "bootstrap.sql")
         # Recheck after bootstrap. Existing checksums are evidence, not values to
@@ -1437,7 +1469,7 @@ def with_test_mysql(callback) -> None:
         docker_wait(container)
         callback(container)
     finally:
-        subprocess.run(["docker", "rm", "--force", container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["docker", "rm", "--force", "--volumes", container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def test_fresh() -> None:

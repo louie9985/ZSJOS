@@ -31,7 +31,7 @@ public class ExamCollectionSummaryController {
     @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
     public CommonResult<Coverage> coverage(@PathVariable Long taskId,@Valid Query query,HttpServletResponse response) { noStore(response);return success(service.coverage(taskId,query)); }
     @PostMapping("/export") @ApiAccessLog(requestEnable=false,responseEnable=false)
-    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query') && @ss.hasPermission('zsjos:exam-collection:export')")
+    @PreAuthorize("@ss.hasPermission('zsjos:exam-collection:query')")
     public void export(@PathVariable Long taskId,@Valid @RequestBody Export query,HttpServletResponse response)throws java.io.IOException { noStore(response);service.export(taskId,query,response); }
     private void noStore(HttpServletResponse response){response.setHeader("Cache-Control","no-store");}
 }

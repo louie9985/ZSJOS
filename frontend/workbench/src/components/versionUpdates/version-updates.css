@@ -1,0 +1,10 @@
+.version-update-page { padding: var(--crm-page-pad); }
+.version-update-tree { max-height: 280px; overflow: auto; margin-top: var(--crm-sp-3); }
+.version-update-content { max-height: 65vh; overflow: auto; overflow-wrap: anywhere; }
+.version-update-list { display: grid; gap: var(--crm-gap); margin-bottom: var(--crm-sp-5); }
+.version-update-record { display: grid; gap: var(--crm-sp-2); width: 100%; padding: var(--crm-card-pad); text-align: left; color: var(--crm-text); background: var(--crm-bg-container); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); cursor: pointer; overflow-wrap: anywhere; }
+.version-update-record > span { display: flex; justify-content: space-between; align-items: start; gap: var(--crm-gap); }
+.version-update-record time { color: var(--crm-text-secondary); }
+.version-update-entry.is-highlighted { animation: version-update-highlight 800ms ease-out; }
+@keyframes version-update-highlight { 40% { background: var(--crm-bg-sunken); box-shadow: var(--crm-shadow-raised); } }
+@media (prefers-reduced-motion: reduce) { .version-update-entry.is-highlighted { animation-duration: 1ms; } }

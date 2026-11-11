@@ -34,6 +34,14 @@ class LeadLifecycleTaskServiceTest {
     @Mock private LeadFollowUpRuleService followUpRuleService;
 
     @Test
+    void cancellingFollowUpRemindersIncludesLeadBusinessScope() {
+        LocalDateTime now = LocalDateTime.now();
+        service.cancelFollowUpReminders(1L, now, "不再跟进");
+        verify(taskCommandService).cancel("lead", "lead_follow_up_reminder", 1L, null, now, "不再跟进");
+        org.mockito.Mockito.verifyNoMoreInteractions(taskCommandService);
+    }
+
+    @Test
     void omittedNextTimeCompletesCurrentReminderWithoutCreatingAnother() {
         LocalDateTime now = LocalDateTime.now();
         service.replaceFollowUpReminder(1L, 20L, "opportunity", 50L, null, now);

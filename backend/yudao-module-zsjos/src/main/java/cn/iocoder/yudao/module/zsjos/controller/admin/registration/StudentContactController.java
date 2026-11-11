@@ -87,21 +87,6 @@ public class StudentContactController {
         return success(service.submitContact(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
     }
 
-    @PostMapping("/{relationId}/delivery-stage")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-contact:delivery-stage-submit')")
-    public CommonResult<Long> submitDeliveryStage(@PathVariable Long relationId,
-                                                   @Valid @RequestBody StudentDeliveryStageSubmitReqVO request) {
-        return success(service.submitDeliveryStage(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
-    }
-
-    @PutMapping("/{relationId}/exam-date")
-    @PreAuthorize("@ss.hasPermission('zsjos:student:exam-date-update')")
-    public CommonResult<Boolean> updateExamDate(@PathVariable Long relationId,
-                                                 @Valid @RequestBody StudentExamDateUpdateReqVO request) {
-        service.updateExamDate(relationId, request, SecurityFrameworkUtils.getLoginUserId());
-        return success(true);
-    }
-
     @PostMapping("/{relationId}/precheck/draft")
     @PreAuthorize("@ss.hasPermission('zsjos:student:director-precheck')")
     public CommonResult<Integer> saveDirectorPrecheckDraft(@PathVariable Long relationId,
@@ -158,7 +143,7 @@ public class StudentContactController {
 
     @PostMapping("/{relationId}/attachments")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-contact:first-submit', 'zsjos:student-contact:study-plan-submit', "
-            + "'zsjos:student-contact:submit', 'zsjos:student-contact:delivery-stage-submit', "
+            + "'zsjos:student-contact:submit', "
             + "'zsjos:student-contact:checklist-update', 'zsjos:student-contact-extension:apply')")
     public CommonResult<StudentContactAttachmentRespVO> uploadAttachment(@PathVariable Long relationId,
                                                                           @RequestParam("file") MultipartFile file)

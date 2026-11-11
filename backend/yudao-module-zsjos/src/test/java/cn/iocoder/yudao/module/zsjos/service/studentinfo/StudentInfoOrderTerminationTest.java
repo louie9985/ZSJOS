@@ -38,6 +38,7 @@ class StudentInfoOrderTerminationTest {
         return form;
     }
     private RegistrationCaseDO item() { var item=new RegistrationCaseDO(); item.setId(2L); item.setOrderId(3L); item.setStatus("ended"); return item; }
+    @Mock cn.iocoder.yudao.module.zsjos.service.registration.RegistrationNotifyPublisher registrationNotifications;
     @AfterEach void clear() { TenantContextHolder.clear(); }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"revision_required","superseded","terminated"})
@@ -52,6 +53,7 @@ class StudentInfoOrderTerminationTest {
         assertEquals("合成学员",service.saveDraft(token,draft).getValues().get("name"));
         var submit=new Submit();submit.setRevision(0L);submit.setValues(Map.of("name","合成学员"));
         service.submit(token,submit);
+        verify(registrationNotifications).publishInformationSubmitted(eq(1L), eq("合成学员"), any(LocalDateTime.class));
         verify(values).insert(any(StudentInfoFormValueDO.class));
         verify(forms).update(isNull(),argThat((com.baomidou.mybatisplus.core.conditions.Wrapper<StudentInfoFormDO> wrapper)->((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StudentInfoFormDO>)wrapper).getParamNameValuePairs().containsValue("SUBMITTED")));
         assertNull(form.getRevokedAt());assertEquals(StudentInfoFormService.hash(token),form.getTokenHash());

@@ -1,3 +1,4 @@
+import { examMemberColumns } from './ExamMemberColumns';
 import { useEffect, useState } from 'react';
 import { Button, Input, Modal, Select, Space, Tag } from 'antd';
 import type { ProColumns } from '@ant-design/pro-components';
@@ -36,11 +37,12 @@ export function ExamMembers({task,canAdjust,canResolve,onChanged}:{task:ExamTask
   const [history,setHistory]=useState<ExamMember>(),[picker,setPicker]=useState(false),[change,setChange]=useState<{candidate:Pick<ExamCandidate,'serviceRelationId'|'studentName'|'className'>;remove:boolean}>();
   useEffect(()=>{let current=true;setLoading(true);setError('');void examCollectionApi.members(task.id,{pageNo:page,pageSize:size,keyword,active})
     .then(v=>{if(current){setRows(v.list);setTotal(v.total)}}).catch(e=>{if(current){setRows([]);setError(studentInfoError(e))}}).finally(()=>{if(current)setLoading(false)});return()=>{current=false}},[task.id,task.revision,page,size,keyword,active,reload]);
-  const columns:ProColumns<ExamMember>[]=[{title:'学员姓名',dataIndex:'studentName',width:140},{title:'手机号',dataIndex:'mobile',width:160},{title:'通知时班级',dataIndex:'className',width:220},{title:'学习规划师',dataIndex:'plannerName',width:150},
-    {title:'本次填写',key:'filled',width:120,render:(_,r)=><Tag color={r.lastSubmissionId?'success':'warning'}>{r.lastSubmissionId?'已填写':'未填写'}</Tag>},
+  const columns:ProColumns<ExamMember>[]=[
+    ...examMemberColumns<ExamMember>(row => Boolean(row.lastSubmissionId)),
+    {title:'班主任',dataIndex:'plannerName',width:150},
     {title:'操作',key:'action',valueType:'option',width:200,render:(_,r)=><Space><Button type="link" onClick={()=>setHistory(r)}>填写历史</Button>{canAdjust&&<Button type="link" danger={active} onClick={()=>setChange({candidate:r,remove:active})}>{active?'移出名单':'恢复应收'}</Button>}</Space>}];
-  return <><BusinessTable<ExamMember> mode="compact" tableKey="exam-members" rowKey="serviceRelationId" columns={columns} dataSource={rows} loading={loading} error={error} onReload={()=>setReload(v=>v+1)}
-    filters={<><Input.Search aria-label="搜索应收学员" placeholder="姓名、手机号" allowClear onSearch={v=>{setKeyword(v);setPage(1)}}/><Select aria-label="名单范围" value={active?'active':'removed'} options={[{value:'active',label:'当前应收名单'},{value:'removed',label:'已移出名单'}]} onChange={v=>{setActive(v==='active');setPage(1)}}/></>}
+  return <><BusinessTable<ExamMember> mode="full" options={{reload:false}} tableKey="exam-members" columnsState={{defaultValue:{plannerName:{show:false}},persistenceKey:"crm-table:exam-members:columns",persistenceType:"localStorage"}} rowKey="serviceRelationId" columns={columns} dataSource={rows} loading={loading} error={error} onReload={()=>setReload(v=>v+1)}
+    filters={<div className="exam-collection-filters"><Input.Search aria-label="搜索应收学员" placeholder="姓名、手机号" allowClear onSearch={v=>{setKeyword(v);setPage(1)}}/><Select aria-label="名单范围" value={active?'active':'removed'} options={[{value:'active',label:'当前应收名单'},{value:'removed',label:'已移出名单'}]} onChange={v=>{setActive(v==='active');setPage(1)}}/></div>}
     actions={canAdjust?<Button onClick={()=>setPicker(true)}>添加学员</Button>:undefined}
     pagination={{current:page,pageSize:size,total,showSizeChanger:true,onChange:(p,s)=>{setPage(s!==size?1:p);setSize(s)}}}/>
     {history&&<MemberHistory taskId={task.id} member={history} canResolve={canResolve} onClose={()=>setHistory(undefined)} onChanged={onChanged}/>}
@@ -49,7 +51,7 @@ export function ExamMembers({task,canAdjust,canResolve,onChanged}:{task:ExamTask
       onClose={()=>setChange(undefined)} onConfirm={async reason=>{await examCollectionApi.adjust(task.id,{revision:task.revision,addServiceIds:change.remove?[]:[change.candidate.serviceRelationId],removeServiceIds:change.remove?[change.candidate.serviceRelationId]:[],reason});setReload(v=>v+1);onChanged()}}/>}
   </>;
 }
-const eventLabels:Record<string,string>={NOTIFY:'通知班级',COMPLETE:'完成任务',REOPEN:'重新开启',ADJUST_MEMBERS:'调整名单',RESOLVE:'人工关联',CORRECT_BINDING:'纠正归属',INVALIDATE:'标记无效',REMINDER_SEEN:'已读提醒'};
+const eventLabels:Record<string,string>={NOTIFY:'通知班级',ADJUST_CLASSES:'调整收集班级',COMPLETE:'完成任务',REOPEN:'重新开启',ADJUST_MEMBERS:'调整名单',RESOLVE:'人工关联',CORRECT_BINDING:'纠正归属',INVALIDATE:'标记无效',REMINDER_SEEN:'已读提醒'};
 export function ExamEvents({taskId}:{taskId:number}){
   const [page,setPage]=useState(1),[rows,setRows]=useState<ExamEvent[]>([]),[total,setTotal]=useState(0),[loading,setLoading]=useState(false),[error,setError]=useState(''),[reload,setReload]=useState(0);
   useEffect(()=>{let active=true;setLoading(true);setError('');void examCollectionApi.events(taskId,{pageNo:page,pageSize:20}).then(v=>{if(active){setRows(v.list);setTotal(v.total)}}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[taskId,page,reload]);

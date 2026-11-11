@@ -107,8 +107,9 @@ public class StudentServiceArchiveStore {
             return previous.getRevision();
         }
         var current = current(relation);
-        var selected = JsonUtils.parseArray(task.getFieldsSnapshot(), Field.class);
-        var incoming = JsonUtils.parseArray(submission.getAnswersJson(), StudentInfoFormValueDO.class);
+        var selected = ExamCollectionFields.liveFields(JsonUtils.parseArray(task.getFieldsSnapshot(), Field.class));
+        var incoming = JsonUtils.parseArray(submission.getAnswersJson(), StudentInfoFormValueDO.class).stream()
+                .filter(value -> !"wechat".equals(value.getFieldKey())).toList();
         Set<String> keys = new LinkedHashSet<>(); selected.forEach(f -> keys.add(f.getKey()));
         if (incoming.stream().anyMatch(v -> !keys.contains(v.getFieldKey()))) throw exception(FIELD_INVALID, "非本次收集字段");
         if (incoming.stream().map(StudentInfoFormValueDO::getFieldKey).distinct().count() != incoming.size())

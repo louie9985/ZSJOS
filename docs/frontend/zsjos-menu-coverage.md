@@ -1,5 +1,7 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
+版本更新通知（2026-11-11）使用独立工作台页面 `/zsjos/version-updates` 发布管理与 `/zsjos/version-update-history` 更新记录，两者组件标记为 `zsjos-workbench`，由 Vue Admin 现有过滤器过滤。权限前缀 `zsjos:version-update:`，右上角入口按 `read` 权限展示，知悉操作独立使用 `acknowledge`。见[版本更新通知契约](../api/version-updates.md)。
+
 报名资料收集（2026-11-01）：`zsjos/studentInfoTasks/index` → Workbench `/zsjos/student-info-tasks`，Vue Admin 过滤该组件。权限为 `zsjos:student-info-task:query` 并累加原报名公共池范围。两端履约仅展示任务状态与资料。见[任务契约](../api/order-student-information-tasks.md)。
 
 我的运营（2026-10-28）：`zsjos/myOperations/index` → Workbench `/zsjos/my-operations`；Vue Admin 过滤该组件。页面权限 `zsjos:my-operations:query`，运营名下客资复用 `LeadManagementPage`，范围含代录归属，不含合作方客资。见[我的运营契约](../api/my-operations.md)。

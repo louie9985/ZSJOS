@@ -8455,3 +8455,196 @@ CREATE TABLE IF NOT EXISTS system_identity_area (
  data_version VARCHAR(64) NOT NULL,
  KEY idx_identity_area_code (code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- V363: empty exam collection and service archive structures; upgrade metadata remains in V363.
+CREATE TABLE IF NOT EXISTS zsjos_exam_collection_task (
+  id bigint NOT NULL AUTO_INCREMENT,
+  title varchar(200) NOT NULL,
+  description varchar(2000) NOT NULL DEFAULT '',
+  status varchar(24) NOT NULL,
+  config_version_id bigint NOT NULL,
+  fields_snapshot longtext NOT NULL,
+  class_ids_json text DEFAULT NULL,
+  create_request_key varchar(64) DEFAULT NULL,
+  create_request_hash varchar(64) DEFAULT NULL,
+  token_hash varchar(64) NOT NULL,
+  token_ciphertext text NOT NULL,
+  sequence_no bigint NOT NULL DEFAULT 0,
+  revision int NOT NULL DEFAULT 0,
+  completion_reason varchar(500) DEFAULT NULL,
+  completed_at datetime DEFAULT NULL,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), UNIQUE KEY uk_token (token_hash), UNIQUE KEY uk_create_request (tenant_id,create_request_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_exam_collection_member (
+  id bigint NOT NULL AUTO_INCREMENT,
+  task_id bigint NOT NULL,
+  service_relation_id bigint NOT NULL,
+  person_id bigint NOT NULL,
+  class_id bigint NOT NULL,
+  planner_user_id bigint DEFAULT NULL,
+  class_name_snapshot varchar(200) NOT NULL,
+  identity_hash varchar(64) DEFAULT NULL,
+  active bit(1) NOT NULL DEFAULT b'1',
+  last_submission_id bigint DEFAULT NULL,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), UNIQUE KEY uk_member (tenant_id,task_id,service_relation_id),
+  KEY idx_identity (tenant_id,task_id,identity_hash),
+  KEY idx_planner (tenant_id,planner_user_id,task_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_exam_collection_submission (
+  id bigint NOT NULL AUTO_INCREMENT,
+  task_id bigint NOT NULL,
+  session_token_hash varchar(64) NOT NULL,
+  idempotency_key varchar(64) DEFAULT NULL,
+  request_hash varchar(64) DEFAULT NULL,
+  sequence_no bigint DEFAULT NULL,
+  status varchar(24) NOT NULL,
+  identity_hash varchar(64) DEFAULT NULL,
+  answers_json longtext DEFAULT NULL,
+  attachment_ids_json text DEFAULT NULL,
+  service_relation_id bigint DEFAULT NULL,
+  exception_code varchar(64) DEFAULT NULL,
+  submitted_at datetime(3) DEFAULT NULL,
+  expires_at datetime NOT NULL,
+  revision int NOT NULL DEFAULT 0,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), UNIQUE KEY uk_session (session_token_hash),
+  UNIQUE KEY uk_submission_key (tenant_id,task_id,idempotency_key),
+  UNIQUE KEY uk_sequence (tenant_id,task_id,sequence_no),
+  KEY idx_identity (tenant_id,task_id,identity_hash)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_exam_collection_binding (
+  id bigint NOT NULL AUTO_INCREMENT,
+  task_id bigint NOT NULL,
+  identity_hash varchar(64) NOT NULL,
+  service_relation_id bigint NOT NULL,
+  manual bit(1) NOT NULL DEFAULT b'0',
+  last_submission_id bigint DEFAULT NULL,
+  last_sequence_no bigint DEFAULT NULL,
+  revision int NOT NULL DEFAULT 0,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), UNIQUE KEY uk_identity (tenant_id,task_id,identity_hash),
+  KEY idx_service (tenant_id,task_id,service_relation_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_exam_collection_attachment (
+  id bigint NOT NULL AUTO_INCREMENT,
+  task_id bigint NOT NULL,
+  submission_id bigint NOT NULL,
+  field_key varchar(64) NOT NULL,
+  side varchar(16) NOT NULL DEFAULT '',
+  infra_file_id bigint NOT NULL,
+  file_size bigint NOT NULL,
+  content_type varchar(100) NOT NULL,
+  original_name varchar(512) NOT NULL,
+  request_key varchar(64) DEFAULT NULL,
+  request_hash varchar(64) DEFAULT NULL,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), KEY idx_submission (tenant_id,submission_id,field_key),
+  UNIQUE KEY uk_upload_request (tenant_id,submission_id,request_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_exam_collection_event (
+  id bigint NOT NULL AUTO_INCREMENT,
+  task_id bigint NOT NULL,
+  submission_id bigint DEFAULT NULL,
+  operator_user_id bigint DEFAULT NULL,
+  action varchar(32) NOT NULL,
+  reason varchar(500) NOT NULL DEFAULT '',
+  details_json longtext DEFAULT NULL,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), KEY idx_task (tenant_id,task_id,id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_student_service_archive_revision (
+  id bigint NOT NULL AUTO_INCREMENT,
+  service_relation_id bigint NOT NULL,
+  person_id bigint NOT NULL,
+  revision int NOT NULL,
+  task_id bigint DEFAULT NULL,
+  submission_id bigint DEFAULT NULL,
+  operator_user_id bigint DEFAULT NULL,
+  source varchar(32) NOT NULL,
+  reason varchar(500) NOT NULL DEFAULT '',
+  idempotency_key varchar(64) NOT NULL,
+  request_hash varchar(64) NOT NULL,
+  fields_snapshot longtext NOT NULL,
+  answers_json longtext NOT NULL,
+  attachments_json longtext NOT NULL,
+  written_keys_json longtext DEFAULT NULL COMMENT '本次显式写入字段，用于安全纠正归属',
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), UNIQUE KEY uk_revision (tenant_id,service_relation_id,revision),
+  UNIQUE KEY uk_request (tenant_id,service_relation_id,idempotency_key),
+  KEY idx_submission (tenant_id,submission_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_student_service_archive_attachment (
+  id bigint NOT NULL AUTO_INCREMENT,
+  service_relation_id bigint NOT NULL,
+  field_key varchar(64) NOT NULL,
+  side varchar(16) NOT NULL DEFAULT '',
+  infra_file_id bigint NOT NULL,
+  file_size bigint NOT NULL,
+  content_type varchar(100) NOT NULL,
+  original_name varchar(512) NOT NULL,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY(id), KEY idx_service (tenant_id, service_relation_id, field_key)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Independent version-update tables; V369 supplies menu metadata and ledger registration.
+CREATE TABLE IF NOT EXISTS zsjos_version_update (
+  id bigint NOT NULL AUTO_INCREMENT,
+  title varchar(100) NOT NULL,
+  content mediumtext NOT NULL,
+  status varchar(16) NOT NULL DEFAULT 'DRAFT',
+  target_user_ids mediumtext NOT NULL,
+  attachment_ids text NOT NULL,
+  inline_file_ids text NOT NULL,
+  publisher_id bigint DEFAULT NULL,
+  publisher_name varchar(100) DEFAULT NULL,
+  publish_time datetime DEFAULT NULL,
+  creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 1,
+  PRIMARY KEY(id), KEY idx_version_update_page(tenant_id,deleted,status,publish_time,id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_version_update_recipient (
+  id bigint NOT NULL AUTO_INCREMENT,
+  update_id bigint NOT NULL, user_id bigint NOT NULL,
+  user_name varchar(100) NOT NULL, dept_id bigint DEFAULT NULL, dept_name varchar(100) DEFAULT NULL,
+  acknowledged_time datetime DEFAULT NULL,
+  creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 1,
+  PRIMARY KEY(id), UNIQUE KEY uk_version_update_recipient(tenant_id,update_id,user_id),
+  KEY idx_version_update_pending(tenant_id,user_id,deleted,acknowledged_time,update_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

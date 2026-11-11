@@ -270,7 +270,13 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
 
     default int cancelPending(String taskType, Long bizId, Long assigneeId,
                               LocalDateTime cancelledAt, String reason) {
+        return cancelPending(null, taskType, bizId, assigneeId, cancelledAt, reason);
+    }
+
+    default int cancelPending(String bizType, String taskType, Long bizId, Long assigneeId,
+                              LocalDateTime cancelledAt, String reason) {
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(bizType != null, BusinessTaskDO::getBizType, bizType)
                 .eq(BusinessTaskDO::getTaskType, taskType)
                 .eq(BusinessTaskDO::getBizId, bizId)
                 .eq(assigneeId != null, BusinessTaskDO::getAssigneeId, assigneeId)
@@ -285,6 +291,18 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getTaskType, taskType)
                 .eq(BusinessTaskDO::getBizId, bizId)
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .set(BusinessTaskDO::getAssigneeId, assigneeId)
+                .set(BusinessTaskDO::getTitleSnapshot, title)
+                .set(BusinessTaskDO::getSummarySnapshot, summary)
+                .set(BusinessTaskDO::getDueAt, dueAt)
+                .set(BusinessTaskDO::getRemindAt, remindAt));
+    }
+
+    default int updatePendingById(Long id, Long assigneeId, String title, String summary,
+                                  LocalDateTime dueAt, LocalDateTime remindAt) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getId, id)
                 .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
                 .set(BusinessTaskDO::getAssigneeId, assigneeId)
                 .set(BusinessTaskDO::getTitleSnapshot, title)

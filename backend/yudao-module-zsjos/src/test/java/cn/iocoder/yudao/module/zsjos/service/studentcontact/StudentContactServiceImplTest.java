@@ -5,9 +5,7 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentContactContextRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentContactSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentFirstContactSubmitReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentExamDateUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentBasicInfoUpdateReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentDeliveryStageSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServiceAcceptReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentStudyPlanSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.DirectorStageSaveReqVO;
@@ -161,7 +159,6 @@ class StudentContactServiceImplTest {
     @BeforeEach
     void grantDeliveryStagePermissionForServiceContractTests() {
         lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq("zsjos:student-archive:read"))).thenReturn(false);
-        lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PERMISSION_DELIVERY_STAGE_SUBMIT))).thenReturn(true);
         lenient().when(directorConfigService.interviewAppointmentHours()).thenReturn(96);
         lenient().when(directorConfigService.trialDays()).thenReturn(14);
     }
@@ -393,21 +390,6 @@ class StudentContactServiceImplTest {
     }
 
     @Test
-    void retiredExamCommandsNeverReadOrMutateBusinessData() {
-        for (String stage : List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
-                "exam_confirmation", STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
-                STAGE_CERTIFICATE, STAGE_CONTINUOUS_FOLLOW_UP, STAGE_COMPLETED)) {
-            ServiceException error = assertThrows(ServiceException.class,
-                    () -> service.submitDeliveryStage(10L, deliveryRequest(stage, stage + "-key"), 7L));
-            assertEquals(LEGACY_EXAM_FLOW_RETIRED.getCode(), error.getCode());
-        }
-        ServiceException error = assertThrows(ServiceException.class,
-                () -> service.updateExamDate(10L, new StudentExamDateUpdateReqVO(), 7L));
-        assertEquals(LEGACY_EXAM_FLOW_RETIRED.getCode(), error.getCode());
-        verifyNoInteractions(relationMapper, recordMapper);
-    }
-
-    @Test
     void legacyExamStudentsCanStillReceiveOrdinaryFollowUp() {
         for (String stage : List.of(STAGE_SUPERVISION, "exam_confirmation", STAGE_EXAM_PREPARATION,
                 STAGE_POST_EXAM, STAGE_RESULT, STAGE_CERTIFICATE, STAGE_CONTINUOUS_FOLLOW_UP)) {
@@ -570,14 +552,6 @@ class StudentContactServiceImplTest {
     private StudentBasicInfoUpdateReqVO basicInfoRequest(String mobile) {
         StudentBasicInfoUpdateReqVO request = new StudentBasicInfoUpdateReqVO();
         request.setName("学员"); request.setMobile(mobile); request.setReason("更正");
-        return request;
-    }
-
-    private StudentDeliveryStageSubmitReqVO deliveryRequest(String stage, String key) {
-        StudentDeliveryStageSubmitReqVO request = new StudentDeliveryStageSubmitReqVO();
-        request.setStage(stage); request.setSuccessful(true); request.setRemark("完成阶段");
-        request.setData(Map.of());
-        request.setIdempotencyKey(key);
         return request;
     }
 

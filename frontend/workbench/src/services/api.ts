@@ -2519,7 +2519,7 @@ export type SalesOrderSupervisorApproval = SalesOrderSupervisorConfirmation & {
 export type ExportTask = {
   id: number;
   taskNo: string;
-  exportType: "lead" | "order" | "finance_order" | "cashback" | "withdrawal" | "exam_calendar";
+  exportType: "lead" | "order" | "finance_order" | "cashback" | "withdrawal" | "exam_calendar" | "exam_collection";
   status:
     | "queued"
     | "prechecking"
@@ -5291,6 +5291,17 @@ export const api = {
     ),
   cancelExportTask: async (id: number) =>
     unwrap<boolean>(await http.post(`/zsjos/export-task/${id}/cancel`)),
+  downloadExportFile: async (id: number, filename: string) => {
+    const response = await http.get(`/zsjos/export-task/${id}/download`, { responseType: 'blob', timeout: 300000 });
+    if (response.data.type.includes('json')) {
+      const error = JSON.parse(await response.data.text()) as { msg?: string };
+      throw new Error(error.msg || '导出文件下载失败');
+    }
+    const url = URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = url; anchor.download = filename; anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  },
   exportDownloadUrl: async (id: number) =>
     unwrap<string>(await http.get(`/zsjos/export-task/${id}/download-url`)),
   bpmTaskPage: async (

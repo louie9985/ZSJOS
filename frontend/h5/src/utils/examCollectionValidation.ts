@@ -1,11 +1,14 @@
 import type { CollectionField, CollectionImage } from '../api/studentInfo'
 import { validCollectionIdentity } from './studentInfoValidation.ts'
 
-/** Validate exactly the frozen task fields; never generate unselected material inputs. */
+/** Existing tasks may retain WeChat in their immutable snapshot; public collection no longer requests it. */
+export const effectiveExamFields = (fields: CollectionField[]) => fields.filter(field => field.enabled && field.key !== 'wechat')
+
+/** Validate effective task fields without introducing unselected material inputs. */
 export function validateExamCollection(fields: CollectionField[], answers: Record<string, string>, images: CollectionImage[]) {
   const errors: Record<string, string> = {}
   const values: Record<string, string | number[]> = {}
-  for (const field of fields.filter(f => f.enabled)) {
+  for (const field of effectiveExamFields(fields)) {
     if (field.type === 'images') {
       const selected = images.filter(i => i.fieldKey === field.key)
       const identity = field.key === 'identity_images'

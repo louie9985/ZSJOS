@@ -233,7 +233,7 @@ class ZsjosProductSkuServiceImplTest {
 
     @Test void deletionRechecksSkuAfterLockingItsProduct() {
         var sku = new ZsjosProductSkuDO(); sku.setId(10L); sku.setSpuId(1L); sku.setSkuRef("sku-1");
-        when(skuMapper.selectById(10L)).thenReturn(sku, null);
+        when(skuMapper.selectById(10L)).thenReturn(sku).thenReturn(null);
         assertThrows(ServiceException.class, () -> service.deleteSku(10L));
         var order = inOrder(skuMapper, productMapper);
         order.verify(skuMapper).selectById(10L);
