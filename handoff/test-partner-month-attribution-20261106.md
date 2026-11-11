@@ -1,0 +1,20 @@
+# Test partner month attribution repair
+
+## Registration — test-partner-month-attribution-20261106
+- Beijing time: 2026-11-06T12:16:50.419541+08:00
+- Environment: test, explicit environment marker; branch main; worktree /opt/zsjos; base e23674d600e61ac87f3b6c8a13a8d81051d7b6a0; owner /root; integration None.
+- Goal: user explicitly requests direct synchronization of current-month Lead attribution for just reassigned Partners. This scoped shared-test write is authorized by that request; one-time exception to historical freeze.
+- Scope: script/sql/mysql/repairs/sync_partner_month_attribution_20261106.py; docs/operations/partner-month-attribution-20261106.md; scoped exception note in docs/api/zsjos-subordinate-partners.md; this uniquely owned handoff record. Preserve existing unrelated changes.
+- Database scope: zsjos tenant 1, ownership log IDs 168–190 (23 reassigned Partners, 2026-11-06 11:59:03–12:10:44 Beijing); 8 active November Leads from 3 Partners, current target employee from authoritative ownership. Synchronize partner owner and contribution employee ID/name, plus version/audit; department/supervisor already match. Preserve other 205 Leads, provider identity, sales owner, statuses, timestamps, historical reports, orders and workflows.
+- Dependencies: existing private-image encoding and Docker-config connection utilities; no new dependency.
+- Verification: fixed private pre/post images; MySQL8 temporary-table initial/repeat/rollback/partial recovery/conflict/restore using same writer; guarded transaction; independent full-row readback and UTF-8 HEX; scoped source/docs/diff checks. No runtime/deployment/schema/ledger/permission/branch operation.
+
+## Delivery — test-partner-month-attribution-20261106
+- Beijing time: 2026-11-06T12:18:39.489535+08:00
+- Context: registration above; test/main /opt/zsjos; HEAD unchanged e23674d600e61ac87f3b6c8a13a8d81051d7b6a0; owner /root; integration None.
+- User goal/result: synchronized November owner/contributor snapshots for the just reassigned Partners. 23 Partners reviewed; 3 have 8 active current-month Leads. All 8 committed; other 205 historical Leads and protected assignment/organization rows unchanged. Only four attribution fields plus version/updater/update_time changed. Sales owners, provider identities, statuses and counted/submission times retained.
+- Decision: explicit current request authorizes scoped shared-test data repair and one-time historical-freeze exception. No permanent automatic resynchronization, schema/ledger/permissions/service/deployment/branch changes. Department/supervisor snapshots already equal target organization and retained; historical frozen reports untouched.
+- Changed files: script/sql/mysql/repairs/sync_partner_month_attribution_20261106.py; docs/operations/partner-month-attribution-20261106.md; scoped docs/api/zsjos-subordinate-partners.md note; this record. Existing unrelated user/task changes preserved.
+- Verification: MySQL8.4.11 same writer temporary-table initial8/replay0; 8 injected failure rollbacks; partial3/recovery5; conflict refusal before writes; restore/reapply; protected205. Actual8, independent complete after-image/UTF-8 HEX verification, actual replay0. Python AST/UTF-8, documentation links and scoped diff/whitespace checks passed. Early fixture-copy attempts were blocked by generated-column/default timestamp handling; corrected to copy only generation_expression-empty columns and reran full rehearsal before business writes.
+- Evidence: private /opt/zsjos-runtime/backups/partner-month-attribution-20261106/ prepared-v3/applied/verified/repeated, 0700/0600; planSHA2569109e67a16949119a24461da6a9271c55eddd51101d448367ba72e47e43c9e67. Scoped before/after images retained; post-commit compensation needs current-state review and separate authorization.
+- Dependency/integration impact: existing connection/encoding helpers only, None for runtime. No frontend/API implementation changes. Browser/login/cache-refresh acceptance not run; database outcomes verified. Remaining requested work None; ownership released.

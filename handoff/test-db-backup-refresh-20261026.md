@@ -58,3 +58,18 @@
 - Deleted precisely 3 old archives and 12 sidecars (15 files, 824255846 bytes); frozen metadata guards and flushed per-file journal; all 6 protected files unchanged. backup/ now has only the latest full archive. Other directories and repair evidence preserved.
 - Files: archive and sidecars, latest/pending-cleanup pointers, backup/refresh-20261030T052938Z manifest/journal/result, this record. All unrelated work preserved. No database writes, service lifecycle, commits or pushes.
 - Limits: no restore rehearsal; external uploaded objects and MySQL system accounts excluded. Removed historical restore points have no newly created copy. User-authorized backup/cleanup complete; ownership released.
+
+## Registration update — 2026-11-09T09:57:33.508240+08:00
+- Owner /root; environment test from /etc/zsjos/agent-environment; branch main; worktree /opt/zsjos; base/HEAD e23674d600e61ac87f3b6c8a13a8d81051d7b6a0; target branch/integration None.
+- User explicitly requests latest database backup and old backup cleanup. Ownership: new backup/ archive and sidecars, latest/pending pointers, backup/refresh-20261109T015733Z private manifest/result/verifier; this record; exact old archive zsjos-test-20261030T052938Z.sql.gz plus tables.txt/sha256/verification.json/stderr sidecars.
+- Impact: permanently remove 5 old files (311227974 bytes) only after new backup passes verification. Historical recovery point is removed without new copy. Preserve all other files, cleanup/repair evidence and other backup directories. No database mutation, service lifecycle or Git operations.
+- Dependencies: configured zsjos on zsjos-mysql-1, MySQL8.4.11, 578 InnoDB tables, zero views/routines/triggers/events; 7.1 GiB free. Single-transaction utf8mb4 stream to gzip.
+- Verification: export exit/stderr; full gzip CRC/UTF-8; exact table/database scope, completion/data markers; SHA256 readback and private permissions; frozen file stats before exact unlink and journal/protected metadata afterward. No restore rehearsal; external files/system accounts excluded.
+
+## Scope correction and delivery — 2026-11-09T10:07:32.312014+08:00
+- User steering: user already cleaned old backups and explicitly requests only latest backup. All previously planned cleanup cancelled; this workstream executed no deletion. Old-file manifest is historical preflight evidence only, not an executable approval.
+- Context: /root; test/main /opt/zsjos; HEAD e23674d600e61ac87f3b6c8a13a8d81051d7b6a0; integration None.
+- Result: /opt/zsjos/backup/zsjos-test-20261109T015733Z.sql.gz; 391106532 compressed / 6278138116 uncompressed bytes; 578 tables; single-transaction utf8mb4 export complete. Latest pointer updated.
+- PASS: mysqldump exit 0/empty stderr; full gzip CRC/strict UTF-8, exact database/table inventory, data/completion markers, SHA256 0c282f71f6659b33fefc83f6b79aedeff1f8380d95a37e3420463b24b8988a7f and independent sha256sum -c; private file0600.
+- Files: archive and four sidecars, latest pointer, earlier private preflight manifest/verifier and this record. Cleanup verifier was never executed. No database mutation/services/Git operations. Unrelated user work preserved.
+- Limits: no restore rehearsal; external uploaded files and MySQL system accounts excluded. User-requested latest backup complete; remaining work None; ownership released.

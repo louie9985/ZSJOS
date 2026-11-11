@@ -49,6 +49,10 @@ Partner Leads created after V143 snapshot `partnerOwnerUserIdSnapshot` and
 `partnerOwnerNameSnapshot` at submission. Older null snapshots display `未记录`; current ownership is
 never substituted as historical fact.
 
+2026-11-06 用户明确授权的单次数据修正，将当日刚改派兼职的 8 条本月客资运营及贡献人快照
+同步到新运营；不改变上述日常改派规则，也不追溯改写往月客资。
+范围与验证见[本月客资归属同步记录](../operations/partner-month-attribution-20261106.md)。
+
 ## Workbench presentation
 
 兼职账号提供“启用 / 全部 / 停用”快捷筛选，默认启用。两种视图共用服务端 `status` 查询，全部不传状态条件并保留历史已转员工账号。切换状态清空已选详情与已加载分页，保留搜索关键字。列表、表格及详情的状态标签使用启用绿色底色、停用红色底色和历史已转员工中性底色，同时保留状态文字。
