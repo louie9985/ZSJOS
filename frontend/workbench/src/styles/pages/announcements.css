@@ -41,17 +41,28 @@
 .announcement-list-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .announcement-list-meta { display: flex; align-items: center; gap: var(--crm-sp-2); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
 .announcement-detail-pane { padding: var(--crm-pane-pad); }
-.announcement-detail { max-width: 880px; margin: 0 auto; }
+.announcement-detail { max-width: 1352px; margin: 0 auto; }
 .announcement-detail header { padding-bottom: var(--crm-sp-5); border-bottom: 1px solid var(--crm-border); }
 .announcement-detail header .ant-typography { letter-spacing: 0; }
 .announcement-rich-text { padding: var(--crm-sp-5) 0; line-height: 1.8; overflow-wrap: anywhere; }
 .announcement-rich-text img { display: block; max-width: 100%; height: auto; margin: var(--crm-sp-4) auto; }
+.announcement-rich-text--tables img { display: inline; margin: 0; }
+.announcement-rich-text--tables { width: 100%; max-width: 1352px; margin-inline: auto; font: 16px/1.5 system-ui, sans-serif; }
+.announcement-rich-text--tables p { margin: 15px 0; }
+.announcement-rich-text--tables td, .announcement-rich-text--tables th { overflow-wrap: anywhere; }
+.notice-rich-text-editor { width: 100%; max-width: 1352px; margin-inline: auto; font: 16px/1.5 system-ui, sans-serif; }
+.notice-rich-text-editor > div { border: 0 !important; box-shadow: inset 0 0 0 1px var(--crm-border); }
+.notice-rich-text-editor .w-e-text-container [data-slate-editor] td, .notice-rich-text-editor .w-e-text-container [data-slate-editor] th { padding: 8px; overflow-wrap: anywhere; }
+.notice-rich-text-editor .w-e-text-container [data-slate-editor] { padding-inline: 0; }
+/* A layout-consuming scrollbar must not change the authored line width. */
+.notice-rich-text-editor .w-e-scroll { scrollbar-width: none; }
+.notice-rich-text-editor .w-e-text-container [data-slate-editor] .w-e-image-container { margin: 0; }
 .announcement-rich-text a { color: var(--crm-color-primary); }
-.announcement-rich-text--tables { min-width: 0; max-width: 100%; }
+.announcement-rich-text--tables { min-width: 0; }
 .announcement-table-scroll { width: 100%; max-width: 100%; min-width: 0; overflow-x: auto; margin-block: var(--crm-sp-3); }
 .announcement-table-scroll:focus-visible { outline: 2px solid var(--crm-color-primary); outline-offset: 2px; }
 .announcement-rich-text--tables table { border-collapse: collapse; }
-.announcement-rich-text--tables td, .announcement-rich-text--tables th { box-sizing: border-box; border: 1px solid var(--crm-border); padding: var(--crm-sp-2); line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; }
+.announcement-rich-text--tables td, .announcement-rich-text--tables th { box-sizing: border-box; border: 1px solid var(--crm-border); padding: 8px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
 .announcement-rich-text--tables th { background: var(--crm-bg-sunken); }
 /* Loaded tables can lack the editor's transient height metadata until selection.
    Anchor column hit areas to the actual table container instead. */

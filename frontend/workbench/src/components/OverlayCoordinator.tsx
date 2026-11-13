@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useState } from 'react'
 
 type OverlayCoordinatorValue = {
   businessOverlayCount: number
@@ -26,7 +26,7 @@ export function OverlayCoordinatorProvider({ children }: React.PropsWithChildren
 export function useBusinessOverlay(open: boolean) {
   const context = useContext(OverlayCoordinatorContext)
   if (!context) throw new Error('useBusinessOverlay must be used inside OverlayCoordinatorProvider')
-  useEffect(() => open ? context.registerBusinessOverlay() : undefined,
+  useLayoutEffect(() => open ? context.registerBusinessOverlay() : undefined,
     [context.registerBusinessOverlay, open])
 }
 

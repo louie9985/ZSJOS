@@ -57,8 +57,8 @@ def check_document_layout(page, width):
             padding: parseFloat(style.paddingLeft),
             overflow: document.documentElement.scrollWidth > innerWidth + 1};
     }''')
-    assert abs(metrics['width'] - min(width, 1120)) < 1, metrics
-    assert abs(metrics['left'] - max(0, (width - 1120) / 2)) < 1, metrics
+    assert abs(metrics['width'] - min(width, 1384)) < 1, metrics
+    assert abs(metrics['left'] - max(0, (width - 1384) / 2)) < 1, metrics
     assert metrics['bodyFont'] == '16px', metrics
     assert 16 <= metrics['padding'] <= 48, metrics
     assert not metrics['overflow'], metrics
@@ -109,10 +109,10 @@ try:
                     assert metrics['border'] > 0 and metrics['padding'] > 0, metrics
                     expect(wrapper.locator('tr').first.locator('td, th').first).to_have_css('border-top-color', 'rgb(221, 221, 221)')
                     if sample == 'fixed':
-                        assert metrics['overflow'] == (width < 1000), metrics
-                        assert abs(metrics['tableWidth'] - 900) < 3, metrics
+                        assert not metrics['overflow'], metrics
+                        assert metrics['tableWidth'] <= min(width - 32, 1352) + 2, metrics
                         assert metrics['layout'] == 'fixed', metrics
-                        assert abs(metrics['widths'][0] - 200) < 3, metrics
+                        assert abs(metrics['widths'][0] / metrics['tableWidth'] - 200 / 900) < .02, metrics
                         assert metrics['rowHeight'] >= 55, metrics
                         expect(page.locator('td[colspan="2"]')).to_have_count(1)
                         expect(page.locator('td[rowspan="2"]')).to_have_count(1)
@@ -122,23 +122,11 @@ try:
                         expect(cell).to_have_css('border-top-color', 'rgb(18, 52, 86)')
                         expect(cell.locator('span')).to_have_css('color', 'rgb(200, 0, 0)')
                     elif sample == 'cells':
-                        assert metrics['tableWidth'] >= 739, metrics
-                        assert metrics['widths'][0] >= 199 and metrics['widths'][1] >= 299, metrics
+                        assert not metrics['overflow'], metrics
+                        assert abs(metrics['widths'][0] / metrics['tableWidth'] - 200 / 740) < .02, metrics
                     elif sample == 'percent':
                         assert not metrics['overflow'], metrics
                         assert abs(metrics['widths'][0] / sum(metrics['widths']) - .25) < .04, metrics
-                    if sample in ['fixed', 'cells'] and width == 390:
-                        assert metrics['overflow'], metrics
-                        wrapper.focus()
-                        wrapper.press('ArrowRight')
-                        # Poll from the test process: page-side RAF polling is disabled in the no-JS reader.
-                        for _ in range(30):
-                            if wrapper.evaluate('(node) => node.scrollLeft > 0'): break
-                            time.sleep(.05)
-                        assert wrapper.evaluate('(node) => node.scrollLeft > 0'), (client, sample, 'keyboard scroll')
-                        wrapper.evaluate('(node) => node.scrollLeft = node.scrollWidth')
-                        assert wrapper.evaluate('(node) => node.scrollLeft + node.clientWidth >= node.scrollWidth - 2')
-                        wrapper.evaluate('(node) => node.scrollLeft = 0')
                     page.screenshot(path=str(fixtures / f'{client}-{sample}-{width}.png'), full_page=True)
                 assert not errors, errors
                 # Resize an already-open reader, including amfe-flexible's root-size updates.

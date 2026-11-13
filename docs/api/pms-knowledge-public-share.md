@@ -23,6 +23,8 @@ XLS/XLSX 独立文件及勾选公开的附件新增“预览表格”入口，�
 
 ## 阅读接口和状态
 
+公开 HTML 正文图片可点击打开原生 Popover 预览，支持关闭按钮、点击外部或 Esc 退出；勾选“原始尺寸”后可滚动查看长图和宽图，也可打开原图。图片原有超链接保留为独立入口。无有效 HTTP(S) 地址的图片不创建预览。该功能保持禁止脚本的 CSP，不修改存储正文。旧浏览器不支持 Popover 时在正文后展示图片预览和原图链接。手机浏览器与企业微信 WebView 的支持取决于其内核版本，真实客户端需单独验收。
+
 `GET/HEAD /public-api/pms/kb/document-share/page?token=...` 返回 UTF-8 HTML；这是文档导航响应，不使用 JSON 包装。初始 HTML 已包含文档标题、正文摘要和 Open Graph 元信息，不需要 JavaScript 或登录，供聊天预览读取。富文本只保留公开阅读安全标签和 HTTP(S) 资源，保留表格结构，不改写数据库正文；编辑器自定义样式不直接透传。
 
 文件文档页面显示标题及“打开／下载文件”。该链接指向 `GET /public-api/pms/kb/document-share/file?token=...`，重新校验分享和文档状态，再通过 Infra FileApi 生成 600 秒签名地址并重定向。图片/PDF 由浏览器打开，其他类型由浏览器下载或交给外部应用；不会在新 HTML 页面加载 Admin 的 FilePreview。已签发的文件 URL 遵循存储签名有效期，关闭分享不能撤回已下载内容。
@@ -67,3 +69,5 @@ Workbench 使用通用 ResourceLink 仅提供“公开查看”，支持复制�
 公开响应使用 `no-store`、`no-referrer`、`nosniff`、禁止脚本的 CSP 和 `noindex/noarchive`。查询参数 token 是阅读凭据，代理、APM 和访问日志不得记录查询令牌；PMS 分享和文档 Mapper 应使用 INFO 或更高日志级别，避免 SQL DEBUG/TRACE 暴露令牌及正文。应用公开页禁用请求/响应业务访问日志。
 
 定向测试覆盖地址配置、已有令牌链接、配置缺失可关闭、生命周期、HTML/HEAD、XSS、文件重定向和失效状态；浏览器使用隔离合成 API 与 Controller 导出 HTML 验证，不代表真实部署验收。上线后需检查外网 URL、反向代理日志脱敏、匿名访问及企业微信真实粘贴预览；客户端旧预览缓存可能继续显示旧标题。
+
+不支持 Popover 的浏览器保留正文原位置的图片和图片链接，隐藏预览副本；支持 Popover 的浏览器继续提供放大查看。

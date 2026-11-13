@@ -52,7 +52,11 @@ public class MediaLeadAnalysisService {
         var orders = facts.firstOrders(TenantContextHolder.getRequiredTenantId(), scopeType, scopeId, centerDeptIds).stream()
                 .filter(x -> x.getEffectiveAt() != null && !x.getEffectiveAt().isAfter(now))
                 .collect(Collectors.toMap(MediaLeadOrderFact::getLeadId, MediaLeadOrderFact::getEffectiveAt, (a, b) -> a));
-        var periods = periodStats(leads, orders, today);
+        var contributions = facts.firstContributionOrders(TenantContextHolder.getRequiredTenantId(), scopeType,
+                        scopeId, centerDeptIds, now).stream()
+                .collect(Collectors.toMap(MediaLeadOrderFact::getLeadId,
+                        x -> Objects.requireNonNullElse(x.getTotalAmount(), BigDecimal.ZERO)));
+        var periods = periodStats(leads, orders, contributions, today);
         var monthStart = today.withDayOfMonth(1);
         var targetsByKey = targetRows(monthStart);
         var target = resolveTarget(query, monthStart, leads, today, targetsByKey);
@@ -307,30 +311,33 @@ public class MediaLeadAnalysisService {
                 ? null : children.stream().mapToInt(Integer::intValue).sum();
     }
 
-    private List<MediaLeadVO.PeriodStats> periodStats(List<MediaLeadFact> leads, Map<Long, LocalDateTime> orders, LocalDate today) {
+    private List<MediaLeadVO.PeriodStats> periodStats(List<MediaLeadFact> leads, Map<Long, LocalDateTime> orders, Map<Long, BigDecimal> contributions, LocalDate today) {
         List<MediaLeadVO.PeriodStats> result = new ArrayList<>();
         var monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-        add(result, "yesterday", "昨日", leads, orders, today.minusDays(1), today);
-        add(result, "today", "今日", leads, orders, today, today.plusDays(1));
-        add(result, "lastWeek", "上周", leads, orders, monday.minusWeeks(1), monday);
-        add(result, "week", "本周", leads, orders, monday, today.plusDays(1));
+        add(result, "yesterday", "昨日", leads, orders, contributions, today.minusDays(1), today);
+        add(result, "today", "今日", leads, orders, contributions, today, today.plusDays(1));
+        add(result, "lastWeek", "上周", leads, orders, contributions, monday.minusWeeks(1), monday);
+        add(result, "week", "本周", leads, orders, contributions, monday, today.plusDays(1));
         var month = today.withDayOfMonth(1);
-        add(result, "lastTwoMonth", "上上月", leads, orders, month.minusMonths(2), month.minusMonths(1));
-        add(result, "lastMonth", "上月", leads, orders, month.minusMonths(1), month);
-        add(result, "month", "本月", leads, orders, month, today.plusDays(1));
-        add(result, "year", "本年", leads, orders, today.withDayOfYear(1), today.plusDays(1));
-        add(result, "all", "全部", leads, orders, null, today.plusDays(1));
+        add(result, "lastTwoMonth", "上上月", leads, orders, contributions, month.minusMonths(2), month.minusMonths(1));
+        add(result, "lastMonth", "上月", leads, orders, contributions, month.minusMonths(1), month);
+        add(result, "month", "本月", leads, orders, contributions, month, today.plusDays(1));
+        add(result, "year", "本年", leads, orders, contributions, today.withDayOfYear(1), today.plusDays(1));
+        add(result, "all", "全部", leads, orders, contributions, null, today.plusDays(1));
         return result;
     }
 
     private void add(List<MediaLeadVO.PeriodStats> out, String key, String label, List<MediaLeadFact> leads,
-                     Map<Long, LocalDateTime> orders, LocalDate start, LocalDate end) {
+                     Map<Long, LocalDateTime> orders, Map<Long, BigDecimal> contributions, LocalDate start, LocalDate end) {
         var selected = leads.stream().filter(x -> start == null || in(x.getSubmittedAt(), start, end)).toList();
         long valid = selected.stream().filter(x -> VALID.contains(x.getStatus())).count();
         long converted = selected.stream().filter(x -> VALID.contains(x.getStatus()) && orders.containsKey(x.getId())).count();
         long invalid = selected.stream().filter(x -> "invalid".equals(x.getStatus())).count();
+        BigDecimal contribution = selected.stream().filter(x -> VALID.contains(x.getStatus()))
+                .map(x -> contributions.getOrDefault(x.getId(), BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2);
         out.add(new MediaLeadVO.PeriodStats(key, label, selected.size(), valid, invalid, converted,
-                ratio(valid, selected.size()), ratio(converted, valid)));
+                ratio(valid, selected.size()), ratio(converted, valid), contribution));
     }
 
     private List<MediaLeadVO.Member> members(MediaLeadVO.Query query, List<MediaLeadFact> leads, Map<Long, LocalDateTime> orders, LocalDate today, Map<String, MediaLeadTargetDO> targetsByKey) {

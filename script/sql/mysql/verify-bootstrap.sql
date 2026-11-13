@@ -77,9 +77,11 @@ SELECT 'student_delivery_stages' AS check_name,
                     AND student_menu.path='my-students' AND student_menu.component='zsjos/my-students'
                     AND student_menu.component_name='ZsjosMyStudents' AND student_menu.type=2
                     AND student_menu.status=0 AND student_menu.visible=b'1' AND student_menu.deleted=b'0')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73428
-               AND permission='zsjos:student-contact:delivery-stage-submit' AND parent_id=73020
-               AND type=3 AND status=0 AND deleted=b'0'),
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V365')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V365')
+          AND NOT EXISTS (SELECT 1 FROM system_menu
+               WHERE permission IN ('zsjos:student-contact:delivery-stage-submit','zsjos:student:exam-date-update')
+                 AND (status<>1 OR deleted<>b'1' OR visible<>b'0')),
           'PASS','FAIL') AS result;
 SELECT 'production_ticket_dispatch_pool' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V145')

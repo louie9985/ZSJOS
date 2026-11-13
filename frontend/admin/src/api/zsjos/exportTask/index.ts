@@ -3,7 +3,7 @@ import request from '@/config/axios'
 export interface ExportTaskVO {
   id: number
   taskNo: string
-  exportType: 'lead' | 'order' | 'finance_order' | 'cashback' | 'withdrawal' | 'exam_calendar'
+  exportType: 'lead' | 'order' | 'finance_order' | 'cashback' | 'withdrawal' | 'exam_calendar' | 'exam_collection'
   status: 'queued' | 'prechecking' | 'generating' | 'ready' | 'failed' | 'cancelled' | 'expired'
   attemptCount: number
   resultFileName?: string
@@ -26,3 +26,6 @@ export const cancelExportTask = (id: number) =>
 
 export const getExportDownloadUrl = (id: number) =>
   request.get<string>({ url: `/zsjos/export-task/${id}/download-url` })
+
+export const downloadExportFile = (id: number) =>
+  request.download<Blob>({ url: `/zsjos/export-task/${id}/download`, timeout: 300000 })

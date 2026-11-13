@@ -1,0 +1,57 @@
+.exam-export-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-6);
+}
+
+.exam-export-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-5);
+  min-width: 0;
+}
+
+.exam-export-form .ant-form-item {
+  margin-bottom: 0;
+}
+
+.exam-export-form .ant-form-item-label {
+  padding-bottom: var(--crm-sp-3);
+}
+
+.exam-export-form .exam-export-disclosure > .ant-collapse-item > .ant-collapse-header {
+  padding: var(--crm-sp-3) 0;
+  align-items: center;
+}
+
+.exam-export-form .exam-export-disclosure > .ant-collapse-item > .ant-collapse-content > .ant-collapse-content-box,
+.exam-export-form .exam-export-disclosure > .ant-collapse-item > .ant-collapse-panel > .ant-collapse-body,
+.exam-export-form .exam-export-disclosure > .ant-collapse-item > .ant-collapse-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-5);
+  padding: var(--crm-sp-4) 0 0;
+}
+
+.exam-export-naming {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+  min-width: 0;
+}
+
+.exam-export-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-4);
+}
+
+.exam-export-example {
+  margin-top: var(--crm-sp-3);
+  overflow-wrap: anywhere;
+}
+
+.exam-export-form .ant-typography code {
+  margin-inline: 0;
+}

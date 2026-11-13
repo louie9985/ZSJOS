@@ -175,6 +175,11 @@ class MediaLeadAnalysisServiceTest {
         current.setStatus("invalid");
         var order = new MediaLeadOrderFact();
         order.setLeadId(101L); order.setEffectiveAt(now.minusSeconds(10));
+        order.setTotalAmount(new java.math.BigDecimal("100.25"));
+        var invalidOrder = new MediaLeadOrderFact();
+        invalidOrder.setLeadId(102L); invalidOrder.setTotalAmount(new java.math.BigDecimal("500.00"));
+        when(facts.firstContributionOrders(eq(1L), eq("DEPT"), eq(10L), eq(List.of()), any()))
+                .thenReturn(List.of(order, invalidOrder));
         when(facts.leads(1L, "DEPT", 10L, List.of())).thenReturn(List.of(previous, current));
         when(facts.firstOrders(1L, "DEPT", 10L, List.of())).thenReturn(List.of(order));
         when(access.mediaUsers()).thenReturn(List.of(user(1)));
@@ -188,6 +193,10 @@ class MediaLeadAnalysisServiceTest {
             var todayStats = result.periods().stream().filter(x -> "today".equals(x.key())).findFirst().orElseThrow();
             assertEquals(1, yesterday.total());
             assertEquals(1, yesterday.converted());
+            assertEquals(new java.math.BigDecimal("100.25"), yesterday.performanceContribution());
+            assertEquals(new java.math.BigDecimal("0.00"), todayStats.performanceContribution());
+            assertEquals(new java.math.BigDecimal("100.25"), result.periods().stream()
+                    .filter(x -> "all".equals(x.key())).findFirst().orElseThrow().performanceContribution());
             assertEquals(1, todayStats.total());
             assertEquals(0, todayStats.converted());
             assertEquals(2, result.funnel().submitted());

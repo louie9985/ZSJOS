@@ -1,5 +1,15 @@
 # Data and Permission Flow
 
+Version updates use the independent `zsjos:version-update:` configured permissions. Management query covers current-tenant version-update records, commands additionally require their action permission and service object checks. Recipient reads and acknowledgements require the frozen user relationship; only users with both read and acknowledge permission can be selected for new publications. V369 adds metadata, and administrators assign role grants. See [version updates](../api/version-updates.md).
+
+## Exam collection (feature branch, 2026-11-04)
+
+The user-approved `zsjos:exam-collection:query` contract permits current-tenant full student/class/archive reads only through the exam-collection feature and its task-context summary. Commands additionally require their configured button permission. `ExamCollectionPermissionProvider` checks tenant, logical deletion, page and action permissions for task objects; it does not infer roles or expand legacy student APIs. V363 defines metadata only, never role assignments. Initial task fields/create/page/detail endpoints are implemented; full roster/public/archive/summary integration and both frontend menu consumers remain in development. See [exam collection](../api/exam-material-collection.md).
+
+Planner reminder endpoints separately require existing business-task query permission and enforce the current user's assigned pending task and frozen roster ownership. They expose own class progress and the shared collection link only, without granting exam management or tenant-wide archive reads. Reminder acknowledgement is display state, not task completion. New public sessions derive tenant context from a random task token and isolate uploaded files by session; they never resolve an input identity to existing personal data in the public response. Roster notification and completion/reopening commands now have independent object/action checks; frontend integration remains pending.
+
+Exam task summary now reuses the StudentSummaryPage component under the authorized exam menu URL, calling dedicated task-scoped endpoints. It never converts exam-query into legacy summary-query. The backend shared projection has an explicitly checked exam entry; fixed member snapshots, not current class membership or prior enrollment completion, own exam coverage. Global summary still requires its original permission and now projects latest service archive revisions. Workbench native-path registration and Admin unsupported-component filtering are implemented and tested with the actual route filter.
+
 ## Management student summary (2026-11-03)
 
 Explicitly approved exception: `zsjos:student-summary:query` grants current-tenant full teaching-service population and archive-field reads, including sensitive and exam fields, without legacy personal/department/archive gates. Export additionally requires `zsjos:student-summary:export`. The exception is isolated to new read-only endpoints, preserves tenant and logical-delete constraints, and grants no legacy command or material-download access. Workbench uses BusinessTable; Vue Admin excludes the unsupported component. V361 adds metadata only, never role grants. See [student summary](../api/student-summary.md).
@@ -1136,3 +1146,7 @@ Within existing feature and Lead sales-history-read authorization, the system-us
 ## Order Lead association projection (2026-11-05)
 
 Explicit user-approved exception: existing order-create permission plus exact customer identity verification permits the order-entry candidate projection to read all non-deleted Leads for that same Person in the current tenant, including otherwise unreadable and closed Leads. Lead/student repurchase contexts retain their original command/object scopes. The candidate API returns the complete order customer-profile projection and current Lead status; it grants no ordinary Lead route/list/write access. Both Workbench and the existing Admin customer-entry consumer use it. No role assignments change. The association and captured profile live in the order approval snapshot, independently of transaction leadId, ownership, cashback and Lead lifecycle. First purchase is unchanged. See [order contract](../api/zsjos-sales-order.md).
+
+## 客资取消下次跟进权限
+
+已成交客资取消下次跟进使用独立配置权限 `zsjos:lead-follow-up:cancel-next-time`，V370 将按钮定义在工作台的客资管理下。Workbench 操作栏和后端取消接口使用同一权限，服务层继续校验客资可写关系及已成交状态。通用待办取消仍使用 `zsjos:business-task:cancel`。菜单 SQL 只定义元数据，管理员通过角色管理授权。Admin 提供通用菜单与角色配置界面，未增加客资取消操作消费端。

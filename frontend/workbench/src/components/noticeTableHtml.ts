@@ -8,7 +8,7 @@ function dimension(value: string) {
   return valueInPixels > 0 ? { value: Math.max(1, Math.round(valueInPixels)), percent: unit === '%' } : undefined
 }
 
-export function normalizeNoticeTableHtml(html: string): string {
+export function normalizeNoticeTableHtml(html: string, maximumWidth = 1352): string {
   if (!/<table[\s>]/i.test(html)) return html
   const doc = new DOMParser().parseFromString(html, 'text/html')
   doc.querySelectorAll<HTMLTableElement>('table').forEach(table => {
@@ -66,12 +66,21 @@ export function normalizeNoticeTableHtml(html: string): string {
     const total = percentageColumns && (!tableWidth || tableWidth.percent) ? 100 : tableWidth && !tableWidth.percent ? tableWidth.value : undefined
     const remainder = (total ?? 0) - widths.reduce<number>((sum, width) => sum + (width ?? 0), 0)
     const fallback = missing && remainder > 0 ? remainder / missing : 90
+    const resolvedWidths = widths.map(width => width ?? fallback)
+    const sum = resolvedWidths.reduce((sum, width) => sum + width, 0)
+    const relative = percentageColumns && (!tableWidth || tableWidth.percent)
+    const fittedWidth = relative ? maximumWidth : Math.min(sum, maximumWidth)
+    // wangEditor stores integer pixel columns. Resolve relative widths at this
+    // editor's actual content width rather than parsing percentages as pixels.
+    const scale = fittedWidth / sum
+    table.style.width = '100%'
+    table.style.removeProperty('min-width')
     const group = doc.createElement('colgroup')
     widths.forEach((width, index) => {
       const col = columns[index]?.cloneNode(false) as HTMLTableColElement | undefined || doc.createElement('col')
       col.removeAttribute('span')
       col.style.removeProperty('width')
-      col.setAttribute('width', String(Math.max(1, Math.round(width ?? fallback))))
+      col.setAttribute('width', String(Math.max(1, Math.floor(resolvedWidths[index] * scale))))
       group.append(col)
     })
     table.querySelectorAll(':scope > colgroup, :scope > col').forEach(col => col.remove())

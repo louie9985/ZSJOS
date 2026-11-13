@@ -48,6 +48,7 @@ public class StudentInfoFormService {
     @Resource private TenantFrameworkService tenants;
     @Resource private StudentInfoImageService images;
     @Resource private StudentInfoTaskMapper collectionTasks;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.registration.RegistrationNotifyPublisher registrationNotifications;
     @Value("${zsjos.student-info.public-base-url:${zsjos.positioning.public-base-url:${ZSJOS_PUBLIC_H5_BASE_URL:}}}") private String publicBaseUrl;
     private static final SecureRandom RANDOM=new SecureRandom();
 
@@ -274,9 +275,14 @@ public class StudentInfoFormService {
                     answer.setValueLabelSnapshot(saved.getLabel());
                 answer.setFormId(form.getId()); answer.setTenantId(form.getTenantId()); values.insert(answer);
             }
+            var submittedAt = LocalDateTime.now();
             forms.update(null,new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,form.getId()).eq(StudentInfoFormDO::getStatus,"DRAFT")
-                    .set(StudentInfoFormDO::getStatus,"SUBMITTED").set(StudentInfoFormDO::getSubmittedAt,LocalDateTime.now()).set(StudentInfoFormDO::getSubmitSource,"public")
-                    .set(StudentInfoFormDO::getDraftSnapshot,null).set(StudentInfoFormDO::getDraftSavedAt,null)); return null;
+                    .set(StudentInfoFormDO::getStatus,"SUBMITTED").set(StudentInfoFormDO::getSubmittedAt,submittedAt).set(StudentInfoFormDO::getSubmitSource,"public")
+                    .set(StudentInfoFormDO::getDraftSnapshot,null).set(StudentInfoFormDO::getDraftSavedAt,null));
+            String studentName = validated.stream().filter(answer -> "name".equals(answer.getFieldKey()))
+                    .map(StudentInfoFormValueDO::getValueText).filter(Objects::nonNull).findFirst().orElse("");
+            registrationNotifications.publishInformationSubmitted(form.getId(), studentName, submittedAt);
+            return null;
         });
     }
     public <T> T withLockedToken(String token,java.util.function.Function<StudentInfoFormDO,T> action) {

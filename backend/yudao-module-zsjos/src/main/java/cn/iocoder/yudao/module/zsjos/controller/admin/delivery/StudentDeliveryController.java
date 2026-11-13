@@ -20,7 +20,6 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.prepost.PreAuthorize;
-import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -88,11 +87,4 @@ public class StudentDeliveryController {
         overview.ensure(accountId,userId); return success(overview.get(accountId,userId,null));
     }
 
-    @PostMapping("/plan/{planId}/complete")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-delivery:complete')")
-    public CommonResult<Boolean> complete(@PathVariable Long planId, @RequestParam Long accountId,
-                                          @RequestParam(required = false) Long directorUserId,
-                                          @RequestParam String stageCode, @RequestParam LocalDateTime completedAt) {
-        throw new IllegalStateException("阶段必须通过提交表单完成");
-    }
 }

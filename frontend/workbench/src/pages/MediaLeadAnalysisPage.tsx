@@ -196,8 +196,28 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
             <p>成交率 = 该期间提交的有效客资中，截至查询时已成交的客资数 ÷ 该期间提交的有效客资数 × 100%。有效客资按当前判定统计，包含已转化、已成交客资；无效、待判等不计入分母。无有效客资时显示“—”。</p>
             <p>成交须有关联的已生效首购订单，且单笔订单总金额≥1280元（含1280元）；复购不计，多笔小额订单不累加，同一客资只计一次。</p>
             <p>期间按客资提交日期划分，成交可发生在后续期间，不限60天；历史成交率随当前状态和后续成交动态更新，不是期末冻结值。归属采用首次计数时冻结的引流贡献人和部门，日期按北京时间计算，周一为每周起点。</p>
+            <p>业绩贡献按该期间提交的有效客资汇总本人及所属兼职的生效首购订单总金额，不设金额门槛。每条客资取最早生效的一笔首购，复购不计，后续成交更新历史期间，归属沿用冻结贡献人和部门。</p>
           </div></details>
-          <BusinessTable rowClassName={row => row.key === 'today' || row.key === 'month' ? 'media-lead-current-period' : ''} tableKey="media-lead-periods" mode="compact" columnMode="native" rowKey="key" size="small" scroll={{ x: 750 }} pagination={false} dataSource={data.periods} columns={[{ title: '期间', dataIndex: 'label' }, { title: '客资总数', dataIndex: 'total' }, { title: '有效客资', dataIndex: 'valid' }, { title: '无效客资', dataIndex: 'invalid' }, { title: '客资有效率', dataIndex: 'validRate', render: (v: number) => percent(v) }, { title: '成交客资', dataIndex: 'converted' }, { title: '成交率', dataIndex: 'convertedRate', render: (v: number) => percent(v) }]} /></Card>
+          <BusinessTable
+            rowClassName={row => row.key === 'today' || row.key === 'month' ? 'media-lead-current-period' : ''}
+            tableKey="media-lead-periods" mode="compact" columnMode="native" rowKey="key" size="small"
+            scroll={{ x: 950 }} pagination={false} dataSource={data.periods}
+            columns={[
+              { title: '期间', dataIndex: 'label', width: 110 },
+              { title: '客资总数', dataIndex: 'total', width: 110 },
+              { title: '有效客资', dataIndex: 'valid', width: 110 },
+              { title: '无效客资', dataIndex: 'invalid', width: 110 },
+              { title: '客资有效率', dataIndex: 'validRate', width: 110, render: (v: number) => percent(v) },
+              { title: '成交客资', dataIndex: 'converted', width: 110 },
+              { title: '成交率', dataIndex: 'convertedRate', width: 110, render: (v: number) => percent(v) },
+              {
+                title: '业绩贡献（元）', dataIndex: 'performanceContribution', width: 180, align: 'right',
+                render: (v?: number) => v == null ? '—' : v.toLocaleString('zh-CN', {
+                  minimumFractionDigits: 2, maximumFractionDigits: 2,
+                }),
+              },
+            ]}
+          /></Card>
         <Card title="团队成员进度表">
           <p className="performance-subtle">成员成交数按合格首购订单的最早生效日期统计，包含往期提交客资；不能直接用成员本期成交数除以本期有效客资数来核对上方成交率。</p>
           <BusinessTable<Member>

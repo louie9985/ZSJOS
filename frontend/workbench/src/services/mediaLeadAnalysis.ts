@@ -3,7 +3,7 @@ import type { Timestamp } from './time'
 
 export type ScopeNode = { key: string; parentKey?: string; title: string; scopeType: 'SELF' | 'USER' | 'DEPT' | 'CENTER'; scopeId?: number }
 export type Target = { id?: number; scopeType: string; scopeId: number; name: string; periodStart: string; targetCount: number | null; actualCount: number; manual: boolean; version?: number }
-export type PeriodStats = { key: string; label: string; total: number; valid: number; invalid: number; converted: number; validRate: number | null; convertedRate: number | null }
+export type PeriodStats = { key: string; label: string; total: number; valid: number; invalid: number; converted: number; validRate: number | null; convertedRate: number | null; performanceContribution?: number }
 export type Member = { userId: number; name: string; targetCount: number | null; yesterday: number; yesterdayConverted: number; today: number; todayConverted: number; week: number; weekValid: number; weekConverted: number; lastWeek: number; lastWeekValid: number; lastWeekConverted: number; month: number; monthValid: number; monthConverted: number; lastMonth: number; lastMonthValid: number; lastMonthConverted: number; monthProgress: number | null }
 export type CalendarDay = { date: string; total: number; valid: number; invalid: number; pending: number }
 export type Funnel = { submitted: number; valid: number; converted: number }

@@ -67,7 +67,13 @@ class DeliveryClassFiltersTest {
                 Map.of("classId",10L,"snapshot","{\"categoryId\":13,\"categoryName\":\"项目乙\"}")));
         var service = new DeliveryClassServiceImpl();
         ReflectionTestUtils.setField(service,"mapper",mapper); ReflectionTestUtils.setField(service,"permissionApi",permissions); ReflectionTestUtils.setField(service,"scopeService",scopes);
+        var users = mock(cn.iocoder.yudao.module.system.api.user.AdminUserApi.class);
+        when(users.getUserMap(Set.of(8L))).thenReturn(Map.of(8L,
+                new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO().setId(8L).setNickname("最新老师")));
+        ReflectionTestUtils.setField(service, "adminUserApi", users);
         var context=service.filterContext(7L,new DeliveryClassPageReqVO(),true);
+        assertEquals("最新老师", context.homerooms().getFirst().name());
+        verify(users).getUserMap(Set.of(8L));
         assertEquals(2,context.projects().size()); assertEquals(8L,context.homerooms().getFirst().id()); assertEquals(1L,context.pendingClass().getId());
     }
 

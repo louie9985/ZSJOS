@@ -456,6 +456,9 @@ class SalesOrderServiceImplTest {
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
         OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL);
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setStatus(STATUS_VALID);
+        LocalDateTime nextFollowUpAt = LocalDateTime.now().plusDays(2);
+        lead.setNextFollowUpAt(nextFollowUpAt);
+        opportunity.setNextFollowUpAt(nextFollowUpAt);
         when(roundMapper.selectByProcessInstanceId("process-1")).thenReturn(round);
         when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
@@ -469,7 +472,10 @@ class SalesOrderServiceImplTest {
         assertEquals(STATUS_WON, lead.getStatus());
         verify(orderMapper).updateById(order); verify(roundMapper).updateById(round); verify(opportunityMapper).updateById(opportunity);
         verify(leadMapper).updateById(lead);
-        verify(lifecycleTaskService).cancelFollowUpReminders(eq(order.getLeadId()), any(), eq("成交订单已生效"));
+        assertEquals(nextFollowUpAt, lead.getNextFollowUpAt());
+        assertEquals(nextFollowUpAt, opportunity.getNextFollowUpAt());
+        verify(lifecycleTaskService).cancelFirstFollowUpTasks(eq(order.getLeadId()), any(), eq("成交订单已生效"));
+        verify(lifecycleTaskService, never()).cancelFollowUpReminders(any(), any(), any());
     }
 
     @Test

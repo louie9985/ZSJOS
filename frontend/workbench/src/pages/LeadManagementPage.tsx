@@ -579,7 +579,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false, me
     : detailError
       ? <Alert type="error" showIcon message={detailError} action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
       : detail
-        ? <LeadDetail lead={detail} refreshVersion={detailRefreshVersion} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
+        ? <LeadDetail lead={detail} permissions={permissions} refreshVersion={detailRefreshVersion} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           readOnly={operationsReadOnly} mode={partnerId !== undefined || operationsReadOnly ? "manager-readonly" : audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
           navigationKey={requestedLeadId === detail.id && requestedTab ? location.key : undefined}

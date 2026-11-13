@@ -80,6 +80,11 @@ public class FileApiImpl implements FileApi {
     }
 
     @Override
+    public boolean deleteUnregisteredFile(Long configId, String path) throws Exception {
+        return fileService.deleteUnregisteredFile(configId, path);
+    }
+
+    @Override
     public String presignGetUrl(String url, Integer expirationSeconds) {
         return fileService.presignGetUrl(url, expirationSeconds);
     }

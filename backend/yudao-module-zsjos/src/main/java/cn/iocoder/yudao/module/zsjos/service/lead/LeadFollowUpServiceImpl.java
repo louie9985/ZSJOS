@@ -133,7 +133,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                     adminUserApi.getUserMap(List.of(existingOpportunity.getOperatorUserId())), null);
         }
         boolean won = STATUS_WON.equals(lead.getStatus());
-        if (reqVO.getNextFollowUpAt() == null ? !won && !automatic : !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
+        if (reqVO.getNextFollowUpAt() == null ? !automatic : !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
             throw exception(LEAD_FOLLOW_UP_TIME_INVALID);
         }
 

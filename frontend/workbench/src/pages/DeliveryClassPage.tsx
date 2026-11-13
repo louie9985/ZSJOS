@@ -1,4 +1,5 @@
 import StudentEntryDialog from '../components/StudentEntryDialog'
+import ClassExamProgressDialog from '../components/ClassExamProgressDialog'
 import { PlusOutlined, QuestionCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, DatePicker, Form, Input, Modal, Segmented, Select, Space, Typography, message } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -17,6 +18,7 @@ function savedView(key: string): { status?: string; keyword?: string; filters?: 
   try { return JSON.parse(sessionStorage.getItem(key) || '{}') } catch { return {} }
 }
 export default function DeliveryClassPage({ permissions = [] }: { permissions?: string[]; manage?: boolean }) {
+  const [examClass, setExamClass] = useState<DeliveryClass>()
   const [entry, setEntry] = useState<{ open: boolean; classId?: number }>({ open: false })
   const { useTableLayout } = useInboxTableLayout()
   const manage = has(permissions, 'zsjos:delivery-class:query-managed')
@@ -96,12 +98,11 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
     finally { saveLock.current = false; setSaving(false) }
   }
   const complete = async (row: DeliveryClass) => {
-    if (!has(permissions, 'zsjos:delivery-class:complete') || !row.availableActions?.includes('COMPLETE')) return
-    try { await api.deliveryClasses.complete(row.id); message.success('班级已结课'); await Promise.all([load(), loadContext()]) }
-    catch (e) { message.error(e instanceof Error ? e.message : '结课失败') }
+    setExamClass(row)
   }
   if (!canQuery) return <Alert type="warning" showIcon message="暂无班级查询权限" />
   return <section className="workspace-page">
+    {examClass && <ClassExamProgressDialog id={examClass.id} name={examClass.className} onClose={() => setExamClass(undefined)} />}
     <StudentEntryDialog {...entry} type="teaching" onClose={() => setEntry({ open: false })} onSaved={() => { void load(); void loadContext() }} />
     <Space direction="vertical" size={16} style={{ width: '100%' }}>
       <Space wrap style={{ justifyContent: 'space-between', width: '100%' }}>

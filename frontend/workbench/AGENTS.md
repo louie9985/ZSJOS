@@ -29,6 +29,8 @@ extend the repository root instructions.
 
 ## UI implementation
 
+- 页面、详情和列表工具栏不得内置手动局部刷新按钮，包括表格组件的默认刷新入口。业务操作成功后自动更新数据，加载失败时保留明确的重试入口。
+
 - 主从收件箱统一采用滚动追加加载，保留已加载记录和已选详情；筛选/范围变化重置加载位置，加载失败保留已有内容并提供重试。表格模式继续分页，不能把表格分页控件直接用作收件箱翻页。仅提供全量目录 API 的人员/成员导航可分批呈现，但必须说明这是渐进渲染，不能宣称减少了接口读取量。
 
 - When changing shared layout, themes, navigation, or component styling, **MUST** consult the relevant parts of `frontend/workbench/docs/ui-guidelines.md` for token usage, page skeletons, and naming conventions. Reuse material already read in the current context unless it changed or is no longer available.

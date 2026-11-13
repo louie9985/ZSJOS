@@ -99,20 +99,22 @@ onBeforeUnmount(() => generation++)
 /* Public documents use viewport space; the partner app keeps its mobile width elsewhere.
    Every document selector includes .norem to opt out of the H5 px-to-rem transform. */
 :global(#app:has(.notice-public.norem)) { max-width: none; background: #f3f5f7; }
-.notice-public.norem { box-sizing: border-box; width: 100%; max-width: 1120px; min-height: 100vh; margin: 0 auto; padding: clamp(20px, 4vw, 48px) clamp(16px, 4vw, 48px) 48px; background: #fff; color: #20242b; font: 16px/1.85 system-ui, sans-serif; overflow-wrap: anywhere; }
+.notice-public.norem { box-sizing: border-box; width: 100%; max-width: 1384px; min-height: 100vh; margin: 0 auto; padding: 24px 16px 48px; background: #fff; color: #20242b; font: 16px/1.85 system-ui, sans-serif; overflow-wrap: anywhere; }
 .notice-public.norem .notice-public-brand { border-bottom: 1px solid #ddd; padding-bottom: 20px; margin-bottom: 28px; font-size: 18px; font-weight: 600; }
 .notice-public.norem .notice-public-brand span { margin-left: 10px; font-size: 14px; font-weight: normal; }
 .notice-public.norem h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.4; }
 .notice-public.norem .notice-public-date, .notice-public.norem .notice-public-note { color: var(--h5-text-secondary, #666); font-size: 13px; }
-.notice-public.norem .notice-public-body { font-size: 16px; line-height: 1.85; margin-top: 28px; }
+.notice-public.norem .notice-public-body { font-size: 16px; line-height: 1.5; margin-top: 28px; }
 .notice-public.norem .notice-public-body :deep(img), .notice-public.norem .notice-public-body :deep(video) { max-width: 100%; height: auto; }
 .notice-public.norem .notice-public-body :deep(img[src]) { cursor: zoom-in; }
+.notice-public.norem .notice-public-body :deep(p) { margin: 15px 0; }
+.notice-public.norem .notice-public-body :deep(td), .notice-public.norem .notice-public-body :deep(th) { overflow-wrap: anywhere; }
 .notice-public.norem .notice-public-body :deep(pre) { display: block; overflow-x: auto; max-width: 100%; }
 .notice-public.norem .notice-public-body :deep(.notice-table-scroll) { width: 100%; max-width: 100%; overflow-x: auto; margin: 12px 0; }
 .notice-public.norem .notice-public-body :deep(.notice-table-scroll:focus-visible) { outline: 2px solid var(--van-primary-color); outline-offset: 2px; }
 .notice-public.norem .notice-public-body :deep(table) { width: 100%; border-collapse: collapse; }
 /* Public document grids need visible lines on white, unlike the translucent card border. */
-.notice-public.norem .notice-public-body :deep(td), .notice-public.norem .notice-public-body :deep(th) { box-sizing: border-box; border: 1px solid #ddd; padding: 8px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; vertical-align: top; }
+.notice-public.norem .notice-public-body :deep(td), .notice-public.norem .notice-public-body :deep(th) { box-sizing: border-box; border: 1px solid #ddd; padding: 8px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
 .notice-public.norem .notice-public-body :deep(th) { background-color: #f7f7f7; }
 .notice-public.norem .notice-public-files { margin-top: 32px; border-top: 1px solid #ddd; }
 .notice-public.norem .notice-public-files h2 { font-size: 20px; }

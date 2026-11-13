@@ -24,8 +24,6 @@ public interface StudentContactService {
     PageResult<StudentContactExtensionRespVO> getExtensions(PageParam page, String statusScope, Long userId);
     void completeAssistance(Long taskId, String remark, Long userId);
     StudentContactAttachmentRespVO uploadAttachment(Long relationId, Long userId, MultipartFile file) throws IOException;
-    Long submitDeliveryStage(Long relationId, StudentDeliveryStageSubmitReqVO request, Long userId);
-    void updateExamDate(Long relationId, StudentExamDateUpdateReqVO request, Long userId);
     Integer saveDirectorPrecheckDraft(Long relationId, DirectorStageSaveReqVO request, Long userId);
     void submitDirectorPrecheck(Long relationId, DirectorStageSaveReqVO request, Long userId);
 }

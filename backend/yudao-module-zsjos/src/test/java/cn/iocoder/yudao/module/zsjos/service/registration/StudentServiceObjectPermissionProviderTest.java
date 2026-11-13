@@ -43,7 +43,7 @@ class StudentServiceObjectPermissionProviderTest {
         when(relationMapper.selectById(10L)).thenReturn(relation);
         when(permissionApi.hasAnyPermissions(7L, StudentReadScope.QUERY_ALL)).thenReturn(true);
         assertTrue(provider.hasPermission(10L, "read", 7L));
-        for (String action : List.of("accept", "contact", "update-basic-info", "delivery-stage", "class-transfer", "close-service"))
+        for (String action : List.of("accept", "contact", "update-basic-info", "class-transfer", "close-service"))
             assertFalse(provider.hasPermission(10L, action, 7L));
         assertTrue(provider.transferActions(10L, 7L).isEmpty());
         relation.setTeachingDelivery(false);
@@ -68,7 +68,7 @@ class StudentServiceObjectPermissionProviderTest {
         var relation=new ServiceRelationDO();relation.setId(10L);relation.setStatus("active");relation.setTeachingClosed(true);
         relation.setOwnerUserId(7L);relation.setContentDirectorUserId(8L);relation.setAcceptanceStatus("accepted");
         when(relationMapper.selectById(10L)).thenReturn(relation);
-        for (String action: List.of("accept","contact","delivery-stage","class-transfer","direct-transfer","update-basic-info","update-exam-date","archive-update"))
+        for (String action: List.of("accept","contact","class-transfer","direct-transfer","update-basic-info","archive-update"))
             assertFalse(provider.hasPermission(10L,action,7L));
         assertTrue(provider.hasPermission(10L,"close-service",7L));
         assertFalse(provider.hasPermission(10L,"close-service",9L));
@@ -96,7 +96,7 @@ class StudentServiceObjectPermissionProviderTest {
         assertTrue(provider.hasPermission(10L, "read", 7L));
         relation.setOwnerUserId(99L);
         assertTrue(provider.hasPermission(10L, "read", 7L));
-        for (String action : List.of("accept", "contact", "update-basic-info", "delivery-stage")) {
+        for (String action : List.of("accept", "contact", "update-basic-info")) {
             assertFalse(provider.hasPermission(10L, action, 7L));
         }
         relation.setClassId(91L); relation.setOwnerUserId(null);
@@ -105,19 +105,6 @@ class StudentServiceObjectPermissionProviderTest {
         assertFalse(provider.hasPermission(10L, "read", 7L));
         relation.setClassId(90L); relation.setStatus("terminated");
         assertFalse(provider.hasPermission(10L, "read", 7L));
-    }
-
-    @Test
-    void deliveryStageRequiresActiveOwner() {
-        ServiceRelationDO relation = new ServiceRelationDO();
-        relation.setId(10L); relation.setOwnerUserId(7L); relation.setStatus("active");
-        when(relationMapper.selectById(10L)).thenReturn(relation);
-
-        assertTrue(provider.hasPermission(10L, "delivery-stage", 7L));
-        assertFalse(provider.hasPermission(10L, "delivery-stage", 8L));
-
-        relation.setStatus("completed");
-        assertFalse(provider.hasPermission(10L, "delivery-stage", 7L));
     }
 
     @Test

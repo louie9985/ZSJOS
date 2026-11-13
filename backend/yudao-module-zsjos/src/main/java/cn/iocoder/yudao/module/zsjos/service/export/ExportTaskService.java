@@ -9,6 +9,7 @@ public interface ExportTaskService {
     PageResult<ExportTaskRespVO> getMyPage(Long userId, PageParam page, String exportType);
     void cancel(Long userId, Long taskId);
     String getDownloadUrl(Long userId, Long taskId);
+    ExportTypeProvider.ExportResult download(Long userId, Long taskId) throws Exception;
     int processAvailable();
     int expireFiles();
     void cleanupTerminalFiles();

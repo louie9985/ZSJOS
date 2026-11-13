@@ -82,7 +82,7 @@ class GiftPurchaseServiceTest {
     }
 
     @Test void missingBatchRowPreventsWritesAndBatchInputIsBounded() {
-        when(mapper.selectOne(any())).thenReturn(row(), null);
+        when(mapper.selectOne(any())).thenReturn(row()).thenReturn(null);
         var req = new GiftPurchaseBatchReqVO(); req.setIds(List.of(12L,13L));
         assertThrows(ServiceException.class, () -> service.batchPurchase(req));
         verify(mapper, never()).update(isNull(), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class));

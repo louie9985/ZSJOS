@@ -4,7 +4,11 @@ import { showImagePreview, showToast } from 'vant'
 import 'vant/es/image-preview/style'
 import { collectionApi, type CollectionImage, type CollectionField } from '@/api/studentInfo'
 import { createIdempotencyKey } from '@/utils/idempotency'
-const props = defineProps<{ token: string; field: CollectionField; images: CollectionImage[]; disabled: boolean }>()
+type ImageClient = Pick<typeof collectionApi, 'removeImage' | 'image'> & {
+  upload: (token: string, field: string, side: string, file: File, progress: (value: number) => void, requestKey?: string) => Promise<CollectionImage>
+}
+const props = defineProps<{ token: string; field: CollectionField; images: CollectionImage[]; disabled: boolean; client?: ImageClient }>()
+const client = (): ImageClient => props.client || collectionApi
 const emit = defineEmits<{ change: [CollectionImage[]]; busy: [boolean]; failed: [boolean] }>()
 type Pending = { uid: string; file: File; side: string; status: 'uploading' | 'error'; progress: number; error?: string }
 const pending = ref<Pending[]>([])
@@ -20,7 +24,7 @@ function status() { emit('busy', deleting.value || pending.value.some(x => x.sta
 async function send(item: Pending) {
   const current = generation; item.status = 'uploading'; item.error = ''; status()
   try {
-    const image = await collectionApi.upload(props.token, props.field.key, item.side, item.file, value => { item.progress = value })
+    const image = await client().upload(props.token, props.field.key, item.side, item.file, value => { item.progress = value }, item.uid)
     if (generation !== current) return
     localImages.value = [...localImages.value, image]; emit('change', localImages.value); pending.value = pending.value.filter(x => x.uid !== item.uid)
   } catch (e) { if (generation === current) { item.status = 'error'; item.error = e instanceof Error ? e.message : '上传失败，请重试' } }
@@ -40,7 +44,7 @@ function choose(event: Event, side: string, max: number) {
 }
 async function remove(image: CollectionImage) {
   deleting.value = true; status()
-  try { await collectionApi.removeImage(props.token, image.id); localImages.value=localImages.value.filter(x => x.id !== image.id); emit('change', localImages.value) }
+  try { await (props.client || collectionApi).removeImage(props.token, image.id); localImages.value=localImages.value.filter(x => x.id !== image.id); emit('change', localImages.value) }
   catch (e) { showToast(e instanceof Error ? e.message : '删除失败') }
   finally { deleting.value = false; status() }
 }
@@ -48,11 +52,11 @@ function discard(uid: string) { pending.value = pending.value.filter(x => x.uid 
 watch(() => props.images, async images => {
   const current = generation
   for (const image of images) if (image.contentType.startsWith('image/') && !urls.value[image.id]) {
-    try { const url = await collectionApi.image(props.token, image); if (current === generation) urls.value[image.id] = url; else URL.revokeObjectURL(url) } catch { /* attachment metadata remains visible with a retry action */ }
+    try { const url = await (props.client || collectionApi).image(props.token, image); if (current === generation) urls.value[image.id] = url; else URL.revokeObjectURL(url) } catch { /* attachment metadata remains visible with a retry action */ }
   }
 }, { immediate: true, deep: true })
 async function preview(image: CollectionImage) {
-  try { if (!urls.value[image.id]) urls.value[image.id] = await collectionApi.image(props.token, image); if (image.contentType.startsWith('image/')) showImagePreview({ images: [urls.value[image.id]], closeable: true, className: 'collection-image-preview norem' }); else { const a = document.createElement('a'); a.href = urls.value[image.id]; a.download = image.name; a.click() } }
+  try { if (!urls.value[image.id]) urls.value[image.id] = await (props.client || collectionApi).image(props.token, image); if (image.contentType.startsWith('image/')) showImagePreview({ images: [urls.value[image.id]], closeable: true, className: 'collection-image-preview norem' }); else { const a = document.createElement('a'); a.href = urls.value[image.id]; a.download = image.name; a.click() } }
   catch (e) { showToast(e instanceof Error ? e.message : '图片加载失败') }
 }
 onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revokeObjectURL) })
@@ -60,7 +64,7 @@ onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revo
 <template>
   <div class="collection-images norem">
     <div v-for="slot in slots()" :key="slot.side" class="collection-images__slot norem">
-      <span v-if="slot.side" class="collection-images__caption norem">{{ slot.label }}</span>
+      <span v-if="slot.side" class="collection-images__caption norem">{{ slot.label }}（{{ sideImages(slot.side).length }}/{{ slot.max }}）</span>
       <div class="collection-images__list norem">
         <div v-for="image in sideImages(slot.side)" :key="image.id" class="collection-images__item norem" :class="{ 'collection-images__document': !image.contentType.startsWith('image/') }">
           <button type="button" class="collection-images__preview norem" :aria-label="`预览${field.label}${slot.side ? slot.label : ''}`" :title="image.name" @click="preview(image)"><img v-if="urls[image.id] && image.contentType.startsWith('image/')" :src="urls[image.id]" :alt="field.label + slot.label"><span v-else-if="image.contentType.startsWith('image/')">查看图片</span><template v-else><svg class="collection-images__file-icon norem" :class="{ 'collection-images__file-icon-word': image.contentType !== 'application/pdf' }" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path d="M18 4h25l11 11v45H18Z" fill="white" stroke="#aebac8" stroke-linejoin="round"/><path d="M43 4v11h11" fill="#e8edf3" stroke="#aebac8" stroke-linejoin="round"/><path d="M26 45h20m-20 5h20m-20 5h14" stroke="#d4dce6" stroke-width="2"/><rect x="4" y="20" width="34" height="26" rx="3" fill="currentColor"/><text x="21" y="38" text-anchor="middle" fill="white" font-family="Arial,sans-serif" font-weight="700" :font-size="image.contentType === 'application/pdf' ? 11 : 18">{{ image.contentType === 'application/pdf' ? 'PDF' : 'W' }}</text></svg><span class="collection-images__file-name norem">{{ image.name }}</span></template></button>
@@ -76,14 +80,4 @@ onBeforeUnmount(() => { generation++; Object.values(urls.value).forEach(URL.revo
     <p class="collection-images__hint norem">支持 {{ (field.allowedExtensions || ['jpg','jpeg','png']).join('/').toUpperCase() }}，单个不超过 {{ field.maxSizeMb || 100 }}MB</p>
   </div>
 </template>
-<style scoped>
-.collection-images__item.collection-images__document.norem { width: 96px; height: auto; min-height: 104px; max-width: 100%; background: transparent; }
-.collection-images__document.norem .collection-images__preview.norem { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; min-height: 104px; padding: 4px; text-align: center; font-size: 12px; box-sizing: border-box; cursor: pointer; }
-.collection-images__document.norem .collection-images__preview.norem:hover { background: var(--h5-glass-sunken); }
-.collection-images__file-icon.norem { display: block; flex-shrink: 0; width: 56px; height: 56px; color: #dc2626; }
-.collection-images__file-icon-word.norem { color: #2563eb; }
-.collection-images__file-name.norem { display: -webkit-box; max-width: 100%; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
-/* The teleported image viewer must remain transparent over its own dark overlay. */
-:global(.collection-image-preview.norem.van-popup){border:0;background:transparent;box-shadow:none;backdrop-filter:none;-webkit-backdrop-filter:none}
-.collection-images__list.norem{display:flex;flex-wrap:wrap;gap:8px}.collection-images__slot.norem{margin-top:8px}.collection-images__caption.norem,.collection-images__hint.norem{font-size:12px;color:var(--h5-text-secondary)}.collection-images__item.norem,.collection-images__add.norem{width:80px;height:80px;position:relative;border-radius:8px;background:var(--h5-glass-sunken);flex-shrink:0}.collection-images__preview.norem{width:100%;height:100%;border:0;background:transparent;padding:0;border-radius:8px;overflow:hidden;color:var(--h5-text-secondary)}.collection-images__preview img{width:100%;height:100%;object-fit:cover}.collection-images__delete.norem{position:absolute;right:-4px;top:-4px;min-width:28px;min-height:28px;border:0;border-radius:50%;background:var(--h5-text-primary);color:var(--h5-card-bg)}.collection-images__add.norem{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--h5-text-placeholder);font-size:12px;overflow:hidden}.collection-images__add input{position:absolute;inset:0;opacity:0;width:100%;height:100%}.collection-images__add.inactive{opacity:.5}.collection-images__pending.norem{max-width:180px;min-height:80px;padding:8px;background:var(--h5-primary-opacity);border-radius:8px;color:var(--h5-text-secondary);overflow-wrap:anywhere;font-size:12px}.collection-images__pending button{margin:6px;border:0;background:transparent;color:var(--h5-primary)}
-</style>
+<style scoped src="../../../../shared/exam-collection-images.css"></style>

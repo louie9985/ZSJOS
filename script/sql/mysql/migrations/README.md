@@ -1611,3 +1611,23 @@ Controlled verification: `python script/sql/mysql/tools/test_student_class_query
 ### V351 — order management query-all permission
 
 `V351__sales_order_query_all_permission.sql` adds `查看全部订单` (`zsjos:sales-order:query-all`) under the unique active `query-management` page. Apply after V350 and before the matching backend; both ledgers must exist. Only one menu definition and missing V351 ledger rows are added, without role assignments, tenant-package changes or business data. Administrators assign it alongside page access. Replay preserves configuration/checksums and repairs partial metadata; errors roll back metadata and ledger writes together. Rollback by disabling the button, retaining history. Verify with `python -B script/sql/mysql/tools/test_sales_order_query_all_permission.py` (retained isolated MySQL fixtures; initial/replay/recovery/failure/UTF-8 and grant preservation).
+
+
+## V365 retired student exam commands
+
+Apply after V364 with the backend removal of the legacy delivery-stage POST and exam-date PUT. V365 soft-deletes only obsolete button definitions 73428 and 602311 under student menu 73020, setting disabled and hidden. Historical V114/V248 remain unchanged. No role assignments or business rows are changed. Both frontends consume the resulting server menu state through their existing permission loading.
+
+The migration validates exact ID/permission/parent/type identities, checks postconditions, and registers both ledgers in the same failure-controlled InnoDB transaction. Replay also repairs partially retired buttons even if V365 markers already exist. Missing prerequisites or identity conflicts abort. Back up both menu rows and V365 ledger records before execution. Restore scoped metadata only with a compatible backend release. Refresh authenticated permission state after application. This local metadata migration requires scoped controlled execution, not baseline reconstruction.
+
+### V367 examination collection rich body
+
+After V366, apply V367 before the updated runtime. Adds nullable task content only, with guarded prerequisite/postcondition checks and both success ledgers. Repeats and partial-application recovery preserve existing rows. Details and scoped MySQL lifecycle command are in `docs/operations/database-migrations.md`.
+
+
+## V369 independent version updates
+
+Apply `V369__version_updates.sql` after V368 and before the version-update runtime. It creates the version-update and recipient tables and seven independent menu/button definitions. Existing business rows and role grants retain their values. Structure, menu identity and postconditions must pass before both ledger writes commit. Partial DDL can be replayed; ledger/menu transaction failures propagate. Runtime rollback retains the new tables and acknowledgement history. Scoped MySQL verification is `python script/sql/mysql/tools/test_version_updates.py`. See [feature contract](../../../../docs/api/version-updates.md).
+
+## V370 客资取消下次跟进独立权限
+
+在 V369 双账本之后、配套前后端之前执行 `V370__lead_next_follow_up_cancel_permission.sql`。仅在客资管理下增加“取消下次跟进”按钮 `zsjos:lead-follow-up:cancel-next-time`，保留通用取消待办菜单。管理员通过角色管理分配新权限。元数据和双账本处于同一事务，失败回滚；可重复执行及恢复已有菜单但缺少账本的情况。应用回退时保留元数据及账本，可通过菜单管理停用按钮。验证命令为 `python script/sql/mysql/tools/test_lead_next_follow_up_cancel_permission.py`。

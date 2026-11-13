@@ -72,7 +72,7 @@
             link
             type="danger"
             @click.stop="finish(row)"
-            >结课</el-button
+            >结束服务</el-button
           ></template
         ></el-table-column
       >
@@ -398,13 +398,13 @@ const save = async () => {
 }
 const finish = async (row: Api.DeliveryClass) => {
   if (!row.availableActions?.includes('COMPLETE') || !checkPermi(['zsjos:delivery-class:complete'])) return
-  await ElMessageBox.confirm(`确认结课“${row.className}”吗？`)
+  await ElMessageBox.confirm(`确认结束“${row.className}”的服务吗？需先在工作台班级考试进度中完成考试，并为所有学员填写考后结果。此操作仅修改班级阶段。`)
   try {
     await Api.completeDeliveryClass(row.id)
-    ElMessage.success('班级已结课')
+    ElMessage.success('班级已结束服务')
     await load()
   } catch (cause: any) {
-    ElMessage.error(cause?.msg || cause?.message || '结课失败')
+    ElMessage.error(cause?.msg || cause?.message || '结束服务失败，请检查班级考试进度')
   }
 }
 const loadTransferOptions = async (_row: Api.DeliveryClassStudent) => {

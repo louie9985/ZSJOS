@@ -47,7 +47,7 @@ export default function FollowUpFormFields({ lead, form, dictionaries, stages, i
         <Form.Item name="remark" label="跟进备注" className="remark-link-field" extra={REMARK_LINK_HINT} rules={[{ required: true, whitespace: true, message: '请输入跟进备注' }, { max: FOLLOW_UP_REMARK_LIMIT, message: '跟进备注不能超过 2000 字' }]}><Input.TextArea rows={3} maxLength={FOLLOW_UP_REMARK_LIMIT} showCount disabled={locked} onChange={() => setNoteError('')}/></Form.Item>
       </div>
       <div>
-        <Form.Item name="nextFollowUpAt" label="下次跟进时间" extra={lead.status === 'won' ? '选填，不填写则不安排下次跟进' : undefined} rules={[{ required: lead.status !== 'won', message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
+        <Form.Item name="nextFollowUpAt" label="下次跟进时间" rules={[{ required: true, message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
           <DatePicker showTime format="YYYY-MM-DD HH:mm" disabled={locked} onChange={() => setShortcut(undefined)} disabledDate={date => date.endOf('day').isBefore(dayjs())}/>
         </Form.Item>
         <div className="follow-up-time-shortcuts">

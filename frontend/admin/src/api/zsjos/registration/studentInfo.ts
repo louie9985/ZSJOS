@@ -11,6 +11,7 @@ export interface CollectionLink {
 }
 export interface CollectionImage {
   id: number
+  source?: 'registration' | 'exam' | 'service'
   fieldKey: string
   side: string
   contentType: string

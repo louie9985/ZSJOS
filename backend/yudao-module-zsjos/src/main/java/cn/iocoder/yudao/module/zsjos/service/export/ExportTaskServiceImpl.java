@@ -112,7 +112,29 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         }
         auditService.record("export", "export.download", "export_task", taskId.toString(),
                 task.getCreatorRoleSnapshot(), Map.of("exportType", task.getExportType(), "taskNo", task.getTaskNo()));
+        provider.checkDownload(task);
+        if (provider.privateResult()) throw exception(EXPORT_STATE_INVALID);
         return fileApi.presignGetUrl(task.getResultFileId(), DOWNLOAD_URL_SECONDS);
+    }
+
+    @Override
+    public ExportTypeProvider.ExportResult download(Long userId, Long taskId) throws Exception {
+        LoginUser login = SecurityFrameworkUtils.getLoginUser();
+        if (login != null && login.getContext("zsjos.impersonation.sessionId", Long.class) != null)
+            throw exception(EXPORT_PERMISSION_DENIED);
+        ExportTaskDO task = requireOwned(taskId, userId);
+        ExportTypeProvider provider = requireProvider(task.getExportType());
+        if (!securityService.hasPermission(provider.getCreatePermission())) throw exception(EXPORT_PERMISSION_DENIED);
+        provider.checkCreator(userId);
+        provider.checkDownload(task);
+        if (!READY.equals(task.getStatus()) || task.getResultFileId() == null || task.getExpiresAt() == null
+                || !task.getExpiresAt().isAfter(LocalDateTime.now())) throw exception(EXPORT_STATE_INVALID);
+        byte[] content = fileApi.getFileContent(task.getResultFileId());
+        if (provider.privateResult()) content = provider.decodeResult(content);
+        provider.checkDownload(task);
+        auditService.record("export", "export.download", "export_task", taskId.toString(),
+                task.getCreatorRoleSnapshot(), Map.of("exportType", task.getExportType(), "taskNo", task.getTaskNo()));
+        return new ExportTypeProvider.ExportResult(content, task.getResultFileName(), 0);
     }
 
     @Override
@@ -159,9 +181,9 @@ public class ExportTaskServiceImpl implements ExportTaskService {
                 failTerminal(task, "ROW_LIMIT_EXCEEDED", "导出数据超过 100000 行");
                 return;
             }
-            var file = fileApi.createFileInfo(result.content(), result.fileName(),
+            var file = fileApi.createFileInfo(provider.privateResult() ? provider.encodeResult(result.content()) : result.content(), provider.privateResult() ? UUID.randomUUID() + ".bin" : result.fileName(),
                     "zsjos/export/" + task.getCreatorUserId(),
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+                    provider.privateResult() ? "application/octet-stream" : Objects.requireNonNullElse(provider.contentType(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
             LocalDateTime now = LocalDateTime.now();
             ExportTaskDO ready = new ExportTaskDO().setStatus(READY).setResultFileId(file.getId()).setResultFileName(result.fileName())
                     .setResultFileSize((long) result.content().length).setReadyAt(now).setExpiresAt(now.plusDays(7))

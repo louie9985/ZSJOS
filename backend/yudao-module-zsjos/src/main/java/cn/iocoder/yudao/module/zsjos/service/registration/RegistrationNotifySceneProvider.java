@@ -32,7 +32,10 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
-        return List.of(new NotifySceneRespDTO(NOTIFY_SCENE_DELIVERY_CANCELLED, "提前交付已停止", List.of(
+        return List.of(new NotifySceneRespDTO(NOTIFY_SCENE_INFO_SUBMITTED, "报名信息收集表已填写", List.of(
+                new NotifySceneVariableRespDTO("student.name", "学员姓名", false)),
+                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_POOL_HANDLERS, "报名服务")),
+                List.of(NotifyActionType.MESSAGE_DETAIL), false), new NotifySceneRespDTO(NOTIFY_SCENE_DELIVERY_CANCELLED, "提前交付已停止", List.of(
                 new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
                 new NotifySceneVariableRespDTO("reason", "停止原因", false)),
                 List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_STUDY_PLANNER, "学习规划师")),

@@ -49,7 +49,7 @@
             v-if="scope.row.status === 'ready'"
             link
             type="primary"
-            @click="download(scope.row.id)"
+            @click="download(scope.row)"
           >
             下载
           </el-button>
@@ -86,6 +86,7 @@ const total = ref(0)
 const query = reactive({ pageNo: 1, pageSize: 10, exportType: undefined as string | undefined })
 const types = [
   { value: 'exam_calendar', label: '考期日历' },
+  { value: 'exam_collection', label: '考试资料' },
   { value: 'lead', label: '客资' },
   { value: 'order', label: '订单' },
   { value: 'cashback', label: '返现' },
@@ -110,7 +111,10 @@ const statusType = (value: string): 'success' | 'danger' | 'info' | 'warning' =>
   return 'warning'
 }
 
+let pollTimer: ReturnType<typeof setTimeout> | undefined
+let disposed = false
 const load = async () => {
+  clearTimeout(pollTimer)
   loading.value = true
   error.value = ''
   try {
@@ -121,6 +125,8 @@ const load = async () => {
     error.value = e?.msg || e?.message || '导出任务加载失败'
   } finally {
     loading.value = false
+    if (!disposed && !error.value && list.value.some(row => activeStatuses.includes(row.status)))
+      pollTimer = setTimeout(load, 3000)
   }
 }
 const cancel = async (id: number) => {
@@ -129,9 +135,25 @@ const cancel = async (id: number) => {
   message.success('导出任务已取消')
   await load()
 }
-const download = async (id: number) => {
-  const url = await ExportApi.getExportDownloadUrl(id)
+const download = async (row: ExportApi.ExportTaskVO) => {
+  if (row.exportType === 'exam_collection') {
+    const blob = await ExportApi.downloadExportFile(row.id)
+    if (blob.type.includes('json')) {
+      const error = JSON.parse(await blob.text())
+      message.error(error.msg || '导出文件下载失败')
+      return
+    }
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = row.resultFileName || '考试资料.zip'
+    anchor.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    return
+  }
+  const url = await ExportApi.getExportDownloadUrl(row.id)
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 onMounted(load)
+onBeforeUnmount(() => { disposed = true; clearTimeout(pollTimer) })
 </script>

@@ -1,4 +1,6 @@
+import VersionUpdatesPage from '../pages/VersionUpdatesPage'
 import StudentSummaryPage from '../pages/StudentSummaryPage'
+import ExamCollectionPage from '../pages/ExamCollectionPage'
 import MyOperationsPage from '../pages/MyOperationsPage'
 import StudentInfoTasksPage from '../pages/StudentInfoTasksPage'
 import { lazy, Suspense } from "react"
@@ -158,6 +160,9 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.WORK_PLAN_CONFIG) return <WorkPlanConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.STUDENT_SUMMARY) return <StudentSummaryPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.VERSION_UPDATES) return <VersionUpdatesPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.VERSION_UPDATE_HISTORY) return <Typography.Text>通过右上角更新记录查看已接收的版本更新。</Typography.Text>
+  if (menu?.path === APP_ROUTES.EXAM_COLLECTION) return <ExamCollectionPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.STUDENT_INFO_TASKS) return <StudentInfoTasksPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions} tenantReadAll={tenantReadAll}/>

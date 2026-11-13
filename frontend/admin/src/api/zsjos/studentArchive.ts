@@ -15,6 +15,7 @@ export interface Archive {
     operatorUserId: number
     operatorName?: string
     reason: string
+    submissionStatus?: string
   }[]
 }
 export interface Edit {
@@ -24,6 +25,7 @@ export interface Edit {
   images: CollectionImage[]
 }
 const base = (id: number) => `/zsjos/student/service/${id}/archive`
+export const imageReference = (item: CollectionImage): string | number => item.source ? `${item.source}:${item.id}` : item.id
 export const detail = (id: number, sensitive = false): Promise<Archive> =>
   request.get({ url: base(id) + (sensitive ? '/sensitive' : '') })
 export const edit = (id: number): Promise<Edit> => request.get({ url: base(id) + '/edit' })
@@ -48,7 +50,7 @@ export const upload = (
   return request.upload({ url: base(id) + '/images', data })
 }
 export const image = async (id: number, item: CollectionImage) => {
-  const blob = await request.download<Blob>({ url: base(id) + '/images/' + item.id })
+  const blob = await request.download<Blob>({ url: base(id) + '/images/' + item.id, params: { source: item.source || 'registration' } })
   if (blob.type.includes('json')) throw Error('图片读取失败或没有权限')
   return URL.createObjectURL(new Blob([blob], { type: item.contentType }))
 }

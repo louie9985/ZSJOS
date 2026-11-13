@@ -2855,3 +2855,24 @@
 - Evidence: /opt/zsjos-runtime/backups/collection-case1244-20261113/{prepared,applied,verified,repeated}, permissions0700/0600; frozen before/after images, rehearsal result and fsynced commit/readback receipts. MySQL temporary-table same writer initial/rollback/recovery/replay/conflict checks PASS; Python AST/UTF-8/doc link/diff checks PASS.
 - Source files: dedicated scoped executor and operation record above, plus this handoff. No runtime, migration, schema, ledger, permission, dependency, branch, commit or service change. MainPID2597740 and 2026-11-06 00:41:57 CST startup timestamp unchanged.
 - Limits: authenticated API/browser and downstream form generation/sending unverified; no session impersonation or business-flow mutation. Repair addresses the authorized missing row; broad compatibility fixes and other missing historical tasks remain outside scope. Ownership released.
+
+
+## Registration — test-merge-origin-main-20261113 — 2026-11-13T15:29:36+08:00
+
+- Environment: test from /etc/zsjos/agent-environment; owner /root; branch main; worktree /opt/zsjos; base e1f238d321bd67d272fb5f9b985a298bb3ac6ce9.
+- Goal: user-authorized merge of origin/main (464c40f6d0eae8ed91cceddde915675ee8a38543) into current local main and create the local merge commit, preserving both histories.
+- Non-goals: push/publication, deployment, service/database operations, dependency additions or independent behavior changes.
+- Ownership: incoming origin/main tracked-file changes as a mechanical merge; conflict resolution only if necessary; this handoff append. Starting worktree clean; remote changes do not overlap the three files in the local-only commit.
+- Dependencies: fetched origin/main; one local-only commit and 23 remote-only commits; common base be2e60615293ba33acfd8538a7786597e75b39ef.
+- Target branch/integration order: main; merge origin/main into local main, validate, then commit.
+- Verification plan: inspect merge/conflict status; compare merged tree with remote plus exact local-only file changes; verify both tips are ancestors after commit and final worktree is clean. No runtime behavior is authored by this merge; application acceptance and migration execution are outside this task.
+
+
+## Delivery — test-merge-origin-main-20261113 — 2026-11-13T15:30:14+08:00
+
+- Context: registration above; test/main /opt/zsjos; owner /root; precommit HEAD e1f238d321bd67d272fb5f9b985a298bb3ac6ce9; merge parent 464c40f6d0eae8ed91cceddde915675ee8a38543. Final merge commit is the commit containing this entry.
+- User goal/result: fetched origin/main and merged 23 remote-only commits with the one local-only commit; automatic merge succeeded without conflicts. Local commit and all remote changes preserved.
+- Changed files: 384 incoming remote files, unchanged from the remote tree; original three local-only file changes preserved exactly; this handoff adds registration and delivery. No independent runtime edits.
+- Verification: no unmerged index entries; programmatic tree/blob checks prove index equals origin/main plus the exact three local file changes, and only this handoff append was additionally modified. Scoped handoff diff check passed. Full incoming diff check reports only existing remote EOF blank lines in handoff/local-self-sourced-follow-up-shortcuts-20261111.md:22 and script/sql/mysql/tools/test_backup_retention.py:120; both files are byte-identical to origin/main and left intact.
+- Integration: local merge commit authorized; no push, service/database operation or deployment. Both-parent ancestry and final clean worktree are checked after commit.
+- Limits/remaining: no application build, runtime, browser or SQL execution; this verifies Git integration, not acceptance of the incoming features. Remote publication remains outside this local merge/commit scope. Ownership released upon successful commit.

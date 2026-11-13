@@ -83,7 +83,8 @@ public class LeadLifecycleTaskService {
     }
 
     public void cancelFollowUpReminders(Long leadId, LocalDateTime cancelledAt, String reason) {
-        taskCommandService.cancel(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, null, cancelledAt, reason);
+        // Complete the tenant/business index prefix to avoid locking unrelated tasks during cancellation.
+        taskCommandService.cancel(BIZ_TYPE_LEAD, TASK_TYPE_FOLLOW_UP_REMINDER, leadId, null, cancelledAt, reason);
     }
 
     public LeadFollowUpRuleDO createQualificationTask(LeadDO lead, Long assigneeId,

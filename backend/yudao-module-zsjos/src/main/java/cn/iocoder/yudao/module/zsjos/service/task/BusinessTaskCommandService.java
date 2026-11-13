@@ -72,9 +72,20 @@ public class BusinessTaskCommandService {
         return taskMapper.cancelPending(taskType, bizId, assigneeId, cancelledAt, reason);
     }
 
+    public int cancel(String bizType, String taskType, Long bizId, Long assigneeId,
+                      LocalDateTime cancelledAt, String reason) {
+        return taskMapper.cancelPending(bizType, taskType, bizId, assigneeId, cancelledAt, reason);
+    }
+
     public int updatePending(String taskType, Long bizId, Long assigneeId, String title, String summary,
                              LocalDateTime dueAt, LocalDateTime remindAt) {
         return taskMapper.updatePending(taskType, bizId, assigneeId, title, summary, dueAt, remindAt);
+    }
+
+    /** Refresh the exact idempotent generation, including its intended assignee. */
+    public int updatePendingById(Long id, Long assigneeId, String title, String summary,
+                                 LocalDateTime dueAt, LocalDateTime remindAt) {
+        return taskMapper.updatePendingById(id, assigneeId, title, summary, dueAt, remindAt);
     }
 
     public BusinessTaskDO getByIdempotencyKey(String idempotencyKey) {

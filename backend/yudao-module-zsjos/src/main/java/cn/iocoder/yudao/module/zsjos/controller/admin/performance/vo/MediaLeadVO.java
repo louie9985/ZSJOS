@@ -43,7 +43,8 @@ public final class MediaLeadVO {
     public record DeptOption(Long id, String name, Long parentId) {}
 
     public record PeriodStats(String key, String label, long total, long valid, long invalid,
-                              long converted, java.math.BigDecimal validRate, java.math.BigDecimal convertedRate) {}
+                              long converted, java.math.BigDecimal validRate, java.math.BigDecimal convertedRate,
+                              java.math.BigDecimal performanceContribution) {}
 
     public record Member(Long userId, String name, Integer targetCount,
                          long yesterday, long yesterdayConverted, long today, long todayConverted,

@@ -318,6 +318,21 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public boolean deleteUnregisteredFile(Long configId, String path) throws Exception {
+        Assert.notNull(configId, "存储配置不能为空");
+        FilePathUtils.validatePath(path);
+        // The original transaction has rolled back its metadata. Read in a new transaction and
+        // retain any locator that is still registered before removing the physical upload.
+        if (fileMapper.selectCount(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<FileDO>()
+                .eq(FileDO::getConfigId, configId).eq(FileDO::getPath, path)) > 0) return false;
+        FileClient client = fileConfigService.getFileClient(configId);
+        Assert.notNull(client, "客户端({}) 不能为空", configId);
+        client.delete(path);
+        return true;
+    }
+
+    @Override
     public void deleteFile(Long id) throws Exception {
         // 1.1 校验存在
         FileDO file = validateFileExists(id);

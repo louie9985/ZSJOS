@@ -37,7 +37,7 @@ class StudentDeliveryParticipationTest {
         when(permissions.hasAnyPermissions(7L,cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.PERMISSION_DIRECTOR_OPERATOR_ASSIGN)).thenReturn(true);
         assertTrue(provider.hasPermission(11L,"assign",7L));
         assertFalse(provider.hasPermission(11L,"create-account",99L));
-        for(String action:List.of("accept","contact","delivery-stage","update-basic-info","class-transfer","direct-transfer","update-exam-date"))
+        for(String action:List.of("accept","contact","update-basic-info","class-transfer","direct-transfer"))
             assertFalse(provider.hasPermission(11L,action,7L),action);
         r.setTeachingDelivery(true);
         assertTrue(provider.hasPermission(11L,"contact",7L));

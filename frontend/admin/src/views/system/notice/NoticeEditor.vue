@@ -69,7 +69,7 @@
           <div class="el-form-item__tip">截止时间前将在员工首页公告栏优先置顶</div>
         </el-form-item>
         <el-form-item label="正文" prop="content">
-          <Editor v-model="formData.content" height="480px" directory="system-notice-content" />
+          <Editor class="notice-document-editor" v-model="formData.content" height="480px" directory="system-notice-content" />
         </el-form-item>
         <el-form-item label="附件">
           <el-upload
@@ -113,13 +113,14 @@
       </el-form>
     </div>
 
-    <el-drawer v-model="previewVisible" title="公告预览" size="720px">
-      <article class="notice-preview">
+    <el-drawer v-model="previewVisible" title="公告预览" size="min(1392px, 100vw)">
+      <el-radio-group v-model="mobilePreview"><el-radio-button :value="false">桌面</el-radio-button><el-radio-button :value="true">手机</el-radio-button></el-radio-group>
+      <article class="notice-preview" :style="{ width: mobilePreview ? '358px' : '1352px', maxWidth: '100%' }">
         <h1>{{ formData.title || '未填写标题' }}</h1>
         <p>文章来源：{{ sourceDepartments.find(dept => dept.id === formData.sourceDeptId)?.name || '未选择' }}</p>
         <p>发布人：发布时自动记录</p>
         <p>接收部门/人员：{{ previewAudience }}</p>
-        <Editor v-model="formData.content" readonly height="auto" />
+        <NoticeContent :html="formData.content" />
         <section v-if="formData.attachments.length" class="notice-preview-files">
           <h3>附件</h3>
           <div v-for="file in formData.attachments" :key="file.infraFileId">
@@ -143,6 +144,7 @@ import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { getFileIcon } from '@/utils/file'
 import * as NoticeApi from '@/api/system/notice'
 import { handleTree } from '@/utils/tree'
+import NoticeContent from './NoticeContent.vue'
 import { noticeSelectedUserIds } from './noticeAudience'
 
 const props = defineProps<{ id?: number }>()
@@ -153,6 +155,7 @@ const loading = ref(false)
 const saving = ref(false)
 const publishing = ref(false)
 const previewVisible = ref(false)
+const mobilePreview = ref(false)
 const noticeId = ref<number | undefined>(props.id)
 const formData = reactive({
   sourceDeptId: undefined as number | undefined,
@@ -367,7 +370,12 @@ onMounted(async () => {
 .notice-editor-page { min-height: 100%; background: var(--el-bg-color-page); }
 .notice-editor-toolbar { position: sticky; top: 0; z-index: 20; display: flex; justify-content: space-between; align-items: center; min-height: 56px; padding: 0 24px; background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-light); }
 .notice-editor-actions { display: flex; gap: 8px; }
-.notice-editor-body { width: min(1120px, calc(100% - 32px)); margin: 24px auto; padding: 24px; background: var(--el-bg-color); border-radius: 8px; }
+.notice-editor-body { width: min(1400px, calc(100% - 32px)); margin: 24px auto; padding: 24px; background: var(--el-bg-color); border-radius: 8px; }
+.notice-document-editor { width: 100%; max-width: 1352px; margin-inline: auto; border: 0; box-shadow: inset 0 0 0 1px var(--el-border-color); font: 16px/1.5 system-ui, sans-serif; }
+.notice-document-editor :deep([data-slate-editor]) { padding-inline: 0; }
+.notice-document-editor :deep(.w-e-scroll) { scrollbar-width: none; }
+.notice-document-editor :deep(.w-e-text-container [data-slate-editor] .w-e-image-container) { margin: 0; }
+.notice-document-editor :deep(.w-e-text-container [data-slate-editor] td), .notice-document-editor :deep(.w-e-text-container [data-slate-editor] th) { padding: 8px; overflow-wrap: anywhere; }
 .notice-editor-type { width: 240px; }
 .notice-audience-filter { width: min(420px, 100%); margin-bottom: 12px; }
 .notice-audience-error { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; color: var(--el-color-danger); background: var(--el-color-danger-light-9); border-radius: 6px; }
@@ -381,7 +389,7 @@ onMounted(async () => {
 .notice-attachment-size { color: var(--el-text-color-secondary); }
 .notice-upload-progress { width: 180px; }
 .notice-upload-error { max-width: 240px; overflow: hidden; color: var(--el-color-danger); text-overflow: ellipsis; white-space: nowrap; }
-.notice-preview { max-width: 680px; margin: 0 auto; }
+.notice-preview { max-width: 1352px; margin: 0 auto; }
 .notice-preview h1 { margin: 0 0 24px; font-size: 24px; letter-spacing: 0; }
 .notice-preview-files { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--el-border-color-light); }
 @media (max-width: 768px) {

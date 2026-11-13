@@ -166,6 +166,22 @@ class RegistrationServiceImplTest {
         assertEquals("师徒班", result.getProductName());
     }
 
+    @Test
+    void savedClassAssignmentResolvesCurrentHomeroomName() {
+        var item = new SalesOrderItemDO(); item.setId(100L);
+        stubClassAssignmentCase(item);
+        var assignment = new RegistrationClassAssignmentDO();
+        assignment.setOrderItemId(100L); assignment.setClassId(200L);
+        assignment.setHomeroomUserId(7L); assignment.setHomeroomUserNameSnapshot("旧姓名");
+        when(classAssignmentMapper.selectByCaseId(1L)).thenReturn(List.of(assignment));
+        when(adminUserApi.getUserMap(java.util.Set.of(7L)))
+                .thenReturn(java.util.Map.of(7L, new AdminUserRespDTO().setId(7L).setNickname("最新姓名")))
+                .thenReturn(java.util.Map.of());
+        assertEquals("最新姓名", service.getCase(1L).getClassAssignments().getFirst().getHomeroomUserName());
+        org.junit.jupiter.api.Assertions.assertNull(service.getCase(1L).getClassAssignments().getFirst().getHomeroomUserName());
+        assertEquals("旧姓名", assignment.getHomeroomUserNameSnapshot());
+    }
+
     private void stubClassAssignmentCase(SalesOrderItemDO item) {
         var registrationCase = new RegistrationCaseDO(); registrationCase.setId(1L); registrationCase.setOrderId(10L);
         registrationCase.setStatus(STATUS_PENDING); registrationCase.setAssignmentMode("class_per_item");

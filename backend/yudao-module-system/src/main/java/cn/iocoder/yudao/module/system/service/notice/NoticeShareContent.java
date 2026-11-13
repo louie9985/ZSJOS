@@ -24,9 +24,8 @@ public final class NoticeShareContent {
         document.select("script,style,iframe,object,embed,form,input,svg,math").remove();
         // Relative/credential-bearing media would inherit the public page origin unexpectedly.
         for (var element : document.getAllElements()) {
-            // The general framework cleaner admits arbitrary styles; public content only
-            // keeps the explicit table-formatting subset, including text within cells.
-            String style = element.closest("table") == null ? "" : NoticeShareTables.cleanStyle(element.attr("style"));
+            // Keep only validated document formatting, including authored image sizes.
+            String style = NoticeShareTables.cleanStyle(element.attr("style"));
             if (style.isEmpty()) element.removeAttr("style"); else element.attr("style", style);
             for (String attribute : new String[]{"src", "href", "poster"}) {
                 if (element.hasAttr(attribute) && !safeUrl(element.attr(attribute))) element.removeAttr(attribute);

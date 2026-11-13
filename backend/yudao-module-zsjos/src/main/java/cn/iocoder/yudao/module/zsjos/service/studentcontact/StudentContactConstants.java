@@ -1,7 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 
 public interface StudentContactConstants {
-    cn.iocoder.yudao.framework.common.exception.ErrorCode LEGACY_EXAM_FLOW_RETIRED = new cn.iocoder.yudao.framework.common.exception.ErrorCode(1_900_010_090, "旧考试流程已停用，请继续督学，等待新的考试流程");
 
     String RETIRED_PLAN_CHECKLIST_KEY = "voice_learning_plan";
     String PERMISSION_CHECKLIST_UPDATE = "zsjos:student-contact:checklist-update";
@@ -66,11 +65,9 @@ public interface StudentContactConstants {
     String PERMISSION_COLLABORATOR_CORRECT = "zsjos:student-collaborator:correct";
     String PERMISSION_ACCEPT = "zsjos:student:accept";
     String PERMISSION_UPDATE_BASIC_INFO = "zsjos:student:update-basic-info";
-    String PERMISSION_UPDATE_EXAM_DATE = "zsjos:student:exam-date-update";
     String PERMISSION_FIRST_CONTACT_SUBMIT = "zsjos:student-contact:first-submit";
     String PERMISSION_STUDY_PLAN_SUBMIT = "zsjos:student-contact:study-plan-submit";
     String PERMISSION_CONTACT_SUBMIT = "zsjos:student-contact:submit";
-    String PERMISSION_DELIVERY_STAGE_SUBMIT = "zsjos:student-contact:delivery-stage-submit";
     String PERMISSION_COLLABORATOR_ASSIGN = "zsjos:student-collaborator:assign";
     String PERMISSION_DIRECTOR_PRECHECK = "zsjos:student:director-precheck";
     String PERMISSION_DIRECTOR_INTERVIEW = "zsjos:student:director-interview";

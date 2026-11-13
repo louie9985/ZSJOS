@@ -47,7 +47,7 @@ class NewcomerPoolServiceTest {
 
     @Test void reenabledConfigRetainsUsageAndNextDayHasFreshQuota() {
         when(configMapper.selectByUserIdForUpdate(10L)).thenReturn(config(10L, true, 2));
-        when(dailyMapper.selectByUserAndDateForUpdate(eq(10L), any())).thenReturn(daily(10L, 2), null);
+        when(dailyMapper.selectByUserAndDateForUpdate(eq(10L), any())).thenReturn(daily(10L, 2)).thenReturn(null);
         assertFalse(service.lockAvailable(10L));
         assertTrue(service.lockAvailable(10L));
     }

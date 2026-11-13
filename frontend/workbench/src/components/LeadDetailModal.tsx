@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Drawer, Skeleton, Tabs, Modal, Input } from 'antd'
+import { Alert, Button, Drawer, Skeleton, Tabs } from 'antd'
 import { api, type DictData, type ManagedLead } from '../services/api'
 import LeadDetailOverview from './LeadDetailOverview'
 import LeadFollowUpPanel from './LeadFollowUpPanel'
 import LeadAppealPanel from './LeadAppealPanel'
 import { APP_ROUTES, DICT_TYPE } from '../constants'
 import { Link } from 'react-router-dom'
+import LeadNextFollowUpCancelButton from './LeadNextFollowUpCancelButton'
 import { hasPermission } from '../services/managementAccess'
 
 type TabKey = 'overview' | 'follow-ups' | 'appeals'
@@ -21,10 +22,6 @@ export default function LeadDetailModal({
   onClose: () => void
   permissions?: string[]
 }) {
-  const [cancelOpen, setCancelOpen] = useState(false)
-  const [cancelReason, setCancelReason] = useState('')
-  const [cancelling, setCancelling] = useState(false)
-  const [cancelError, setCancelError] = useState('')
   const [lead, setLead] = useState<ManagedLead>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -55,7 +52,6 @@ export default function LeadDetailModal({
   }, [leadId, open])
 
   useEffect(() => {
-    setCancelOpen(false)
     if (open) {
       void loadLead()
       setActiveTab('overview')
@@ -82,28 +78,9 @@ export default function LeadDetailModal({
       title="客户档案"
       width="90%"
       styles={{ body: { padding: 0 } }}
-      extra={lead?.status === 'won' && lead.nextFollowUpAt &&
-        hasPermission(permissions, 'zsjos:lead-follow-up:create') && hasPermission(permissions, 'zsjos:business-task:cancel') ?
-        <Button onClick={() => { setCancelReason(''); setCancelError(''); setCancelOpen(true) }}>取消跟进时间</Button> : undefined}
+      extra={lead && <LeadNextFollowUpCancelButton key={lead.id} lead={lead} permissions={permissions} onChanged={loadLead} />}
       destroyOnClose
     >
-      <Modal title="取消跟进时间" open={cancelOpen} confirmLoading={cancelling}
-        okText="确认取消" cancelText="返回" okButtonProps={{ disabled: !cancelReason.trim() }}
-        onCancel={() => { if (!cancelling) setCancelOpen(false) }}
-        onOk={async () => {
-          setCancelling(true); setCancelError('')
-          try {
-            await api.cancelLeadNextFollowUp(leadId, cancelReason.trim())
-            setCancelOpen(false)
-            await loadLead()
-          } catch (e) { setCancelError(e instanceof Error ? e.message : '取消失败，请重试') }
-          finally { setCancelling(false) }
-        }}>
-        <p>取消当前跟进提醒，保留历史跟进记录。</p>
-        <Input.TextArea aria-label="取消原因" placeholder="请填写取消原因" maxLength={500}
-          value={cancelReason} onChange={e => setCancelReason(e.target.value)} disabled={cancelling} />
-        {cancelError && <Alert type="error" showIcon message={cancelError} />}
-      </Modal>
       {loading && <Skeleton active paragraph={{ rows: 10 }} style={{ padding: 24 }} />}
       {error && (
         <Alert

@@ -1,0 +1,65 @@
+/* UTF-8. Exam collection reuses system form, table and archive surfaces. */
+.exam-collection-stack { width: 100%; gap: var(--crm-sp-4) !important; overflow-wrap: anywhere; }
+.exam-collection-stack > .ant-space-item { min-width: 0; max-width: 100%; }
+.exam-collection-full { width: 100%; }
+.exam-collection-field-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--crm-sp-4); width: 100%; }
+.exam-collection-selection { margin: 0; padding-inline-start: var(--crm-sp-5); }
+.exam-collection-selection li { padding-block: var(--crm-sp-2); }
+.exam-collection-selection li span { margin-inline-start: var(--crm-sp-4); color: var(--crm-text-secondary); }
+.exam-collection-title { margin: 0 !important; overflow-wrap: anywhere; }
+.exam-collection-stats { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--crm-sp-2) var(--crm-sp-5); color: var(--crm-text-secondary); }
+.exam-collection-stats strong { color: var(--crm-text); margin-inline-end: var(--crm-sp-2); }
+.exam-collection-detail { display: flex; flex-direction: column; gap: var(--crm-gap); min-width: 0; }
+.exam-collection-target { padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); }
+.exam-collection-target dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0,1fr); gap: var(--crm-sp-2) var(--crm-sp-4); }
+.exam-collection-target dt { color: var(--crm-text-secondary); }
+.exam-collection-target dd { margin: 0; overflow-wrap: anywhere; }
+.exam-planner-notice { margin-bottom: var(--crm-sp-3); }
+.exam-planner-reminder-item { padding: var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); }
+.exam-planner-reminder-item p { margin: var(--crm-sp-2) 0 var(--crm-sp-3); color: var(--crm-text-secondary); overflow-wrap: anywhere; }
+.home-other-panel .task-panel-item--exam { border-inline-start: 3px solid var(--crm-color-primary); background: var(--crm-color-primary-bg); }
+.home-other-panel .task-panel-item--exam .task-panel-item-icon { color: var(--crm-color-primary); }
+
+.exam-collection-filters { display: flex; align-items: center; flex-wrap: nowrap; gap: var(--crm-sp-2); min-width: 0; }
+.exam-collection-filters .ant-input-search { width: 220px; min-width: 120px; flex: 1; }
+.exam-collection-filters .ant-select { width: 140px; flex: none; }
+.exam-collection-detail-pane { overflow: auto; min-width: 0; }
+.exam-collection-task-list .business-inbox-item { text-align: start; flex: none; }
+
+.exam-collection-qr-compact { display: flex; flex-wrap: wrap; align-items: center; gap: var(--crm-sp-4); }
+.exam-notify-class-select { height: var(--crm-control-h); min-width: 0; }
+.exam-notify-class-select .ant-select-selector { height: 100%; overflow: hidden; }
+.exam-notify-class-select .ant-select-selection-overflow { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+.exam-notify-class-select .ant-select-selection-search { min-width: 0; }
+
+/* Master-detail: list filters live at the top of the list pane, detail keeps tasks visible above the fold. */
+.exam-collection-list-toolbar { display: flex; flex: none; flex-direction: column; gap: var(--crm-sp-2); margin-bottom: var(--crm-gap-sm); }
+.exam-collection-list-toolbar .business-inbox-toolbar { margin-bottom: 0; }
+.exam-collection-list-toolbar .business-inbox-toolbar > .ant-btn { flex: none; }
+.exam-collection-item-progress { display: flex; align-items: center; gap: var(--crm-sp-2); color: var(--crm-text-secondary); font-size: var(--crm-font-sm); white-space: nowrap; }
+.exam-collection-item-progress .ant-progress { flex: 1; min-width: 0; margin: 0; }
+.exam-collection-task-list .business-inbox-item-meta { justify-content: space-between; }
+.exam-collection-task-list .business-inbox-item-meta .ant-tag { margin: 0; }
+.exam-collection-hero { align-items: center; flex-wrap: wrap; }
+.exam-collection-hero-copy { display: flex; flex: 1 1 280px; min-width: 0; flex-direction: column; gap: var(--crm-sp-2); }
+.exam-collection-hero-title { display: flex; align-items: center; gap: var(--crm-sp-2); min-width: 0; }
+.exam-collection-hero-title .ant-tag { flex: none; margin: 0; }
+.exam-collection-stat-warning { color: var(--crm-color-warning) !important; }
+.exam-collection-reason { overflow-wrap: anywhere; }
+.exam-collection-share { display: flex; flex-direction: column; gap: var(--crm-sp-1); padding: var(--crm-sp-3) var(--crm-card-pad); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); box-shadow: var(--crm-shadow-card); }
+.exam-collection-share-main { display: flex; align-items: center; gap: var(--crm-sp-3); min-width: 0; }
+.exam-collection-share-main > .ant-typography { flex: none; }
+.exam-collection-share-link { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.exam-collection-share-actions { display: flex; flex: none; gap: var(--crm-sp-2); }
+.exam-collection-share-hint { font-size: var(--crm-font-sm); }
+.exam-collection-share-qr { display: flex; flex-direction: column; gap: var(--crm-sp-2); }
+.exam-collection-tabs { padding-block: 0 var(--crm-sp-3); }
+.exam-collection-tabs > .ant-tabs-nav { margin-bottom: var(--crm-sp-3); }
+/* The tab card already supplies the inset; drop ProTable's own card inset so columns align with the tab bar. */
+.exam-collection-tabs .business-table .ant-pro-card-body { padding-inline: 0; }
+@media (max-width: 768px) {
+  .exam-collection-share-main { flex-wrap: wrap; }
+  .exam-collection-share-link { flex-basis: 100%; order: 1; }
+  /* Shared hero stacks vertically here; a 280px basis would become a fixed height. */
+  .exam-collection-hero-copy { flex: none; width: 100%; }
+}

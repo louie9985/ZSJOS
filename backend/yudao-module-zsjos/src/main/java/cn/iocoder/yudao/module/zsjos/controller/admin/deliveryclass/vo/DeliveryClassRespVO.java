@@ -32,6 +32,7 @@ public class DeliveryClassRespVO {
     private LocalDate startDate;
     private LocalDate endDate;
     private Long homeroomUserId;
+    /** Compatibility field name. Resolved from the current System user nickname on every read. */
     private String homeroomUserNameSnapshot;
     private Long deptId;
     private String deptNameSnapshot;

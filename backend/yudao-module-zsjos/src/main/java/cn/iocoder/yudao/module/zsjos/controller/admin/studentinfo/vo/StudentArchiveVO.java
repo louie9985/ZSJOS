@@ -13,9 +13,14 @@ public interface StudentArchiveVO {
         private Boolean canMaintain;
         private StudentInfoVO.Detail information;
         private List<History> history = List.of();
+        private List<History> submissions = List.of();
     }
     @Data class History {
+        private String submissionStatus;
         private Integer revision;
+        private String source;
+        private String taskTitle;
+        private Long taskId, submissionId;
         private Long operatorUserId;
         private LocalDateTime modifiedAt;
         private String reason;
@@ -31,6 +36,6 @@ public interface StudentArchiveVO {
         @NotNull @Min(0) private Integer revision;
         @NotBlank @Size(max=64) private String idempotencyKey;
         @Size(max=500) private String reason;
-        @NotNull @Size(max=33) private Map<String, Object> changes;
+        @NotNull @Size(max=34) private Map<String, Object> changes;
     }
 }

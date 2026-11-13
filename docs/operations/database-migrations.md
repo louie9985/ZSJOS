@@ -1360,3 +1360,11 @@ Fresh 兼容：bootstrap-compatibility.sql 仅在两本台账、System 用户、
 本次范围为尚未发布的本地开发更正。既有本地库已拥有这些业务结构，应先做只读结构、有效元数据与两本账本比较；不存在差异时无业务 DDL 或数据修复需要。已有登记 checksum 保留，不随此次源文件更正被静默重写。正式发布前须按迁移校验差异流程审定部署兼容性及校验值处理；本地受控验证不等于已执行生产升级。
 
 受控测试覆盖正确前置状态、重复执行、部分完成恢复、错误索引/主键/自增/软删除元数据、账本写入失败及 UTF-8 HEX。所有错误对象与修复动作只在本次创建的合成验证库中执行，不修改应用业务数据或 `system_role_menu`。
+
+## V363 schema synchronization
+
+The desired Core schema and fresh baseline include all eight empty V363 tables. Existing databases upgrade through V362 → V363; no historical migration or role assignment is rewritten. V363 owns menu metadata and both version records. Repeated creation preserves rows; partial DDL requires inspection and replay. Rollback retains collected data and added tables. Local application requires backup and successful migration preflight.
+
+## V367 examination collection body
+
+Apply `V367__exam_collection_rich_body.sql` after V366 and before deploying the body-capable backend. It adds nullable `mediumtext content` to `zsjos_exam_collection_task` and records both version ledgers after structure verification. No business rows or role grants are changed. Historical tasks retain null body. Original bootstrap and applied V363 remain intact, and fresh installations obtain the new column through the migration chain. Desired `schema/core.sql` includes the final column. Replays preserve data, and partial DDL is recoverable by rerunning after repairing the prerequisite. DDL commits implicitly. Rollback retains the column and content while reverting application code. Scoped lifecycle verification is `python script/sql/mysql/tools/test_exam_collection_body.py` against the local MySQL 8 container, retaining synthetic databases.

@@ -102,14 +102,15 @@ public final class NoticeSharePage {
         head.appendElement("style").text("""
                 * { box-sizing: border-box; }
                 body { margin: 0; background: #f3f5f7; color: #20242b; font: 16px/1.85 system-ui, sans-serif; }
-                main { width: 100%; max-width: 1120px; min-height: 100vh; margin: auto; padding: clamp(20px, 4vw, 48px) clamp(16px, 4vw, 48px) 48px; background: #fff; overflow-wrap: anywhere; }
+                main { width: 100%; max-width: 1384px; min-height: 100vh; margin: auto; padding: 24px 16px 48px; background: #fff; overflow-wrap: anywhere; }
                 header { border-bottom: 1px solid #ddd; padding-bottom: 20px; margin-bottom: 28px; font-size: 18px; font-weight: 600; }
                 header span { margin-left: 10px; font-size: 14px; font-weight: normal; }
                 h1 { margin: 0 0 12px; font-size: 26px; line-height: 1.4; }
                 h2 { font-size: 20px; }
                 a { color: #1677ff; }
                 .muted { color: #666; font-size: 13px; }
-                .content { margin-top: 28px; }
+                .content { margin-top: 28px; line-height: 1.5; }
+                .content p { margin: 15px 0; }
                 .content img, .content video { max-width: 100%; height: auto; }
                 .content a:has(> img) { cursor: zoom-in; }
                 .notice-image-preview { display: none; position: fixed; inset: 0; z-index: 1000; background: #101010; color: #fff; padding: 16px; overflow: auto; }
@@ -122,7 +123,7 @@ public final class NoticeSharePage {
                 .notice-table-scroll { width: 100%; max-width: 100%; overflow-x: auto; margin: 12px 0; }
                 .notice-table-scroll:focus-visible { outline: 2px solid #1677ff; outline-offset: 2px; }
                 .content table { width: 100%; border-collapse: collapse; }
-                .content td, .content th { border: 1px solid #ddd; padding: 8px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: break-word; vertical-align: top; }
+                .content td, .content th { border: 1px solid #ddd; padding: 8px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; vertical-align: top; }
                 .content th { background-color: #f7f7f7; }
                 .files { border-top: 1px solid #ddd; margin-top: 28px; padding-top: 16px; }
                 .file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 12px 0; }

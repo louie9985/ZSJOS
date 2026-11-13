@@ -11,11 +11,9 @@ import org.apache.ibatis.annotations.Select;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 import java.time.LocalDateTime;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Collection;
 
-import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.STAGE_EXAM_PREPARATION;
 
 @Mapper
 public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
@@ -174,33 +172,6 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .eq(ServiceRelationDO::getVersion, version)
                 .set(ServiceRelationDO::getDeliveryStage, nextStage)
                 .set(ServiceRelationDO::getDeliveryDataJson, deliveryDataJson)
-                .set(ServiceRelationDO::getVersion, version + 1));
-    }
-
-    default int updateExamDate(Long id, Long userId, LocalDate examDate, Integer version,
-                               String stage, LocalDateTime now) {
-        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
-                .eq(ServiceRelationDO::getTeachingDelivery, true)
-                .eq(ServiceRelationDO::getTeachingClosed, false)
-                .eq(ServiceRelationDO::getId, id)
-                .eq(ServiceRelationDO::getStatus, "active").eq(ServiceRelationDO::getVersion, version)
-                .set(ServiceRelationDO::getExamDate, examDate)
-                .set(ServiceRelationDO::getExamDateVersion, version + 1)
-                .set(ServiceRelationDO::getLastNotifiedExamDate, null)
-                .set(ServiceRelationDO::getExamNoticeSentAt, null)
-                .set(ServiceRelationDO::getDeliveryStage, stage)
-                .set(ServiceRelationDO::getVersion, version + 1)
-                .set(ServiceRelationDO::getUpdateTime, now));
-    }
-
-    default int markExamNoticeSent(Long id, LocalDate examDate, LocalDateTime sentAt, Integer version) {
-        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
-                .eq(ServiceRelationDO::getTeachingClosed,false)
-                .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getVersion, version)
-                .eq(ServiceRelationDO::getExamDate, examDate).isNull(ServiceRelationDO::getExamNoticeSentAt)
-                .set(ServiceRelationDO::getLastNotifiedExamDate, examDate)
-                .set(ServiceRelationDO::getExamNoticeSentAt, sentAt)
-                .set(ServiceRelationDO::getDeliveryStage, STAGE_EXAM_PREPARATION)
                 .set(ServiceRelationDO::getVersion, version + 1));
     }
 

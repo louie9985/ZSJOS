@@ -21,6 +21,7 @@ import { formatTimestamp } from '../services/time'
 import { hasPermission } from '../services/managementAccess'
 
 const statusLabel = { enabled: '启用', disabled: '停用', converted: '历史已转员工' }
+const statusColor = { enabled: 'success', disabled: 'error', converted: 'default' } as const
 const passwordRule = /^(?=.*[A-Za-z])(?=.*\d).{8,20}$/
 
 export default function SubordinatePartnerPage({ permissions }: { permissions: string[] }) {
@@ -30,6 +31,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
   const hasExpandedQuery = hasPermission(permissions, 'zsjos:partner:query')
   const rail = useInboxAvatarRail('zsjos.partner.inbox.collapsed')
   const [view, setView] = useState<'inbox' | 'table'>('inbox')
+  const [statusFilter, setStatusFilter] = useState<'enabled' | 'all' | 'disabled'>('enabled')
   const [activeTab, setActiveTab] = useState('overview')
   const [partners, setPartners] = useState<Partner[]>([])
   const [selected, setSelected] = useState<Partner>()
@@ -49,12 +51,12 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
   const [mobileForm] = Form.useForm<{ mobile: string }>(), [passwordForm] = Form.useForm<{ password: string }>()
   const partnerRequestRef = useRef(0), leadRequestRef = useRef(0)
 
-  const mergePartners=useInboxPageMerge<Partner>(appliedKeyword,view==='inbox',row=>row.id)
+  const mergePartners=useInboxPageMerge<Partner>(JSON.stringify([appliedKeyword, statusFilter]),view==='inbox',row=>row.id)
   const loadPartners = useCallback(async () => {
     const requestId = ++partnerRequestRef.current
     setLoading(true); setError('')
     try {
-      const result = await managementApi.partnerPage({ pageNo: partnerPage, pageSize: 20, keyword: appliedKeyword || undefined })
+      const result = await managementApi.partnerPage({ pageNo: partnerPage, pageSize: 20, keyword: appliedKeyword || undefined, status: statusFilter === 'all' ? undefined : statusFilter })
       if (requestId !== partnerRequestRef.current) return
       const merged=mergePartners(partnerPage,result.list);setPartners(merged); setPartnerTotal(result.total)
       setSelected(current => current && merged.some(item => item.id === current.id)
@@ -65,7 +67,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
     } finally {
       if (requestId === partnerRequestRef.current) setLoading(false)
     }
-  }, [appliedKeyword, partnerPage,mergePartners,view])
+  }, [appliedKeyword, statusFilter, partnerPage,mergePartners,view])
 
   const loadLeads = useCallback(async () => {
     if (!selected) return
@@ -154,7 +156,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
     { title: '兼职信息', key: 'identity', width: 220, render: (_: unknown, row: Partner) => <Button type="link" className="subordinate-partner-identity" onClick={() => selectPartner(row)}><SubjectAvatar seed={row.partnerNo} label={row.name} size={36}/><span>{row.name}</span></Button> },
     { title: '兼职编号', dataIndex: 'partnerNo', width: 160 },
     { title: '手机号', dataIndex: 'mobile', width: 150 },
-    { title: '账号状态', dataIndex: 'status', width: 130, render: (_, row) => <Tag>{statusLabel[row.status]}</Tag> },
+    { title: '账号状态', dataIndex: 'status', width: 130, render: (_, row) => <Tag color={statusColor[row.status]}>{statusLabel[row.status]}</Tag> },
     { title: '当前归属', dataIndex: 'assignedEmployeeName', width: 140, render: (_, row) => row.assignedEmployeeName || '未分配' },
     { title: '归属时间', dataIndex: 'assignedAt', width: 160, render: (_, row) => <DateTimeText value={row.assignedAt}/> },
     { title: '操作', key: 'action', width: 110, render: (_: unknown, row: Partner) => <Button type="link" onClick={() => selectPartner(row)}>查看概览</Button> }
@@ -164,7 +166,13 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
   return <section className="workspace-page subordinate-partner-page">
     <div className="page-heading">
       <div><Typography.Title level={4}>兼职管理</Typography.Title><Typography.Text type="secondary">{canManageAll ? '管理当前租户全部兼职账号及其提交客资' : canReadAll ? '查看全部兼职及其提交客资' : hasExpandedQuery ? '查看本人及关联运营名下的兼职及其提交客资' : '查看直接归属给我的兼职及其提交客资'}</Typography.Text></div>
-      <Space wrap><Segmented value={view} onChange={value=>{setView(value as typeof view);setPartnerPage(1)}} options={[{ label: '收件箱', value: 'inbox' }, { label: '表格', value: 'table' }]}/>
+      <Space wrap><Segmented aria-label="兼职账号状态筛选" value={statusFilter}
+        options={[{ label: '启用', value: 'enabled' }, { label: '全部', value: 'all' }, { label: '停用', value: 'disabled' }]}
+        onChange={value => {
+          ++partnerRequestRef.current
+          setStatusFilter(value as typeof statusFilter)
+          setPartnerPage(1); setPartners([]); setPartnerTotal(0); setSelected(undefined)
+        }}/><Segmented value={view} onChange={value=>{setView(value as typeof view);setPartnerPage(1)}} options={[{ label: '收件箱', value: 'inbox' }, { label: '表格', value: 'table' }]}/>
         <Button aria-label="刷新兼职列表" icon={<ReloadOutlined/>} onClick={() => void loadPartners()}/>
         {canManageAll && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setCreateOpen(true)}>新增兼职</Button>}</Space>
     </div>
@@ -184,7 +192,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
           {loading && !partners.length ? (rail.collapsed ? <Skeleton.Avatar active size={36}/> : <Skeleton active/>) : partners.length ? partners.map(item => <Tooltip key={item.id} title={rail.collapsed ? `${item.name} · ${item.partnerNo}` : undefined} trigger={['hover', 'focus']}>
             <button type="button" className={`subordinate-partner-item${selected?.id === item.id ? ' active' : ''}`} aria-label={`${item.name} · ${item.partnerNo}`} aria-current={selected?.id === item.id ? 'true' : undefined} onClick={() => selectPartner(item)}>
               <SubjectAvatar seed={item.partnerNo} label={item.name} size={36}/>
-              <span className="subordinate-partner-item-copy"><span className="subordinate-partner-item-title"><strong>{item.name}</strong><Tag>{statusLabel[item.status]}</Tag></span><span>{item.partnerNo}</span><span>{item.mobile || '无手机号'} · {item.assignedEmployeeName || '未分配'}</span></span>
+              <span className="subordinate-partner-item-copy"><span className="subordinate-partner-item-title"><strong>{item.name}</strong><Tag color={statusColor[item.status]}>{statusLabel[item.status]}</Tag></span><span>{item.partnerNo}</span><span>{item.mobile || '无手机号'} · {item.assignedEmployeeName || '未分配'}</span></span>
             </button>
           </Tooltip>) : !error && (rail.collapsed ? <span role="status" className="subordinate-partner-empty">暂无兼职</span> : <Empty description="暂无授权范围内的兼职"/>)}
         </div>
@@ -193,7 +201,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
       <main className="subordinate-partner-leads">
         {!selected ? <Empty description="请选择兼职查看概览与客资"/> : <>
           <div className="subordinate-partner-detail-heading">
-            <div className="subordinate-partner-identity"><SubjectAvatar seed={selected.partnerNo} label={selected.name} size={48}/><div><Typography.Title level={4}>{selected.name} <Tag>{statusLabel[selected.status]}</Tag></Typography.Title><Typography.Text type="secondary">{selected.partnerNo} · {selected.mobile || '无手机号'}</Typography.Text></div></div>
+            <div className="subordinate-partner-identity"><SubjectAvatar seed={selected.partnerNo} label={selected.name} size={48}/><div><Typography.Title level={4}>{selected.name} <Tag color={statusColor[selected.status]}>{statusLabel[selected.status]}</Tag></Typography.Title><Typography.Text type="secondary">{selected.partnerNo} · {selected.mobile || '无手机号'}</Typography.Text></div></div>
             <Space wrap>
               <Button aria-label="刷新客资" icon={<ReloadOutlined/>} onClick={() => void loadLeads()}/>
               {canManageAll && <><Button icon={<MobileOutlined/>} onClick={() => { setMobilePartner(selected); mobileForm.setFieldsValue({ mobile: selected.mobile }) }}>手机号</Button>

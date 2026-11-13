@@ -32,6 +32,7 @@ public class StudentArchiveService {
     @Resource private StudentInfoImageService images;
     @Resource private PermissionApi permissions;
     @Resource private cn.iocoder.yudao.module.system.api.user.AdminUserApi users;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.examcollection.StudentServiceArchiveFacade serviceArchive;
 
     private StudentInfoFormDO form(Long relationId) {
         var relation = relations.selectById(relationId);
@@ -60,6 +61,7 @@ public class StudentArchiveService {
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
     public Detail detail(Long relationId, boolean sensitive) {
         if (sensitive && !permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        if (serviceArchive.hasRevision(relationId)) return serviceArchive.detail(relationId, sensitive);
         var relation = relations.selectById(relationId);
         var form = form(relationId);
         var result = new Detail();
@@ -100,6 +102,7 @@ public class StudentArchiveService {
 
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="update")
     public Edit edit(Long relationId) {
+        if (serviceArchive.hasRevision(relationId)) return serviceArchive.edit(relationId);
         var form = submitted(relationId); var latest = revisions.latest(form.getId());
         var result = new Edit(); result.setRevision(latest == null ? 0 : latest.getRevision());
         Map<String,Object> raw = new LinkedHashMap<>();
@@ -122,6 +125,7 @@ public class StudentArchiveService {
     @Transactional(rollbackFor=Exception.class)
     public Integer save(Long relationId, Save request) {
         cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relations.selectByIdForUpdate(relationId,cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
+        if (serviceArchive.hasRevision(relationId)) return serviceArchive.save(relationId, request);
         var form = forms.lock(submitted(relationId).getId());
         String fingerprint = cn.hutool.crypto.digest.DigestUtil.sha256Hex(JsonUtils.toJsonString(request));
         var previous = revisions.byKey(request.getIdempotencyKey());
@@ -178,11 +182,17 @@ public class StudentArchiveService {
     public StudentInfoVO.Image upload(Long relationId, String fieldKey, String side, MultipartFile file) {
         cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.requireOpen(relations.selectByIdForUpdate(relationId,cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
         if (!permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        if (serviceArchive.hasRevision(relationId)) return serviceArchive.upload(relationId, fieldKey, side, file);
         return images.archiveUpload(forms.lock(submitted(relationId).getId()), fieldKey, side, file);
     }
     @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
     public byte[] image(Long relationId, Long imageId) {
+        return image(relationId, imageId, "registration");
+    }
+    @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
+    public byte[] image(Long relationId, Long imageId, String source) {
         if (!permitted(ARCHIVE_SENSITIVE)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
+        if (serviceArchive.hasRevision(relationId) || !"registration".equals(source)) return serviceArchive.read(relationId, imageId, source);
         var form = submitted(relationId); var image = imageMapper.selectById(imageId);
         if (image == null || !Objects.equals(image.getFormId(),form.getId())) throw exception(LINK_INVALID);
         return images.archiveRead(form.getId(), imageId);
@@ -191,5 +201,14 @@ public class StudentArchiveService {
     public Detail export(Long relationId) {
         if (!permitted(ARCHIVE_EXPORT)) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         return detail(relationId,permitted(ARCHIVE_SENSITIVE));
+    }
+    @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
+    public Detail history(Long relationId, Integer revision, boolean sensitive) {
+        if (!serviceArchive.hasRevision(relationId)) throw exception(LINK_INVALID);
+        return serviceArchive.history(relationId, revision, sensitive);
+    }
+    @ZsjosPermission(bizType="student-archive", bizId="#relationId", action="read")
+    public Detail submission(Long relationId, Long submissionId, boolean sensitive) {
+        return serviceArchive.submission(relationId, submissionId, sensitive);
     }
 }

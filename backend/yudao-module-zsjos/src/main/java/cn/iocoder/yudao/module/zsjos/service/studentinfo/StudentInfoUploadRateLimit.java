@@ -15,6 +15,11 @@ public class StudentInfoUploadRateLimit {
     public void check(String token,String ip) {
         acquire("token:"+StudentInfoFormService.hash(token),30); acquire("ip:"+DigestUtil.sha256Hex(ip),120);
     }
+    public void checkExamSession(String token, String ip) {
+        // One link belongs to an entire cohort; do not apply the per-person upload quota to it.
+        acquire("exam-session-task:" + StudentInfoFormService.hash(token), 600);
+        acquire("exam-session-ip:" + DigestUtil.sha256Hex(ip), 120);
+    }
     private void acquire(String key,int count) {
         var limiter=redis.getRateLimiter("zsjos:student-info:upload:"+key);
         limiter.trySetRate(RateType.OVERALL,count,Duration.ofMinutes(1)); limiter.expire(Duration.ofMinutes(2));

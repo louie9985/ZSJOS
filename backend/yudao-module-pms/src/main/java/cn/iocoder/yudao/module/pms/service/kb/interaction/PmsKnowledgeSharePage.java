@@ -34,6 +34,7 @@ public final class PmsKnowledgeSharePage {
                     .attr("target", "_blank").attr("rel", "noopener noreferrer").text("打开／下载文件");
         } else {
             article.appendElement("div").addClass("content").html(content.isBlank() ? "<p>暂无内容</p>" : content);
+            imagePreviews(page);
         }
         if (document.getAttachments() != null && !document.getAttachments().isEmpty()) {
             var section = article.appendElement("section");
@@ -48,6 +49,40 @@ public final class PmsKnowledgeSharePage {
             }
         }
         return page.outerHtml();
+    }
+
+    private static void imagePreviews(Document page) {
+        int index = 0;
+        for (var image : page.select(".content img[src]")) {
+            String id = "image-preview-" + ++index;
+            String description = image.attr("alt").isBlank() ? "正文图片 " + index : image.attr("alt");
+            var preview = page.body().appendElement("div").attr("id", id).attr("popover", "auto")
+                    .attr("role", "dialog").attr("aria-label", description).addClass("image-preview");
+            var toolbar = preview.appendElement("div").addClass("image-preview-toolbar");
+            toolbar.appendElement("span").text(description);
+            toolbar.appendElement("button").attr("type", "button").attr("popovertarget", id)
+                    .attr("popovertargetaction", "hide").attr("autofocus", "").text("关闭");
+            var label = preview.appendElement("label").addClass("image-preview-size");
+            label.appendElement("input").attr("type", "checkbox");
+            label.appendText(" 原始尺寸（可滚动查看）");
+            preview.appendElement("div").addClass("image-preview-scroll").attr("tabindex", "0")
+                    .appendElement("img").attr("src", image.attr("src")).attr("alt", description);
+            preview.appendElement("a").attr("href", image.attr("src")).attr("target", "_blank")
+                    .attr("rel", "noopener noreferrer").text("打开原图");
+            var trigger = new org.jsoup.nodes.Element("button").attr("type", "button")
+                    .attr("popovertarget", id).attr("aria-label", "放大查看：" + description).addClass("image-preview-trigger");
+            // Keep existing image links available without nesting interactive controls.
+            var link = image.closest("a");
+            if (link != null) {
+                link.before(trigger);
+                if (link.text().isBlank()) link.appendText("打开图片链接");
+            } else {
+                image.before(trigger);
+            }
+            // Preserve the original position and link for browsers without Popover support.
+            image.addClass("image-preview-original");
+            trigger.appendChild(image.clone().removeClass("image-preview-original"));
+        }
     }
 
     public static String error(String title, String message, boolean retry) {
@@ -157,6 +192,25 @@ public final class PmsKnowledgeSharePage {
                 h1 { font-size: 26px; line-height: 1.4; }
                 a { color: #1677ff; }
                 .content img, .content video { max-width: 100%; height: auto; }
+                .image-preview-trigger { display: none; max-width: 100%; padding: 0; border: 0; background: transparent; cursor: zoom-in; vertical-align: middle; }
+                .image-preview-trigger img { display: block; }
+                .image-preview { width: calc(100% - 32px); max-width: 1200px; max-height: calc(100dvh - 32px); padding: 16px; border: 0; border-radius: 12px; color: #20242b; background: white; overflow: auto; }
+                .image-preview::backdrop { background: rgb(0 0 0 / 75%); }
+                .image-preview-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+                .image-preview-toolbar span { overflow-wrap: anywhere; }
+                .image-preview-toolbar button { min-width: 64px; min-height: 44px; flex-shrink: 0; font: inherit; cursor: pointer; }
+                .image-preview-size { display: flex; align-items: center; min-height: 44px; gap: 8px; cursor: pointer; }
+                .image-preview-scroll { overflow: auto; max-height: 65dvh; text-align: center; }
+                .image-preview-scroll img { max-width: 100%; max-height: 65dvh; height: auto; width: auto; vertical-align: middle; }
+                .image-preview:has(input:checked) .image-preview-scroll { text-align: left; }
+                .image-preview:has(input:checked) .image-preview-scroll img { max-width: none; max-height: none; }
+                @supports selector(:popover-open) {
+                    .image-preview-original { display: none; }
+                    .image-preview-trigger { display: inline-block; }
+                }
+                @supports not (selector(:popover-open)) {
+                    .image-preview { display: none; }
+                }
                 pre, .table-scroll { max-width: 100%; overflow-x: auto; }
                 table { width: 100%; border-collapse: collapse; }
                 td, th { border: 1px solid #ddd; padding: 8px; min-width: 90px; }

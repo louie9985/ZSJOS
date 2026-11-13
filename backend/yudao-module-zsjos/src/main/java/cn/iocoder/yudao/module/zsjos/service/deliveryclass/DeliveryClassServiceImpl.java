@@ -52,6 +52,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             StudentContactConstants.TYPE_FIRST_CONTACT, StudentContactConstants.TYPE_STUDY_PLAN,
             StudentContactConstants.TYPE_CONTACT, StudentContactConstants.TYPE_ASSISTANCE);
     @Resource private DeliveryClassMapper mapper;
+    @Resource private ClassExamProgressService examProgress;
     @Resource private ExamScheduleMapper scheduleMapper;
     @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private AdminUserApi adminUserApi;
@@ -142,6 +143,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         var query = mapper.classQuery(new DeliveryClassPageReqVO(), scope.departments(), scope.subject(), scope.all(), scope.system());
         query.in(DeliveryClassDO::getStatus, List.of("SERVING", "COMPLETED"));
         List<DeliveryClassDO> rows = mapper.selectList(query);
+        Map<Long, AdminUserRespDTO> homeroomUsers = homeroomUsers(rows);
         Map<Long, List<DeliveryClassProjectRespVO>> byClass = DeliveryClassProjects.load(mapper, rows);
         Map<Long, DeliveryClassProjectRespVO> projects = new LinkedHashMap<>();
         Map<Long, DeliveryClassFilterContextRespVO.Homeroom> homerooms = new LinkedHashMap<>();
@@ -151,7 +153,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
             byClass.getOrDefault(row.getId(), List.of()).forEach(project -> projects.putIfAbsent(project.id(), project));
             if (row.getHomeroomUserId() != null) homerooms.putIfAbsent(row.getHomeroomUserId(),
                     new DeliveryClassFilterContextRespVO.Homeroom(row.getHomeroomUserId(),
-                            row.getHomeroomUserNameSnapshot() == null ? "班主任姓名未记录" : row.getHomeroomUserNameSnapshot(), row.getDeptNameSnapshot()));
+                            homeroomName(row, homeroomUsers) == null ? "班主任姓名未记录" : homeroomName(row, homeroomUsers), row.getDeptNameSnapshot()));
         }
         return new DeliveryClassFilterContextRespVO(projects.values().stream()
                 .sorted(Comparator.comparing(DeliveryClassProjectRespVO::path).thenComparing(DeliveryClassProjectRespVO::id)).toList(),
@@ -170,6 +172,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
 
     PageResult<DeliveryClassRespVO> toPageResult(PageResult<DeliveryClassDO> page, Long userId) {
         List<DeliveryClassDO> rows = page.getList();
+        Map<Long, AdminUserRespDTO> homeroomUsers = homeroomUsers(rows);
         Map<Long, Integer> studentCounts = new HashMap<>();
         Map<Long, List<Long>> idsByTenant = rows.stream().collect(Collectors.groupingBy(
                 DeliveryClassDO::getTenantId, Collectors.mapping(DeliveryClassDO::getId, Collectors.toList())));
@@ -179,7 +182,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         ClassActionScope actionScope = rows.stream().anyMatch(row -> !Boolean.TRUE.equals(row.getSystemClass()))
                 ? actionScope(userId) : ClassActionScope.NONE;
         return new PageResult<>(rows.stream().map(row -> {
-            DeliveryClassRespVO vo = toVO(row, studentCounts.getOrDefault(row.getId(), 0));
+            DeliveryClassRespVO vo = toVO(row, studentCounts.getOrDefault(row.getId(), 0), homeroomUsers);
             vo.setProjects(projects.getOrDefault(row.getId(), List.of()));
             vo.setAvailableActions(availableActions(row, actionScope));
             return vo;
@@ -263,9 +266,10 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
                         .or().eq(DeliveryClassDO::getCategoryId, categoryId))
                 .orderByDesc(DeliveryClassDO::getSystemClass).orderByAsc(DeliveryClassDO::getClassName)
                 .orderByAsc(DeliveryClassDO::getId));
+        Map<Long, AdminUserRespDTO> homeroomUsers = homeroomUsers(rows);
         return rows.stream().filter(row -> includePending || !DeliveryClassKind.pending(row))
                 .filter(row -> !DeliveryClassKind.UNSCHEDULED.equals(row.getClassKind()) || validAssignmentOwner(row))
-                .map(this::toOption).toList();
+                .map(row -> toOption(row, homeroomUsers)).toList();
     }
 
     private boolean validAssignmentOwner(DeliveryClassDO row) {
@@ -406,13 +410,14 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = BIZ_TYPE, bizId = "#id", action = "complete")
     public void complete(Long id, Long userId) {
-        DeliveryClassDO row = mapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
-        if (row == null) throw exception(DELIVERY_CLASS_NOT_EXISTS);
-        if (Boolean.TRUE.equals(row.getSystemClass()) || !"SERVING".equals(row.getStatus())) {
-            throw exception(DELIVERY_CLASS_STATE_INVALID);
-        }
-        row.setStatus("COMPLETED").setVersion(row.getVersion() + 1);
-        if (mapper.updateById(row) != 1) throw exception(DELIVERY_CLASS_VERSION_CONFLICT);
+        var state = examProgress.get(id, userId);
+        if (!ClassExamProgressPolicy.EXAM.equals(state.stage())) throw exception(
+                new cn.iocoder.yudao.framework.common.exception.ErrorCode(1_900_019_092,
+                        "请先在工作台班级考试进度中依次进入考前冲刺、完成考试，再结束服务"));
+        var result = examProgress.transition(id, userId,
+                new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.ClassExamProgressVO.Command("END", state.version()));
+        if (!result.changed()) throw exception(new cn.iocoder.yudao.framework.common.exception.ErrorCode(
+                1_900_019_091, result.message()));
     }
 
     @Override
@@ -548,11 +553,13 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private DeliveryClassRespVO toVO(DeliveryClassDO row) {
-        return toVO(row, mapper.countStudents(row.getTenantId(), row.getId()));
+        return toVO(row, mapper.countStudents(row.getTenantId(), row.getId()), homeroomUsers(List.of(row)));
     }
 
-    private DeliveryClassRespVO toVO(DeliveryClassDO row, int studentCount) {
+    private DeliveryClassRespVO toVO(DeliveryClassDO row, int studentCount, Map<Long, AdminUserRespDTO> homeroomUsers) {
         DeliveryClassRespVO vo = BeanUtils.toBean(row, DeliveryClassRespVO.class);
+        // Legacy response field name is retained for both frontends, but current names come from System.
+        vo.setHomeroomUserNameSnapshot(homeroomName(row, homeroomUsers));
         DeliveryClassDates dates = DeliveryClassDates.fromSnapshot(row.getExamScheduleSnapshot());
         if (dates != null) {
             vo.setStartDate(dates.start());
@@ -567,14 +574,25 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         return vo;
     }
 
-    private DeliveryClassOptionRespVO toOption(DeliveryClassDO row) {
+    private DeliveryClassOptionRespVO toOption(DeliveryClassDO row, Map<Long, AdminUserRespDTO> homeroomUsers) {
         DeliveryClassOptionRespVO vo = new DeliveryClassOptionRespVO();
         vo.setId(row.getId()); vo.setClassNo(row.getClassNo()); vo.setClassName(row.getClassName());
         vo.setClassKind(row.getClassKind()); vo.setSystemClass(row.getSystemClass()); vo.setCategoryId(row.getCategoryId());
         vo.setCategoryName(row.getCategoryNameSnapshot()); vo.setExamScheduleId(row.getExamScheduleId());
         vo.setExamScheduleName(row.getExamScheduleSnapshot()); vo.setHomeroomUserId(row.getHomeroomUserId());
-        vo.setHomeroomUserName(row.getHomeroomUserNameSnapshot());
+        vo.setHomeroomUserName(homeroomName(row, homeroomUsers));
         return vo;
+    }
+
+    private Map<Long, AdminUserRespDTO> homeroomUsers(List<DeliveryClassDO> rows) {
+        Set<Long> ids = rows.stream().map(DeliveryClassDO::getHomeroomUserId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        return ids.isEmpty() ? Map.of() : adminUserApi.getUserMap(ids);
+    }
+
+    private String homeroomName(DeliveryClassDO row, Map<Long, AdminUserRespDTO> users) {
+        AdminUserRespDTO user = row.getHomeroomUserId() == null ? null : users.get(row.getHomeroomUserId());
+        return user == null ? null : cn.hutool.core.util.StrUtil.trimToNull(user.getNickname());
     }
 
     private boolean blank(String value) { return value == null || value.isBlank(); }

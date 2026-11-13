@@ -80,6 +80,17 @@ final class NoticeShareTables {
     }
 
     static void prepare(Document document) {
+        for (Element paragraph : document.select("p")) {
+            var images = paragraph.select("img");
+            double total = images.stream().mapToDouble(NoticeShareTables::pixels).sum();
+            if (images.size() < 2 || total > 1352 || images.stream().anyMatch(image -> pixels(image) <= 0)) continue;
+            for (Element image : images) {
+                Map<String, String> values = declarations(image);
+                values.put("width", (pixels(image) / 1352 * 100) + "%");
+                image.attr("style", style(values));
+                image.removeAttr("width");
+            }
+        }
         for (Element table : document.select("table")) {
             double minimum = pixels(table);
             var columns = table.select("col").stream().filter(col -> col.closest("table") == table).toList();
@@ -93,12 +104,28 @@ final class NoticeShareTables {
                 for (Element cell : row.children()) {
                     if (!Set.of("td", "th").contains(cell.normalName())) continue;
                     double width = pixels(cell);
-                    if (width > 0) minimumStyle(cell, width);
                     rowWidth += width > 0 ? width : 80 * span(cell, "colspan");
                 }
                 if (columns.isEmpty()) minimum = Math.max(minimum, rowWidth);
             }
-            if (minimum > 0) minimumStyle(table, minimum);
+            // Column ratios survive narrower readers without adding pixel lower bounds.
+            for (Element element : table.select("col,td,th")) {
+                if (element.closest("table") != table) continue;
+                double width = pixels(element);
+                Map<String, String> values = declarations(element);
+                values.remove("min-width");
+                if (width > 0 && minimum > 0) {
+                    values.put("width", (width / minimum * 100) + "%");
+                    element.removeAttr("width");
+                }
+                element.attr("style", style(values));
+            }
+            Map<String, String> values = declarations(table);
+            values.remove("min-width");
+            values.put("width", "100%");
+            values.put("table-layout", "fixed");
+            table.removeAttr("width");
+            table.attr("style", style(values));
             table.wrap("<div class=\"notice-table-scroll\" tabindex=\"0\" role=\"region\" aria-label=\"正文表格，可横向滚动\"></div>");
         }
     }
@@ -120,12 +147,6 @@ final class NoticeShareTables {
     private static double pixels(Element element) {
         String value = declarations(element).getOrDefault("width", element.attr("width"));
         return value.matches("[0-9]+(?:\\.[0-9]+)?(?:px)?") ? Math.min(10000, Double.parseDouble(value.replace("px", ""))) : 0;
-    }
-
-    private static void minimumStyle(Element element, double minimum) {
-        Map<String, String> values = declarations(element);
-        if (!values.containsKey("min-width")) values.put("min-width", String.format(Locale.ROOT, "%s", minimum) + "px");
-        element.attr("style", style(values));
     }
 
     private static String style(Map<String, String> values) {

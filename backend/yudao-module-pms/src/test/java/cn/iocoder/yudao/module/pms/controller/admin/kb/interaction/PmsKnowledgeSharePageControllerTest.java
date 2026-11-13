@@ -82,6 +82,34 @@ class PmsKnowledgeSharePageControllerTest {
         export("file.html", html);
     }
 
+    @Test void bodyImagesHaveScriptFreePreviewsAndOriginalSizeControls() throws Exception {
+        when(service.getDocumentByShareToken(TOKEN)).thenReturn(document().setContent(
+                "<p>点击图片查看细节</p><img src='http://127.0.0.1:18765/long.png' alt='课程长图'>"
+                + "<a href='https://example.test/course'><img src='https://example.test/image.png'></a>"
+                + "<img src='javascript:bad()'><div id='image-preview-1' popover='auto'>不可信属性</div>"));
+        var response = mvc.perform(get(ROOT + "/page").param("token", TOKEN))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        var html = response.getContentAsString(StandardCharsets.UTF_8);
+        var page = Jsoup.parse(html);
+        assertEquals(2, page.select("button.image-preview-trigger").size());
+        assertEquals(2, page.select(".content img.image-preview-original").size());
+        assertEquals(1, page.select(".content a[href='https://example.test/course'] > img.image-preview-original").size());
+        assertTrue(page.select("button img.image-preview-original").isEmpty());
+        assertEquals(2, page.select("[popover=auto]").size());
+        assertEquals(2, page.select(".image-preview input[type=checkbox]").size());
+        assertEquals(2, page.select(".image-preview button[popovertargetaction=hide]").size());
+        assertTrue(page.select("a button, script, [onclick], [src^=javascript]").isEmpty());
+        assertEquals(1, page.select("#image-preview-1").size());
+        assertEquals("https://example.test/course", page.selectFirst(".content a").attr("href"));
+        for (var trigger : page.select("button.image-preview-trigger")) {
+            var preview = page.getElementById(trigger.attr("popovertarget"));
+            assertNotNull(preview);
+            assertEquals(trigger.selectFirst("img").attr("src"), preview.selectFirst("img").attr("src"));
+        }
+        assertTrue(response.getHeader("Content-Security-Policy").contains("script-src 'none'"));
+        export("images.html", html);
+    }
+
     @Test void fileNavigationRevalidatesAndRejectsUnsafeOrUnboundFiles() throws Exception {
         var document = document().setType(4).setContent("stored-file");
         when(service.getDocumentByShareToken(TOKEN)).thenReturn(document);

@@ -16,6 +16,7 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
 }) {
   const { message, modal } = App.useApp()
   const [form] = Form.useForm<Values>()
+  const [mobilePreview, setMobilePreview] = useState(false)
   const [id, setId] = useState(initial?.id)
   const [attachments, setAttachments] = useState<AnnouncementAttachment[]>(initial?.attachments || [])
   const [types, setTypes] = useState<DictData[]>([])
@@ -191,6 +192,9 @@ export default function NoticeEditorDialog({ initial, permissions, onClose, onCh
         </Form>
       </Spin>
     </Modal>
-    <Modal open={!!preview} title="公告预览" width={800} footer={null} onCancel={() => setPreview(undefined)}>{preview && <NoticeManagementDetail notice={preview} preview />}</Modal>
+    <Modal open={!!preview} title="公告预览" width="min(1400px, calc(100vw - 32px))" footer={null} onCancel={() => setPreview(undefined)}>
+      <Radio.Group value={mobilePreview} onChange={event => setMobilePreview(event.target.value)} options={[{ label: '桌面', value: false }, { label: '手机', value: true }]} />
+      <div style={{ width: mobilePreview ? 358 : 1352, maxWidth: '100%', marginInline: 'auto' }}>{preview && <NoticeManagementDetail notice={preview} preview />}</div>
+    </Modal>
   </>
 }

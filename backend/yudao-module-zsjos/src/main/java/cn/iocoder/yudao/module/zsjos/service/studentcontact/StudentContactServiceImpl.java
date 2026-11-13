@@ -380,20 +380,6 @@ public class StudentContactServiceImpl implements StudentContactService {
                 request.getNextContactAt(), null, null, null, request.getData(), request.getIdempotencyKey(), userId);
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "delivery-stage")
-    public Long submitDeliveryStage(Long relationId, StudentDeliveryStageSubmitReqVO request, Long userId) {
-        // Keep the authorized endpoint explicit for older clients; no legacy mutation is allowed.
-        throw exception(LEGACY_EXAM_FLOW_RETIRED);
-    }
-
-    @Override @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "update-exam-date")
-    public void updateExamDate(Long relationId, StudentExamDateUpdateReqVO request, Long userId) {
-        // Keep the authorized endpoint explicit for older clients; no legacy mutation is allowed.
-        throw exception(LEGACY_EXAM_FLOW_RETIRED);
-    }
-
     private Long submit(Long relationId, Long taskId, String expectedType, Boolean successful, String unsuccessfulReason,
                           String remark, List<Long> attachments, List<String> checklistKeys, Boolean planCompleted, LocalDateTime nextAt,
                           String extensionReason, String extensionDescription, List<Long> extensionAttachments,
