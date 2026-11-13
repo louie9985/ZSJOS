@@ -107,9 +107,16 @@ public class StudentServiceArchiveStore {
             return previous.getRevision();
         }
         var current = current(relation);
-        var selected = ExamCollectionFields.liveFields(JsonUtils.parseArray(task.getFieldsSnapshot(), Field.class));
-        var incoming = JsonUtils.parseArray(submission.getAnswersJson(), StudentInfoFormValueDO.class).stream()
-                .filter(value -> !"wechat".equals(value.getFieldKey())).toList();
+        var answers = JsonUtils.parseArray(submission.getAnswersJson(), StudentInfoFormValueDO.class);
+        var attendance = answers.stream().filter(v -> ExamCollectionFields.ATTENDANCE_KEY.equals(v.getFieldKey()))
+                .map(StudentInfoFormValueDO::getValueText).findFirst().orElse(null);
+        // Attendance belongs to this task only and stays on the submission. A declined submission refreshes identity
+        // fields and leaves every other archived value and attachment untouched.
+        var perTask = Set.of(ExamCollectionFields.ATTENDANCE_KEY, ExamCollectionFields.ABSENCE_REASON_KEY);
+        var selected = ExamCollectionFields.applicable(ExamCollectionFields.liveFields(JsonUtils.parseArray(task.getFieldsSnapshot(), Field.class)), attendance)
+                .stream().filter(f -> !perTask.contains(f.getKey())).toList();
+        var incoming = answers.stream()
+                .filter(value -> !"wechat".equals(value.getFieldKey()) && !perTask.contains(value.getFieldKey())).toList();
         Set<String> keys = new LinkedHashSet<>(); selected.forEach(f -> keys.add(f.getKey()));
         if (incoming.stream().anyMatch(v -> !keys.contains(v.getFieldKey()))) throw exception(FIELD_INVALID, "非本次收集字段");
         if (incoming.stream().map(StudentInfoFormValueDO::getFieldKey).distinct().count() != incoming.size())

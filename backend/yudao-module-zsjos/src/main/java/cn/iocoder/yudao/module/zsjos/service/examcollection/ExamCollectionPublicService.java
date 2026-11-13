@@ -66,7 +66,7 @@ public class ExamCollectionPublicService {
             requireOpen(task);
             var previous = submissions.byRequest(task.getId(), request.getIdempotencyKey());
             if (previous != null) throw exception(CONFLICT);
-            var definitions = definitions(task);
+            var definitions = ExamCollectionFields.applicable(definitions(task), input.get(ExamCollectionFields.ATTENDANCE_KEY));
             var values = fields.validateCollectionValues(definitions, input);
             var fileIds = validateAttachments(task, row, definitions, input);
             String identity = values.stream().filter(v -> "id_card".equals(v.getFieldKey())).findFirst()

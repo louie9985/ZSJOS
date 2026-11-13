@@ -146,6 +146,8 @@ public class ExamCollectionQueryService {
         // One batch projection for this page preserves formal-archive precedence and excludes drafts.
         var archiveRows = summary.projectForExam(taskId, new ArrayList<>(serviceMap.values())).stream()
                 .collect(Collectors.toMap(r -> r.serviceRelationId(), r -> r.values()));
+        var lastIds = page.getList().stream().map(ExamCollectionMemberDO::getLastSubmissionId).filter(Objects::nonNull).toList();
+        var absences = lastIds.isEmpty() ? Map.<Long, String>of() : ExamCollectionFields.absenceReasons(submissions.selectByIds(lastIds));
         var planners = plannerIds.isEmpty() ? Map.<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO>of() : users.getUserMap(plannerIds);
         return new PageResult<>(page.getList().stream().map(m -> new Member(m.getServiceRelationId(), m.getPersonId(),
                 serviceMap.containsKey(m.getServiceRelationId()) ? serviceMap.get(m.getServiceRelationId()).getStudentNameSnapshot() : "已删除学员服务",
@@ -154,7 +156,8 @@ public class ExamCollectionQueryService {
                 Boolean.TRUE.equals(m.getActive()), m.getLastSubmissionId(),
                 archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.name"),
                 archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.mobile"),
-                archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.id_card"))).toList(), page.getTotal());
+                archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.id_card"),
+                m.getLastSubmissionId() == null ? null : absences.get(m.getLastSubmissionId()))).toList(), page.getTotal());
     }
     static Map<String, String> display(List<StudentInfoFormValueDO> answers) {
         var values = new LinkedHashMap<String, String>();

@@ -3,7 +3,7 @@ import { CollectionError, type CollectionField, type CollectionImage } from './s
 
 export interface ExamCollectionRuntime { title: string; description: string; content?: string; status: 'OPEN' | 'COMPLETED'; fields: CollectionField[] }
 export interface ExamCollectionSession { sessionToken: string; expiresAt: number }
-export interface ExamSubmissionCommand { idempotencyKey: string; values: Record<string, string | number[]> }
+export interface ExamSubmissionCommand { idempotencyKey: string; values: Record<string, string | string[] | number[]> }
 const client = axios.create({ baseURL: '/public-api', timeout: 15000 })
 client.interceptors.response.use(response => response, async error => {
   if (axios.isAxiosError(error)) {

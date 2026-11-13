@@ -7,13 +7,13 @@
     :query="queryParams"
     advanced-scene="order"
     advanced-search-endpoint="/zsjos/sales-order/management-search-page"
-    advanced-placeholder="订单号 / 学员姓名 / 手机号"
+    advanced-placeholder="订单号 / 学员姓名 / 手机号 / 微信号"
     advanced-page-key="sales_order_management"
   >
     <template #actions="{ reload }">
       <el-input
         v-model="queryParams.keyword"
-        placeholder="订单号 / 学员姓名 / 手机号"
+        placeholder="订单号 / 学员姓名 / 手机号 / 微信号"
         clearable
         class="!w-240px"
         @keyup.enter="reload"

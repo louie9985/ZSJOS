@@ -40,6 +40,13 @@ public class MediaLeadAnalysisController {
         return success(service.detailPage(query));
     }
 
+    @GetMapping("/drill-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-lead-analysis:detail')")
+    public CommonResult<cn.iocoder.yudao.framework.common.pojo.PageResult<MediaLeadVO.DrillDetail>> drillPage(
+            @Valid MediaLeadVO.DrillQuery query) {
+        return success(service.drillPage(query));
+    }
+
     @GetMapping("/tree")
     public CommonResult<List<MediaLeadVO.ScopeNode>> tree() {
         return success(service.tree());

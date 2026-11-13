@@ -190,7 +190,18 @@ public class StudentInfoFields {
             }
             StudentInfoFormValueDO v = new StudentInfoFormValueDO();
             v.setFieldKey(f.getKey()); v.setFieldType(f.getType()); v.setSensitive(f.getSensitive());
-            if ("area".equals(f.getType())) {
+            if ("radio".equals(f.getType()) || "checkbox".equals(f.getType())) {
+                List<?> choices;
+                if ("checkbox".equals(f.getType()) && raw instanceof List<?> list) choices = list;
+                else if ("radio".equals(f.getType()) && raw instanceof String text) choices = List.of(text);
+                else throw exception(FIELD_INVALID, f.getLabel());
+                if (f.getOptions() == null || choices.isEmpty() || new HashSet<>(choices).size() != choices.size()
+                        || !f.getOptions().containsAll(choices)) throw exception(FIELD_INVALID, f.getLabel());
+                String snapshot = choices.stream().map(Object::toString).collect(java.util.stream.Collectors.joining("、"));
+                v.setValueText(snapshot);
+                v.setValueCode(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(choices));
+                v.setValueLabelSnapshot(snapshot);
+            } else if ("area".equals(f.getType())) {
                 if (!(raw instanceof List<?> path) || path.isEmpty() || path.size()>5)
                     throw exception(FIELD_INVALID, f.getLabel());
                 List<String> codes = new ArrayList<>(), labels = new ArrayList<>();

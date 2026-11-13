@@ -117,6 +117,35 @@ class StudentAttachmentSchemaContractTest(unittest.TestCase):
                         self.assertEqual(expected, db.schema_drift(client, manifest))
 
 
+class ExamCollectionBodySchemaContractTest(unittest.TestCase):
+    def test_v367_body_is_declared_in_desired_and_fresh_schemas(self):
+        key = ('zsjos_exam_collection_task', 'content')
+        for relative in ('schema/core.sql', '00-bootstrap-schema.sql'):
+            with self.subTest(path=relative):
+                columns, _, _ = db.desired_schema(db.SQL_ROOT / relative)
+                self.assertEqual(('mediumtext', 'YES'), columns.get(key))
+
+
+class ExamProgressExportSchemaContractTest(unittest.TestCase):
+    def test_v366_progress_tables_match_authoritative_migration(self):
+        expected = db.desired_schema(db.SQL_ROOT / 'migrations/V366__class_exam_progress.sql')
+        tables = {'zsjos_class_exam_progress', 'zsjos_student_exam_progress'}
+        self.assertEqual(tables, {table for table, _ in expected[0]})
+        for relative in ('schema/core.sql', '00-bootstrap-schema.sql'):
+            with self.subTest(path=relative):
+                actual = db.desired_schema(db.SQL_ROOT / relative)
+                for expected_map, actual_map in zip(expected, actual):
+                    self.assertEqual(expected_map, {key: value for key, value in actual_map.items()
+                                                   if key[0] in tables})
+
+    def test_v368_export_settings_is_nullable_mediumtext_in_both_sources(self):
+        key = ('zsjos_exam_collection_task', 'export_settings_json')
+        for relative in ('schema/core.sql', '00-bootstrap-schema.sql'):
+            with self.subTest(path=relative):
+                columns, _, _ = db.desired_schema(db.SQL_ROOT / relative)
+                self.assertEqual(('mediumtext', 'YES'), columns.get(key))
+
+
 class SchemaDriftTest(unittest.TestCase):
     def setUp(self):
         self.manifests = {'core': db.load_manifests()['core']}

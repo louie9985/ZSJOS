@@ -49,7 +49,7 @@ class ExamCollectionPublicServiceTest {
     ExamCollectionPublicVO.Submit request() {
         var result = new ExamCollectionPublicVO.Submit(); result.setIdempotencyKey("request-one");
         // Publicly documented synthetic checksum example; no real person fixture.
-        result.setValues(Map.of("name", "测试学员", "mobile", "13800000000", "wechat", "synthetic", "id_card", "11010519491231002X"));
+        result.setValues(Map.of("name", "测试学员", "mobile", "13800000000", "wechat", "synthetic", "id_card", "11010519491231002X", "exam_attendance", "是"));
         return result;
     }
     @Test void validSubmitUsesOwningTenantAndNetworkRetryDoesNotReapply() {

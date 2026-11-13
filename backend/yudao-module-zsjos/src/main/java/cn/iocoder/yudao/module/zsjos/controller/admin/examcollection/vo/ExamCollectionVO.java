@@ -24,6 +24,8 @@ public final class ExamCollectionVO {
         @Size(max=200000) private String content;
         @NotNull @Size(max=12) private List<@NotBlank String> selectedFields;
         @Size(max=12) private Map<String, @NotNull @Valid UploadLimit> uploadLimits;
+        @Size(max=30) private List<@NotNull @Valid Field> customFields;
+        @Size(max=45) private Map<@NotBlank String, @Size(max=500) String> fieldNotes;
     }
     @Data @EqualsAndHashCode(callSuper=true) public static class Query extends PageParam {
         @Size(max=200) private String keyword;
@@ -125,5 +127,5 @@ public final class ExamCollectionVO {
     }
     public record Member(Long serviceRelationId, Long personId, String studentName, String mobile,
                          Long classId, String className, String plannerName, boolean active, Long lastSubmissionId,
-                         String archiveName, String archiveMobile, String archiveIdCard) {}
+                         String archiveName, String archiveMobile, String archiveIdCard, String absenceReason) {}
 }

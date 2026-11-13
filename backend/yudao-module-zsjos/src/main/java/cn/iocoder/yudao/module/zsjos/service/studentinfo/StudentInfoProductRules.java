@@ -36,6 +36,10 @@ public class StudentInfoProductRules {
         boolean education=path.stream().anyMatch(roots::contains);
         var copy=JsonUtils.parseArray(JsonUtils.toJsonString(definitions),Field.class);
         return copy.stream().filter(Field::getEnabled).filter(f -> education || !CONDITIONAL.contains(f.getKey()))
-                .peek(f -> { if (CONDITIONAL.contains(f.getKey())) f.setRequired(true); }).toList();
+                .peek(f -> {
+                    // Shipping addresses included in a new collection must be complete before submission.
+                    if (CONDITIONAL.contains(f.getKey()) || Set.of("textbook_shipping_address", "gift_shipping_address").contains(f.getKey()))
+                        f.setRequired(true);
+                }).toList();
     }
 }

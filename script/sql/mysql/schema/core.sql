@@ -8462,6 +8462,7 @@ CREATE TABLE IF NOT EXISTS zsjos_exam_collection_task (
   title varchar(200) NOT NULL,
   description varchar(2000) NOT NULL DEFAULT '',
   content mediumtext DEFAULT NULL,
+  export_settings_json mediumtext DEFAULT NULL,
   status varchar(24) NOT NULL,
   config_version_id bigint NOT NULL,
   fields_snapshot longtext NOT NULL,
@@ -8648,4 +8649,26 @@ CREATE TABLE IF NOT EXISTS zsjos_version_update_recipient (
   deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 1,
   PRIMARY KEY(id), UNIQUE KEY uk_version_update_recipient(tenant_id,update_id,user_id),
   KEY idx_version_update_pending(tenant_id,user_id,deleted,acknowledged_time,update_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- V366: empty examination progress tables; dictionary and version metadata remain in V366.
+CREATE TABLE IF NOT EXISTS zsjos_class_exam_progress (
+  class_id bigint NOT NULL, tenant_id bigint NOT NULL,
+  stage varchar(24) NOT NULL, version int NOT NULL DEFAULT 0,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY(tenant_id,class_id)
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS zsjos_student_exam_progress (
+  service_relation_id bigint NOT NULL, tenant_id bigint NOT NULL,
+  stage varchar(24) NOT NULL, outcome varchar(100) DEFAULT NULL,
+  outcome_label varchar(100) DEFAULT NULL,
+  creator varchar(64) DEFAULT '', updater varchar(64) DEFAULT '',
+  create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY(tenant_id,service_relation_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

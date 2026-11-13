@@ -52,8 +52,8 @@ with sync_playwright() as playwright:
     expect(page.get_by_role('dialog').get_by_text('KZ202609280001')).to_be_visible()
     assert page.evaluate('window.mediaLeadDetailQueries.at(-1).params.start') == '2026-09-28'
     assert page.evaluate('window.mediaLeadDetailQueries.at(-1).params.end') == '2026-09-28'
-    page.locator('.ant-modal-close').click()
-    expect(page.locator('.ant-modal-wrap')).not_to_be_visible()
+    page.locator('.ant-drawer-close').click()
+    expect(page.locator('.ant-drawer-content-wrapper')).not_to_be_visible()
     month_picker = page.locator('input[aria-label="客资统计月份"]')
     month_picker.fill('2026-08')
     expect(page.get_by_role('img', name='提交客资 8')).to_be_visible()
@@ -65,8 +65,8 @@ with sync_playwright() as playwright:
     page.locator('button.performance-day').filter(has=page.get_by_role('img', name='提交5，有效3，无效1，待判或其他1')).click()
     expect(page.get_by_role('dialog').get_by_text('KZ202608040001')).to_be_visible()
     assert page.evaluate('window.mediaLeadDetailQueries.at(-1).params.start') == '2026-08-04'
-    page.locator('.ant-modal-close').click()
-    expect(page.locator('.ant-modal-wrap')).not_to_be_visible()
+    page.locator('.ant-drawer-close').click()
+    expect(page.locator('.ant-drawer-content-wrapper')).not_to_be_visible()
     page.screenshot(path=str(OUT / 'dashboard-august-cohort.png'), full_page=True)
     month_picker.fill('2026-07')
     expect(page.get_by_text('所选月份暂无提交客资')).to_be_visible()
@@ -80,10 +80,10 @@ with sync_playwright() as playwright:
     assert '/' not in page.get_by_role('dialog').inner_text()
     missing_order = page.get_by_role('dialog').locator('tbody tr').filter(has_text='KZ202609280002')
     expect(missing_order.locator('td').last).to_have_text('—')
-    page.wait_for_timeout(400)  # Capture the fully opened modal, not its entrance transition.
+    page.wait_for_timeout(400)  # Capture the fully opened drawer after its entrance transition.
     page.screenshot(path=str(OUT / 'dashboard-details.png'))
-    page.locator('.ant-modal-close').click()
-    expect(page.locator('.ant-modal-wrap')).not_to_be_visible()
+    page.locator('.ant-drawer-close').click()
+    expect(page.locator('.ant-drawer-content-wrapper')).not_to_be_visible()
     page.evaluate('window.scrollTo(0, 0)')
     page.screenshot(path=str(OUT / 'dashboard-desktop.png'), full_page=True)
     page.set_viewport_size({'width': 390, 'height': 844})

@@ -161,7 +161,7 @@ export default function MySalesOrderPage({ permissions = [] }: { permissions?: s
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    {useTableLayout ? <div className="sales-order-table-area"><BusinessTable<SalesOrderListItem> filters={<><AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="my-sales-order-page-1" error={error} onReload={reload}
+    {useTableLayout ? <div className="sales-order-table-area"><BusinessTable<SalesOrderListItem> filters={<><AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></>} tableKey="my-sales-order-page-1" error={error} onReload={reload}
       className="sales-order-inbox-table"
       rowKey="id"
 
@@ -178,7 +178,7 @@ export default function MySalesOrderPage({ permissions = [] }: { permissions?: s
         <div className="inbox-avatar-toolbar lead-inbox-controls">
           <InboxAvatarControls label="订单" listId="order-avatar-list" collapsed={avatarRail.collapsed} filtered={Boolean(keyword || filterCount(advancedFilter))} onChange={avatarRail.change}/>
           <div className="inbox-avatar-filters" ref={avatarRail.filterRef} hidden={avatarRail.collapsed}>
-            <AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+            <AdvancedFilterToolbar scene="order" pageKey="sales_order_management" placeholder="搜索订单号 / 学员姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
             {sortingMenu}
           </div>
         </div>

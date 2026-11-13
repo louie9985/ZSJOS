@@ -4,20 +4,20 @@ import type { SummaryColumn, SummaryQuery, SummaryRow } from './studentSummary';
 import type { Timestamp } from './time';
 
 export interface ExamTask { id:number; title:string; description:string; content?:string; status:'OPEN'|'COMPLETED'; revision:number; createdAt?:Timestamp; completedAt?:Timestamp; completionReason?:string; expected:number; collected:number; exceptions:number; additional:number }
-export interface ExamCreateCommand {title:string;description?:string;content?:string;selectedFields:string[];uploadLimits?:Record<string,{maxSizeMb:number;maxImages:number}>;idempotencyKey:string}
+export interface ExamCreateCommand {title:string;description?:string;content?:string;selectedFields:string[];customFields?:StudentInfoField[];fieldNotes?:Record<string,string>;uploadLimits?:Record<string,{maxSizeMb:number;maxImages:number}>;idempotencyKey:string}
 export interface ExamTaskDetail extends ExamTask { fields:StudentInfoField[]; classIds:number[]; url:string }
 export interface ExamClass { id:number; name:string; groupId?:number; groupName?:string; plannerId?:number; plannerName?:string; selectable?:boolean }
 export interface ExamSubmission { id:number; serviceRelationId?:number; sequenceNo:number; revision:number; status:'ARCHIVED'|'EXCEPTION'|'INVALID'; exceptionCode?:string; submittedAt:Timestamp; values:Record<string,string> }
 export interface ExamSubmissionDetail extends ExamSubmission { fields:StudentInfoField[]; attachments:StudentInfoImage[]; pendingGroupCount:number; latestPendingSubmissionId?:number; latestPendingSubmittedAt?:Timestamp }
 export interface ExamCandidate { serviceRelationId:number; personId:number; studentName:string; mobile?:string; classId?:number; className?:string; serviceStatus:string }
-export interface ExamMember extends Omit<ExamCandidate,'serviceStatus'> { archiveName?:string; archiveMobile?:string; archiveIdCard?:string; plannerName?:string; active:boolean; lastSubmissionId?:number }
+export interface ExamMember extends Omit<ExamCandidate,'serviceStatus'> { archiveName?:string; archiveMobile?:string; archiveIdCard?:string; plannerName?:string; active:boolean; lastSubmissionId?:number; absenceReason?:string|null }
 export interface ExamArchive { serviceRelationId:number; revision:number; fields:StudentInfoField[]; values:Record<string,string>; attachments:(StudentInfoImage & {source:'registration'|'exam'|'service'})[] }
 export interface ExamCorrectionPreview {sourceStudentName?:string;targetStudentName?:string;revision:number;taskRevision:number;bindingRevision:number;latestSubmissionId:number;submissionCount:number;sourceArchive:ExamArchive;restoredArchive:ExamArchive;targetArchive:ExamArchive;restoredFields:string[];retainedFields:string[]}
 export interface ExamCorrectionCommand {revision:number;taskRevision:number;bindingRevision:number;latestSubmissionId:number;sourceArchiveRevision:number;targetArchiveRevision:number;serviceRelationId:number;reason:string}
 export interface ExamEvent { id:number; submissionId?:number; action:string; reason:string; operatorName:string; time:Timestamp }
 export interface ExamTodo { todoId:number; collectionTaskId:number; title:string; classes:string[]; expected:number; collected:number; url:string }
 export interface ExamPlannerState { pending:ExamTodo[]; unreadTodoIds:number[] }
-export interface ExamPlannerMember { archiveName?:string; archiveMobile?:string; archiveIdCard?:string; serviceRelationId:number; studentName:string; mobile?:string; className:string; filled:boolean }
+export interface ExamPlannerMember { archiveName?:string; archiveMobile?:string; archiveIdCard?:string; serviceRelationId:number; studentName:string; mobile?:string; className:string; filled:boolean; absenceReason?:string|null }
 export const EXAM_COLLECTION_PROGRESS_EVENT='zsjos:exam-collection-progress';
 export interface Page<T> { list:T[]; total:number }
 export interface Paging { pageNo:number; pageSize:number }

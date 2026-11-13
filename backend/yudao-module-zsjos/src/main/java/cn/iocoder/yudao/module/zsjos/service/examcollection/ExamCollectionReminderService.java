@@ -25,6 +25,7 @@ public class ExamCollectionReminderService {
     @Resource private BusinessTaskMapper businessTasks;
     @Resource private ExamCollectionTaskMapper tasks;
     @Resource private ExamCollectionMemberMapper members;
+    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.examcollection.ExamCollectionSubmissionMapper submissions;
     @Resource private ExamCollectionEventMapper events;
     @Resource private ExamCollectionTaskService taskService;
     @Resource private ExamCollectionPlannerPermissionProvider plannerPermissions;
@@ -63,6 +64,8 @@ public class ExamCollectionReminderService {
         // Use the same formal archive precedence as the collection management roster.
         var archiveRows = summary.projectForExamPlanner(taskId, new ArrayList<>(serviceMap.values())).stream()
                 .collect(Collectors.toMap(r -> r.serviceRelationId(), r -> r.values()));
+        var lastIds = page.getList().stream().map(ExamCollectionMemberDO::getLastSubmissionId).filter(Objects::nonNull).toList();
+        var absences = lastIds.isEmpty() ? Map.<Long, String>of() : ExamCollectionFields.absenceReasons(submissions.selectByIds(lastIds));
         var projected = page.getList().stream().map(m->
                 new ExamCollectionPlannerVO.Member(m.getServiceRelationId(),
                     serviceMap.containsKey(m.getServiceRelationId())?serviceMap.get(m.getServiceRelationId()).getStudentNameSnapshot():"已删除学员服务",
@@ -70,7 +73,8 @@ public class ExamCollectionReminderService {
                     m.getClassNameSnapshot(),m.getLastSubmissionId()!=null,
                     archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.name"),
                     archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.mobile"),
-                    archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.id_card"))).toList();
+                    archiveRows.getOrDefault(m.getServiceRelationId(), Map.of()).get("info.id_card"),
+                    m.getLastSubmissionId()==null?null:absences.get(m.getLastSubmissionId()))).toList();
         if (!sorted) return new PageResult<>(projected, page.getTotal());
         java.util.function.Function<ExamCollectionPlannerVO.Member, String> value = switch (query.getSortField()) {
             case "studentName" -> ExamCollectionPlannerVO.Member::studentName;

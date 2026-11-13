@@ -138,7 +138,8 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (isNotBlank(reqVO.getKeyword())) {
             String keyword = reqVO.getKeyword().trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, keyword)
-                    .or().like(SalesOrderDO::getStudentName, keyword).or().like(SalesOrderDO::getStudentMobile, keyword));
+                    .or().like(SalesOrderDO::getStudentName, keyword).or().like(SalesOrderDO::getStudentMobile, keyword)
+                    .or().like(SalesOrderDO::getStudentWechatId, keyword));
         }
         if (matchedOrderIds != null) {
             if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
@@ -158,7 +159,8 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (isNotBlank(keyword)) {
             String value = keyword.trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
-                    .or().like(SalesOrderDO::getStudentName, value).or().like(SalesOrderDO::getStudentMobile, value));
+                    .or().like(SalesOrderDO::getStudentName, value).or().like(SalesOrderDO::getStudentMobile, value)
+                    .or().like(SalesOrderDO::getStudentWechatId, value));
         }
         if (matchedOrderIds != null) {
             if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);

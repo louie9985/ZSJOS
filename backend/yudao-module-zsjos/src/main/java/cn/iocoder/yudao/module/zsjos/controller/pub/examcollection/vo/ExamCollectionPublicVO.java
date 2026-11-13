@@ -18,6 +18,6 @@ public final class ExamCollectionPublicVO {
     }
     @Data public static class Submit {
         @NotBlank @Size(max=64) private String idempotencyKey;
-        @NotNull @Size(max=16) private Map<String, Object> values;
+        @NotNull @Size(max=45) private Map<String, Object> values;
     }
 }
