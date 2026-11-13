@@ -2837,3 +2837,21 @@
 - Verification: MySQL8.4.11 same-writer temporary-table initial659/replay0; failures at1/329/659 fully rolled back; partial17/recovery642; conflict refused before writes; restore/reapply passed. Actual659 committed, independent verify passed, live repeat0. Protected rows/source fields unchanged, full after-images and Chinese HEX passed. Current deployed2026.11.06-003517-e23674d6 Java parser/projection validated all659 planned and stored snapshots against source times. Python AST/UTF-8/docs links/git diff checks passed.
 - Evidence: private /opt/zsjos-runtime/backups/order-lead-time-20261106/ prepared/applied/verified/repeated/java-check; planSHA2562a810e8084ce7d421e155c32689e22e83d41285bbd375b35a599c317e4c2d26d; protectedSHA256113e32fbab81eb593c1114da3c857423b60b06f694a184ea2af5a638a1e4635c.
 - Limits: authenticated HTTP/browser acceptance not run; persisted data and actual deployed parser/projection verified. No UI/protocol changes; Workbench timestamp consumer and Admin existing contact consumers inspected. Missing entire profiles are outside scope. Requested backfill completed; ownership released.
+
+## Registration — test-collection-case1244-20261113
+
+- Environment: test, resolved from /etc/zsjos/agent-environment; branch main; worktree /opt/zsjos; base be2e60615293ba33acfd8538a7786597e75b39ef; owner /root; integration None.
+- Authorization: user confirmed the reviewed single-row repair for order OD202611021716320007, registration case 1244, item 9664, tenant 1. Insert one empty collection task only; no service restart.
+- Goal: restore the existing order-item collection lookup without changing order, fulfillment progress, historical forms, permissions or schema. Other missing cases and runtime compatibility fixes are outside this authorization.
+- Ownership: script/sql/mysql/repairs/backfill_collection_case1244_20261113.py; docs/operations/collection-case1244-20261113.md; this record. Private evidence under /opt/zsjos-runtime/backups/collection-case1244-20261113/.
+- Dependencies: existing secure connection/evidence helpers, MySQL 8, current task schema and deployed lookup contract. No new dependency or migration.
+- Verification: freeze scoped preimages; rehearse exact insert on a connection-local MySQL temporary table for initial/replay/rollback/conflict/recovery; recheck locked target and protected rows in one transaction; independent committed readback and zero-write replay; UTF-8/source/docs/diff checks. Authenticated UI verification requires the user's existing browser session and is not claimed by database checks.
+
+## Delivery — test-collection-case1244-20261113
+
+- Context: registration above; test/main /opt/zsjos, base unchanged; owner /root; integration None. User explicitly confirmed this single-row data repair.
+- Actual result: one empty zsjos_student_info_task inserted at 2026-11-13 15:24:30 +08:00, task 361 for order OD202611021716320007/item9664/case1244/tenant1. form_id NULL, version0, no source/operator/command facts. Independent committed verification PASS; exact-plan replay inserted0.
+- Protection: complete scoped order/item/case/checklist/approval/customer/historical-form/other-customer-task images unchanged. Task unique key, target state and bindings verified under order-first locks; UTF-8 name HEX passed. Product resolved through existing product_ref fallback and published template exists. Other missing case untouched.
+- Evidence: /opt/zsjos-runtime/backups/collection-case1244-20261113/{prepared,applied,verified,repeated}, permissions0700/0600; frozen before/after images, rehearsal result and fsynced commit/readback receipts. MySQL temporary-table same writer initial/rollback/recovery/replay/conflict checks PASS; Python AST/UTF-8/doc link/diff checks PASS.
+- Source files: dedicated scoped executor and operation record above, plus this handoff. No runtime, migration, schema, ledger, permission, dependency, branch, commit or service change. MainPID2597740 and 2026-11-06 00:41:57 CST startup timestamp unchanged.
+- Limits: authenticated API/browser and downstream form generation/sending unverified; no session impersonation or business-flow mutation. Repair addresses the authorized missing row; broad compatibility fixes and other missing historical tasks remain outside scope. Ownership released.
