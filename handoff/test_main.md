@@ -2876,3 +2876,74 @@
 - Verification: no unmerged index entries; programmatic tree/blob checks prove index equals origin/main plus the exact three local file changes, and only this handoff append was additionally modified. Scoped handoff diff check passed. Full incoming diff check reports only existing remote EOF blank lines in handoff/local-self-sourced-follow-up-shortcuts-20261111.md:22 and script/sql/mysql/tools/test_backup_retention.py:120; both files are byte-identical to origin/main and left intact.
 - Integration: local merge commit authorized; no push, service/database operation or deployment. Both-parent ancestry and final clean worktree are checked after commit.
 - Limits/remaining: no application build, runtime, browser or SQL execution; this verifies Git integration, not acceptance of the incoming features. Remote publication remains outside this local merge/commit scope. Ownership released upon successful commit.
+
+
+## Registration — test-student-team-transfer-20261116 — 2026-11-16T11:33:29.003240+08:00
+
+- Environment test from /etc/zsjos/agent-environment; owner /root; branch main; worktree /opt/zsjos; base b5e77830694ad787331b44ec0e460f319ab9d8f9; target branch/integration None. Starting tree clean.
+- Goal: current user confirmed source identity and transfer of all current students under director42 or operator45 to operator40 and director31. The union is64 active/accepted media services for64 Persons;43 overlap. Prior38 Partner reassignments were separately completed and are protected.
+- Ownership: script/sql/mysql/repairs/transfer_students_20261116.py; docs/operations/student-team-transfer-20261116.md; this record. Private source manifest/evidence under /opt/zsjos-runtime/backups/student-team-transfer-20261116/.
+- Scope: fixed reviewed service/Person/group manifest; current media service/account/group/plan/waiting-stage/card responsibilities and recognized pending director tasks, version metadata and SYSTEM events. Preserve historical authors/submissions/content, teaching services, permissions, personnel relations, login accounts, Partner ownership, other tenants, BPM state and notifications.
+- Dependencies: existing secure MySQL connection/evidence and scoped handover writer/rehearsal helpers. No dependency/schema/migration/runtime/Git operation. One service has a group ID different from its own ID; resolve explicit collaboration_group_id, never assume equality.
+- Verification: exact locked preimages and scope/grants/relation revalidation; real MySQL temporary-table initial/repeat/failure rollback/partial recovery/stale rejection/compensation; live transaction and independent full postimage/history comparison; committed zero-write replay, Chinese UTF-8 HEX, evidence permissions, Python AST and scoped diff/docs links. Authenticated HTTP/browser not claimed.
+
+
+## Delivery — test-student-team-transfer-20261116 — 2026-11-16T11:39:11.987735+08:00
+
+- Context: registration above; test/main /opt/zsjos; HEAD unchanged b5e77830694ad787331b44ec0e460f319ab9d8f9; owner /root; integration None. Current user clarified source42 identity and explicitly confirmed target40 plus director31.
+- Result: all64 distinct source students/services committed to operator40/director31; source42/45 service population now0. Changes: service64/account123/group64/plan123/waiting-stage123/current-card62/pending-diagnosis-task866 =1,425 rows plus1,425 SYSTEM events. No duplicate processing of the43 overlapping source students.
+- Files: new script/sql/mysql/repairs/transfer_students_20261116.py and docs/operations/student-team-transfer-20261116.md; this handoff. Existing engine reused without edits. No dependencies, DDL, ledger, permission, personnel-relation, BPM, notification, service, deploy, branch, commit or production operation.
+- Protection:241 content batches, completed interviews, positioning submissions, content/versions, teaching services/tasks and all captured non-whitelist fields unchanged. Full tenant Partner ownership/log snapshots unchanged, preserving the separately completed38 Partner transfers. Service1016 explicitly resolves group1008; source_service_relation_id and no outside sharing verified.
+- Verification: MySQL temporary-table initial1,425/repeat0/failure rollback/partial3 recovery1,422/stale rejection/compensation passed. Locked live preimages and exact scope/grants/relation checks passed; committed independent complete row/history/receipt comparison and replay0 passed. Chinese name/audit UTF-8 HEX and0700/0600 evidence permissions passed. Python AST/reference paths and scoped git diff check passed.
+- Evidence: /opt/zsjos-runtime/backups/student-team-transfer-20261116/source.json, verified/, applied/; manifest SHA256f0e57c66271e7c0e8d414864b349661de3ff49a27f642d7c7350959d10742206. No sensitive payloads in repository/output.
+- Limits: authenticated HTTP/browser/business submissions unverified; existing historical batch participants/operation restrictions remain. No application protocol or UI changes. User-requested ownership transfer complete; ownership released.
+
+
+## Registration — test-retire-diagnosis-tasks-20261116 — 2026-11-16T11:48:47.757864+08:00
+
+- Environment: test from /etc/zsjos/agent-environment; owner /root; branch main; worktree /opt/zsjos; base b5e77830694ad787331b44ec0e460f319ab9d8f9; target branch/integration None.
+- Goal/authorization: user explicitly confirmed cancellation of all986 current pending account diagnosis tasks in tenant1 and stopping automatic generation, preserving1167 completed tasks and all historical diagnosis content. Current scope covers188 accounts;333 existing cancelled tasks also remain unchanged.
+- Non-goals: physical deletion, other tasks/tenants, historical entries/metrics/members/notifications, permissions, schemas/ledgers, frontend/API removal, dependencies, Git operations. Existing unrelated uncommitted student transfer files and handoff entries preserved.
+- Ownership: MediaAccountDiagnosisScheduler.java and MediaAccountDiagnosisSchedulingTest.java in account service/test; script/sql/mysql/repairs/retire_diagnosis_tasks_20261116.py; docs/operations/retire-diagnosis-tasks-20261116.md; directly affected docs/api/weekly-account-diagnosis.md and docs/deployment/account-diagnosis-followup.md; this record. Private evidence/candidate artifact under /opt/zsjos-runtime/backups/retire-diagnosis-tasks-20261116/.
+- Dependencies: existing PyMySQL secure connection/evidence helpers and MySQL8.4; Spring disabled-cron support. Current backend PID2597740 predates this change. Prepare and verify a candidate containing only the scheduler class change against deployed dependencies; do not publish or restart until separate explicit approval names the backend service and interruption.
+- Verification: real MySQL temporary-table initial/replay/failure rollback/partial recovery/stale rejection/compensation; fixed986-row preimages, locked transactional cancellation plus SYSTEM events, independent full postimage/protected-history comparison and UTF-8 HEX; focused scheduler/reminder/task-query tests plus deployed-dependency compilation and candidate byte-content comparison. Check task read predicates in Workbench and Admin; no UI/protocol change. Live schedule disable/startup verification remains dependent on separately authorized restart.
+
+
+## Registration update — test-retire-diagnosis-tasks-20261116 — 2026-11-16T11:53:27.599222+08:00
+
+- User narrowed scope explicitly: do not restart backend; only clear existing tasks first. Cancel the same reviewed986 pending tasks; preserve completed/history and running generator. Future periods can still generate tasks. No deployment, publication, service/configuration operation or permanent generation-disable change is authorized in this scope.
+- Ownership now limited to script/sql/mysql/repairs/retire_diagnosis_tasks_20261116.py, docs/operations/retire-diagnosis-tasks-20261116.md and this record. Reverted this workstream's scheduler edit and removed its newly added scheduling test; original runtime source restored exactly. No API/deployment-document change required because generation behavior stays unchanged.
+- Preparation evidence retained privately: MySQL rehearsal passed initial986/replay0/rollback1,493,986/partial3 recovery983/stale conflicts/compensation986. Unused candidate and isolated30-test evidence are explicitly not delivered or deployed. Database apply/independent verification remain to perform.
+
+
+## Delivery — test-retire-diagnosis-tasks-20261116 — 2026-11-16T11:56:06.075306+08:00
+
+- Context: registration and narrowed-scope update above; test/main /opt/zsjos, base b5e77830694ad787331b44ec0e460f319ab9d8f9; owner /root; integration None. Latest user instruction is only clear existing tasks and do not restart backend.
+- Actual result: committed986 pending diagnosis-task cancellations for188 accounts at2026-11-16 11:54:46–11:54:49 +08:00;986 NULL-human-operator SYSTEM state events in the same transaction. Final tenant1 diagnosis counts pending0/completed1167/cancelled1319 (333 original plus986). No physical deletion.
+- Protection: full task-table comparison preserved all non-target tasks/tenants and non-whitelist fields. Completed tasks, prior cancellations, all account profile history, diagnosis metrics/members and existing notification stages unchanged. No permissions, schema, ledger, dependencies, service/configuration, frontend/API, Git branch/commit or publication operation.
+- Source: added script/sql/mysql/repairs/retire_diagnosis_tasks_20261116.py and docs/operations/retire-diagnosis-tasks-20261116.md; appended this record. Unrelated existing student-transfer work preserved. Scheduler source restored exactly and newly added scheduling test removed after scope narrowing; no runtime source changes remain.
+- Verification: MySQL8.4.11 same-writer temporary-table initial986/replay0/failure rollback at1,493,986/partial3 recovery983/stale preimage and later-edit rejection/compensation986 passed. Two independent committed full-postimage/protected-history comparisons, actual-plan replay0, all target/audit UTF-8 HEX and private0700/0600 evidence checks passed. Python AST/UTF-8/local doc links/whitespace/scoped diff checks passed.
+- Runtime unchanged: MainPID2597740, active since2026-11-06 00:41:57 CST; deployed JAR SHA unchanged. Unused scheduler-only candidate and30 isolated tests retained privately as withdrawn preparation, explicitly not deployed. Generator remains active; old idempotency keys prevent identical-cycle recreation, future periods may produce new tasks.
+- Evidence: private /opt/zsjos-runtime/backups/retire-diagnosis-tasks-20261116/{prepared,applied,verified}; original plan and complete before/after images, transaction receipt, repeated independent result and rehearsal evidence. No credentials or personal data logged.
+- Limits: authenticated HTTP/browser not executed; Workbench diagnosis and Vue Admin today-task server pending predicates inspected. No frontend/protocol behavior change. Latest authorized data-only goal complete; ownership released.
+
+
+## Registration — test-merge-push-main-20261119 — 2026-11-19T22:55:49+08:00
+
+- Environment: test from /etc/zsjos/agent-environment; owner /root; branch main; worktree /opt/zsjos; base ae7dd1785bf05f94a3bb435565668ee4d23efd70.
+- Goal/authorization: user explicitly approved merging origin/main (21631a8a98a62c41a3c71596a6739e03a535c3b6) and pushing main to origin, preserving both histories.
+- Non-goals: independent application changes, dependency additions, SQL execution, database/service operations, deployment, history rewriting or force push.
+- Ownership: mechanical incoming changes in the 64 remote-only changed files; this test handoff append. Preserve all 13 local-only changed files, except the required append to this record. No overlapping files between the two commits; starting worktree clean.
+- Dependencies: fetched origin/main; one local-only and one remote-only commit, common base b5e77830694ad787331b44ec0e460f319ab9d8f9.
+- Target branch/integration order: main; automatic merge without committing, validate exact merged blobs and handoff, create merge commit, normal push to origin/main, verify remote tip and clean worktree.
+- Verification plan: no unmerged index entries; merged index equals origin/main plus exact local-only changes except handoff append; both tips remain ancestors; read-only remote-tip comparison after push. Application builds/browser/SQL acceptance are outside this Git integration task.
+
+
+## Delivery — test-merge-push-main-20261119 — 2026-11-19T22:56:21+08:00
+
+- Context: registration above; test/main /opt/zsjos; owner /root; precommit HEAD ae7dd1785bf05f94a3bb435565668ee4d23efd70; merge parent 21631a8a98a62c41a3c71596a6739e03a535c3b6. Final merge commit is the commit containing this entry.
+- Goal/result: user-approved automatic merge of the one remote-only and one local-only commit succeeded without conflicts. Exact index/tree comparison proves all incoming and local-only tracked content preserved; only this required handoff append is additionally authored.
+- Changed files: 64 incoming remote files retained exactly; 13 local-only files retained, with this record receiving append-only registration/delivery. No independent runtime behavior change.
+- Verification: zero unmerged index entries; full repository index equals remote tree plus exact local-only changes. Working-tree difference is only this append; existing handoff content is an exact prefix. Scoped handoff whitespace validation precedes commit. Both-parent ancestry, clean final worktree and remote main equality are checked after commit/push.
+- Integration: target main; create the authorized merge commit and perform normal push to origin/main immediately after these checks. Publication outcome is verified through Git tool results after this entry is committed; no force push or history rewrite.
+- Limits: application build, API/browser acceptance and SQL execution not performed; this verifies Git integration only. No deployment, database/service change or dependency addition. Ownership released on successful commit/push and final verification; any failure is reported to the user.
