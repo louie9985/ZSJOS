@@ -8,15 +8,15 @@ import CollectionImages from '../studentInfo/CollectionImages.vue'
 import { CollectionError, type CollectionImage } from '@/api/studentInfo'
 import { examCollectionApi, type ExamCollectionRuntime, type ExamCollectionSession, type ExamSubmissionCommand } from '@/api/examCollection'
 import { createIdempotencyKey } from '@/utils/idempotency'
-import { effectiveExamFields, validateExamCollection } from '@/utils/examCollectionValidation'
+import { visibleExamFields, validateExamCollection } from '@/utils/examCollectionValidation'
 
 const route = useRoute()
 const token = computed(() => new URLSearchParams(route.hash.slice(1)).get('token') || '')
 const runtime = ref<ExamCollectionRuntime>()
 const session = ref<ExamCollectionSession>()
-const answers = ref<Record<string, string>>({})
+const answers = ref<Record<string, string | string[]>>({})
 const images = ref<CollectionImage[]>([])
-const fieldErrors = ref<Record<string, string>>({})
+const fieldErrors = ref<Record<string, string | string[]>>({})
 const uploadBusy = ref<Record<string, boolean>>({}), uploadFailed = ref<Record<string, boolean>>({})
 const loading = ref(false), saving = ref(false), success = ref(false), expired = ref(false)
 const loadError = ref(''), submitError = ref(''), sessionGeneration = ref(0)
@@ -24,10 +24,10 @@ const command = shallowRef<ExamSubmissionCommand>()
 let generation = 0
 const hasUploads = computed(() => Object.values(uploadBusy.value).some(Boolean))
 const hasUploadErrors = computed(() => Object.values(uploadFailed.value).some(Boolean))
-const dirty = computed(() => !success.value && (Object.values(answers.value).some(v => v.trim()) || images.value.length > 0 || hasUploads.value || hasUploadErrors.value))
+const dirty = computed(() => !success.value && (Object.values(answers.value).some(v => Array.isArray(v) ? v.length > 0 : v.trim()) || images.value.length > 0 || hasUploads.value || hasUploadErrors.value))
 const locked = computed(() => saving.value || Boolean(command.value) || expired.value)
 const groups = computed(() => {
-  const fields = effectiveExamFields(runtime.value?.fields || [])
+  const fields = visibleExamFields(runtime.value?.fields || [], answers.value)
   return [
     { key: 'basic', title: '基本信息', fields: fields.filter(f => f.type !== 'images') },
     { key: 'materials', title: '本次收集材料', fields: fields.filter(f => f.type === 'images') },
@@ -69,7 +69,7 @@ async function initialize(preserve = false, forceSession = false) {
     if (run !== generation) return
     runtime.value = result
     if (result.status !== 'OPEN') return
-    if (!result.fields.length || result.fields.some(f => !['text', 'textarea', 'images'].includes(f.type))) throw new Error('收集表配置暂不可用，请联系考务老师')
+    if (!result.fields.length || result.fields.some(f => !['text', 'textarea', 'images', 'radio', 'checkbox'].includes(f.type))) throw new Error('收集表配置暂不可用，请联系考务老师')
     if (!session.value || forceSession) {
       const created = await examCollectionApi.start(taskToken)
       if (run !== generation) return
@@ -87,6 +87,16 @@ function updateImages(field: string, selected: CollectionImage[]) {
   images.value = [...images.value.filter(i => i.fieldKey !== field), ...selected]
   inputChanged(field)
 }
+function toggleChoice(key: string, option: string, checked: boolean) {
+  const current = answers.value[key]
+  const choices = Array.isArray(current) ? current : []
+  answers.value[key] = checked ? [...choices, option] : choices.filter(value => value !== option)
+  inputChanged(key)
+}
+const openChoice = ref('')
+const choiceText = (key: string) => { const value = answers.value[key]; return Array.isArray(value) ? value.join('、') : value || '' }
+function closeChoice(event: PointerEvent) { if (!(event.target as Element | null)?.closest?.('.exam-public__select')) openChoice.value = '' }
+document.addEventListener('pointerdown', closeChoice)
 function inputChanged(field: string) {
   delete fieldErrors.value[field]
   if (!command.value && !expired.value) submitError.value = ''
@@ -144,7 +154,7 @@ onBeforeRouteLeave(confirmLeave)
 onBeforeRouteUpdate((to, from) => to.hash === from.hash && to.path === from.path ? true : confirmLeave())
 function beforeUnload(event: BeforeUnloadEvent) { if (dirty.value || saving.value) { event.preventDefault(); event.returnValue = '' } }
 window.addEventListener('beforeunload', beforeUnload)
-onBeforeUnmount(() => { generation++; window.removeEventListener('beforeunload', beforeUnload) })
+onBeforeUnmount(() => { generation++; window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('pointerdown', closeChoice) })
 </script>
 
 <template>
@@ -164,6 +174,18 @@ onBeforeUnmount(() => { generation++; window.removeEventListener('beforeunload',
             <label :for="`exam-input-${field.key}`"><span v-if="field.required" class="exam-public__required norem" aria-hidden="true">*</span>{{ field.label }}<span v-if="field.type === 'images'" class="exam-public__hint norem" aria-live="polite">（{{ images.filter(image => image.fieldKey === field.key).length }}/{{ field.key === 'identity_images' ? 2 : field.maxImages || 9 }}）</span></label>
             <CollectionImages v-if="field.type === 'images'" :key="`${sessionGeneration}:${field.key}`" :token="token" :client="imageClient" :field="field" :images="images.filter(i => i.fieldKey === field.key)" :disabled="locked"
               @change="updateImages(field.key, $event)" @busy="uploadBusy[field.key] = $event" @failed="uploadFailed[field.key] = $event"/>
+            <div v-else-if="field.type === 'radio' || field.type === 'checkbox'" class="exam-public__select norem" @keydown.esc="openChoice = ''">
+              <button :id="`exam-input-${field.key}`" type="button" class="exam-public__select-trigger norem" :class="{ 'is-open': openChoice === field.key }" :disabled="locked"
+                :aria-expanded="openChoice === field.key" :aria-controls="`exam-options-${field.key}`" :aria-invalid="Boolean(fieldErrors[field.key])" :aria-describedby="fieldErrors[field.key] ? `exam-error-${field.key}` : undefined"
+                @click="openChoice = openChoice === field.key ? '' : field.key"><span :class="{ 'is-placeholder': !choiceText(field.key) }">{{ choiceText(field.key) || '请选择' }}</span></button>
+              <fieldset v-show="openChoice === field.key" :id="`exam-options-${field.key}`" class="exam-public__select-panel norem" :aria-label="field.label" :disabled="locked">
+                <label v-for="option in field.options || []" :key="option" class="exam-public__choice norem">
+                  <input v-if="field.type === 'radio'" v-model="answers[field.key]" type="radio" :name="field.key" :value="option" @change="inputChanged(field.key); openChoice = ''">
+                  <input v-else type="checkbox" :checked="Array.isArray(answers[field.key]) && answers[field.key].includes(option)" @change="toggleChoice(field.key, option, ($event.target as HTMLInputElement).checked)">
+                  {{ option }}
+                </label>
+              </fieldset>
+            </div>
             <textarea v-else-if="field.type === 'textarea'" :id="`exam-input-${field.key}`" v-model="answers[field.key]" rows="3" maxlength="2000" :required="field.required" :disabled="locked" :aria-invalid="Boolean(fieldErrors[field.key])" :aria-describedby="fieldErrors[field.key] ? `exam-error-${field.key}` : undefined" @input="inputChanged(field.key)"/>
             <input v-else :id="`exam-input-${field.key}`" v-model="answers[field.key]" :type="field.key === 'mobile' ? 'tel' : 'text'" :maxlength="field.key === 'mobile' ? 11 : field.key === 'id_card' ? 18 : 200"
               :required="field.required" :disabled="locked" autocomplete="off" :aria-invalid="Boolean(fieldErrors[field.key])" :aria-describedby="fieldErrors[field.key] ? `exam-error-${field.key}` : undefined" @input="inputChanged(field.key)"/>

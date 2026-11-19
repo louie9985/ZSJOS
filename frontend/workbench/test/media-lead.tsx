@@ -41,7 +41,7 @@ let mistakenCenterVersion = 0
 http.defaults.adapter = async config => {
   const path = config.url ?? ''
   if (path.endsWith('/overview')) queries.push({ path, params: config.params })
-  if (path.endsWith('/detail-page')) detailQueries.push({ path, params: config.params })
+  if (path.endsWith('/drill-page')) detailQueries.push({ path, params: config.params })
   let data: unknown = []
   if (config.method?.toLowerCase() === 'put') {
     const payload = JSON.parse(String(config.data))
@@ -51,10 +51,10 @@ http.defaults.adapter = async config => {
     data = true
   }
   else if (path.endsWith('/tree')) data = scopes
-  else if (path.endsWith('/detail-page')) data = (config.params as { start?: string } | undefined)?.start === '2026-08-04' ? [
-    { leadNo: 'KZ202608040001', submittedAt: Date.parse('2026-08-04T10:20:00+08:00'), contributorName: '测试运营', status: 'valid', statusLabel: '有效', channelLabel: '视频号', categoryLabel: '考研', converted: true, orderEffectiveAt: Date.parse('2026-08-05T12:00:00+08:00') }
+  else if (path.endsWith('/drill-page')) data = (config.params as { start?: string } | undefined)?.start === '2026-08-04' ? [
+    { leadNo: 'KZ202608040001', submittedAt: Date.parse('2026-08-04T10:20:00+08:00'), contributorName: '测试运营', status: 'valid', statusLabel: '有效', channelLabel: '视频号', categoryLabel: '考研', converted: true, orderId: 11, orderNo: 'DD-TEST-11', orderAmount: 1600, orderEffectiveAt: Date.parse('2026-08-05T12:00:00+08:00') }
   ] : [
-    { leadNo: 'KZ202609280001', submittedAt: Date.parse('2026-09-28T10:20:00+08:00'), contributorName: '测试运营', status: 'valid', statusLabel: '有效', channelLabel: '视频号', categoryLabel: '考研', converted: true, orderEffectiveAt: Date.parse('2026-09-28T12:00:00+08:00') },
+    { submittedName: '测试客资', providerName: '提交兼职', leadNo: 'KZ202609280001', submittedAt: Date.parse('2026-09-28T10:20:00+08:00'), contributorName: '测试运营', status: 'valid', statusLabel: '有效', channelLabel: '视频号', categoryLabel: '考研', converted: true, orderId: 11, orderNo: 'DD-TEST-11', orderAmount: 1600, orderEffectiveAt: Date.parse('2026-09-28T12:00:00+08:00') },
     { leadNo: 'KZ202609280002', submittedAt: Date.parse('2026-09-28T11:00:00+08:00'), contributorName: '测试运营', status: 'invalid', statusLabel: '无效', channelLabel: '视频号', categoryLabel: '考研', converted: false }
   ]
   else if (path.endsWith('/overview')) {
@@ -82,7 +82,7 @@ http.defaults.adapter = async config => {
     { deptId: 10, centerId: 20, kind: 'DEPT', name: '新媒体一部', centerName: '新媒体中心' }
   ]
   else if (path.endsWith('/departments')) data = [{ id: 20, name: '新媒体中心', parentId: 0 }, { id: 10, name: '新媒体一部', parentId: 20 }]
-  if (path.endsWith('/detail-page')) {
+  if (path.endsWith('/drill-page')) {
     if (paging.delay) await new Promise(resolve => setTimeout(resolve, paging.delay))
     if (paging.fail) throw new Error('明细加载失败')
     const seed = data as Record<string, unknown>[]
@@ -92,5 +92,5 @@ http.defaults.adapter = async config => {
   }
   return { data: { code: 0, data }, status: 200, statusText: 'OK', headers: {}, config }
 }
-const permissions = ['zsjos:media-lead-analysis:query', 'zsjos:media-lead-analysis:department', 'zsjos:media-lead-analysis:center', 'zsjos:media-lead-analysis:detail', 'zsjos:media-lead-target:query', 'zsjos:media-lead-target:update', 'zsjos:media-lead-target:configure']
+const permissions = ['zsjos:media-lead-analysis:query', 'zsjos:media-lead-analysis:department', 'zsjos:media-lead-analysis:center', 'zsjos:media-lead-analysis:detail', 'zsjos:media-lead-target:query', 'zsjos:media-lead-target:update', 'zsjos:media-lead-target:configure'].filter(value => !location.search.includes('noDetail') || value !== 'zsjos:media-lead-analysis:detail')
 createRoot(document.getElementById('root')!).render(<BrowserRouter><ThemeProvider><App>{location.search.includes('target') ? <MediaLeadTargetPage permissions={permissions} /> : <MediaLeadAnalysisPage permissions={permissions} />}</App></ThemeProvider></BrowserRouter>)

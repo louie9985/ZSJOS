@@ -69,6 +69,35 @@ public class MediaLeadAnalysisService {
                 groups(leads, monthStart.minusMonths(1), monthStart, MediaLeadFact::getCategoryLabel));
     }
 
+    @Transactional(readOnly = true)
+    public cn.iocoder.yudao.framework.common.pojo.PageResult<MediaLeadVO.DrillDetail> drillPage(MediaLeadVO.DrillQuery request) {
+        var query = request.scopeQuery();
+        access.authorize(query, false);
+        if (!access.has(MediaLeadAccess.DETAIL)) throw MediaLeadAccess.denied();
+        if (request.getPageNo() < 1 || request.getPageSize() < 1 || request.getPageSize() > 100
+                || query.start().isAfter(query.end())
+                || !request.isCumulative() && java.time.temporal.ChronoUnit.DAYS.between(query.start(), query.end()) > 366
+                || request.isCumulative() && "memberConverted".equals(request.getMetric())
+                || (request.getDimension() == null) != (request.getGroupLabel() == null)) {
+            throw PerformanceAccess.invalid("下钻日期、分页或筛选条件无效");
+        }
+        var now = LocalDateTime.now(ZONE);
+        var tenant = TenantContextHolder.getRequiredTenantId();
+        var type = normalizedType(query);
+        var id = normalizedId(query);
+        var departments = scopedCenterDepartments(type, id);
+        var start = query.start().atStartOfDay();
+        var end = query.end().plusDays(1).atStartOfDay();
+        long total = queries.countDrill(tenant, type, id, departments, start, end, now, request);
+        long offset = (long) (request.getPageNo() - 1) * request.getPageSize();
+        var rows = offset >= total ? List.<MediaLeadVO.DrillDetail>of()
+                : queries.pageDrill(tenant, type, id, departments, start, end, now, request, offset, request.getPageSize())
+                .stream().map(row -> new MediaLeadVO.DrillDetail(row.getLeadNo(), row.getSubmittedName(), row.getProviderName(), row.getSubmittedAt(),
+                        row.getContributorName(), row.getStatus(), row.getChannelLabel(), row.getCategoryLabel(),
+                        row.getOrderId(), row.getOrderNo(), row.getOrderAmount(), row.getOrderEffectiveAt())).toList();
+        return new cn.iocoder.yudao.framework.common.pojo.PageResult<>(rows, total);
+    }
+
     public List<MediaLeadVO.Detail> details(MediaLeadVO.Query query) {
         access.authorize(query, false);
         LocalDateTime now = LocalDateTime.now(ZONE);

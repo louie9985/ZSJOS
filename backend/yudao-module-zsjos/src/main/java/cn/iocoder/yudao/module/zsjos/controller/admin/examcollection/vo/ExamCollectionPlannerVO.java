@@ -16,5 +16,5 @@ public final class ExamCollectionPlannerVO {
         @jakarta.validation.constraints.Pattern(regexp="asc|desc")
         private String sortOrder;
     }
-    public record Member(Long serviceRelationId, String studentName, String mobile, String className, boolean filled, String archiveName, String archiveMobile, String archiveIdCard) {}
+    public record Member(Long serviceRelationId, String studentName, String mobile, String className, boolean filled, String archiveName, String archiveMobile, String archiveIdCard, String absenceReason) {}
 }

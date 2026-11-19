@@ -166,6 +166,24 @@ class StudentServiceArchiveStoreTest {
         assertTrue(captor.getValue().getAnswersJson().contains("75"));
     }
 
+    @Test void declinedAttendanceRefreshesIdentityOnlyAndKeepsAttendanceOutOfTheArchive() {
+        var current = revision(1, "staff_edit", "[\"name\"]", List.of(answer("name", "old"), answer("certificate_shipping_address", "preserved")));
+        current.setAttachmentsJson(JsonUtils.toJsonString(List.of(new StudentServiceArchiveStore.Attachment("registration", 7L, "portrait", "", "photo.png", "image/png", 10L))));
+        when(revisions.latest(10L)).thenReturn(current);
+        var photo = field("portrait"); photo.setType("images"); photo.setMaxImages(9);
+        var task = task(); task.setFieldsSnapshot(JsonUtils.toJsonString(List.of(field("name"), field("exam_attendance"),
+                field("absence_reason"), field("certificate_shipping_address"), photo)));
+        var input = submission(); input.setAnswersJson(JsonUtils.toJsonString(List.of(answer("name", "new"),
+                answer("exam_attendance", "否"), answer("absence_reason", "工作冲突"))));
+        store.apply(task, input, 10L, null, "");
+        var captor = ArgumentCaptor.forClass(StudentServiceArchiveRevisionDO.class); verify(revisions).insert(captor.capture());
+        var written = captor.getValue();
+        assertTrue(written.getAnswersJson().contains("new") && written.getAnswersJson().contains("preserved"));
+        assertTrue(written.getAttachmentsJson().contains("photo.png"));
+        assertFalse(written.getAnswersJson().contains("exam_attendance") || written.getAnswersJson().contains("工作冲突"));
+        assertEquals("[\"name\"]", written.getWrittenKeysJson());
+    }
+
     StudentServiceArchiveRevisionDO revision(int number, String source, String intent, List<StudentInfoFormValueDO> values) {
         var row = new StudentServiceArchiveRevisionDO(); row.setTenantId(1L); row.setServiceRelationId(10L); row.setPersonId(20L);
         row.setRevision(number); row.setTaskId(1L); row.setSubmissionId(2L); row.setSource(source); row.setWrittenKeysJson(intent);

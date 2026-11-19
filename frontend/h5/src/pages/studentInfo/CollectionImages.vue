@@ -17,7 +17,7 @@ const localImages = ref<CollectionImage[]>([...props.images])
 watch(() => props.images, value => { localImages.value = [...value] }, { deep: true })
 const deleting = ref(false)
 let generation = 0
-const slots = () => props.field.key === 'identity_images' ? [{ side: 'front', label: '身份证正面', max: 1 }, { side: 'back', label: '身份证反面', max: 1 }] : [{ side: '', label: '添加附件', max: props.field.maxImages || 9 }]
+const slots = () => props.field.key === 'identity_images' ? [{ side: 'front', label: '身份证正面（人像面）', max: 1 }, { side: 'back', label: '身份证反面（国徽面）', max: 1 }] : [{ side: '', label: '添加附件', max: props.field.maxImages || 9 }]
 const sideImages = (side: string) => localImages.value.filter(x => x.side === side)
 const canAdd = (side: string, max: number) => sideImages(side).length + pending.value.filter(x => x.side === side).length < max
 function status() { emit('busy', deleting.value || pending.value.some(x => x.status === 'uploading')); emit('failed', pending.value.some(x => x.status === 'error')) }

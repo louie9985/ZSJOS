@@ -33,6 +33,21 @@ class MediaLeadAnalysisServiceTest {
     @Mock private MediaLeadQueryMapper queries;
     private static final LocalDate MONTH = LocalDate.of(2026, 9, 1);
 
+    @Test void drillRequiresDetailPermissionAndRejectsInvalidFiltersBeforeQuery() {
+        var query = new MediaLeadVO.DrillQuery();
+        query.setStart(MONTH); query.setEnd(MONTH.plusDays(2));
+        assertThrows(RuntimeException.class, () -> service.drillPage(query));
+        verifyNoInteractions(queries);
+        when(access.has(MediaLeadAccess.DETAIL)).thenReturn(true);
+        query.setDimension("channel");
+        assertThrows(RuntimeException.class, () -> service.drillPage(query));
+        query.setDimension(null);query.setPageSize(101);
+        assertThrows(RuntimeException.class, () -> service.drillPage(query));
+        query.setPageSize(20);query.setCumulative(true);query.setMetric("memberConverted");
+        assertThrows(RuntimeException.class, () -> service.drillPage(query));
+        verifyNoInteractions(queries);
+    }
+
     private AdminUserRespDTO user(long id) {
         var user = new AdminUserRespDTO(); user.setId(id); user.setDeptId(10L); user.setNickname("成员" + id); return user;
     }

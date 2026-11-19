@@ -2926,3 +2926,24 @@
 - Runtime unchanged: MainPID2597740, active since2026-11-06 00:41:57 CST; deployed JAR SHA unchanged. Unused scheduler-only candidate and30 isolated tests retained privately as withdrawn preparation, explicitly not deployed. Generator remains active; old idempotency keys prevent identical-cycle recreation, future periods may produce new tasks.
 - Evidence: private /opt/zsjos-runtime/backups/retire-diagnosis-tasks-20261116/{prepared,applied,verified}; original plan and complete before/after images, transaction receipt, repeated independent result and rehearsal evidence. No credentials or personal data logged.
 - Limits: authenticated HTTP/browser not executed; Workbench diagnosis and Vue Admin today-task server pending predicates inspected. No frontend/protocol behavior change. Latest authorized data-only goal complete; ownership released.
+
+
+## Registration — test-merge-push-main-20261119 — 2026-11-19T22:55:49+08:00
+
+- Environment: test from /etc/zsjos/agent-environment; owner /root; branch main; worktree /opt/zsjos; base ae7dd1785bf05f94a3bb435565668ee4d23efd70.
+- Goal/authorization: user explicitly approved merging origin/main (21631a8a98a62c41a3c71596a6739e03a535c3b6) and pushing main to origin, preserving both histories.
+- Non-goals: independent application changes, dependency additions, SQL execution, database/service operations, deployment, history rewriting or force push.
+- Ownership: mechanical incoming changes in the 64 remote-only changed files; this test handoff append. Preserve all 13 local-only changed files, except the required append to this record. No overlapping files between the two commits; starting worktree clean.
+- Dependencies: fetched origin/main; one local-only and one remote-only commit, common base b5e77830694ad787331b44ec0e460f319ab9d8f9.
+- Target branch/integration order: main; automatic merge without committing, validate exact merged blobs and handoff, create merge commit, normal push to origin/main, verify remote tip and clean worktree.
+- Verification plan: no unmerged index entries; merged index equals origin/main plus exact local-only changes except handoff append; both tips remain ancestors; read-only remote-tip comparison after push. Application builds/browser/SQL acceptance are outside this Git integration task.
+
+
+## Delivery — test-merge-push-main-20261119 — 2026-11-19T22:56:21+08:00
+
+- Context: registration above; test/main /opt/zsjos; owner /root; precommit HEAD ae7dd1785bf05f94a3bb435565668ee4d23efd70; merge parent 21631a8a98a62c41a3c71596a6739e03a535c3b6. Final merge commit is the commit containing this entry.
+- Goal/result: user-approved automatic merge of the one remote-only and one local-only commit succeeded without conflicts. Exact index/tree comparison proves all incoming and local-only tracked content preserved; only this required handoff append is additionally authored.
+- Changed files: 64 incoming remote files retained exactly; 13 local-only files retained, with this record receiving append-only registration/delivery. No independent runtime behavior change.
+- Verification: zero unmerged index entries; full repository index equals remote tree plus exact local-only changes. Working-tree difference is only this append; existing handoff content is an exact prefix. Scoped handoff whitespace validation precedes commit. Both-parent ancestry, clean final worktree and remote main equality are checked after commit/push.
+- Integration: target main; create the authorized merge commit and perform normal push to origin/main immediately after these checks. Publication outcome is verified through Git tool results after this entry is committed; no force push or history rewrite.
+- Limits: application build, API/browser acceptance and SQL execution not performed; this verifies Git integration only. No deployment, database/service change or dependency addition. Ownership released on successful commit/push and final verification; any failure is reported to the user.

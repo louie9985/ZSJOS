@@ -137,14 +137,19 @@ public class ExamCollectionExportService {
                 if (!selected(request, relationId, member)) continue;
                 var archive = archives.current(relationId);
                 var values = ExamCollectionQueryService.display(archive.answers());
+                var latest = submitted.stream().filter(s -> Objects.equals(relationId, s.getServiceRelationId()))
+                        .max(Comparator.comparing(ExamCollectionSubmissionDO::getSequenceNo)).orElse(null);
+                // Attendance is kept on the submission rather than the archive; show the latest answer for this task.
+                if (latest != null) ExamCollectionQueryService.display(JsonUtils.parseArray(latest.getAnswersJson(),
+                        cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormValueDO.class)).forEach((key, value) -> {
+                    if (ExamCollectionFields.ATTENDANCE_KEY.equals(key) || ExamCollectionFields.ABSENCE_REASON_KEY.equals(key)) values.put(key, value);
+                });
                 if (!matches(values, request.getKeyword())) continue;
                 String person = "service:" + relationId;
                 people.add(person);
                 var selected = archive.attachments().stream().filter(a -> labels.containsKey(a.fieldKey())
                         && (request.getFieldKeys().isEmpty() || request.getFieldKeys().contains(a.fieldKey()))).toList();
                 missing(warnings, values, labels, request, selected.stream().map(StudentServiceArchiveStore.Attachment::fieldKey).toList());
-                var latest = submitted.stream().filter(s -> Objects.equals(relationId, s.getServiceRelationId()))
-                        .max(Comparator.comparing(ExamCollectionSubmissionDO::getSequenceNo)).orElse(null);
                 int start = items.size();
                 for (var file : selected) add(items, paths, directories, usedDirectories, request, labels, values, member, person,
                         relationId, null, latest == null ? null : latest.getSubmittedAt(), "", file.id(), file.source(), file.fieldKey(), file.side(), file.name(), file.contentType(), file.size(), archive.revision());

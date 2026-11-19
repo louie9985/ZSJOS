@@ -22,6 +22,22 @@ public final class MediaLeadVO {
         public Query scopeQuery() { return new Query(scopeType, scopeId, start, end); }
     }
 
+    @lombok.Data
+    @lombok.EqualsAndHashCode(callSuper = true)
+    public static class DrillQuery extends DetailPageQuery {
+        @NotNull @Pattern(regexp = "submitted|valid|invalid|converted|contribution|memberConverted")
+        private String metric = "submitted";
+        private boolean cumulative;
+        private Long memberUserId;
+        @Pattern(regexp = "channel|category") private String dimension;
+        @Size(max = 255) private String groupLabel;
+    }
+
+    public record DrillDetail(String leadNo, String submittedName, String providerName, java.time.LocalDateTime submittedAt, String contributorName,
+                              String status, String channelLabel, String categoryLabel,
+                              Long orderId, String orderNo, java.math.BigDecimal orderAmount,
+                              java.time.LocalDateTime orderEffectiveAt) {}
+
     public record ScopeNode(String key, String parentKey, String title, String scopeType, Long scopeId) {}
 
     public record Target(Long id, String scopeType, Long scopeId, String name, LocalDate periodStart,

@@ -17,7 +17,7 @@ class MediaLeadPageQueryTest {
    try(var sql=session.getConnection().createStatement()) {
     sql.execute("CREATE TABLE zsjos_lead(id BIGINT,tenant_id BIGINT,deleted INT,lead_no VARCHAR,submitted_at TIMESTAMP,contribution_user_id_snapshot BIGINT,contribution_dept_id_snapshot BIGINT,contribution_user_name_snapshot VARCHAR,status VARCHAR,source_channel_label_snapshot VARCHAR,lead_category_label_snapshot VARCHAR)");
     sql.execute("INSERT INTO zsjos_lead VALUES(1,9,0,'LD-1','2025-01-02',1,10,'冻结贡献人','valid','历史渠道','历史分类'),(2,9,0,'LD-2','2025-01-02',1,10,'冻结贡献人','invalid',NULL,NULL),(3,99,0,'FOREIGN','2025-01-02',1,10,'foreign','valid',NULL,NULL),(4,9,1,'DELETED','2025-01-02',1,10,'deleted','valid',NULL,NULL),(5,9,0,'OUTSIDE','2025-01-02',2,20,'other','valid',NULL,NULL),(6,9,0,'FUTURE','2025-02-02',1,10,'future','valid',NULL,NULL),(7,9,0,'MISSING','2025-01-02',NULL,10,NULL,'valid',NULL,NULL)");
-    sql.execute("CREATE TABLE zsjos_order(tenant_id BIGINT,deleted INT,lead_id BIGINT,status VARCHAR,order_type VARCHAR,effective_at TIMESTAMP,total_amount DECIMAL(18,2) DEFAULT 1280)");
+    sql.execute("CREATE TABLE zsjos_order(id BIGINT AUTO_INCREMENT PRIMARY KEY,order_no VARCHAR DEFAULT 'DD-TEST',tenant_id BIGINT,deleted INT,lead_id BIGINT,status VARCHAR,order_type VARCHAR,effective_at TIMESTAMP,total_amount DECIMAL(18,2) DEFAULT 1280)");
     sql.execute("INSERT INTO zsjos_order(tenant_id,deleted,lead_id,status,order_type,effective_at) VALUES(9,0,1,'effective','first_purchase','2025-01-04'),(9,0,1,'effective','first_purchase','2025-01-03'),(9,0,1,'effective','repurchase','2025-01-02'),(99,0,1,'effective','first_purchase','2025-01-01'),(9,1,1,'effective','first_purchase','2025-01-01'),(9,0,2,'effective','first_purchase','2025-02-01')");
    }
    var mapper=session.getMapper(MediaLeadQueryMapper.class);var start=LocalDateTime.parse("2025-01-01T00:00:00");var end=start.plusMonths(2);var now=start.plusDays(20);
@@ -26,6 +26,46 @@ class MediaLeadPageQueryTest {
     var first=mapper.pageDetails(9L,type,id,List.of(10L),start,end,now,0,1).getFirst();assertEquals("LD-2",first.getLeadNo());assertNull(first.getOrderEffectiveAt());
     var second=mapper.pageDetails(9L,type,id,List.of(10L),start,end,now,1,1).getFirst();assertEquals("LD-1",second.getLeadNo());assertEquals(start.plusDays(2),second.getOrderEffectiveAt());assertEquals("历史渠道",second.getChannelLabel());assertEquals("冻结贡献人",second.getContributorName());
    }
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("ALTER TABLE zsjos_lead ADD COLUMN submitted_name VARCHAR");
+    sql.execute("ALTER TABLE zsjos_lead ADD COLUMN provider_owner_name_snapshot VARCHAR");
+    sql.execute("UPDATE zsjos_lead SET submitted_name='测试客资',provider_owner_name_snapshot='提交兼职' WHERE id=1");
+   }
+   var drill = new cn.iocoder.yudao.module.zsjos.controller.admin.performance.vo.MediaLeadVO.DrillQuery();
+   assertEquals(2,mapper.countDrill(9L,"USER",1L,List.of(),start,end,now,drill));
+   drill.setMetric("valid");
+   assertEquals(1,mapper.countDrill(9L,"USER",1L,List.of(),start,end,now,drill));
+   drill.setMetric("converted");
+   var convertedRows=mapper.pageDrill(9L,"USER",1L,List.of(),start,end,now,drill,0,20);
+   assertEquals(1,convertedRows.size());assertEquals("测试客资",convertedRows.getFirst().getSubmittedName());assertEquals("提交兼职",convertedRows.getFirst().getProviderName());assertEquals("DD-TEST",convertedRows.getFirst().getOrderNo());
+   assertEquals(start.plusDays(2),convertedRows.getFirst().getOrderEffectiveAt());
+   drill.setMemberUserId(2L);
+   assertEquals(0,mapper.countDrill(9L,"USER",1L,List.of(),start,end,now,drill));
+   drill.setMemberUserId(null);drill.setMetric("memberConverted");
+   assertEquals(1,mapper.countDrill(9L,"USER",1L,List.of(),start.plusDays(2),start.plusDays(3),now,drill));
+   assertEquals(0,mapper.countDrill(9L,"USER",1L,List.of(),start,start.plusDays(1),now,drill));
+   drill.setMetric("submitted");drill.setCumulative(true);
+   assertEquals(2,mapper.countDrill(9L,"USER",1L,List.of(),start.plusYears(1),end.plusYears(1),now,drill));
+   drill.setCumulative(false);drill.setMetric("valid");drill.setDimension("channel");drill.setGroupLabel("历史渠道");
+   assertEquals(1,mapper.countDrill(9L,"DEPT",10L,List.of(),start,end,now,drill));
+   drill.setGroupLabel("其他渠道");assertEquals(0,mapper.countDrill(9L,"DEPT",10L,List.of(),start,end,now,drill));
+   drill.setDimension(null);drill.setGroupLabel(null);
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("INSERT INTO zsjos_order(tenant_id,deleted,lead_id,status,order_type,effective_at,total_amount) VALUES(9,0,1,'effective','first_purchase','2025-01-02',500)");
+   }
+   drill.setMetric("contribution");
+   var contribution=mapper.pageDrill(9L,"USER",1L,List.of(),start,end,now,drill,0,20).getFirst();
+   assertEquals(new java.math.BigDecimal("500.00"),contribution.getOrderAmount());
+   drill.setMetric("converted");
+   assertEquals(new java.math.BigDecimal("1280.00"),mapper.pageDrill(9L,"USER",1L,List.of(),start,end,now,drill,0,20).getFirst().getOrderAmount());
+   assertEquals(0,mapper.countDrill(999L,"USER",1L,List.of(),start,end,now,drill));
+   assertEquals(0,mapper.countDrill(9L,"CENTER",10L,List.of(),start,end,now,drill));
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("INSERT INTO zsjos_order(tenant_id,deleted,lead_id,status,order_type,effective_at,total_amount) VALUES(9,0,2,'effective','first_purchase','2025-01-05',1600)");
+   }
+   drill.setMetric("memberConverted");
+   assertEquals(2,mapper.countDrill(9L,"USER",1L,List.of(),start,end,now,drill));
+   drill.setMetric("converted");assertEquals(1,mapper.countDrill(9L,"USER",1L,List.of(),start,end,now,drill));
    assertEquals(0,mapper.countDetails(999L,"USER",1L,List.of(),start,end,now));
    assertEquals(0,mapper.countDetails(9L,"CENTER",10L,List.of(),start,end,now));
    assertEquals(0,mapper.countDetails(9L,"UNKNOWN",10L,List.of(10L),start,end,now));

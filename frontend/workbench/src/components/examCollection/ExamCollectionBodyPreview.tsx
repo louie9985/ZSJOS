@@ -10,37 +10,39 @@ import themeCss from '../../../../h5/src/styles/themes/coral.css?raw';
 import vantCss from '../../../../h5/node_modules/vant/lib/index.css?raw';
 import vantOverrides from '../../../../h5/src/styles/vant-overrides.css?raw';
 import type { StudentInfoField } from '../../services/studentInfo';
+import { EXAM_ABSENCE_REASON_KEY, EXAM_ATTENDANCE_KEY, examFieldGroups } from './examFieldLayout';
 
 function escapeText(value: string) {
   return value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 }
 
-function fieldHtml(field: Pick<StudentInfoField, 'key' | 'label' | 'type' | 'note' | 'allowedExtensions' | 'maxImages' | 'maxSizeMb'>) {
+function fieldHtml(field: Pick<StudentInfoField, 'key' | 'label' | 'type' | 'note' | 'allowedExtensions' | 'maxImages' | 'maxSizeMb' | 'options' | 'required'>) {
   const label = escapeText(field.label);
   let control: string;
   if (field.type === 'images') {
     const slots = field.key === 'identity_images'
-      ? [{ label: '身份证正面', max: 1 }, { label: '身份证反面', max: 1 }]
+      ? [{ label: '身份证正面（人像面）', max: 1 }, { label: '身份证反面（国徽面）', max: 1 }]
       : [{ label: '添加附件', max: field.maxImages || 9 }];
     control = slots.map(slot => `<div class="collection-images__slot norem"><span class="collection-images__caption norem">${slot.label}（0/${slot.max}）</span><button class="collection-images__add norem" type="button" disabled aria-label="${slot.label}"><i class="van-icon van-icon-plus" style="font-size:24px" aria-hidden="true"></i><span>0 / ${slot.max}</span></button></div>`).join('')
       + `<p class="exam-public__hint norem">支持 ${escapeText((field.allowedExtensions || ['jpg', 'jpeg', 'png']).join('/').toUpperCase())}，单个不超过 ${field.maxSizeMb || 100}MB</p>`;
+  } else if (field.type === 'radio' || field.type === 'checkbox') {
+    control = `<div class="exam-public__select norem"><button id="field-${escapeText(field.key)}" type="button" class="exam-public__select-trigger norem"><span class="is-placeholder">请选择</span></button></div>`;
   } else {
     control = field.type === 'textarea'
       ? `<textarea id="field-${escapeText(field.key)}" rows="3" readonly></textarea>`
       : `<input id="field-${escapeText(field.key)}" type="${field.key === 'mobile' ? 'tel' : 'text'}" readonly>`;
   }
-  return `<div class="exam-public__field norem ${field.type === 'text' ? '' : 'is-wide'}"><label for="field-${escapeText(field.key)}"><span class="exam-public__required norem">*</span>${label}${field.type === 'images' ? `（0/${field.key === 'identity_images' ? 2 : field.maxImages || 9}）` : ''}</label>${control}${field.note ? `<p class="exam-public__hint norem">${escapeText(field.note)}</p>` : ''}</div>`;
+  if (field.key === EXAM_ATTENDANCE_KEY) control += '<p class="exam-public__hint norem">预览按选择「是」展示后续内容；选择「否」时仅填写不参加原因。</p>';
+  return `<div class="exam-public__field norem ${field.type === 'text' ? '' : 'is-wide'}"><label for="field-${escapeText(field.key)}">${field.required !== false ? '<span class="exam-public__required norem">*</span>' : ''}${label}${field.type === 'images' ? `（0/${field.key === 'identity_images' ? 2 : field.maxImages || 9}）` : ''}</label>${control}${field.note ? `<p class="exam-public__hint norem">${escapeText(field.note)}</p>` : ''}</div>`;
 }
 
+/** fields arrive in collection-form order, including the fixed identity fields. */
 export default function ExamCollectionBodyPreview({ title, description, content, fields, onClose }: {
   title: string; description: string; content: string; fields: StudentInfoField[]; onClose: () => void;
 }) {
   const [mobile, setMobile] = useState(false);
   const body = examCollectionBodyHtml(sanitizeRichText(content));
-  const fixed = [{ key: 'name', label: '姓名', type: 'text' as const }, { key: 'mobile', label: '手机号', type: 'text' as const }, { key: 'id_card', label: '身份证号码', type: 'text' as const }];
-  const selected = fields.filter(field => !['name', 'mobile', 'id_card', 'wechat'].includes(field.key)).sort((a, b) => a.sort - b.sort);
-  const basic = [...fixed, ...selected.filter(field => field.type !== 'images')];
-  const materials = selected.filter(field => field.type === 'images');
+  const { basic, materials } = examFieldGroups(fields.filter(field => field.key !== EXAM_ABSENCE_REASON_KEY));
   const source = `<!doctype html>
 <html data-theme="coral"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>

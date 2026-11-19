@@ -79,8 +79,9 @@ public class ExamCollectionSummaryService {
         var roster=page.getList().stream().collect(Collectors.toMap(ExamCollectionMemberDO::getServiceRelationId,Function.identity()));
         for(var row:projected) {
             var member=roster.get(row.serviceRelationId());
-            row.values().put("collectionStatus",member.getLastSubmissionId()==null?"未填写":"已填写");
             var input=member.getLastSubmissionId()==null?null:submitted.get(member.getLastSubmissionId());
+            var absence=input==null?null:ExamCollectionFields.absenceReason(JsonUtils.parseArray(input.getAnswersJson(),cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormValueDO.class));
+            row.values().put("collectionStatus",member.getLastSubmissionId()==null?"未填写":absence!=null?"不参加："+absence:"已填写");
             row.values().put("submittedAt",input==null||input.getSubmittedAt()==null?"":input.getSubmittedAt().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         }
         return new PageResult<>(projected,page.getTotal());

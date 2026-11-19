@@ -32,8 +32,8 @@
 - `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情。新建或重提审批轮次会在既有 `order_snapshot` 中保存录单时订单字典显示值（性质、服务期限、学员来源、收费方式、支付方式）以及关联客资的档案字段和来源/分类/渠道显示值；详情优先使用该轮次快照，因此字典或客资后续变更、停用不会让已录订单显示为“标签未配置”。历史轮次没有这些快照字段时，返回历史缺失信息，不回退当前字典、客资或用户资料。首购订单有历史客资快照时，`leadProfile` 返回客资业务编号 `leadNo`、客户联系方式、来源、提交人、所属销售、分类、渠道、派单方式和地区，用于审批详情展示；无关联客资的复购订单不返回该字段；新录复购选择或自动匹配的客资档案通过独立 associatedLeadId 与 leadProfile 保存于轮次快照，不写交易 leadId，且内部 `leadId` 不作为客资编号回退。`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/动作时姓名快照及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
 - `GET /zsjos/sales-order/management/{id}`：订单管理详情。仅接受 `zsjos:sales-order:query-management`，并按当前 System 数据权限（或独立 `query-all`）校验订单提交人范围；不会继承旧 `query-team` 的团队读取范围。
 - `GET /zsjos/sales-order/my-page`：本人提交订单分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。列表响应直接投影订单详情中可用于表格展示的业务字段，包括购买方、学员联系方式与地区、历史字典标签快照、课程摘要、付款与服务信息、备注、关联客资业务编号及来源摘要；课程明细按当前页批量读取，不要求前端逐行请求详情。内部关联 ID 仍只用于路由和命令，不作为用户可见列。
-- `GET /zsjos/sales-order/management-page`、`POST /zsjos/sales-order/management-search-page`：订单管理分页及高级筛选，服务端按 System 数据权限（或独立 `query-all`）计算订单提交人范围。
-- `GET /zsjos/sales-order/management-cursor`、`POST /zsjos/sales-order/management-search-cursor`：订单管理游标查询，与分页接口使用相同可见范围。
+- `GET /zsjos/sales-order/management-page`、`POST /zsjos/sales-order/management-search-page`：订单管理分页及高级筛选，`keyword` 去除首尾空白后按订单号、学员姓名、手机号或订单保存的学员微信号（`studentWechatId`）模糊匹配；与状态、高级条件同时生效。服务端按 System 数据权限（或独立 `query-all`）计算订单提交人范围。
+- `GET /zsjos/sales-order/management-cursor`、`POST /zsjos/sales-order/management-search-cursor`：订单管理游标查询，与分页接口使用相同关键词匹配规则和可见范围。
 - `GET /zsjos/sales-order/management-status-counts`：订单管理状态统计，与订单列表使用相同可见范围。
 - `POST /zsjos/sales-order/my-search-page`：在本人订单固定范围内组合关键词与高级条件树；高级条件与用户选择的可选状态分组同时生效（管理员全量读取仅解除权限范围，不解除用户筛选）。
 - `GET /zsjos/sales-order/my-status-counts`：本人订单的全部、待审核、待重提、已通过及历史旧单（已重提）数量。

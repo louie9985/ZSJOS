@@ -2,9 +2,9 @@ import { http, unwrap } from './api'
 import type { Timestamp } from './time'
 
 export interface StudentInfoField {
-  key: string; label: string; type: 'text' | 'textarea' | 'dict' | 'area' | 'images'
+  key: string; label: string; type: 'text' | 'textarea' | 'dict' | 'area' | 'images' | 'radio' | 'checkbox'
   allowedExtensions?: string[]; group: string; maxImages?: number; maxSizeMb?: number
-  enabled: boolean; required: boolean; sort: number; note?: string; dictType?: string; sensitive: boolean
+  enabled: boolean; required: boolean; sort: number; note?: string; options?: string[]; dictType?: string; sensitive: boolean
 }
 export interface StudentInfoDetail {
   id?: number; status: string; createdAt?: Timestamp; submittedAt?: Timestamp; expiresAt?: Timestamp

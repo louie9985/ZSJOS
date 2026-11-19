@@ -56,3 +56,13 @@
 ## 业绩贡献（2026-11-06）
 
 期间表在成交率后增加“业绩贡献（元）”，overview.periods 新增 performanceContribution 金额字段，使用十进制精度汇总并显示两位小数。按各行客资提交期间筛选当前有效（valid / converted / won）的客资，沿用本人、兼职及代录的冻结贡献人和部门范围，累计截至查询时最早生效首购订单的 total_amount。业绩贡献不设金额门槛，每条客资只取一笔，生效时间相同取内部订单 ID 较小者，复购、未生效、已删除、未来生效、跨租户订单排除。缺失金额按零参与汇总，无贡献显示 0.00，旧后端缺少字段显示“—”。后续成交动态更新历史提交期间。成交率仍采用原有单笔 1280 元门槛，因此业绩贡献可能包含未计入成交率分子的低金额首购。接口按已有 query 和范围权限授权，React Workbench 为此新增字段的消费者，Vue Admin 无此页面。
+
+## 指标点击下钻（2026-11-12）
+
+Workbench 团队期间表的总数、有效、无效、成交、比率及业绩贡献，月度实际有效数，成员提交/有效/成交，月度漏斗，以及来源/分类分布支持点击查看分页明细。明细抽屉展示客资业务编号、姓名、提供方历史快照、提交时间、冻结贡献人、当前判定、渠道/分类历史快照，以及对应首购订单业务编号、金额和生效时间。客资、订单完整页面链接另需原业务页面权限，并继续受原对象范围限制。
+
+新增 GET /admin-api/zsjos/media-lead-analysis/drill-page，沿用 query 与 detail 配置权限和原范围授权。既有 details、detail-page 接口保持兼容。参数继承 scopeType/scopeId/start/end/pageNo/pageSize，并增加 metric、cumulative、memberUserId、dimension、groupLabel。metric 支持 submitted、valid、invalid、converted、contribution、memberConverted，均为统计查询命令。dimension 仅接受 channel/category，以历史快照标签筛选。memberUserId 在原授权范围内继续取交集，包含冻结到该员工的兼职/代录客资。cumulative 用于全部期间，仍排除未来提交及未来生效订单。
+
+团队成交按提交批次与当前有效状态筛选，订单取最早单笔金额达到1280元的生效首购。成员成交按最早合格首购生效日期筛选，包含往期提交客资，沿用汇总不另加当前有效状态过滤。业绩贡献取有效客资最早生效首购，无金额门槛，生效时间相同按内部订单ID排序去重。业绩贡献下钻仅列有对应订单的客资，缺失金额展示零贡献规则沿用原汇总。复购、跨租户、逻辑删除、未生效和未来订单排除。先更新后端，再发布工作台。
+
+此次仅 React Workbench 消费新增接口，Vue Admin 无此大盘和接口调用。无需数据库迁移或角色授权写入。

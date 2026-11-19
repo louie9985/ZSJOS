@@ -65,11 +65,15 @@ public class ExamCollectionTaskService {
         if (request.getUploadLimits() != null && !request.getUploadLimits().isEmpty()) {
             hash = DigestUtil.sha256Hex(hash + ":" + JsonUtils.toJsonString(new java.util.TreeMap<>(request.getUploadLimits())));
         }
+        if (request.getCustomFields() != null && !request.getCustomFields().isEmpty())
+            hash = DigestUtil.sha256Hex(hash + ":" + JsonUtils.toJsonString(request.getCustomFields()));
+        if (request.getFieldNotes() != null && !request.getFieldNotes().isEmpty())
+            hash = DigestUtil.sha256Hex(hash + ":" + JsonUtils.toJsonString(new java.util.TreeMap<>(request.getFieldNotes())));
         var previous = tasks.byCreateRequest(key, false);
         if (previous != null) return replay(previous, tenant, key, hash);
         var config = configs.state("PUBLISHED");
         if (config == null) throw exception(CONFIG_MISSING);
-        var snapshot = ExamCollectionFields.snapshot(JsonUtils.parseArray(config.getFieldsJson(), Field.class), request.getSelectedFields(), request.getUploadLimits());
+        var snapshot = ExamCollectionFields.customize(ExamCollectionFields.snapshot(JsonUtils.parseArray(config.getFieldsJson(), Field.class), request.getSelectedFields(), request.getUploadLimits()), request.getCustomFields(), request.getFieldNotes());
         String token = tokens.create();
         publicUrl(token); // Fail configuration checks before creating an unusable task.
         tokens.identityHash("configuration-check");

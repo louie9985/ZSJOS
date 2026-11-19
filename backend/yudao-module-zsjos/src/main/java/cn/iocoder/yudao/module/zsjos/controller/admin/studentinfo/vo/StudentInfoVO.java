@@ -17,6 +17,7 @@ public final class StudentInfoVO {
         @NotNull private Boolean required;
         @NotNull @Min(0) @Max(10000) private Integer sort;
         @Size(max=500) private String note;
+        @Size(max=50) private List<@NotBlank @Size(max=200) String> options;
         @Size(max=100) private String dictType;
         private Boolean sensitive;
         @NotBlank private String group;

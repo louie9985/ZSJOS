@@ -12,6 +12,17 @@
 .exam-public__field.norem label { display: block; margin-bottom: 8px; font-weight: 500; }
 .exam-public__field.norem input, .exam-public__field.norem textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--h5-border); border-radius: 8px; font: inherit; background: var(--h5-card-bg); color: var(--h5-text-primary); }
 .exam-public__field.norem input:focus, .exam-public__field.norem textarea:focus { outline: 2px solid var(--h5-primary); outline-offset: 1px; }
+.exam-public__field.norem label.exam-public__choice { display: flex; align-items: center; gap: 8px; min-height: 44px; margin: 0; font-weight: 400; cursor: pointer; }
+.exam-public__field.norem .exam-public__choice input { flex: none; width: 18px; height: 18px; min-height: 0; margin: 0; padding: 0; accent-color: var(--h5-primary); }
+.exam-public__select.norem { position: relative; }
+.exam-public__select-trigger.norem { display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--h5-border); border-radius: 8px; font: inherit; text-align: left; background: var(--h5-card-bg); color: var(--h5-text-primary); cursor: pointer; }
+.exam-public__select-trigger.norem::after { content: ""; flex: none; border: 5px solid transparent; border-bottom-width: 0; border-top-color: var(--h5-text-secondary); transition: transform .2s; }
+.exam-public__select-trigger.is-open.norem { border-color: var(--h5-primary); }
+.exam-public__select-trigger.is-open.norem::after { transform: rotate(180deg); }
+.exam-public__select-trigger.norem:focus-visible { outline: 2px solid var(--h5-primary); outline-offset: 1px; }
+.exam-public__select-trigger.norem:disabled { cursor: not-allowed; opacity: .6; }
+.exam-public__select-trigger.norem .is-placeholder { color: var(--h5-text-secondary); }
+.exam-public__select-panel.norem { position: absolute; z-index: 10; top: calc(100% + 4px); left: 0; right: 0; box-sizing: border-box; max-height: 280px; overflow-y: auto; margin: 0; padding: 4px 16px; border: 1px solid var(--h5-content-border); border-radius: 8px; background: var(--h5-card-bg); box-shadow: 0 6px 16px rgb(0 0 0 / 12%); }
 .exam-public__required.norem { margin-right: 4px; color: var(--h5-danger); }
 .exam-public__field-error.norem { margin: 8px 0 0; color: color-mix(in srgb,var(--h5-danger) 75%,var(--h5-text-primary)); line-height: 1.6; }
 .exam-public__error.norem { padding: 16px; border: 1px solid var(--h5-danger); border-radius: 10px; background: var(--h5-card-bg); margin: 16px 0; }

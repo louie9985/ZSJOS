@@ -1,9 +1,9 @@
 import axios from 'axios'
 
 export interface CollectionField {
-  key: string; label: string; type: 'text' | 'textarea' | 'dict' | 'area' | 'images'
+  key: string; label: string; type: 'text' | 'textarea' | 'dict' | 'area' | 'images' | 'radio' | 'checkbox'
   allowedExtensions?: string[]; group: string; maxImages?: number; maxSizeMb?: number
-  required: boolean; enabled: boolean; note?: string; sensitive: boolean
+  required: boolean; enabled: boolean; note?: string; options?: string[]; sensitive: boolean
 }
 export interface CollectionRuntime {
   draft?: CollectionDraft

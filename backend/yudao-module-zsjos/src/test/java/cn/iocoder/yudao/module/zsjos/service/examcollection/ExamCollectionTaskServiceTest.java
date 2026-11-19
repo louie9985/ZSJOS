@@ -48,7 +48,7 @@ class ExamCollectionTaskServiceTest {
             var result = service.create(request);
             assertEquals("<p style=\"text-align:center\"><strong>Instructions</strong></p>", result.getContent());
             assertEquals(4L, result.getId()); assertEquals("test task", result.getTitle());
-            assertEquals(4, result.getFields().size()); assertTrue(result.getUrl().startsWith("https://example.invalid/h5/exam-collection#token="));
+            assertEquals(6, result.getFields().size()); assertTrue(result.getUrl().startsWith("https://example.invalid/h5/exam-collection#token="));
             var row = ArgumentCaptor.forClass(ExamCollectionTaskDO.class); verify(tasks).insert(row.capture());
             assertEquals(result.getContent(), row.getValue().getContent());
             assertEquals(1L, row.getValue().getTenantId()); assertEquals(3L, row.getValue().getConfigVersionId());

@@ -15,10 +15,15 @@ export type Group = { label: string; count: number }
 export type Overview = { asOf: string; target: Target; periods: PeriodStats[]; members: Member[]; calendar: CalendarDay[]; funnel?: Funnel; currentMonthChannels: Group[]; lastMonthChannels: Group[]; currentMonthCategories: Group[]; lastMonthCategories: Group[] }
 export type Query = { scopeType: 'SELF' | 'USER' | 'DEPT' | 'CENTER'; scopeId?: number; start: string; end: string }
 
+export type DrillMetric = 'submitted' | 'valid' | 'invalid' | 'converted' | 'contribution' | 'memberConverted'
+export type DrillQuery = Query & { metric: DrillMetric; cumulative?: boolean; memberUserId?: number; dimension?: 'channel' | 'category'; groupLabel?: string }
+export type DrillDetail = Omit<Detail, 'statusLabel' | 'converted'> & { submittedName?: string; providerName?: string; orderId?: number; orderNo?: string; orderAmount?: number }
+
 async function get<T>(path: string, params?: object, signal?: AbortSignal) {
   return unwrap<T>(await http.get<T>(path, { params, signal }))
 }
 export const mediaLeadApi = {
+  drillPage: (query: DrillQuery & { pageNo: number; pageSize: number }, signal?: AbortSignal) => get<PageResult<DrillDetail>>('/zsjos/media-lead-analysis/drill-page', query, signal),
   tree: (signal?: AbortSignal) => get<ScopeNode[]>('/zsjos/media-lead-analysis/tree', undefined, signal),
   overview: (query: Query, signal?: AbortSignal) => get<Overview>('/zsjos/media-lead-analysis/overview', query, signal),
   details: (query: Query, signal?: AbortSignal) => get<Detail[]>('/zsjos/media-lead-analysis/details', query, signal),

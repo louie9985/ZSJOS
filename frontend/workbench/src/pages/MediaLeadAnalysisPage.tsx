@@ -1,8 +1,10 @@
-import { Alert, Button, Card, Drawer, Empty, Input, Modal, Progress, Space, Spin, Tag, Tooltip, Tree, Typography } from 'antd'
+import { Alert, Button, Card, Drawer, Empty, Input, Progress, Space, Spin, Tag, Tooltip, Tree, Typography } from 'antd'
+import { useNavigate } from 'react-router-dom'
+import { APP_ROUTES } from '../constants'
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DataNode } from 'antd/es/tree'
-import { mediaLeadApi, percent, type CalendarDay, type Detail, type Group, type Member, type Overview, type Query, type ScopeNode } from '../services/mediaLeadAnalysis'
+import { mediaLeadApi, percent, type CalendarDay, type DrillDetail, type DrillQuery, type DrillMetric, type Group, type Member, type Overview, type Query, type ScopeNode } from '../services/mediaLeadAnalysis'
 import { ApiError, AuthenticationError } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import BusinessTable from '../components/BusinessTable'
@@ -11,13 +13,13 @@ import './MediaLeadAnalysisPage.css'
 
 const date = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 const monthRange = (month: string): [string, string] => [month + '-01', month + '-' + new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()]
-function MonthlySummary({ target }: { target: Overview['target'] }) {
+function MonthlySummary({ target, onValid }: { onValid?: () => void; target: Overview['target'] }) {
   const completion = target.targetCount != null && target.targetCount > 0 ? target.actualCount / target.targetCount : null
   const unavailable = target.targetCount == null ? '目标未设置' : target.targetCount === 0 ? '目标为 0' : ''
   return <>
     <div className="media-lead-summary">
       <Card size="small" className="media-lead-summary-card"><Typography.Text type="secondary">本月有效客资目标</Typography.Text><div className="media-lead-summary-value">{target.targetCount ?? '未设置'}</div></Card>
-      <Card size="small" className="media-lead-summary-card media-lead-summary-actual"><Typography.Text type="secondary">本月有效客资</Typography.Text><div className="media-lead-summary-value">{target.actualCount}</div></Card>
+      <Card size="small" className="media-lead-summary-card media-lead-summary-actual"><Typography.Text type="secondary">本月有效客资</Typography.Text><div className="media-lead-summary-value">{onValid ? <Button type="link" onClick={onValid}>{target.actualCount}</Button> : target.actualCount}</div></Card>
     </div>
     <div className="media-lead-completion">
       <div className="media-lead-completion-label"><span>月度目标完成进度</span><span>完成率 {percent(completion)}{unavailable && ` · ${unavailable}`}</span></div>
@@ -25,11 +27,11 @@ function MonthlySummary({ target }: { target: Overview['target'] }) {
     </div>
   </>
 }
-function MemberMetricTags({ submitted, valid, converted }: { submitted: number; valid?: number; converted: number }) {
+function MemberMetricTags({ submitted, valid, converted, onOpen }: { onOpen?: (metric: DrillMetric) => void; submitted: number; valid?: number; converted: number }) {
   return <Space size={4} wrap className="media-lead-metric-tags">
-    <Tag color="processing" style={{ marginInlineEnd: 0 }}>提交 {submitted}</Tag>
-    {valid !== undefined && <Tag color="success" style={{ marginInlineEnd: 0 }}>有效 {valid}</Tag>}
-    <Tag color="warning" style={{ marginInlineEnd: 0 }}>成交 {converted}</Tag>
+    <Tag color="processing" style={{ marginInlineEnd: 0 }}>提交 {onOpen ? <Button type="link" size="small" onClick={() => onOpen("submitted")}>{submitted}</Button> : submitted}</Tag>
+    {valid !== undefined && <Tag color="success" style={{ marginInlineEnd: 0 }}>有效 {onOpen ? <Button type="link" size="small" onClick={() => onOpen("valid")}>{valid}</Button> : valid}</Tag>}
+    <Tag color="warning" style={{ marginInlineEnd: 0 }}>成交 {onOpen ? <Button type="link" size="small" onClick={() => onOpen("memberConverted")}>{converted}</Button> : converted}</Tag>
   </Space>
 }
 const pageSizes = [20, 50, 100]
@@ -59,13 +61,13 @@ function periodRange(key: string, today: string): [string, string] | undefined {
     return [iso(start), iso(end)]
   }
   if (key === 'year') return [today.slice(0, 4) + '-01-01', today]
-  return key === 'all' ? undefined : [today.slice(0, 7) + '-01', today]
+  return key === 'all' ? ['1970-01-01', today] : [today.slice(0, 7) + '-01', today]
 }
-function Pie({ title, rows }: { title: string; rows: Group[] }) {
+function Pie({ title, rows, onOpen }: { title: string; rows: Group[]; onOpen?: (label: string) => void }) {
   const total = rows.reduce((sum, row) => sum + row.count, 0)
   let offset = 0
   const slices = rows.map((row, index) => { const from = offset; offset += row.count / total * 100; return `${colors[index % colors.length]} ${from}% ${offset}%` })
-  return <Card size="small" title={title} style={{ minWidth: 250, flex: '1 1 250px' }}>{total === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无有效客资" /> : <Space align="start"><div role="img" aria-label={`${title}，共 ${total} 条`} style={{ width: 128, height: 128, flexShrink: 0, borderRadius: '50%', background: `conic-gradient(${slices.join(',')})` }} /><div>{rows.map((row, index) => <div key={row.label} style={{ whiteSpace: 'nowrap' }}><span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 6, background: colors[index % colors.length] }} />{row.label} {row.count}（{percent(row.count / total)}）</div>)}</div></Space>}</Card>
+  return <Card size="small" title={title} style={{ minWidth: 250, flex: '1 1 250px' }}>{total === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无有效客资" /> : <Space align="start"><div role="img" aria-label={`${title}，共 ${total} 条`} style={{ width: 128, height: 128, flexShrink: 0, borderRadius: '50%', background: `conic-gradient(${slices.join(',')})` }} /><div>{rows.map((row, index) => <div key={row.label} style={{ whiteSpace: 'nowrap' }}><span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 6, background: colors[index % colors.length] }} />{onOpen ? <Button type="link" onClick={() => onOpen(row.label)}>{row.label} {row.count}（{percent(row.count / total)}）</Button> : <>{row.label} {row.count}（{percent(row.count / total)}）</>}</div>)}</div></Space>}</Card>
 }
 
 function CalendarRing({ day }: { day: CalendarDay }) {
@@ -82,7 +84,7 @@ function CalendarRing({ day }: { day: CalendarDay }) {
   </svg>
 }
 
-function MonthlyCohort({ data, month, canDetail, onDay }: { data: Overview; month: string; canDetail: boolean; onDay: (day: string) => void }) {
+function MonthlyCohort({ data, month, canDetail, onDay, onMetric }: { onMetric: (metric: DrillMetric) => void; data: Overview; month: string; canDetail: boolean; onDay: (day: string) => void }) {
   const rows = data.funnel ? [{ key: 'submitted', label: '提交客资', count: data.funnel.submitted }, { key: 'valid', label: '判有效客资', count: data.funnel.valid }, { key: 'converted', label: '成交客资', count: data.funnel.converted }] : []
   const max = Math.max(1, ...rows.map(row => row.count))
   const days = new Map(data.calendar.map(day => [day.date, day]))
@@ -91,7 +93,7 @@ function MonthlyCohort({ data, month, canDetail, onDay }: { data: Overview; mont
   return <div className="performance-cohort">
     <div><h4>提交批次转化漏斗</h4>{!data.funnel ? <Alert type="warning" showIcon title="月度漏斗暂不可用" description="请更新后端服务后重试，判定日历仍可查看。" /> : data.funnel.submitted === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="所选月份暂无提交客资" /> : <div className="performance-funnel">{rows.map((row, index) => {
       const top = 190 * row.count / max, bottom = 190 * (rows[index + 1]?.count ?? row.count) / max
-      return <div className="performance-funnel-row" key={row.key}><div><strong>{row.label} {row.count}</strong><span>{index ? '较上一步 ' + percent(rows[index - 1].count ? row.count / rows[index - 1].count : null) : '所选月提交批次'}</span></div><svg viewBox="0 0 400 50" role="img" aria-label={row.label + ' ' + row.count}><polygon points={[200 - top, 0, 200 + top, 0, 200 + bottom, 48, 200 - bottom, 48].join(' ')} fill={['var(--ant-color-primary)', 'var(--ant-color-success)', 'var(--ant-color-warning)'][index]} /></svg></div>
+      return <div className="performance-funnel-row" key={row.key}><div><strong>{canDetail ? <Button type="link" onClick={() => onMetric(row.key as DrillMetric)}>{row.label} {row.count}</Button> : <>{row.label} {row.count}</>}</strong><span>{index ? '较上一步 ' + percent(rows[index - 1].count ? row.count / rows[index - 1].count : null) : '所选月提交批次'}</span></div><svg viewBox="0 0 400 50" role="img" aria-label={row.label + ' ' + row.count}><polygon points={[200 - top, 0, 200 + top, 0, 200 + bottom, 48, 200 - bottom, 48].join(' ')} fill={['var(--ant-color-primary)', 'var(--ant-color-success)', 'var(--ant-color-warning)'][index]} /></svg></div>
     })}</div>}<p className="performance-subtle">按所选月份的提交批次统计；成交为其中已判有效且截至查询时已有单笔总金额≥1280元生效首购的去重客资。</p></div>
     <div><h4>提交日期与判定情况</h4><div className="performance-legend"><span style={{ color: '#397bee' }}>● 有效</span><span style={{ color: '#a8adb7' }}>● 无效</span><span style={{ color: '#eebf45' }}>● 待判或其他</span><span>每日环形图中央为提交客资数</span></div>
       <div className="performance-calendar">{['一', '二', '三', '四', '五', '六', '日'].map(weekday => <strong key={weekday}>周{weekday}</strong>)}{Array.from({ length: leading }, (_, index) => <span key={'pad' + index} />)}{Array.from({ length: dayCount }, (_, index) => {
@@ -108,8 +110,23 @@ function detailRequestMessage(cause: unknown) {
   return cause instanceof Error ? cause.message : '客资明细加载失败，请稍后重试。'
 }
 
-function DetailModal({ open, title, loading, error, rows, page, pageSize, total, onChange, onRetry, onClose }: { open: boolean; title: string; loading: boolean; error: string; rows: Detail[]; page: number; pageSize: number; total: number; onChange: (page: number, size: number) => void; onRetry: () => void; onClose: () => void }) {
-  return <Modal title={title} open={open} width={1080} footer={null} onCancel={onClose}>{loading ? <Spin /> : error ? <Alert type="error" showIcon title={error} action={<Button onClick={onRetry}>重试</Button>} /> : rows.length === 0 && total === 0 ? <Empty description="暂无客资明细" /> : <BusinessTable tableKey="media-lead-details" mode="compact" columnMode="native" rowKey="leadNo" scroll={{ x: 950 }} pagination={{ ...slashFreePagination, current: page, pageSize, total, onChange }} dataSource={rows} columns={[{ title: '客资编号', dataIndex: 'leadNo' }, { title: '提交时间', dataIndex: 'submittedAt', render: (v: Detail['submittedAt']) => formatTimestamp(v, '—', 'second') }, { title: '冻结引流贡献人', dataIndex: 'contributorName' }, { title: '判定', dataIndex: 'statusLabel' }, { title: '来源渠道', dataIndex: 'channelLabel' }, { title: '客资分类', dataIndex: 'categoryLabel' }, { title: '成交', render: (_: unknown, row: Detail) => row.converted ? <Tag color="success">已成交</Tag> : <Tag>未成交</Tag> }, { title: '首购生效时间', dataIndex: 'orderEffectiveAt', render: (v: Detail['orderEffectiveAt']) => formatTimestamp(v, '—', 'second') }]} />}</Modal>
+function DetailModal({ open, title, loading, error, rows, page, pageSize, total, onChange, onRetry, onClose, permissions }: { open: boolean; title: string; loading: boolean; error: string; rows: DrillDetail[]; page: number; pageSize: number; total: number; onChange: (page: number, size: number) => void; onRetry: () => void; onClose: () => void; permissions: string[] }) {
+  const navigate = useNavigate()
+  return <Drawer title={title} open={open} width="min(1180px, 100vw)" onClose={onClose}>
+    {loading ? <Spin /> : error ? <Alert type="error" showIcon title={error} action={<Button onClick={onRetry}>重试</Button>} /> : rows.length === 0 && total === 0 ? <Empty description="暂无明细" /> : <BusinessTable<DrillDetail> tableKey="media-lead-details" mode="compact" columnMode="native" rowKey="leadNo" scroll={{ x: 1200 }} pagination={{ ...slashFreePagination, current: page, pageSize, total, onChange }} dataSource={rows} columns={[
+      { title: '客资编号', dataIndex: 'leadNo', render: (value: string) => permissions.includes('zsjos:lead:query') ? <Button type="link" onClick={() => navigate(`${APP_ROUTES.LEAD_MANAGEMENT}?leadNo=${encodeURIComponent(value)}`)}>{value}</Button> : value },
+      { title: '提交时间', dataIndex: 'submittedAt', render: value => formatTimestamp(value, '—', 'second') },
+      { title: '姓名', dataIndex: 'submittedName', render: value => value ?? '—' },
+      { title: '提供方', dataIndex: 'providerName', render: value => value ?? '历史未记录' },
+      { title: '冻结引流贡献人', dataIndex: 'contributorName' },
+      { title: '判定', dataIndex: 'status', render: (value: string) => ['valid', 'converted', 'won'].includes(value) ? '有效' : value === 'invalid' ? '无效' : '待判或其他' },
+      { title: '来源渠道', dataIndex: 'channelLabel', render: value => value ?? '历史未记录' },
+      { title: '客资分类', dataIndex: 'categoryLabel', render: value => value ?? '历史未记录' },
+      { title: '首购订单', dataIndex: 'orderNo', render: (value: string | undefined, row) => value && permissions.includes('zsjos:sales-order:query-management') ? <Button type="link" onClick={() => navigate(`${APP_ROUTES.SALES_ORDERS}?orderId=${row.orderId}`)}>{value}</Button> : value ?? '—' },
+      { title: '订单金额（元）', dataIndex: 'orderAmount', render: (value?: number) => value == null ? '—' : Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) },
+      { title: '首购生效时间', dataIndex: 'orderEffectiveAt', render: value => formatTimestamp(value, '—', 'second') },
+    ]} />}
+  </Drawer>
 }
 
 export default function MediaLeadAnalysisPage({ permissions }: { permissions: string[] }) {
@@ -117,19 +134,19 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
   const [month, setMonth] = useState(() => date().slice(0, 7))
   const requestId = useRef(0)
   const [keyword, setKeyword] = useState(''), [collapsed, setCollapsed] = useState(false), [drawerOpen, setDrawerOpen] = useState(false)
-  const [detailOpen, setDetailOpen] = useState(false), [detailTitle, setDetailTitle] = useState(''), [detailRows, setDetailRows] = useState<Detail[]>([]), [detailLoading, setDetailLoading] = useState(false), [detailError, setDetailError] = useState('')
-  const [detailQuery, setDetailQuery] = useState<Query>()
+  const [detailOpen, setDetailOpen] = useState(false), [detailTitle, setDetailTitle] = useState(''), [detailRows, setDetailRows] = useState<DrillDetail[]>([]), [detailLoading, setDetailLoading] = useState(false), [detailError, setDetailError] = useState('')
+  const [detailQuery, setDetailQuery] = useState<DrillQuery>()
   const [detailPage, setDetailPage] = useState(1), [detailPageSize, setDetailPageSize] = useState(20), [detailTotal, setDetailTotal] = useState(0)
   const detailRequest = useRef<AbortController | undefined>(undefined)
   useEffect(() => () => detailRequest.current?.abort(), [])
   const closeDetails = () => { detailRequest.current?.abort(); setDetailOpen(false) }
-  const loadDetails = async (query: Query, page: number, size: number) => {
+  const loadDetails = async (query: DrillQuery, page: number, size: number) => {
     detailRequest.current?.abort()
     const controller = new AbortController()
     detailRequest.current = controller
     setDetailPage(page); setDetailPageSize(size); setDetailRows([]); setDetailLoading(true); setDetailError('')
     try {
-      const result = await mediaLeadApi.detailPage({ ...query, pageNo: page, pageSize: size }, controller.signal)
+      const result = await mediaLeadApi.drillPage({ ...query, pageNo: page, pageSize: size }, controller.signal)
       if (!controller.signal.aborted) { setDetailRows(result.list); setDetailTotal(result.total) }
     } catch (cause) {
       if (!controller.signal.aborted) setDetailError(detailRequestMessage(cause))
@@ -172,12 +189,20 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
     return build()
   }, [nodes, keyword])
   if (!permissions.includes('zsjos:media-lead-analysis:query')) return <Alert type="warning" showIcon title="暂无新媒体客资分析权限" />
-  const openDetails = async (title: string, range: [string, string]) => {
+  const openDetails = async (title: string, range: [string, string], filters: Partial<Omit<DrillQuery, keyof Query>> = {}) => {
     if (!scope || !permissions.includes('zsjos:media-lead-analysis:detail')) return
-    const query: Query = { scopeType: scope.scopeType, scopeId: scope.scopeId, start: range[0], end: range[1] }
+    const query: DrillQuery = { scopeType: scope.scopeType, scopeId: scope.scopeId, start: range[0], end: range[1], metric: 'submitted', ...filters }
     setDetailOpen(true); setDetailTitle(title); setDetailQuery(query); setDetailTotal(0)
     await loadDetails(query, 1, detailPageSize)
   }
+  const canDetail = permissions.includes('zsjos:media-lead-analysis:detail')
+  const openPeriod = (key: string, label: string, metric: DrillMetric, filters: Partial<DrillQuery> = {}) => {
+    if (!data) return
+    const range = periodRange(key, data.asOf)
+    if (range) void openDetails(label, range, { metric, cumulative: key === 'all', ...filters })
+  }
+  const metricValue = (value: React.ReactNode, key: string, label: string, metric: DrillMetric) => canDetail
+    ? <Button type="link" onClick={() => openPeriod(key, label, metric)}>{value}</Button> : value
   const scopeTree = <><Input.Search aria-label="搜索组织或人员" placeholder="搜索组织或人员" value={keyword} onChange={event => setKeyword(event.target.value)} allowClear />
     {treeData.length ? <Tree key={keyword} blockNode defaultExpandAll treeData={treeData} selectedKeys={scope ? [scope.key] : []} onSelect={keys => {
       const node = nodes.find(item => item.key === keys[0])
@@ -191,7 +216,7 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
       <div className="performance-heading"><div><Typography.Title level={3} style={{ margin: 0 }}>新媒体客资分析大盘</Typography.Title><Typography.Text type="secondary">按冻结引流贡献人统计，数据使用北京时间</Typography.Text></div></div>
       {error && <Alert type="error" showIcon title={error} action={<Button size="small" onClick={() => void load(scope)}>重试</Button>} />}
       {loading ? <Card><Spin /></Card> : !data ? <Empty description="暂无数据" /> : <>
-        <Card title="团队大盘" className="media-lead-overview"><MonthlySummary target={data.target} />
+        <Card title="团队大盘" className="media-lead-overview"><MonthlySummary target={data.target} onValid={canDetail ? () => openPeriod("month", "本月有效客资", "valid") : undefined} />
           <details className="media-lead-methodology"><summary>按提交日期统计，判定与成交截至查询时更新 · 查看完整统计口径</summary><div>
             <p>成交率 = 该期间提交的有效客资中，截至查询时已成交的客资数 ÷ 该期间提交的有效客资数 × 100%。有效客资按当前判定统计，包含已转化、已成交客资；无效、待判等不计入分母。无有效客资时显示“—”。</p>
             <p>成交须有关联的已生效首购订单，且单笔订单总金额≥1280元（含1280元）；复购不计，多笔小额订单不累加，同一客资只计一次。</p>
@@ -204,17 +229,17 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
             scroll={{ x: 950 }} pagination={false} dataSource={data.periods}
             columns={[
               { title: '期间', dataIndex: 'label', width: 110 },
-              { title: '客资总数', dataIndex: 'total', width: 110 },
-              { title: '有效客资', dataIndex: 'valid', width: 110 },
-              { title: '无效客资', dataIndex: 'invalid', width: 110 },
-              { title: '客资有效率', dataIndex: 'validRate', width: 110, render: (v: number) => percent(v) },
-              { title: '成交客资', dataIndex: 'converted', width: 110 },
-              { title: '成交率', dataIndex: 'convertedRate', width: 110, render: (v: number) => percent(v) },
+              { title: '客资总数', dataIndex: 'total', width: 110, render: (value: number, row) => metricValue(value, row.key, row.label + '提交客资', 'submitted') },
+              { title: '有效客资', dataIndex: 'valid', width: 110, render: (value: number, row) => metricValue(value, row.key, row.label + '有效客资', 'valid') },
+              { title: '无效客资', dataIndex: 'invalid', width: 110, render: (value: number, row) => metricValue(value, row.key, row.label + '无效客资', 'invalid') },
+              { title: '客资有效率', dataIndex: 'validRate', width: 110, render: (v: number, row) => metricValue(percent(v), row.key, row.label + '有效客资', 'valid') },
+              { title: '成交客资', dataIndex: 'converted', width: 110, render: (value: number, row) => metricValue(value, row.key, row.label + '成交客资', 'converted') },
+              { title: '成交率', dataIndex: 'convertedRate', width: 110, render: (v: number, row) => metricValue(percent(v), row.key, row.label + '成交客资', 'converted') },
               {
                 title: '业绩贡献（元）', dataIndex: 'performanceContribution', width: 180, align: 'right',
-                render: (v?: number) => v == null ? '—' : v.toLocaleString('zh-CN', {
+                render: (v: number | undefined, row) => v == null ? '—' : metricValue(v.toLocaleString('zh-CN', {
                   minimumFractionDigits: 2, maximumFractionDigits: 2,
-                }),
+                }), row.key, row.label + '业绩贡献订单', 'contribution'),
               },
             ]}
           /></Card>
@@ -226,21 +251,21 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
             columns={[
               { title: '成员', dataIndex: 'name', fixed: 'left' },
               { title: '本月目标', dataIndex: 'targetCount', render: (v: number | null) => v ?? '未设置' },
-              { title: '昨日', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.yesterday} converted={x.yesterdayConverted} /> },
-              { title: '今日', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.today} converted={x.todayConverted} /> },
-              { title: '本周', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.week} valid={x.weekValid} converted={x.weekConverted} /> },
-              { title: '上周', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.lastWeek} valid={x.lastWeekValid} converted={x.lastWeekConverted} /> },
-              { title: '本月', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.month} valid={x.monthValid} converted={x.monthConverted} /> },
-              { title: '上月', render: (_: unknown, x: Member) => <MemberMetricTags submitted={x.lastMonth} valid={x.lastMonthValid} converted={x.lastMonthConverted} /> },
+              { title: '昨日', render: (_: unknown, x: Member) => <MemberMetricTags onOpen={canDetail ? metric => openPeriod("yesterday", x.name + " · 客资与订单", metric, { memberUserId: x.userId }) : undefined} submitted={x.yesterday} converted={x.yesterdayConverted} /> },
+              { title: '今日', render: (_: unknown, x: Member) => <MemberMetricTags onOpen={canDetail ? metric => openPeriod("today", x.name + " · 客资与订单", metric, { memberUserId: x.userId }) : undefined} submitted={x.today} converted={x.todayConverted} /> },
+              { title: '本周', render: (_: unknown, x: Member) => <MemberMetricTags onOpen={canDetail ? metric => openPeriod("week", x.name + " · 客资与订单", metric, { memberUserId: x.userId }) : undefined} submitted={x.week} valid={x.weekValid} converted={x.weekConverted} /> },
+              { title: '上周', render: (_: unknown, x: Member) => <MemberMetricTags onOpen={canDetail ? metric => openPeriod("lastWeek", x.name + " · 客资与订单", metric, { memberUserId: x.userId }) : undefined} submitted={x.lastWeek} valid={x.lastWeekValid} converted={x.lastWeekConverted} /> },
+              { title: '本月', render: (_: unknown, x: Member) => <MemberMetricTags onOpen={canDetail ? metric => openPeriod("month", x.name + " · 客资与订单", metric, { memberUserId: x.userId }) : undefined} submitted={x.month} valid={x.monthValid} converted={x.monthConverted} /> },
+              { title: '上月', render: (_: unknown, x: Member) => <MemberMetricTags onOpen={canDetail ? metric => openPeriod("lastMonth", x.name + " · 客资与订单", metric, { memberUserId: x.userId }) : undefined} submitted={x.lastMonth} valid={x.lastMonthValid} converted={x.lastMonthConverted} /> },
               { title: '月度完成率', dataIndex: 'monthProgress', render: (v: number | null) => <Progress percent={v == null ? 0 : Math.min(100, v * 100)} format={() => percent(v)} /> }
             ]}
           />
         </Card>
-        <Card title="提交日期与判定" extra={<Input type="month" aria-label="客资统计月份" value={month} max={date().slice(0, 7)} style={{ width: 150 }} onChange={event => { const next = event.target.value; if (next) { setMonth(next); void load(scope, next) } }} />}><MonthlyCohort data={data} month={month} canDetail={permissions.includes('zsjos:media-lead-analysis:detail')} onDay={day => void openDetails(day + ' 提交客资明细', [day, day])} /></Card>
-        <Card title="引流数据分析"><div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}><Pie title="本月有效客资来源渠道" rows={data.currentMonthChannels} /><Pie title="上月有效客资来源渠道" rows={data.lastMonthChannels} /><Pie title="本月有效客资分类" rows={data.currentMonthCategories} /><Pie title="上月有效客资分类" rows={data.lastMonthCategories} /></div></Card>
+        <Card title="提交日期与判定" extra={<Input type="month" aria-label="客资统计月份" value={month} max={date().slice(0, 7)} style={{ width: 150 }} onChange={event => { const next = event.target.value; if (next) { setMonth(next); void load(scope, next) } }} />}><MonthlyCohort onMetric={metric => void openDetails("所选月份 · 客资与订单", monthRange(month), { metric })} data={data} month={month} canDetail={permissions.includes('zsjos:media-lead-analysis:detail')} onDay={day => void openDetails(day + ' 提交客资明细', [day, day])} /></Card>
+        <Card title="引流数据分析"><div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}><Pie title="本月有效客资来源渠道" rows={data.currentMonthChannels} onOpen={canDetail ? label => openPeriod("month", label + " · 有效客资", "valid", { dimension: "channel", groupLabel: label }) : undefined} /><Pie title="上月有效客资来源渠道" rows={data.lastMonthChannels} onOpen={canDetail ? label => openPeriod("lastMonth", label + " · 有效客资", "valid", { dimension: "channel", groupLabel: label }) : undefined} /><Pie title="本月有效客资分类" rows={data.currentMonthCategories} onOpen={canDetail ? label => openPeriod("month", label + " · 有效客资", "valid", { dimension: "category", groupLabel: label }) : undefined} /><Pie title="上月有效客资分类" rows={data.lastMonthCategories} onOpen={canDetail ? label => openPeriod("lastMonth", label + " · 有效客资", "valid", { dimension: "category", groupLabel: label }) : undefined} /></div></Card>
       </>}
-      {permissions.includes('zsjos:media-lead-analysis:detail') && <Space wrap><Typography.Text type="secondary">按提交期间查看客资明细：</Typography.Text>{data?.periods.filter(x => periodRange(x.key, data.asOf)).map(x => <Button key={x.key} aria-label={'查看' + x.label + '客资明细'} size="small" onClick={() => { const range = periodRange(x.key, data.asOf); if (range) void openDetails(x.label + '提交客资明细', range) }}>{x.label}</Button>)}</Space>}
-      <DetailModal open={detailOpen} title={detailTitle} loading={detailLoading} error={detailError} rows={detailRows} page={detailPage} pageSize={detailPageSize} total={detailTotal} onChange={(page, size) => { if (detailQuery) void loadDetails(detailQuery, size === detailPageSize ? page : 1, size) }} onRetry={() => { if (detailQuery) void loadDetails(detailQuery, detailPage, detailPageSize) }} onClose={closeDetails} />
+      {permissions.includes('zsjos:media-lead-analysis:detail') && <Space wrap><Typography.Text type="secondary">按提交期间查看客资明细：</Typography.Text>{data?.periods.filter(x => periodRange(x.key, data.asOf)).map(x => <Button key={x.key} aria-label={'查看' + x.label + '客资明细'} size="small" onClick={() => openPeriod(x.key, x.label + '提交客资明细', 'submitted')}>{x.label}</Button>)}</Space>}
+      <DetailModal permissions={permissions} open={detailOpen && canDetail} title={detailTitle} loading={detailLoading} error={detailError} rows={detailRows} page={detailPage} pageSize={detailPageSize} total={detailTotal} onChange={(page, size) => { if (detailQuery) void loadDetails(detailQuery, size === detailPageSize ? page : 1, size) }} onRetry={() => { if (detailQuery) void loadDetails(detailQuery, detailPage, detailPageSize) }} onClose={closeDetails} />
     </Space>
     </main>
   </div>
