@@ -184,6 +184,24 @@ public class SalesOrderSupervisorConfirmationService {
                     confirmation.getId(), confirmation.getStatus());
         }
         BpmTaskRespDTO task = done ? processTaskApi.getDoneTask(userId, taskId) : processTaskApi.getTodoTask(userId, taskId);
+        if (task != null && Boolean.TRUE.equals(task.getSignTask())
+                && FINANCE_PROCESS_DEFINITION_KEY.equals(task.getProcessDefinitionKey()) && TASK_FINANCE.equals(task.getTaskDefinitionKey())
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_REVIEW)) {
+            task = done ? task : processTaskApi.getParticipantTodoTask(userId, taskId);
+            if (task == null) throw exception(SALES_ORDER_PERMISSION_DENIED);
+            Long signOrderId = parseOrderId(task.getBusinessKey());
+            SalesOrderApprovalRoundDO round = roundMapper.selectByProcessInstanceId(task.getProcessInstanceId());
+            SalesOrderDO order = signOrderId == null ? null : orderMapper.selectById(signOrderId);
+            if (order == null || round == null || !signOrderId.equals(round.getOrderId())
+                    || !FINANCE_PROCESS_DEFINITION_KEY.equals(round.getProcessDefinitionKey())
+                    || (!done && !Objects.equals(order.getCurrentApprovalRoundId(), round.getId()))) {
+                throw exception(SALES_ORDER_PERMISSION_DENIED);
+            }
+            var target = taskTarget("approval", signOrderId, taskId, TASK_FINANCE, null, done ? "handled" : "pending");
+            target.setProcessDefinitionKey(task.getProcessDefinitionKey());
+            target.setApprovalReasonRequired(task.getReasonRequire());
+            return target;
+        }
         if (task == null || Boolean.TRUE.equals(task.getSignTask())
                 || !Set.of(TASK_REGISTRATION, TASK_FINANCE).contains(task.getTaskDefinitionKey())) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
@@ -192,6 +210,7 @@ public class SalesOrderSupervisorConfirmationService {
         if (orderId == null) throw exception(SALES_ORDER_PERMISSION_DENIED);
         objectPermissionService.check(orderId, done ? "read" : "review");
         SalesOrderApprovalTaskTargetRespVO result = taskTarget("approval", orderId, taskId, task.getTaskDefinitionKey(), null, done ? "handled" : "pending");
+        result.setProcessDefinitionKey(task.getProcessDefinitionKey());
         result.setApprovalReasonRequired(task.getReasonRequire());
         return result;
     }

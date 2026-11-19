@@ -11,6 +11,7 @@ const base = { userId: 1, name: '销售甲', username: 'sales-test', mobile: '�
   presence: 'online', accepting: true, canReceiveNewLeads: true, todayPendingCount: 2,
   todayFollowUpRemainingCount: 2, todayFollowUpTotalCount: 8, todayAssignedCount: 10, todayMissedCount: 1,
   todayReceivedCount: 9, todayQualifiedCount: 6, todayFollowUpRecordCount: 12, todayOrderAmount: 25079.4,
+  todayNewIntentionCount: 3, todayOldIntentionFollowUpRecordCount: 4, todayStudentContactCount: 5,
   pendingQualificationCount: 5, validLeadCount: 247, convertedLeadCount: 16, effectiveOrderAmount: 25079.4,
 } as SubordinateSales
 const rows = [base, { ...base, userId: 2, name: '销售乙', todayFollowUpRemainingCount: 0 },

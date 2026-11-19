@@ -12,7 +12,7 @@ class LeadSubmissionControllerPermissionTest {
         var filter = cn.iocoder.yudao.framework.apilog.core.filter.ApiAccessLogFilter.class;
         var sanitize = filter.getDeclaredMethod("sanitizeJson", String.class, String[].class);
         sanitize.setAccessible(true);
-        for (String method : new String[]{"create", "createSelfSourced", "createEducationSelfSourced"}) {
+        for (String method : new String[]{"create", "createSelfSourced"}) {
             var annotation = LeadSubmissionController.class.getMethod(method, LeadCreateReqVO.class)
                     .getAnnotation(cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog.class);
             org.junit.jupiter.api.Assertions.assertNotNull(annotation);
@@ -29,8 +29,8 @@ class LeadSubmissionControllerPermissionTest {
         var request = cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadContactCheckReqVO.class;
         assertEquals("@ss.hasPermission('zsjos:lead:self-sourced:create')", LeadSubmissionController.class
                 .getMethod("querySalesArchive", request).getAnnotation(PreAuthorize.class).value());
-        assertEquals("@ss.hasPermission('zsjos:lead:education-self-sourced:create')", LeadSubmissionController.class
-                .getMethod("queryEducationArchive", request).getAnnotation(PreAuthorize.class).value());
+        org.junit.jupiter.api.Assertions.assertThrows(NoSuchMethodException.class,
+                () -> LeadSubmissionController.class.getMethod("queryEducationArchive", request));
     }
 
     @Test
@@ -38,7 +38,7 @@ class LeadSubmissionControllerPermissionTest {
         var auth = LeadSubmissionController.class.getMethod("checkContact",
                 cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadContactCheckReqVO.class)
                 .getAnnotation(PreAuthorize.class);
-        assertEquals("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create')", auth.value());
+        assertEquals("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create')", auth.value());
     }
 
 
@@ -57,10 +57,8 @@ class LeadSubmissionControllerPermissionTest {
                 .getAnnotation(PreAuthorize.class);
 
         // 产品目录是所有录单入口共用的下拉数据源，每新增一个录单入口都要把它的创建权限
-        // 加进来，否则该入口的提交页拉不到目录、产品选不了。教务自拓新增
-        // zsjos:lead:education-self-sourced:create。
+        // 加进来，否则该入口的提交页拉不到目录、产品选不了。
         assertEquals("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', "
-                + "'zsjos:lead:education-self-sourced:create', "
                 + "'zsjos:lead:update', 'zsjos:lead:submitter-supplement')", authorization.value());
     }
 

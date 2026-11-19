@@ -18,12 +18,12 @@ with sync_playwright() as p:
         page.goto(base + '/test/student-table-completion.html?layout=table')
         table = width > 768
         scope = page.locator('.student-filter-toolbar' if table else '.inbox-avatar-toolbar')
-        for label in ('全部学习规划师', '全部接收状态', '全部交付阶段', '全部任务状态', '全部班级', '全部服务状态'):
+        for label in ('全部班主任', '全部接收状态', '全部交付阶段', '全部任务状态', '全部班级', '全部服务状态'):
             expect(page.get_by_role('combobox', name=label, exact=True)).to_have_count(1)
             expect(scope.get_by_role('combobox', name=label, exact=True)).to_be_visible()
         expect(page.get_by_placeholder('搜索姓名、学员编号、手机号、微信号或客资编号')).to_have_count(1)
         expect(scope.get_by_role('button', name=re.compile('筛选'))).to_have_count(1)
-        owner = page.get_by_role('combobox', name='全部学习规划师', exact=True)
+        owner = page.get_by_role('combobox', name='全部班主任', exact=True)
         owner.click()
         page.locator('.ant-select-dropdown').get_by_title('规划师2', exact=True).click()
         page.wait_for_function('subjectFixture.requests.at(-1).ownerUserId === 21')

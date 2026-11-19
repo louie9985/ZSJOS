@@ -10,9 +10,10 @@ public final class SubordinateSalesIdentitySql {
             + "AND h.lead_id=zsjos_lead.id AND h.id=(SELECT x.id FROM zsjos_lead_assignment_history x "
             + "WHERE x.tenant_id=zsjos_lead.tenant_id AND x.deleted=0 AND x.lead_id=zsjos_lead.id ORDER BY x.occurred_at DESC,x.id DESC LIMIT 1) "
             + "AND h.action_type='recycle' AND h.from_owner_user_id=zsjos_lead.recycle_source_owner_user_id AND h.to_owner_user_id IS NULL "
-            + "AND (h.owner_identity_snapshot='sales' OR (h.owner_identity_snapshot IS NULL AND EXISTS ("
+            + "AND ((h.owner_identity_snapshot='sales' AND (zsjos_lead.owner_identity IS NULL OR zsjos_lead.owner_identity=h.owner_identity_snapshot)) OR (h.owner_identity_snapshot IS NULL AND EXISTS ("
             + "SELECT 1 FROM zsjos_lead_assignment_history p WHERE p.tenant_id=h.tenant_id AND p.deleted=0 AND p.lead_id=h.lead_id "
             + "AND p.id=(SELECT x.id FROM zsjos_lead_assignment_history x WHERE x.tenant_id=h.tenant_id AND x.deleted=0 "
             + "AND x.lead_id=h.lead_id ORDER BY x.occurred_at DESC,x.id DESC LIMIT 1 OFFSET 1) "
-            + "AND p.action_type IN ('accept','claim','transfer') AND p.to_owner_user_id=h.from_owner_user_id AND p.owner_identity_snapshot='sales'))))))";
+            + "AND p.action_type IN ('accept','claim','transfer') AND p.to_owner_user_id=h.from_owner_user_id AND p.owner_identity_snapshot='sales' "
+            + "AND (zsjos_lead.owner_identity IS NULL OR zsjos_lead.owner_identity=p.owner_identity_snapshot)))))))";
 }

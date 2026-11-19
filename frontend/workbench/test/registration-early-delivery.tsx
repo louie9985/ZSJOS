@@ -22,12 +22,5 @@ api.advancedFilterTemplates = async () => []
 api.deliveryClasses.options = async () => [{ id: 20, classNo: 'CLASS-20', className: '首次班级', systemClass: false, homeroomUserId: 7, homeroomUserName: '测试规划师' }]
 api.registrationPoolPage = async params => ({ list: rows.filter(row => params.statusGroup === 'all' || (params.statusGroup === 'processed' ? row.status === 'completed' : row.status !== 'completed')), total: rows.filter(row => row.status !== 'completed').length })
 api.registrationCase = async id => structuredClone(rows.find(row => row.id === id)!)
-api.updateRegistrationClassAssignments = async id => {
- if (state === 'error') throw new Error('保存分班失败，请重试')
- const row = rows.find(row => row.id === id)!
- Object.assign(row, { deliveryEstablished: true, assignable: false, assignmentBlockReason: '已建立交付服务，变更班级请通过班级管理办理转班', status: 'processing', statusLabel: '处理中', version: 1,
- deliveries: [{ serviceRelationId: 1000 + id, orderItemId: row.orderItemId, status: 'active', classId: 30, className: '当前交付班级', ownerUserId: 7, ownerUserName: '测试规划师', acceptanceStatus: 'accepted' }] })
- return structuredClone(row)
-}
 api.completeRegistration = async id => { Object.assign(rows.find(row => row.id === id)!, { status: 'completed', statusLabel: '已完成' }); return true }
 createRoot(document.getElementById('root')!).render(<ThemeProvider><App><BrowserRouter><RegistrationPoolPage permissions={state === 'denied' ? ['zsjos:registration:query-pool'] : ['zsjos:registration:query-pool', 'zsjos:registration:update', 'zsjos:registration:complete']} /></BrowserRouter></App></ThemeProvider>)

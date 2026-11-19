@@ -840,6 +840,16 @@ permission and separate page are retired; their endpoints remain temporary rolli
 The `lead_specified_assignment` user-relation scene and specified-sales permission are independent of this
 Partner visibility split. Correcting any candidate-filtering deviation in that flow is outside V185.
 
+### Direct BPM instance authorization
+
+Native Admin and Workbench instance detail, approval detail, diagram, print, task history,
+and comments retain their configured endpoint permissions and verify the instance in the
+current tenant. Direct reads are available to the ADMIN starter, a current or historical task
+assignee or owner, a recorded actor of a workflow transfer or delegation, a persisted copy
+recipient, or an account with a configured BPM management query permission. Comments created
+from the UI require task update permission and the current task assignment. Existing workflow
+operations record their own audit comments internally.
+
 ### BPM related-approval authorization
 
 `ProcessInstanceSelect` is a launch-form-only FormCreate system field. The deployed launch schema, rather
@@ -1150,3 +1160,13 @@ Explicit user-approved exception: existing order-create permission plus exact cu
 ## 客资取消下次跟进权限
 
 已成交客资取消下次跟进使用独立配置权限 `zsjos:lead-follow-up:cancel-next-time`，V370 将按钮定义在工作台的客资管理下。Workbench 操作栏和后端取消接口使用同一权限，服务层继续校验客资可写关系及已成交状态。通用待办取消仍使用 `zsjos:business-task:cancel`。菜单 SQL 只定义元数据，管理员通过角色管理授权。Admin 提供通用菜单与角色配置界面，未增加客资取消操作消费端。
+
+## Education identity retirement (2026-11-16)
+
+The former education team no longer exists; every lead owner is sales. Code recognizes only the `sales` owner identity and the `sales_self_sourced` self-sourced entry; `education`, `education_self_sourced`, the education self-sourced endpoints and the `zsjos:lead:education-self-sourced:create` permission reference, the `education_team` advanced-filter scene and home-metric source, and the partner "education" undertaking identity are removed without compatibility branches. An unrecognized persisted identity fails closed for supervisor restore/transfer/recycle/release. Stored lead, history, follow-up, complaint, order, partner-relation, automatic-provenance, inbox-filter, home-metric and filter-template snapshots are backfilled by the separately authorized, tenant-scoped repair `script/sql/mysql/repair/sales_education_identity_backfill.sql`; no `system_role_menu` assignment is changed. Sections above that describe education restoration, education self-sourcing or education-team scenes are historical.
+
+## 客资与学员追加沟通记录
+
+员工工作台在客资详情和学员服务详情的“沟通记录”标签中展示追加记录。客资按客资对象检查，学员按服务关系检查，两端点均复用各自详情的功能权限和对象可见范围。详情可见的人员可分页读取该对象的沟通记录。追加还须分别拥有角色管理配置的 `zsjos:lead-follow-up:append` 或 `zsjos:student-contact:append`。
+
+工作台通过 GET 或 POST 访问 `/zsjos/contact-note/lead/{id}` 或 `/zsjos/contact-note/student/{serviceRelationId}`。GET 接受 pageNo 和 pageSize，返回 list、total 和 canAppend。POST 接受 content（最多 2000 字符）和 requestKey，返回记录 ID。服务端从当前登录用户和服务端时间记录填写人和时间，同一人对同一对象的同一请求可安全重试。追加只写入沟通记录表，原跟进提交、任务办理、负责人和下次跟进安排沿用各自的业务流程。

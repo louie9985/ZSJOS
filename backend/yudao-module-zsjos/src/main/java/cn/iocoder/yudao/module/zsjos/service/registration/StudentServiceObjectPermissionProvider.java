@@ -31,6 +31,7 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     @Resource private DeliveryClassScopeService deliveryClassScopeService;
     @Resource private PermissionApi permissionApi;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     private boolean hasManagedStudentReadPermission(Long userId) {
         return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
@@ -58,7 +59,7 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
         var result = new java.util.HashMap<Long, java.util.List<String>>();
         for (var relation : eligible) {
             var actions = new java.util.ArrayList<String>();
-            var source = classes.get(relation.getClassId());
+            var source = relation.getClassId() == null ? null : classes.get(relation.getClassId());
             if (direct && source != null && (cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassKind.pending(source)
                     || source.getDeptId() != null && scope != null && (scope.allDepartments() || scope.deptIds().contains(source.getDeptId()))))
                 actions.add(cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.CONTEXT_ACTION_DIRECT_TRANSFER);
@@ -73,6 +74,11 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     public boolean hasPermission(Long bizId, String action, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(bizId);
         if (relation == null) return false;
+        boolean collaborator = Objects.equals(relation.getContentDirectorUserId(), userId)
+                || Objects.equals(relation.getCareerPlannerUserId(), userId);
+        // Explicit collaborators keep their original per-action rules; otherwise sales access follows the owner.
+        if (!collaborator && salesBoundary.isSalesActor(userId)
+                && (relation.getOwnerUserId() == null || !salesBoundary.canAccessUser(userId, relation.getOwnerUserId()))) return false;
         if ("close-service".equals(action)) return StudentDeliveryParticipation.includes(relation)
                 && Objects.equals(relation.getOwnerUserId(), userId);
         if ("restore-service".equals(action)) {

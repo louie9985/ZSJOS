@@ -22,6 +22,45 @@ import static org.mockito.Mockito.*;
 
 class SalesOrderManagementKeywordTest {
     @Test
+    void managementPageCursorAndCountApplyFormalOwnerBoundary() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), SalesOrderDO.class);
+        var mapper = mock(SalesOrderMapper.class, CALLS_REAL_METHODS);
+        var captured = new AtomicReference<LambdaQueryWrapper<SalesOrderDO>>();
+        doAnswer(call -> { captured.set(call.getArgument(0)); return List.of(); }).when(mapper).selectList(any(Wrapper.class));
+        doAnswer(call -> { captured.set(call.getArgument(0)); return 0L; }).when(mapper).selectCount(any(Wrapper.class));
+        var scope = new SalesOrderManagementScope(true, true, Set.of(), Set.of(), Set.of(30L));
+        var req = new SalesOrderMyPageReqVO(); req.setPageSize(PageParam.PAGE_SIZE_NONE);
+        mapper.selectManagementPage(scope, req, null);
+        assertTrue(captured.get().getSqlSegment().contains("formal_sales_user_id IN"));
+        mapper.selectManagementCursor(scope, null, null, null, null, null, 10);
+        assertTrue(captured.get().getSqlSegment().contains("formal_sales_user_id IN"));
+        mapper.selectManagementCount(scope, null);
+        assertTrue(captured.get().getSqlSegment().contains("formal_sales_user_id IN"));
+    }
+
+    @Test
+    void salesBoundaryKeepsActorsOwnSubmissionsWithSamePredicateForListAndCount() {
+        TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), SalesOrderDO.class);
+        var mapper = mock(SalesOrderMapper.class, CALLS_REAL_METHODS);
+        var captured = new AtomicReference<LambdaQueryWrapper<SalesOrderDO>>();
+        doAnswer(call -> { captured.set(call.getArgument(0)); return List.of(); }).when(mapper).selectList(any(Wrapper.class));
+        doAnswer(call -> { captured.set(call.getArgument(0)); return 0L; }).when(mapper).selectCount(any(Wrapper.class));
+        var scope = new SalesOrderManagementScope(true, true, Set.of(), Set.of(), new SalesOrderBoundaryUserIds(30L, Set.of(30L, 31L)));
+        mapper.selectManagementCursor(scope, null, null, null, null, null, 10);
+        String list = captured.get().getSqlSegment();
+        assertTrue(captured.get().getParamNameValuePairs().containsValue(30L));
+        mapper.selectManagementCount(scope, null);
+        String count = captured.get().getSqlSegment();
+        for (String sql : List.of(list, count)) {
+            assertTrue(sql.contains("formal_sales_user_id IN"), sql);
+            assertTrue(sql.contains("OR submitter_user_id ="), sql);
+        }
+        // Plain id collections (non-sales callers) keep the formal-owner-only predicate.
+        mapper.selectManagementCount(new SalesOrderManagementScope(true, true, Set.of(), Set.of(), Set.of(31L)), null);
+        assertFalse(captured.get().getSqlSegment().contains("submitter_user_id"));
+    }
+
+    @Test
     void pageAndCursorSearchWechatWithinExistingScopeAndFilters() {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), SalesOrderDO.class);
         var mapper = mock(SalesOrderMapper.class, CALLS_REAL_METHODS);

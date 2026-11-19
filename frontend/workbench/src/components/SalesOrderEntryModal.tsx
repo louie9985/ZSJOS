@@ -22,7 +22,7 @@ import type { OrderProfile, OrderProfileField } from '../services/api'
 type Values = {
   repurchaseReason?: string
   buyerName?: string; studentName: string; studentNature: string; mobile: string; wechatId: string; regionPath: string[]
-  agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string
+  agreedExamMonth?: Dayjs; classType?: string; servicePeriod: string; studentSource: string
   customerPaidAt: Dayjs; feeMode: string; paymentMethod: string; remark?: string
   specialRequirements?: string; materialDeliveryContact?: string
   giftItems?: string[]; giftShippingAddress?: string
@@ -154,7 +154,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         buyerName: order?.buyerName, studentName: order?.studentName || lead.submittedName,
         studentNature: order?.studentNatureLabelSnapshot ? order.studentNature : undefined,
         ...resolveSalesOrderContacts(undefined, order, lead), regionPath: regionPath.length ? regionPath : undefined,
-        agreedExamTime: order?.agreedExamTime, classType: order?.classType, servicePeriod: order?.servicePeriodLabelSnapshot ? order.servicePeriod : undefined,
+        agreedExamMonth: order?.agreedExamMonth ? dayjs(`${order.agreedExamMonth}-01`) : undefined, classType: order?.classType, servicePeriod: order?.servicePeriodLabelSnapshot ? order.servicePeriod : undefined,
         studentSource: order?.studentSourceLabelSnapshot ? order.studentSource : undefined, customerPaidAt: order ? dayjs(order.customerPaidAt) : dayjs(),
         feeMode: order?.feeModeLabelSnapshot ? order.feeMode : undefined, paymentMethod: order?.paymentMethodLabelSnapshot ? order.paymentMethod : undefined, remark: order?.remark,
         specialRequirements: order?.studentSpecialRequirements, materialDeliveryContact: order?.materialDeliveryContact,
@@ -286,7 +286,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         refreshedDictionaryFields, buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
         studentMobile: values.mobile.trim(), studentWechatId: values.wechatId.trim(),
         provinceCode, provinceName: region.provinceName, cityCode, cityName: region.cityName,
-        agreedExamTime: values.agreedExamTime?.trim() || undefined, classType: values.classType?.trim() || undefined,
+        agreedExamMonth: values.agreedExamMonth?.format('YYYY-MM'), classType: values.classType?.trim() || undefined,
         servicePeriod: values.servicePeriod, studentSource: values.studentSource, customerPaidAt: values.customerPaidAt.valueOf(),
         feeMode: values.feeMode, paymentMethod: values.paymentMethod, remark: values.remark?.trim() || undefined,
         studentSpecialRequirements: values.specialRequirements?.trim() || undefined,
@@ -372,7 +372,12 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         <Typography.Paragraph type="secondary">请填写本次报名的真实信息。与客户档案不一致时，提交前可选择是否更新档案。</Typography.Paragraph>
         <Divider titlePlacement="start">报名与服务</Divider>
         <Row gutter={16}>
-          <Col xs={24} md={12}><Form.Item name="agreedExamTime" label="商定考试时间"><Input maxLength={100}/></Form.Item></Col>
+          <Col xs={24} md={12}>
+            <Form.Item name="agreedExamMonth" label="商定考试月份" rules={[{ required: true, message: '请选择商定考试月份' }]}
+              extra={revisionOrder?.agreedExamTime ? `原商定考试时间（文本）：${revisionOrder.agreedExamTime}` : '审批通过后按产品、考试月份和成交负责人自动分班'}>
+              <DatePicker picker="month" format="YYYY年M月" style={{ width: '100%' }}/>
+            </Form.Item>
+          </Col>
           <Col xs={24} md={12}><Form.Item name="classType" label="开通班种"><Input maxLength={100}/></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="servicePeriod" label="服务周期" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_SERVICE_PERIOD)}/></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="studentSource" label="学生来源" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_SOURCE)}/></Form.Item></Col>
@@ -380,7 +385,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         <Divider titlePlacement="start">成交课程与金额</Divider>
         {orderId && revisionOrder && <Alert showIcon type="info" message={transactionLocked
           ? '线上已到账：课程、规格和金额不可直接修改，补正资料后将重新审批。'
-          : '线下已支付：可更正课程及金额录入错误，请核实付款凭证；重提后教务和财务将重新审批，补款或退款须另行处理。'}/>}
+          : '线下已支付：可更正课程及金额录入错误，请核实付款凭证；重提后将进入财务审核，补款或退款须另行处理。'}/>}
         <Form.List name="items" rules={[{ validator: async (_, value) => value?.length ? undefined : Promise.reject(new Error('至少添加一个成交课程')) }]}>
           {(fields, { add, remove }, { errors }) => <>
             {fields.map((field, index) => <Row gutter={12} key={field.key} align="top">

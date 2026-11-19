@@ -109,6 +109,9 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
             case "subordinate.todayReceivedCount" -> row.getTodayReceivedCount();
             case "subordinate.todayQualifiedCount" -> row.getTodayQualifiedCount();
             case "subordinate.todayFollowUpRecordCount" -> row.getTodayFollowUpRecordCount();
+            case "subordinate.todayNewIntentionCount" -> row.getTodayNewIntentionCount();
+            case "subordinate.todayOldIntentionFollowUpRecordCount" -> row.getTodayOldIntentionFollowUpRecordCount();
+            case "subordinate.todayStudentContactCount" -> row.getTodayStudentContactCount();
             case "subordinate.todayOrderAmount" -> row.getTodayOrderAmount();
             case "subordinate.pendingQualificationCount" -> row.getPendingQualificationCount();
             case "subordinate.todayFollowUpTotalCount" -> row.getTodayFollowUpTotalCount();
@@ -149,7 +152,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
                 .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
         List<SubordinateTaskRespVO> rows = tasks.stream().filter(task -> {
             var lead = leads.get(task.getBizId());
-            return BIZ_TYPE_LEAD.equals(task.getBizType()) && lead != null && OWNER_SALES.equals(lead.getOwnerIdentity()) && Objects.equals(salesUserId, lead.getOwnerUserId());
+            return BIZ_TYPE_LEAD.equals(task.getBizType()) && lead != null && Objects.equals(salesUserId, lead.getOwnerUserId());
         }).map(task -> {
             SubordinateTaskRespVO row = new SubordinateTaskRespVO();
             row.setId(task.getId()); row.setTaskType(task.getTaskType()); row.setLeadId(task.getBizId());
@@ -166,9 +169,8 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
 
     @Override
     public List<LeadAssignmentUserRespVO> getTransferCandidates(Long managerUserId) {
-        Set<Long> managed = permissionService.getManagedUserIds(managerUserId);
-        Set<Long> sales = scope.managed(managerUserId).stream().map(AdminUserRespDTO::getId).collect(Collectors.toSet());
-        return assignmentService.getEligibleSalesUsers().stream().filter(user -> managed.contains(user.getId()) && sales.contains(user.getId())).toList();
+        Set<Long> targets = scope.transferTargetIds(managerUserId);
+        return assignmentService.getEligibleSalesUsers().stream().filter(user -> targets.contains(user.getId())).toList();
     }
 
     @Override
@@ -179,8 +181,11 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead);
         Long excluded = lead.getOwnerUserId() == null ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
+        String source = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+        Set<Long> receivers = isSelfSourced(source) ? null : assignmentService.getEligibleReceivers().stream()
+                .map(LeadAssignmentUserRespVO::getId).collect(Collectors.toSet());
         return getTransferCandidates(managerUserId).stream()
-                .filter(user -> !Objects.equals(user.getId(), excluded)).toList();
+                .filter(user -> !Objects.equals(user.getId(), excluded) && (receivers == null || receivers.contains(user.getId()))).toList();
     }
 
     @Override
@@ -189,10 +194,20 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         if (ids.isEmpty() || ids.size() > 200) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
         commandService.validateManagedLeads(ids, managerUserId);
         var leads = leadMapper.selectBatchIds(ids);
-        Set<Long> excluded = leads.stream().map(lead -> lead.getOwnerUserId() == null
-                ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId()).collect(Collectors.toSet());
         leads.forEach(lead -> SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead));
-        return getTransferCandidates(managerUserId).stream().filter(user -> !excluded.contains(user.getId())).toList();
+        // Same per-lead rules as getTransferCandidates(manager, leadId), with candidates and receivers loaded once.
+        List<LeadAssignmentUserRespVO> base = getTransferCandidates(managerUserId);
+        Set<Long> allowed = base.stream().map(LeadAssignmentUserRespVO::getId).collect(Collectors.toCollection(HashSet::new));
+        Set<Long> receivers = null;
+        for (LeadDO lead : leads) {
+            allowed.remove(lead.getOwnerUserId() == null ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId());
+            String source = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+            if (isSelfSourced(source)) continue;
+            if (receivers == null) receivers = assignmentService.getEligibleReceivers().stream()
+                    .map(LeadAssignmentUserRespVO::getId).collect(Collectors.toSet());
+            allowed.retainAll(receivers);
+        }
+        return base.stream().filter(user -> allowed.contains(user.getId())).toList();
     }
 
     @Override
@@ -290,7 +305,8 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         if (replay != null) return replay;
         commandService.validateManagedLeads(reqVO.getLeadIds(), managerUserId);
         if ("transfer".equals(action)) {
-            for (Long id : reqVO.getLeadIds()) requireTransferTarget(id, reqVO.getTargetUserId(), managerUserId);
+            // Leads were validated above as one batch; the target rule does not depend on the individual lead.
+            requireEligibleTarget(reqVO.getTargetUserId(), managerUserId);
         }
         if ("release-public-sea".equals(action) && reqVO.getCollaboratorUserId() != null) requireEligibleTarget(reqVO.getCollaboratorUserId(), managerUserId);
         replay = commandService.beginBatch("batch-" + action, managerUserId, reqVO.getIdempotencyKey(), fingerprint);
@@ -322,33 +338,36 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     private List<SubordinateSalesRespVO> buildRows(List<AdminUserRespDTO> users) {
         if (users.isEmpty()) return List.of();
         List<Long> ids = users.stream().map(AdminUserRespDTO::getId).toList();
-        Map<Long, List<LeadDO>> leads = leadMapper.selectByOwnerUserIds(ids).stream().filter(lead -> OWNER_SALES.equals(lead.getOwnerIdentity()))
+        Map<Long, List<LeadDO>> leads = leadMapper.selectByOwnerUserIds(ids).stream()
                 .collect(Collectors.groupingBy(LeadDO::getOwnerUserId));
         var allTasks = taskMapper.selectByAssigneeIds(ids);
         Set<Long> taskLeadIds = allTasks.stream().filter(task -> BIZ_TYPE_LEAD.equals(task.getBizType())).map(BusinessTaskDO::getBizId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, LeadDO> taskLeads = taskLeadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(taskLeadIds).stream().collect(Collectors.toMap(LeadDO::getId, Function.identity()));
         Map<Long, List<BusinessTaskDO>> tasks = allTasks.stream().filter(task -> {
             LeadDO lead = taskLeads.get(task.getBizId());
-            return BIZ_TYPE_LEAD.equals(task.getBizType()) && lead != null && OWNER_SALES.equals(lead.getOwnerIdentity()) && Objects.equals(task.getAssigneeId(), lead.getOwnerUserId());
+            return BIZ_TYPE_LEAD.equals(task.getBizType()) && lead != null && Objects.equals(task.getAssigneeId(), lead.getOwnerUserId());
         }).collect(Collectors.groupingBy(BusinessTaskDO::getAssigneeId));
-        Map<Long, List<SalesOrderDO>> orders = orderMapper.selectEffectiveBySubmitterIds(ids).stream().filter(order -> OWNER_SALES.equals(order.getFormalOwnerIdentity()))
+        Map<Long, List<SalesOrderDO>> orders = orderMapper.selectEffectiveBySubmitterIds(ids).stream()
                 .collect(Collectors.groupingBy(SalesOrderDO::getSubmitterUserId));
-        Set<Long> eligible = assignmentService.getEligibleSalesUsers().stream()
+        Set<Long> eligible = assignmentService.getEligibleReceivers().stream()
                 .map(LeadAssignmentUserRespVO::getId).collect(Collectors.toSet());
         List<DictDataRespDTO> categories = dictDataApi.getDictDataList(DICT_CATEGORY).stream()
                 .filter(data -> CommonStatusEnum.ENABLE.getStatus().equals(data.getStatus())).toList();
         LocalDateTime start = LocalDate.now(BEIJING).atStartOfDay();
         LocalDateTime end = start.plusDays(1);
         LocalDateTime now = LocalDateTime.now(BEIJING);
-        var assignments = assignmentHistoryMapper.selectTodayByUserIds(ids, start, end).stream().filter(item -> OWNER_SALES.equals(item.getOwnerIdentitySnapshot())).toList();
-        var followUps = followUpRecordMapper.selectTodayByUserIds(ids, start, end).stream().filter(item -> OWNER_SALES.equals(item.getOwnerIdentitySnapshot())).toList();
-        var opportunityFollowUps = opportunityFollowUpRecordMapper.selectTodayByUserIds(ids, start, end).stream().filter(item -> OWNER_SALES.equals(item.getOwnerIdentitySnapshot())).toList();
+        var assignments = assignmentHistoryMapper.selectTodayByUserIds(ids, start, end);
+        var followUps = followUpRecordMapper.selectTodayByUserIds(ids, start, end);
+        var opportunityFollowUps = opportunityFollowUpRecordMapper.selectTodayByUserIds(ids, start, end);
         var qualifications = salesDailyMapper.selectQualifications(cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId(), ids, start, end);
+        long tenant = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        var intentions = salesDailyMapper.selectNewIntentions(tenant, ids, start, end);
+        var oldFollowUps = salesDailyMapper.selectOldIntentionFollowUps(tenant, ids, start, end);
+        var studentContacts = salesDailyMapper.selectContactedStudents(tenant, ids, start, end);
         Set<Long> deptIds = users.stream().map(AdminUserRespDTO::getDeptId).filter(Objects::nonNull).collect(Collectors.toSet());
         var departments = deptIds.isEmpty() ? Map.<Long,cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO>of() : deptApi.getDeptMap(deptIds);
         Set<Long> postIds = users.stream().filter(user -> user.getPostIds()!=null).flatMap(user -> user.getPostIds().stream()).collect(Collectors.toSet());
         var posts = postApi.getPostMap(postIds);
-        var salesPost = postApi.getPostByCode(SALES_POST_CODE);
         return users.stream().map(user -> {
             var row = buildRow(user, leads.getOrDefault(user.getId(), List.of()),
                 tasks.getOrDefault(user.getId(), List.of()), orders.getOrDefault(user.getId(), List.of()),
@@ -356,8 +375,10 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
             row.setDeptId(user.getDeptId());
             var department=user.getDeptId()==null?null:departments.get(user.getDeptId());row.setDepartmentName(department==null?null:department.getName());
             row.setPostNames(user.getPostIds()==null?List.of():user.getPostIds().stream().map(posts::get).filter(Objects::nonNull).map(PostRespDTO::getName).toList());
-            row.setSalesDispatchSupported(salesPost!=null&&user.getPostIds()!=null&&user.getPostIds().contains(salesPost.getId()));
-            row.setEducationOwnershipSupported(false);
+            row.setSalesDispatchSupported(eligible.contains(user.getId()));
+            row.setTodayNewIntentionCount(intentions.stream().filter(item -> Objects.equals(item.getOperatorUserId(), user.getId())).map(item -> item.getAggregateId()).distinct().count());
+            row.setTodayOldIntentionFollowUpRecordCount(oldFollowUps.stream().filter(item -> Objects.equals(item.getOperatorUserId(), user.getId())).count());
+            row.setTodayStudentContactCount(studentContacts.stream().filter(item -> Objects.equals(item.getOperatorUserId(), user.getId())).count());
             row.setOrderCreationSupported(permissionApi.hasAnyPermissions(user.getId(), "zsjos:sales-order:create", "zsjos:sales-order:student-repurchase"));
             // Event-time attribution survives later ownership changes; never infer daily activity from current ownership.
             var history = assignments.stream().filter(item -> Objects.equals(item.getCandidateUserId(), row.getUserId())).toList();
@@ -458,13 +479,6 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     private void requireEligibleTarget(Long userId, Long managerUserId) {
         boolean valid = getTransferCandidates(managerUserId).stream().anyMatch(user -> Objects.equals(user.getId(), userId));
         if (!valid) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
-    }
-
-    private void requireTransferTarget(Long leadId, Long target, Long manager) {
-        commandService.validateManagedLeads(List.of(leadId), manager);
-        LeadDO lead = leadMapper.selectById(leadId);
-        if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        requireEligibleTarget(target, manager);
     }
 
     private SubordinateBatchResultVO executeBatch(List<Long> ids, BatchAction action) {

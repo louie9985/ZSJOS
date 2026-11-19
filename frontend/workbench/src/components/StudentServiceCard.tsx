@@ -5,7 +5,7 @@ import '../styles/components/student-service-card.css'
 
 export default function StudentServiceCard({ service }: { service: MyStudent['services'][number] }) {
   const people = [
-    { key: 'planner', label: '学习规划师（班主任）', id: service.ownerUserId, name: service.ownerUserName },
+    { key: 'planner', label: '班主任', id: service.ownerUserId, name: service.ownerUserName },
     { key: 'director', label: '编导', id: service.contentDirectorUserId, name: service.contentDirectorUserName },
     { key: 'career', label: '职业规划师', id: service.careerPlannerUserId, name: service.careerPlannerUserName },
     { key: 'operator', label: '运营负责人', id: service.operatorUserId, name: service.operatorUserName },

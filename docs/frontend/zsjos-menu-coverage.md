@@ -1,8 +1,12 @@
+> 销售与学生交付合并更新：旧教务团队页面已合并到下属销售；历史 `education_team` 指标与筛选仅作兼容输入，详见 [统一团队迁移](../api/education-team.md)。以下旧教务团队说明仅记录历史。
+
 # ZSJOS 双前端菜单覆盖矩阵
 
 版本更新通知（2026-11-11）使用独立工作台页面 `/zsjos/version-updates` 发布管理与 `/zsjos/version-update-history` 更新记录，两者组件标记为 `zsjos-workbench`，由 Vue Admin 现有过滤器过滤。权限前缀 `zsjos:version-update:`，右上角入口按 `read` 权限展示，知悉操作独立使用 `acknowledge`。见[版本更新通知契约](../api/version-updates.md)。
 
-报名资料收集（2026-11-01）：`zsjos/studentInfoTasks/index` → Workbench `/zsjos/student-info-tasks`，Vue Admin 过滤该组件。权限为 `zsjos:student-info-task:query` 并累加原报名公共池范围。两端履约仅展示任务状态与资料。见[任务契约](../api/order-student-information-tasks.md)。
+报名资料收集由两端“我的报名履约”详情办理，支持生成、发送、查看及复用资料。页面权限为 `zsjos:registration:query-my`，资料操作继续按原资料权限配置，转交使用 `zsjos:registration:transfer`。原报名资料收集独立入口已退役。见[任务契约](../api/order-student-information-tasks.md)。
+
+新成交订单的财务审批由通用 BPM 待办及已办承载。两端复用通用审批的前置、后置加签及办理记录，并按 BPM 任务读取订单详情。旧流程中仍待办的主管确认继续通过原入口办理。
 
 我的运营（2026-10-28）：`zsjos/myOperations/index` → Workbench `/zsjos/my-operations`；Vue Admin 过滤该组件。页面权限 `zsjos:my-operations:query`，运营名下客资复用 `LeadManagementPage`，范围含代录归属，不含合作方客资。见[我的运营契约](../api/my-operations.md)。
 
@@ -13,9 +17,11 @@
 编导运营和班级管理添加按钮复用此权限；候选跨部门选择不增加历史学员读取权。
 见[学员直接新增契约](../api/student-entry.md)。
 
-学生交付中心端替换补充：按认证后的服务端交付域归属确认，移除原下属员工菜单和旧地址的可打开路由，仅使用获授权的教务团队入口；销售端下属销售入口保留。无教务授权不得回退旧入口或推导新权限。
+~~学生交付中心端替换补充：按认证后的服务端交付域归属确认，移除原下属员工菜单和旧地址的可打开路由，仅使用获授权的教务团队入口；销售端下属销售入口保留。无教务授权不得回退旧入口或推导新权限。~~（已随销售与学生交付合并退役，仅保留历史记录。）
 
-教务团队（2026-10-18）：`zsjos/educationTeam/index` → Workbench `/zsjos/education-team` 独立原生页面；Vue Admin 的菜单过滤器排除该组件，销售端下属销售页面保留。权限使用 `zsjos:education-team:*`，不继承下属员工授权，详见 [教务团队 API](../api/education-team.md)。
+销售与学生交付合并（V371 草稿）：以下三类菜单由 V371 逻辑删除（`deleted=1`、停用、隐藏），双端均不再渲染：教务团队 `zsjos:education-team:*`（页面 `zsjos/educationTeam/index`）、独立交付业绩 `zsjos:delivery-performance*`（页面 `zsjos/deliveryPerformance/index`、`zsjos/deliveryPerformanceTarget/index`）及教务自拓 `zsjos:lead:education-self-sourced:create`（页面 `zsjos/leadEducationSelfSourced/index`）。引用这些菜单的历史 `system_role_menu` 行不撤销、不改派，因菜单已删除而失效。新安装种子不再创建学生服务与交付中心/一部（1050/1051）、学习规划师与交付主管岗位及角色。
+
+（已退役）教务团队（2026-10-18）：`zsjos/educationTeam/index` → Workbench `/zsjos/education-team` 独立原生页面；Vue Admin 的菜单过滤器排除该组件，销售端下属销售页面保留。权限使用 `zsjos:education-team:*`，不继承下属员工授权，详见 [教务团队 API](../api/education-team.md)。
 
 考期产品／规格选项仅管理权限可读取，查看和管理仍使用独立叶子权限；仅考期允许部分规格。三端产品展示覆盖见 [产品规格展示清单](product-spec-presentation.md)。
 
@@ -37,7 +43,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 1 | 提交客资 | `/zsjos/leads/submit` | `LeadSubmissionPage` | `zsjos/leadSubmission/index` |
 | 2 | 客资管理 | `/zsjos/leads/manage` | `LeadManagementPage`（全部/我提交的/我负责的） | `zsjos/lead/index` |
 | 3 | 销售自拓 | `/zsjos/leads/self-sourced` | `LeadSubmissionPage(selfSourced)` | `zsjos/leadSelfSourced/index` |
-| 3 | 教务自拓 | `/zsjos/leads/education-self-sourced` | `LeadSubmissionPage(educationSelfSourced)` | `zsjos/leadEducationSelfSourced/index` |
+| 3 | ~~教务自拓~~（V371 退役） | ~~`/zsjos/leads/education-self-sourced`~~ | 服务端菜单已退役 | 服务端菜单已退役 |
 | 4 | 销售投诉处理 | `/zsjos/leads/complaints` | `LeadComplaintPage` | `zsjos/leadComplaint/index` |
 | 5 | 我提交的（兼容路径） | `/zsjos/leads/submitted` | 重定向至客资管理并选择提交范围 | 隐藏权限节点 |
 | 6 | 我负责的（兼容路径） | `/zsjos/leads/owned` | 重定向至客资管理并选择负责范围 | 隐藏权限节点 |
@@ -72,7 +78,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 35 | 未读消息 | `/messages/unread` | `MessageInboxPage(view=unread)` | `system/notify/my/unread/index` |
 
 消息中心导航角标由现有 System 未读摘要接口驱动：`/messages/notice` 显示当前用户公告未读数，`/messages/unread` 显示站内信未读数，`/messages` 显示两者合计；`/messages/all` 和“站内信管理”不重复显示数量。角标固定在服务端菜单图标右上外侧，超过 99 显示 `99+`，不改变菜单权限或可见性。
-| 36 | 报名履约公共池 | `/zsjos/registration-pool` | `RegistrationPoolPage` | `zsjos/registration-pool` |
+| 36 | 我的报名履约 | `/zsjos/registration-pool` | `RegistrationPoolPage` | `zsjos/registration-pool` |
 | 37 | 履约清单配置 | `/zsjos/registration-checklist-config` | `RegistrationChecklistConfigPage` | `zsjos/registrationChecklistConfig/index` |
 | 38 | 学员管理（隐藏深链） | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
 | 38.1 | 班级管理 | `/zsjos/class-management` | `DeliveryClassPage`（按服务端权限选择数据范围） | `zsjos/class-management` |
@@ -128,7 +134,7 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 - 历史 `/zsjos/sales-order-supervisor-confirmations` 仅由 React 重定向到 `/zsjos/sales-order-approvals`，服务端不再发布独立主管确认页面菜单。
 - 新增或修改页面菜单时，必须同步服务端菜单种子、React `APP_ROUTES`/`RENDERABLE_APP_ROUTES`/`RouteHost`、Vue `component` 文件和本矩阵。
 - 强制表单管理页是 Vue Admin 配置面，使用服务端权限 `zsjos:forced-form:*`，不作为 Workbench 可导航页面注册。员工端通过全局 `ForcedFormProvider` 在登录、刷新、路由切换、401 恢复和 WebSocket 重连后查询 `/zsjos/forced-form/pending`，有待办时显示不可关闭填写面并阻断普通业务接口。
-- `/zsjos/my-students` 仅属于 `study_planner`；`content_director` 和 `new_media_operator` 共用 `/zsjos/media-students` 与 `zsjos:media-student:query-my`，后端分别按服务关系、账号责任关系和本人任务限制学员范围。
+- `/zsjos/my-students` 历史上仅属于 `study_planner`（该角色已随销售与交付合并退役；访问仅由 System 角色管理中配置的菜单权限决定）；`content_director` 和 `new_media_operator` 共用 `/zsjos/media-students` 与 `zsjos:media-student:query-my`，后端分别按服务关系、账号责任关系和本人任务限制学员范围。
 - V283 定义 `/zsjos/media-lead-analysis` 和 `/zsjos/media-lead-target` 两个 Workbench 菜单及独立的新媒体按钮权限；角色授权仅由 System 角色管理配置。Vue Admin 会过滤这两个仅由 React Workbench 渲染的组件键，保留其他已授权的 Vue 页面。大盘本人、部门、中心范围同时受后端业务权限和 System 数据范围约束；目标与组织配置不复用销售业绩权限或销售组织映射。部署与真实账号验收状态见 [新媒体客资分析契约](../api/media-lead-analysis.md)。
 - `/zsjos/accounts`、`/zsjos/content`、`/zsjos/positioning` 的页面菜单由 V113 退役。稳定的查询和操作权限字符串保留，并调整到学员菜单下；账号、内容和定位只能从具体学员的相应标签进入。
 The subordinate-sales left pane uses the shared 20-row append lazy-loading pattern with a scroll-root sentinel, stable server ordering, deduplication, stale-request rejection, and retryable load-more failure. The `一键下班` command is rendered only from `zsjos:subordinate-sales:pause-all`; its scope is entirely server-owned. The home page and header consume one dispatch-status provider so mode, heartbeat, page-offline state, retry, and eligibility remain synchronized without duplicate polling.
@@ -176,7 +182,7 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 
 2026-10-08：主管直接改判有效仅在 Workbench 客资管理与下属销售详情提供，复用 `SUPERVISOR_OVERTURN_VALID` 动作和独立按钮权限。Vue Admin 不增加此操作，其客资详情及申诉处理保持原入口；新增动作字段兼容读取。V289 仅添加菜单按钮与通知元数据，不分配角色。见 [操作与发布说明](../api/supervisor-lead-overturn.md)。
 
-2026-10-19：下属销售恢复销售岗位及销售身份范围，教务团队使用独立六项今日指标。两页均沿用现有布局，不新增表格视图。服务端 V334 恢复下属销售菜单名称，不调整角色授权。
+2026-10-19：下属销售恢复销售岗位及销售身份范围，教务团队（已由 V371 退役）使用独立六项今日指标。两页均沿用现有布局，不新增表格视图。服务端 V334 恢复下属销售菜单名称，不调整角色授权。
 
 
 ### 中世健考勤通（2026-10-22）

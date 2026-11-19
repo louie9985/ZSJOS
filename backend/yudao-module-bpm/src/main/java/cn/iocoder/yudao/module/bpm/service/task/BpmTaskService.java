@@ -25,6 +25,9 @@ import java.util.Set;
  * @author 芋道源码
  */
 public interface BpmTaskService {
+    void skipObsoleteNode(Long operatorUserId, String processInstanceId, String processDefinitionKey,
+                          String businessKey, String taskDefinitionKey, String reason);
+
 
     // ========== Query 查询相关方法 ==========
 

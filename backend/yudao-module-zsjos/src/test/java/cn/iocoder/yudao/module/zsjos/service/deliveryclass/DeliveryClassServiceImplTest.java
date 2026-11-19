@@ -51,6 +51,7 @@ class DeliveryClassServiceImplTest {
     @Mock private DeliveryClassScopeService scopeService;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Mock private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
     @Mock private RoleApi roleApi;
     @Mock private ZsjosProductSkuService productSkuService;
@@ -71,9 +72,9 @@ class DeliveryClassServiceImplTest {
                 .thenReturn(java.util.Map.of(7L, new AdminUserRespDTO().setId(7L).setNickname("新姓名")))
                 .thenReturn(java.util.Map.of(7L, new AdminUserRespDTO().setId(7L).setNickname("再次改名")))
                 .thenReturn(java.util.Map.of());
-        assertEquals("新姓名", service.options(null, false).getFirst().getHomeroomUserName());
-        assertEquals("再次改名", service.options(null, false).getFirst().getHomeroomUserName());
-        org.junit.jupiter.api.Assertions.assertNull(service.options(null, false).getFirst().getHomeroomUserName());
+        assertEquals("新姓名", service.options(null, false, 9L).getFirst().getHomeroomUserName());
+        assertEquals("再次改名", service.options(null, false, 9L).getFirst().getHomeroomUserName());
+        org.junit.jupiter.api.Assertions.assertNull(service.options(null, false, 9L).getFirst().getHomeroomUserName());
         assertEquals("旧姓名", row.getHomeroomUserNameSnapshot());
         verify(adminUserApi, times(3)).getUserMap(java.util.Set.of(7L));
         verifyNoMoreInteractions(adminUserApi);
@@ -94,15 +95,18 @@ class DeliveryClassServiceImplTest {
     @Test void classQueryAllExpandsManagedPageButNotPersonalPageOrWrites() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
         when(permissionApi.hasAnyPermissions(9L, DeliveryClassService.PERMISSION_QUERY_ALL)).thenReturn(true);
-        when(classMapper.selectDeliveryClassPage(request, java.util.Set.of(), null, true, true))
+        when(classMapper.classQuery(eq(request), anySet(), any(), anyBoolean(), anyBoolean()))
+                .thenAnswer(call -> new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<DeliveryClassDO>());
+        when(classMapper.selectPage(eq(request), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty());
         assertEquals(0L, service.getManagedPage(9L, request).getTotal());
-        when(classMapper.selectDeliveryClassPage(request, java.util.Set.of(), 9L, false, false))
-                .thenReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty());
         assertEquals(0L, service.getMyPage(9L, request).getTotal());
         var row = new DeliveryClassDO().setId(1L).setDeptId(80L).setStatus("SERVING").setSystemClass(false);
         assertEquals(java.util.List.of(), service.availableActions(row, 9L));
-        verifyNoInteractions(scopeService, objectPermissions);
+        // Only the sales-actor probe may touch the scope service; non-sales readers never resolve command scope.
+        verify(scopeService, never()).resolve(anyLong());
+        verify(scopeService, never()).resolveRead(anyLong());
+        verifyNoInteractions(objectPermissions);
     }
 
     @Test void rowActionsRequireFeatureObjectSameDepartmentAndLifecycle() {
@@ -122,10 +126,14 @@ class DeliveryClassServiceImplTest {
     @Test void administratorReadScopesDoNotReuseCommandDepartmentScope() {
         var request = new cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.DeliveryClassPageReqVO();
         when(permissionApi.hasTenantReadAllAccess(9L)).thenReturn(true);
-        when(classMapper.selectDeliveryClassPage(request, java.util.Set.of(), null, true, true))
+        when(classMapper.classQuery(eq(request), anySet(), any(), anyBoolean(), anyBoolean()))
+                .thenAnswer(call -> new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<DeliveryClassDO>());
+        when(classMapper.selectPage(eq(request), any(com.baomidou.mybatisplus.core.conditions.Wrapper.class)))
                 .thenReturn(cn.iocoder.yudao.framework.common.pojo.PageResult.empty());
         assertEquals(0L, service.getManagedPage(9L, request).getTotal());
-        verifyNoInteractions(scopeService, taskCommandService);
+        verify(scopeService, never()).resolve(anyLong());
+        verify(scopeService, never()).resolveRead(anyLong());
+        verifyNoInteractions(taskCommandService);
         request.setReadScope("ALL");
         when(readScopeService.resolve("ALL", null, 9L)).thenReturn(null);
         assertEquals(0L, service.getMyPage(9L, request).getTotal());
@@ -447,10 +455,7 @@ class DeliveryClassServiceImplTest {
     }
 
     private void plannerRole(Long userId) {
-        RoleRespDTO role = new RoleRespDTO(); role.setId(3012L); role.setCode("study_planner");
-        role.setStatus(CommonStatusEnum.ENABLE.getStatus());
-        when(roleApi.getRoleByCode("study_planner")).thenReturn(role);
-        when(permissionApi.getEnabledRoleIdsByUserId(userId)).thenReturn(java.util.Set.of(3012L));
+        when(permissionApi.hasAnyPermissions(userId, "zsjos:sales:eligible")).thenReturn(true);
     }
 
     private static ExamProductScopeRespVO scope(Long productId, Long categoryId, Long skuId) {

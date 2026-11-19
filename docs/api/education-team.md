@@ -1,4 +1,13 @@
-# 教务团队
+# 统一下属销售与旧教务团队迁移
+
+已退役（2026-11-16）。Workbench `/zsjos/education-team` 路由、`zsjos/educationTeam/index` 组件映射、Vue Admin 路由过滤项、高级筛选 `education_team` 场景（`educationTeam.*` 字段及其模板权限）和首页指标 `education_team` 来源全部删除；菜单元数据已由 V371 退役。团队管理统一使用[下属销售](zsjos-subordinate-sales.md)及 `zsjos:subordinate-sales:*` 权限。
+
+已保存的首页指标草稿/发布快照及高级筛选模板中的 `education_team` 来源和 `educationTeam.X` 字段由 [`sales_education_identity_backfill.sql`](../../script/sql/mysql/repair/sales_education_identity_backfill.sql) 改写为 `subordinate_sales` / `subordinate.X`；服务端兼容映射 `HomeMetricEducationFilterCompatibility` 已删除，未回填的旧来源按未知来源拒绝。
+
+## 以下为旧独立团队接口的历史说明
+
+以下接口、独立页面和独立统计实现已由上述统一流程取代，仅用于理解历史部署和数据，不代表当前可调用接口。
+
 
 Workbench 独立页面 `/zsjos/education-team`，组件 `zsjos/educationTeam/index`；接口前缀 `/admin-api/zsjos/education-team`。学生交付中心端完整替换原“下属员工”入口，旧入口和旧地址不再可打开；销售端继续使用自己的下属销售页面与接口。教务团队不包装 SubordinateSalesPage，也不调用 SubordinateSalesService。
 

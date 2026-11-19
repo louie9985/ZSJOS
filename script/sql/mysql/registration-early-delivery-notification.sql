@@ -31,7 +31,7 @@ BEGIN
   INSERT INTO system_notify_rule
     (name,scene_code,channel_code,template_id,recipient_roles,specified_user_ids,action_type,status,creator,create_time,updater,update_time,deleted,tenant_id)
   SELECT '提前交付已停止','zsjos.registration.delivery_cancelled','in_app',t.id,
-    '["study_planner"]','[]','message_detail',0,'registration-early-delivery',NOW(),'registration-early-delivery',NOW(),b'0',1
+    '["head_teacher"]','[]','message_detail',0,'registration-early-delivery',NOW(),'registration-early-delivery',NOW(),b'0',1
   FROM system_notify_template t
   WHERE t.code='ZSJOS_REGISTRATION_DELIVERY_CANCELLED' AND t.deleted=b'0'
     AND NOT EXISTS (SELECT 1 FROM system_notify_rule r WHERE r.tenant_id=1

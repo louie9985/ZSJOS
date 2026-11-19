@@ -28,6 +28,18 @@ public class RegistrationNotifyPublisher {
     }
 
     public void publishTaskCreated(RegistrationCaseDO registrationCase, SalesOrderDO order) {
+        publishTaskAssignment(registrationCase, order, "registration-task-created:" + registrationCase.getId(),
+                registrationCase.getRegistrationApprovedAt());
+    }
+
+    public void publishTaskTransferred(RegistrationCaseDO registrationCase, SalesOrderDO order) {
+        publishTaskAssignment(registrationCase, order,
+                "registration-task-transferred:" + registrationCase.getId() + ":" + registrationCase.getVersion(),
+                java.time.LocalDateTime.now());
+    }
+
+    private void publishTaskAssignment(RegistrationCaseDO registrationCase, SalesOrderDO order, String eventKey,
+                                       java.time.LocalDateTime occurredAt) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("registrationCaseId", registrationCase.getId());
         payload.put("orderId", registrationCase.getOrderId());
@@ -35,9 +47,9 @@ public class RegistrationNotifyPublisher {
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
                 .tenantId(TenantContextHolder.getRequiredTenantId())
                 .sceneCode(NOTIFY_SCENE_TASK_CREATED)
-                .sourceEventKey("registration-task-created:" + registrationCase.getId())
+                .sourceEventKey(eventKey)
                 .bizType("registration_case").bizId(registrationCase.getId())
-                .occurredAt(registrationCase.getRegistrationApprovedAt()).payload(payload).build());
+                .occurredAt(occurredAt).payload(payload).build());
     }
 
     public void publishPlannerAssigned(RegistrationCaseDO registrationCase, SalesOrderDO order,

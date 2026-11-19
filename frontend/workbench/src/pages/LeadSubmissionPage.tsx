@@ -43,9 +43,8 @@ const DISPATCH_MODE_HINTS: Record<string, string> = {
 
 export default function LeadSubmissionPage({
   selfSourced = false,
-  educationSelfSourced = false,
   permissions = []
-}: { selfSourced?: boolean; educationSelfSourced?: boolean; permissions?: string[] }) {
+}: { selfSourced?: boolean; permissions?: string[] }) {
   const [form] = Form.useForm<FormValues>()
   const mobile = Form.useWatch('mobile', form)
   const wechatId = Form.useWatch('wechatId', form)
@@ -112,7 +111,7 @@ export default function LeadSubmissionPage({
     const sequence = ++archiveRequest.current
     setArchiveLoading(true); setArchiveError(undefined); setArchiveCandidates(undefined); setSelectedArchive(undefined)
     try {
-      const candidates = await api.querySelfSourcedArchive(educationSelfSourced, {
+      const candidates = await api.querySelfSourcedArchive({
         mobile: archiveMobile.trim() || undefined, wechatId: archiveWechat.trim() || undefined, idempotencyKey: createIdempotencyKey()
       })
       if (sequence !== archiveRequest.current) return
@@ -129,7 +128,7 @@ export default function LeadSubmissionPage({
     return true
   }
   const canCheckContact = permissions.some(permission => [
-    'zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create'
+    'zsjos:lead:submit', 'zsjos:lead:self-sourced:create'
   ].includes(permission))
 
   const checkContact = async () => {
@@ -144,9 +143,7 @@ export default function LeadSubmissionPage({
       setCheckingContact(true)
       setContactResult(undefined)
       try {
-        const checkApi = educationSelfSourced
-          ? api.checkEducationSelfSourcedLeadContact
-          : selfSourced ? api.checkSelfSourcedLeadContact : api.checkLeadContact
+        const checkApi = selfSourced ? api.checkSelfSourcedLeadContact : api.checkLeadContact
         const matched = await checkApi({
           mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined, idempotencyKey
         })
@@ -341,7 +338,7 @@ export default function LeadSubmissionPage({
         return
       }
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
-      const result = await (educationSelfSourced ? api.createEducationSelfSourcedLead : selfSourced ? api.createSelfSourcedLead : api.createLead)({
+      const result = await (selfSourced ? api.createSelfSourcedLead : api.createLead)({
         ...(selfSourced ? { archiveQueryConfirmed: true, archiveQueryMobile: archiveMobile.trim() || undefined,
           archiveQueryWechatId: archiveWechat.trim() || undefined, selectedPersonId: selectedArchive?.personId,
           archiveSnapshotKey: selectedArchive?.snapshotKey } : {}),

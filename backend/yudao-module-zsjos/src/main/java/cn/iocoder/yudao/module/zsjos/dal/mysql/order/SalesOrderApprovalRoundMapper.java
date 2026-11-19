@@ -12,6 +12,19 @@ import java.util.List;
 @Mapper
 public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApprovalRoundDO> {
     @Select("<script>SELECT DISTINCT r.process_instance_id FROM zsjos_order o "
+            + "JOIN zsjos_order_approval_round r ON r.order_id=o.id AND r.tenant_id=o.tenant_id AND r.deleted=FALSE "
+            + "WHERE o.tenant_id=#{tenantId} AND o.deleted=FALSE AND r.process_instance_id IS NOT NULL "
+            + "AND (o.formal_sales_user_id IN <foreach collection='owners' item='id' open='(' separator=',' close=')'>#{id}</foreach>"
+            + "<if test='submitter != null'> OR o.submitter_user_id = #{submitter}</if>)</script>")
+    List<String> selectProcessIdsByFormalOwners(@Param("tenantId") Long tenantId, @Param("owners") java.util.Collection<Long> owners,
+                                                @Param("submitter") Long submitterUserId);
+
+    /** Boundary owners plus, for a sales boundary, the actor's own submissions (same rule as order lists). */
+    default List<String> selectProcessIdsByFormalOwners(Long tenantId, java.util.Collection<Long> owners) {
+        return selectProcessIdsByFormalOwners(tenantId, owners,
+                cn.iocoder.yudao.module.zsjos.service.order.SalesOrderBoundaryUserIds.actorOf(owners));
+    }
+    @Select("<script>SELECT DISTINCT r.process_instance_id FROM zsjos_order o "
             + "JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.tenant_id = o.tenant_id AND r.deleted = FALSE "
             + "WHERE o.tenant_id = #{tenantId} AND o.deleted = FALSE AND r.process_instance_id IS NOT NULL AND TRIM(r.process_instance_id) != '' "
             + "<if test='status != null'>AND o.status = #{status} </if>"

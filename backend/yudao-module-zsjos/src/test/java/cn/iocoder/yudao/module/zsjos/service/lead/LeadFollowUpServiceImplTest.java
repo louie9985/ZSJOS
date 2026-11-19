@@ -465,7 +465,7 @@ class LeadFollowUpServiceImplTest {
     void automaticFollowUpRejectsOtherEntrypointsAndReusedCycles() {
         for (int scenario=0;scenario<5;scenario++) {
             LeadDO lead=validLead().setSourceType("sales_self_sourced").setSourceProviderRecorded(true).setDispatchMode("self").setRemark("备注");
-            switch(scenario) {case 0 -> lead.setSourceType("education_self_sourced");case 1 -> lead.setSourceProviderUserId(3L);case 2 -> lead.setOwnerUserId(99L);case 3 -> lead.setSourceProviderRecorded(false);default -> lead.setCurrentAssignmentFirstFollowUpAt(LocalDateTime.now());}
+            switch(scenario) {case 0 -> lead.setSourceType("partner");case 1 -> lead.setSourceProviderUserId(3L);case 2 -> lead.setOwnerUserId(99L);case 3 -> lead.setSourceProviderRecorded(false);default -> lead.setCurrentAssignmentFirstFollowUpAt(LocalDateTime.now());}
             when(leadMapper.selectByIdForUpdate(1L,9L)).thenReturn(lead);
             assertThrows(ServiceException.class,()->withTenant(()->service.createSelfSourcedAutomatic(1L,20L,null)));
         }

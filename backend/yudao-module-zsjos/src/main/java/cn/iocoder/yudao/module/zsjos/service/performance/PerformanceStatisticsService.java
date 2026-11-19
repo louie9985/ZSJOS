@@ -27,7 +27,7 @@ public class PerformanceStatisticsService {
  private LocalDateTime now(){return LocalDateTime.now(clock);}
  private PerformanceReportQuery request(Query q,LocalDateTime n) {
   access.authorize(q,false);var scope=access.historicalScope(q);
-  var r=new PerformanceReportQuery();r.setTenant(tenant());r.setBusinessDomain(PerformanceDomain.current());r.setType(q.getScopeType());r.setId(q.getScopeId());
+  var r=new PerformanceReportQuery();r.setTenant(tenant());r.setBusinessDomain("sales");r.setType(q.getScopeType());r.setId(q.getScopeId());
   r.setAllDepartments(scope.allDepartments());r.setMissingDepartment(scope.missingDepartment());r.setDepartments(scope.departments());
   r.setNow(n);r.setToday(n.toLocalDate().atStartOfDay());r.setTomorrow(n.toLocalDate().plusDays(1).atStartOfDay());return r;
  }
@@ -210,7 +210,7 @@ public class PerformanceStatisticsService {
   access.authorize(q,false);
   var scope=access.historicalScope(q);
   var n=now();
-  var request=new PerformanceDetailQuery().setBusinessDomain(PerformanceDomain.current()).setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
+  var request=new PerformanceDetailQuery().setBusinessDomain("sales").setTenant(tenant()).setType(q.getScopeType()).setId(q.getScopeId())
     .setAllDepartments(scope.allDepartments()).setMissingDepartment(scope.missingDepartment()).setDepartments(scope.departments());
   if(CurrentFollowUpSql.supports(q.getMetric()))request.setAssigneeIds(access.currentFollowUpAssignees(q));
   if(q.isCumulative()){

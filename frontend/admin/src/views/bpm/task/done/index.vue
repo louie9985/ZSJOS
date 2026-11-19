@@ -259,7 +259,8 @@ const handleAudit = (row: any) => {
     name: 'BpmProcessInstanceDetail',
     query: {
       id: row.processInstance.id,
-      taskId: row.id
+      taskId: row.id,
+      taskView: 'done'
     }
   })
 }

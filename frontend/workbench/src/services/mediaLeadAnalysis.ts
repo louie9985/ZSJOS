@@ -2,7 +2,7 @@ import { http, unwrap, type PageResult } from './api'
 import type { Timestamp } from './time'
 
 export type ScopeNode = { key: string; parentKey?: string; title: string; scopeType: 'SELF' | 'USER' | 'DEPT' | 'CENTER'; scopeId?: number }
-export type Target = { id?: number; scopeType: string; scopeId: number; name: string; periodStart: string; targetCount: number | null; actualCount: number; manual: boolean; version?: number }
+export type Target = { id?: number; scopeType: string; scopeId: number; name: string; periodStart: string; targetCount: number | null; actualCount: number; manual: boolean; targetAmount?: number | null; amountManual?: boolean; version?: number }
 export type PeriodStats = { key: string; label: string; total: number; valid: number; invalid: number; converted: number; validRate: number | null; convertedRate: number | null; performanceContribution?: number }
 export type Member = { userId: number; name: string; targetCount: number | null; yesterday: number; yesterdayConverted: number; today: number; todayConverted: number; week: number; weekValid: number; weekConverted: number; lastWeek: number; lastWeekValid: number; lastWeekConverted: number; month: number; monthValid: number; monthConverted: number; lastMonth: number; lastMonthValid: number; lastMonthConverted: number; monthProgress: number | null }
 export type CalendarDay = { date: string; total: number; valid: number; invalid: number; pending: number }
@@ -29,7 +29,7 @@ export const mediaLeadApi = {
   details: (query: Query, signal?: AbortSignal) => get<Detail[]>('/zsjos/media-lead-analysis/details', query, signal),
   detailPage: (query: Query & { pageNo: number; pageSize: number }, signal?: AbortSignal) => get<PageResult<Detail>>('/zsjos/media-lead-analysis/detail-page', query, signal),
   targets: (periodStart: string, signal?: AbortSignal) => get<Target[]>('/zsjos/media-lead-target/list', { periodStart }, signal),
-  saveTargets: async (items: Array<{ scopeType: string; scopeId: number; periodStart: string; targetCount?: number; version?: number; reason: string; restoreAutomatic: boolean }>) => unwrap<boolean>(await http.put('/zsjos/media-lead-target/batch', items)),
+  saveTargets: async (items: Array<{ scopeType: string; scopeId: number; periodStart: string; targetCount?: number; targetAmount?: number; amountOnly?: boolean; countChanged?: boolean; amountChanged?: boolean; restoreAmountAutomatic?: boolean; sourceId?: number; version?: number; reason: string; restoreAutomatic: boolean }>) => unwrap<boolean>(await http.put('/zsjos/media-lead-target/batch', items)),
   revisions: (id: number, signal?: AbortSignal) => get<TargetRevision[]>(`/zsjos/media-lead-target/${id}/revisions`, undefined, signal),
   organizations: (signal?: AbortSignal) => get<MediaOrg[]>('/zsjos/media-lead-target/orgs', undefined, signal),
   departments: (signal?: AbortSignal) => get<DeptOption[]>('/zsjos/media-lead-target/departments', undefined, signal),

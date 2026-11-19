@@ -40,8 +40,11 @@ All endpoints are tenant-scoped Admin APIs and use the standard `CommonResult` w
 Writes carry the template version and idempotency key. A version contains ordered checklist items and
 ordered legacy route options. Administrators can add, remove, reorder and enable/disable ordinary items,
 choose manual-checkbox or attachment type, mark attachment items required, and map routes to System
-department IDs plus the stable assignee type. The fixed `study_planner` item cannot be removed,
-disabled, or renamed. New cases snapshot the published version and never follow later edits.
+department IDs plus the stable assignee type. Since automatic class enrollment (2026-11-16) the
+`study_planner` fixed item and `study_planner` route option are retired: drafts no longer require or
+accept them, copying a published version drops them, publishing a draft that still carries them is
+rejected, and route options are optional (`content_director` only). New cases snapshot the published
+version and never follow later edits.
 
 ## Public pool
 
@@ -50,12 +53,9 @@ disabled, or renamed. New cases snapshot the published version and never follow 
 - 两种公共池查询均支持可选 `statusGroup`：`pending` 包含 `pending/processing`，`processed` 包含 `completed/cancelled/ended`，`all` 或省略参数不限制状态。非法值校验失败；分类与原 `status`、关键词、高级筛选取交集后分页，权限范围不变。
 - Workbench 顶部提供“待处理、已处理、全部”，默认待处理；切换分类重置分页和选择，完成或关闭后刷新第一页。卡片仍展示具体履约状态。管理端未传分类参数时保留原查询行为。
 - `GET /zsjos/registration/{id}`
-- `GET /zsjos/registration/study-planner-candidates`
 - `GET /zsjos/registration/{id}/routes/{routeId}/candidates`
 - `PUT /zsjos/registration/{id}/items/{itemId}`
-- `PUT /zsjos/registration/{id}/study-planner`
 - `PUT /zsjos/registration/{id}/routes`
-- `PUT /zsjos/registration/{id}/class-assignments`
 - `POST /zsjos/registration/{id}/items/{itemId}/attachments`
 - `DELETE /zsjos/registration/{id}/items/{itemId}/attachments/{attachmentId}`
 - `POST /zsjos/registration/{id}/complete`
@@ -71,11 +71,11 @@ object authorization failures.
 
 新履约任务按 `orderItemId` 独立生成，返回 `orderItemId`、`productName` 和 `specs`。
 同一 Person 可拥有多个任务、课程服务主体和班级；同产品的不同订单明细不合并。审批仍按整单，
-完成仍要求订单生效；财务待审核时允许保存分班并立即建立交付服务。每个任务独立保存清单、附件、分班和完成状态。
+完成要求订单生效并通过履约清单和必传附件校验，学员资料收集状态独立；新任务完成后按订单正式成交负责人建立其当前部门待分班服务。之后在班级管理中分班，负责人随班主任同步。历史未完成任务沿用冻结的班级选择或规划师模式，逐商品任务未选班的商品由成交负责人承接；已建立服务不重写。每个任务独立保存清单、附件和完成状态。
 
 `close` 在 pending/processing 的商品任务上表示“结束本产品，无需后续交付”，保存 `ended`、
 完成时间及操作人，原因沿用 `cancelReason`，操作时间兼容 `cancelledAt`。它不创建服务关系，
-不要求分班；若已提前建立服务，同步取消当前任务的服务和未完成交付待办、延期审批，保留历史记录。
+不要求分班；若历史任务已提前建立服务，同步取消当前任务的服务和未完成交付待办、延期审批，保留历史记录。
 不更改订单和其他商品任务。历史整单任务仍按旧语义置为 cancelled。
 自动订单终止使用 cancelled，不改写已完成或已结束任务的处理事实。
 
@@ -90,21 +90,7 @@ selected assignee. Attachment items allow at most nine files, 100 MB each, in JP
 Excel formats; required attachment items must contain at least one file. Department and assignee names
 are stored as completion-time snapshots on the case routes.
 
-New cases use `assignmentMode=class_per_item`. The detail response returns one `classAssignments` projection
-for the task's order item (historical aggregate cases retain all items), including product/category facts, the saved class and homeroom snapshots, and a stable
-per-item error when the current selection is no longer usable. `PUT .../class-assignments` replaces the complete
-set in one versioned, idempotent command: every item belonging to this task must occur exactly once and select a tenant-owned
-`SERVING` class, including the system pending class. Registration requests options without `categoryId` and
-both frontends show a flat searchable list of all serving classes, with loading, empty and retryable error states.
-Product/category/SKU/exam metadata does not filter candidates or block saving/completion, even when absent.
-Initial delivery creation revalidates the order-item set, tenant class, serving state and formal homeroom eligibility
-(enabled account with the enabled `study_planner` role). Pending classes have no owner.
-Category fields on assignments are optional product metadata, not the chosen class's category; missing labels
-remain null rather than being invented. Existing historical snapshots are not rewritten by schema correction.
-Unsaved class selections must be saved before completion. The optional category column is introduced by the
-V188 development correction; deployed environments with protected historical checksums require a separately
-reviewed rollout, never silent checksum reconciliation.
-
+历史逐商品任务保留首次分班快照。完成时逐商品沿用已保存班级；未选班的商品按订单成交负责人建立交付，后续在班级管理办理分班。已有交付关系按当前关系校验。报名履约不提供分班写接口。
 
 Attachment validation requires the detected MIME type to exactly match the file extension; unknown
 `application/octet-stream` values and raw `application/zip` are not accepted as Office documents.
@@ -228,7 +214,7 @@ The overview exposes optional one-time content-director and career-planner assig
 - `GET /zsjos/media-students/page` and `POST /zsjos/media-students/search-page` accept optional positive `operatorUserId`. It intersects keyword, service-period and advanced filters before pagination/counting. It matches the current operator of a service visible in the selected read scope, including visible historical services; it is distinct from the account-level advanced filter `mediaAccount.ownerOperatorUserId`. A matching student does not need an account. The filter never broadens tenant, student or service visibility. The shared request VO carries this additive field; ordinary student endpoints do not consume it.
 - List and detail account summaries expose optional `homepageUrl`, projected from the authorized account's `detailValuesJson.homepage_url`. Missing/non-text values produce null; no URL is synthesized from nickname or platform ID. Workbench exposes two independent links under the existing account query permission: the SVG platform logo opens the saved valid HTTP(S) homepage in a new tab, while the account name retains the internal account-tab link with navigation guards. Missing/invalid homepage values disable only the external logo link, never the internal account link. Without account query permission both are plain content. Both projections include the field so refreshing detail cannot erase an existing card link.
 
-- `GET /zsjos/media-students/page` defaults to the tenant media scope when System `hasTenantReadAllAccess` or configured `zsjos:media-student:query-all` allows it; otherwise it retains the existing personal service-owner/collaborator scope. Explicit `SELF` remains personal; existing administrator `USER` queries retain their System authorization. `ALL` is accepted for configured media full readers without a target user.
+- `GET /zsjos/media-students/page` defaults to the tenant media scope when System `hasTenantReadAllAccess` or configured `zsjos:media-student:query-all` allows it, subject to the sales department boundary described below; otherwise it retains the existing personal service-owner/collaborator scope. Explicit `SELF` remains personal; existing administrator `USER` queries retain their System authorization. `ALL` is accepted for configured media full readers without a target user.
 - The full media scope includes people with media collaborators or retained accounts, positioning cards or interviews, including historical services and unbound drafts. It excludes unrelated sales-only people and deleted/cross-tenant records. Course projections contain media-related services only; surviving assets may have no remaining course relationship. Class/status filters match those same media service relations.
 - `GET /zsjos/media-students/{personId}` returns Person/course context plus third-party accounts, positioning history, content production history, the media operation timeline, and the positioning-to-operation-to-graduation task line. The Workbench media surface renders only overview, account/positioning, and content tabs; it does not load Lead detail, contact history, or the separately retained legacy talk-record APIs, and it filters legacy `talk` events from the visible timeline.
 - Both endpoints require `zsjos:media-student:query-my`. Page visibility never grants object access: detail and command endpoints recheck the current service relation, account responsibility, or task assignment.
@@ -381,9 +367,7 @@ The media-only `/zsjos/media-students/page` response adds a required `accounts` 
 
 ### 自由班级选择（2026-09-28）
 
-报名履约按订单商品选择服务中的班级，继续使用不带分类条件的班级候选接口；不要求班级与商品的
-产品、SKU、分类或考期匹配。新班级可独立命名且不绑定产品，正式班仍须有效班主任；待分班、
-班级状态、租户隔离、保存/完成前的有效性复核保持原契约。WorkBench 与 Admin 调班候选也不按
+历史已保存的班级在首次建立交付时仍需校验有效性。WorkBench 与 Admin 调班候选也不按
 产品分类筛选；审批流程与服务归属校验保持不变，详见[班级管理](delivery-class-management.md)。
 
 
@@ -450,10 +434,30 @@ MySQL 可存多个 NULL，未预约跟进仍受提交幂等键约束。升级以
 
 ### 2026-10-21：未确定考期的规划师默认班
 
-新履约按商品选班允许 `NORMAL/PENDING/UNSCHEDULED`；`UNSCHEDULED` 名称“未确定考期”，owner 必须实时校验并绑定班主任，不能因 systemClass=true 置空。保存分班及建立交付都重新校验目标服务状态及规划师资格，异常结业班不允许。直接选规划师的新履约进入该规划师唯一 UNSCHEDULED，保持逐订单商品服务身份、通知和接收规则；已建立服务的班级不被报名重放覆盖，历史数据不自动搬迁。响应 ClassAssignment 增加 classKind，双端以班型区分全局待分班和规划师默认班。参见 delivery-class-management.md 的 V343 部署顺序。
+历史 `class_per_item` 快照仍接受 `NORMAL/PENDING/UNSCHEDULED`，完成时检查冻结选择；异常结业班不可分配。新 `sales_owner` 任务完成后进入成交负责人当前部门的 `UNSCHEDULED`（未确定考期），同一负责人调部后创建新部门容器，旧班级及服务保持原归属。响应 ClassAssignment 保留 classKind，供历史任务和客户端区分班型。
 
 2026-10-22：兼容聚合学员及新媒体学员的关键词查询先以订单姓名快照/联系方式等筛出数据库候选，仍以授权显示投影进行精确核验；带关键词排序只收集一次匹配集，不按结果页重复扫描。内部候选字段不作为新的授权来源。
 
 ### Legacy exam workflow retirement (2026-10-28)
 
 The retired exam-date PUT and delivery-stage POST endpoints and their exclusive command DTOs, services, permission actions and exam-reminder DAL methods were removed on 2026-11-06. There is no compatibility command handler. V365 retires menu definitions 73428 and 602311 without changing role assignments. It was applied to the authorized local database on 2026-11-06. First-contact, study-plan and ordinary-contact APIs remain active. Stage navigation ends at supervision; historical later stages remain readable and allow ordinary contact for open services. Exam-date reminders and their scheduler are removed. No database history or role assignments are rewritten. Class exam schedules and the exam calendar are unchanged.
+
+### 销售与交付合并后的学员和媒体范围
+
+销售业务部门用户的学员、媒体服务及班级查询还受已配置业务部门边界与 System 数据范围限制；旧 query-all 本身不授予跨部访问，获得 `zsjos:sales:cross-department` 后仍须落在 System 范围内。两部继续共享客户基础档案，有权限的姓名、手机号和微信修改作用于同一档案；订单、服务、跟进和附件按各自对象范围读取。
+
+销售用户新建媒体学员交谈记录时必须提供 `serviceRelationId`，后端验证服务属于该客户、当前用户参与且有权访问；账号可选，提供时必须关联该服务。历史记录未填写服务关联的不回填：已有账号可证明其服务关联时按该关联检查；销售视角无法证明归属的历史内容及附件引用仅向具备 `zsjos:media-student:history-review` 的核对人员开放，同时仍需原媒体学员功能和对象权限；System 超管保留框架既有例外。该权限只允许核对历史，不授予修改或修复归属的能力；非销售编导、运营继续使用原有接口和读取规则。
+
+### 审批通过后自动分班（2026-11-14）
+
+- 订单提交及重提必须携带 `agreedExamMonth`（`YYYY-MM`）。带考试月份的订单审批通过、变为生效时，在同一事务内为每个订单商品创建 `assignmentMode=auto_class` 的报名任务，并按“产品 + 考试月份 + 成交负责人（`formalSalesUserId`）”查找服务中的普通班，不存在时自动创建（班名“产品名 YYYY年M月”，考期为该月首日至月末），随后建立课程服务，服务负责人即班主任。多商品订单每个产品各入一个班。
+- 成交负责人缺失、账号停用或缺少 `zsjos:sales:eligible` 时，审批通过动作失败并返回可操作提示，不会静默跳过入班。审批回调重放时已建立的服务保持不变；并发创建同一班级由唯一键收敛到同一班。
+- `auto_class` 任务的履约确认只补齐和校验履约清单、必传附件，不再选择班级或建立服务；已存在的 `sales_owner`、`class_per_item` 等历史任务保持原模式。
+- 历史订单 `agreedExamMonth` 为空，保持原流程；旧文本 `agreedExamTime` 仅作“原商定考试时间（文本）”只读展示，不转换为月份。驳回后重提的订单视同新提交，须选择考试月份，审批通过后按新规则自动分班。
+
+### 履约页识别自动分班并退役学习规划师固定项（2026-11-16）
+
+- 两端报名履约详情识别 `assignmentMode=auto_class`：任务流程中移除自动分班步骤，交付摘要从 `deliveries` 展示所在班级与班主任，不提供班级或负责人选择。管理端同时识别 `sales_owner`（完成履约后归成交负责人）。历史规划师流转仍可办理。历史逐商品任务的分班记录只读。
+- 已删除 `GET /zsjos/registration/study-planner-candidates` 与 `PUT /zsjos/registration/{id}/study-planner`；历史 `legacy_planner` 任务仍通过 `routes/{routeId}/candidates` 与 `PUT /{id}/routes` 处理，`sales_owner`、`class_per_item`、`auto_class` 任务调用路由保存返回状态错误。
+- 履约清单配置不再强制“配置学习规划师”固定项，也不再提供“学习规划师”流转类型；新建报名任务即使命中仍含该项的已发布版本，也不会快照 `study_planner` 清单项或流转项，完成校验不依赖它。历史任务中已快照的 `study_planner` 清单项保持只读展示。
+- 已发布模板中残留的 `study_planner` 项不影响运行；管理员复制已发布版本、保存草稿并重新发布即可清除。

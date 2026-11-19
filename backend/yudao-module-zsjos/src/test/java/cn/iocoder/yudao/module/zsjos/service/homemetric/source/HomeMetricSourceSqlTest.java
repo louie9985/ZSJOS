@@ -71,6 +71,14 @@ class HomeMetricSourceSqlTest {
   when(leads.metricVisibilityScope(7L)).thenReturn(new LeadManagementServiceImpl.LeadVisibilityScope(List.of(),List.of(),false));
   assertEquals(0,aggregate("lead",MetricAggregate.COUNT,null,null).value().signum());
  }
+ @Test void salesQueryAllLeadScopeAddsUnassignedButNotForeignRecyclePending()throws Exception{
+  sql("CREATE TABLE zsjos_lead(id BIGINT,lead_no VARCHAR,tenant_id BIGINT,deleted INT,provider_owner_type VARCHAR,provider_owner_id BIGINT,owner_user_id BIGINT,assignment_status VARCHAR,recycle_source_owner_user_id BIGINT,status VARCHAR,follow_up_count INT,submitted_at TIMESTAMP)");
+  sql("INSERT INTO zsjos_lead VALUES(1,'L1',1,0,'partner',9,7,'owned',NULL,'submitted',1,NULL),(2,'L2',1,0,'partner',9,NULL,'public_pool',NULL,'submitted',1,NULL),(3,'L3',1,0,'partner',9,NULL,'recycle_pending',8,'submitted',1,NULL),(4,'L4',1,0,'partner',9,8,'owned',NULL,'submitted',1,NULL)");
+  when(leads.metricVisibilityScope(7L)).thenReturn(new LeadManagementServiceImpl.LeadVisibilityScope(List.of(),List.of(7L),false,true));
+  assertEquals(0,new BigDecimal("2").compareTo(aggregate("lead",MetricAggregate.COUNT,null,null).value()));
+  when(leads.metricVisibilityScope(7L)).thenReturn(new LeadManagementServiceImpl.LeadVisibilityScope(List.of(),List.of(7L),false));
+  assertEquals(0,BigDecimal.ONE.compareTo(aggregate("lead",MetricAggregate.COUNT,null,null).value()));
+ }
  @Test void multipleVisibleServicesCountOnePersonAndHiddenServiceDoesNotGrantVisibility()throws Exception{
   sql("CREATE TABLE zsjos_service_relation(id BIGINT,person_id BIGINT,tenant_id BIGINT,deleted INT,teaching_delivery INT,order_id BIGINT,order_item_id BIGINT,class_id BIGINT,owner_user_id BIGINT,activated_at TIMESTAMP)");
   sql("CREATE TABLE zsjos_person(id BIGINT,person_no VARCHAR,tenant_id BIGINT,deleted INT)");

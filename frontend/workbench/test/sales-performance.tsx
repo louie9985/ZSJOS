@@ -26,5 +26,5 @@ if (new URLSearchParams(location.search).has('timestamps')) {
   return {data:{code:0,data},status:200,statusText:'OK',headers:{},config}
  }
 }
-const permissions=['zsjos:sales-performance:query','zsjos:sales-performance:self','zsjos:sales-performance:department','zsjos:sales-performance:center','zsjos:sales-performance:detail','zsjos:sales-performance-target:query','zsjos:sales-performance-target:update','zsjos:sales-performance-target:configure','zsjos:lead:query'].filter(p=>!new URLSearchParams(location.search).has('noDetail')||!['zsjos:sales-performance:detail','zsjos:lead:query'].includes(p))
+const permissions=['zsjos:sales-performance:query','zsjos:sales-performance:self','zsjos:sales-performance:department','zsjos:sales-performance:center','zsjos:sales-performance:detail','zsjos:sales-performance-target:query','zsjos:sales-performance-target:update','zsjos:sales-performance-target:configure','zsjos:sales:boundary-configure','zsjos:lead:query'].filter(p=>!new URLSearchParams(location.search).has('noDetail')||!['zsjos:sales-performance:detail','zsjos:lead:query'].includes(p))
 createRoot(document.getElementById('root')!).render(<BrowserRouter><ThemeProvider><App>{location.search.includes('target')?<SalesPerformanceTargetPage permissions={permissions}/>:<SalesPerformancePage permissions={permissions}/>}</App></ThemeProvider></BrowserRouter>)

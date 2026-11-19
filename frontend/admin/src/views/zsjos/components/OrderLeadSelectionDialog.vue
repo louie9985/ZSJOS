@@ -29,7 +29,7 @@ const groupName = useId()
 const emit = defineEmits<{ 'update:modelValue': [value: number] }>()
 const fields = (item: OrderLeadCandidate) => {
   const p = item.profile
-  const source = p.selfSourcedWithoutProvider ? p.sourceType === 'sales_self_sourced' ? '销售本人自拓（未关联新媒体）' : '教务本人自拓（未关联新媒体）' : p.sourceUserName
+  const source = p.selfSourcedWithoutProvider ? '销售本人自拓（未关联新媒体）' : p.sourceUserName
   return [
     { label: '姓名', value: p.submittedName }, { label: '客资编号', value: p.leadNo },
     { label: '手机号', value: p.submittedMobile }, { label: '微信号', value: p.submittedWechatId },

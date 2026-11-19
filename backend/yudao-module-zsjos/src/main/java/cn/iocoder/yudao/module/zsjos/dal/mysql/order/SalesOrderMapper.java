@@ -91,9 +91,13 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         return selectOne(SalesOrderDO::getSupersedesOrderId, orderId);
     }
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO, List<Long> matchedOrderIds) {
+        return selectMyPage(userId, reqVO, matchedOrderIds, null);
+    }
+    default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO, List<Long> matchedOrderIds, Collection<Long> boundaryIds) {
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .eq(SalesOrderDO::getSubmitterUserId, userId)
                 .eqIfPresent(SalesOrderDO::getStatus, reqVO.getStatus());
+        applySalesBoundary(query, boundaryIds);
         if (isNotBlank(reqVO.getKeyword())) {
             String keyword = reqVO.getKeyword().trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, keyword)
@@ -111,10 +115,15 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     }
     default PageResult<SalesOrderDO> selectTeamPage(Collection<Long> userIds, SalesOrderMyPageReqVO reqVO,
                                                      List<Long> matchedOrderIds) {
+        return selectTeamPage(userIds, reqVO, matchedOrderIds, null);
+    }
+    default PageResult<SalesOrderDO> selectTeamPage(Collection<Long> userIds, SalesOrderMyPageReqVO reqVO,
+                                                     List<Long> matchedOrderIds, Collection<Long> boundaryIds) {
         if (userIds == null || userIds.isEmpty()) return PageResult.empty();
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .in(SalesOrderDO::getSubmitterUserId, userIds)
                 .eqIfPresent(SalesOrderDO::getStatus, reqVO.getStatus());
+        applySalesBoundary(query, boundaryIds);
         if (isNotBlank(reqVO.getKeyword())) {
             String keyword = reqVO.getKeyword().trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, keyword)
@@ -135,6 +144,7 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .eqIfPresent(SalesOrderDO::getStatus, reqVO.getStatus());
         if (!scope.isAll()) query.in(SalesOrderDO::getSubmitterUserId, scope.getSubmitterUserIds());
+        applySalesBoundary(query, scope);
         if (isNotBlank(reqVO.getKeyword())) {
             String keyword = reqVO.getKeyword().trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, keyword)
@@ -156,6 +166,7 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (scope.isEmpty()) return List.of();
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>().eqIfPresent(SalesOrderDO::getStatus, status);
         if (!scope.isAll()) query.in(SalesOrderDO::getSubmitterUserId, scope.getSubmitterUserIds());
+        applySalesBoundary(query, scope);
         if (isNotBlank(keyword)) {
             String value = keyword.trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
@@ -174,14 +185,38 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (scope.isEmpty()) return 0;
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>().eqIfPresent(SalesOrderDO::getStatus, status);
         if (!scope.isAll()) query.in(SalesOrderDO::getSubmitterUserId, scope.getSubmitterUserIds());
+        applySalesBoundary(query, scope);
         return selectCount(query);
+    }
+
+    private static void applySalesBoundary(LambdaQueryWrapperX<SalesOrderDO> query, SalesOrderManagementScope scope) {
+        applySalesBoundary(query, scope.getBoundaryUserIds());
+    }
+    /** Formal owner inside the boundary, or the boundary actor's own submission (object checks use the same rule). */
+    private static void applySalesBoundary(LambdaQueryWrapperX<SalesOrderDO> query, Collection<Long> ids) {
+        if (ids == null) return;
+        Long actor = cn.iocoder.yudao.module.zsjos.service.order.SalesOrderBoundaryUserIds.actorOf(ids);
+        if (ids.isEmpty()) {
+            if (actor == null) query.eq(SalesOrderDO::getId, -1L);
+            else query.eq(SalesOrderDO::getSubmitterUserId, actor);
+            return;
+        }
+        query.and(w -> {
+            w.in(SalesOrderDO::getFormalSalesUserId, ids);
+            if (actor != null) w.or().eq(SalesOrderDO::getSubmitterUserId, actor);
+        });
     }
     default List<SalesOrderDO> selectTeamCursor(Collection<Long> userIds, String status, String keyword,
                                                  List<Long> matchedOrderIds, LocalDateTime cursorTime,
                                                  Long cursorId, int limit) {
+        return selectTeamCursor(userIds, status, keyword, matchedOrderIds, cursorTime, cursorId, limit, null);
+    }
+    default List<SalesOrderDO> selectTeamCursor(Collection<Long> userIds, String status, String keyword,
+            List<Long> matchedOrderIds, LocalDateTime cursorTime, Long cursorId, int limit, Collection<Long> boundaryIds) {
         if (userIds == null || userIds.isEmpty()) return List.of();
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .in(SalesOrderDO::getSubmitterUserId, userIds).eqIfPresent(SalesOrderDO::getStatus, status);
+        applySalesBoundary(query, boundaryIds);
         if (isNotBlank(keyword)) {
             String value = keyword.trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
@@ -201,9 +236,14 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
                 .last("LIMIT " + limit));
     }
     default long selectTeamCount(Collection<Long> userIds, String status) {
+        return selectTeamCount(userIds, status, null);
+    }
+    default long selectTeamCount(Collection<Long> userIds, String status, Collection<Long> boundaryIds) {
         if (userIds == null || userIds.isEmpty()) return 0;
-        return selectCount(new LambdaQueryWrapperX<SalesOrderDO>()
-                .in(SalesOrderDO::getSubmitterUserId, userIds).eqIfPresent(SalesOrderDO::getStatus, status));
+        var query = new LambdaQueryWrapperX<SalesOrderDO>()
+                .in(SalesOrderDO::getSubmitterUserId, userIds).eqIfPresent(SalesOrderDO::getStatus, status);
+        applySalesBoundary(query, boundaryIds);
+        return selectCount(query);
     }
     default List<SalesOrderDO> selectByLeadId(Long leadId) {
         return selectList(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
@@ -211,8 +251,13 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     }
     default List<SalesOrderDO> selectMyCursor(Long userId, String status, String keyword, List<Long> matchedOrderIds,
                                                LocalDateTime cursorTime, Long cursorId, int limit) {
+        return selectMyCursor(userId, status, keyword, matchedOrderIds, cursorTime, cursorId, limit, null);
+    }
+    default List<SalesOrderDO> selectMyCursor(Long userId, String status, String keyword, List<Long> matchedOrderIds,
+                                               LocalDateTime cursorTime, Long cursorId, int limit, Collection<Long> boundaryIds) {
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .eq(SalesOrderDO::getSubmitterUserId, userId).eqIfPresent(SalesOrderDO::getStatus, status);
+        applySalesBoundary(query, boundaryIds);
         if (isNotBlank(keyword)) {
             String value = keyword.trim();
             query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
@@ -231,21 +276,29 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     }
     default PageResult<SalesOrderDO> selectFinanceExportPage(FinanceOrderExportReqVO reqVO,
                                                                AdvancedFilterQuery advancedFilter) {
+        return selectFinanceExportPage(reqVO, advancedFilter, null);
+    }
+    default PageResult<SalesOrderDO> selectFinanceExportPage(FinanceOrderExportReqVO reqVO,
+            AdvancedFilterQuery advancedFilter, Collection<Long> boundaryIds) {
+        if (boundaryIds != null && boundaryIds.isEmpty()) return PageResult.empty();
         Page<SalesOrderDO> page = new Page<>(reqVO.getPageNo(), reqVO.getPageSize());
         List<SalesOrderDO> rows = selectFinanceExportRows(page, reqVO, advancedFilter,
-                TenantContextHolder.getRequiredTenantId());
+                TenantContextHolder.getRequiredTenantId(), boundaryIds);
         return new PageResult<>(rows, page.getTotal());
     }
 
     @SelectProvider(type = SqlProvider.class, method = "financeExportSql")
     List<SalesOrderDO> selectFinanceExportRows(Page<?> page, @Param("request") FinanceOrderExportReqVO request,
                                                 @Param("query") AdvancedFilterQuery query,
-                                                @Param("tenantId") Long tenantId);
+                                                @Param("tenantId") Long tenantId,
+                                                @Param("boundaryIds") Collection<Long> boundaryIds);
 
     final class SqlProvider {
         public static String financeExportSql() {
             return "<script>SELECT o.* FROM zsjos_order o WHERE o.deleted=b'0' "
                     + "AND o.tenant_id=#{tenantId} "
+                    + "<if test='boundaryIds != null'>AND o.formal_sales_user_id IN "
+                    + "<foreach collection='boundaryIds' item='id' open='(' separator=',' close=')'>#{id}</foreach> </if>"
                     + "<if test='request.status != null and request.status != \"\"'>AND o.status=#{request.status} </if>"
                     + "<if test='request.keyword != null and request.keyword != \"\"'>"
                     + "AND (o.order_no LIKE CONCAT('%',#{request.keyword},'%') "
@@ -256,9 +309,14 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         }
     }
     default long selectMyCount(Long userId, String status) {
-        return selectCount(new LambdaQueryWrapperX<SalesOrderDO>()
+        return selectMyCount(userId, status, null);
+    }
+    default long selectMyCount(Long userId, String status, Collection<Long> boundaryIds) {
+        var query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .eq(SalesOrderDO::getSubmitterUserId, userId)
-                .eqIfPresent(SalesOrderDO::getStatus, status));
+                .eqIfPresent(SalesOrderDO::getStatus, status);
+        applySalesBoundary(query, boundaryIds);
+        return selectCount(query);
     }
     default List<Long> selectIdsByKeyword(String keyword) {
         if (!isNotBlank(keyword)) return null;

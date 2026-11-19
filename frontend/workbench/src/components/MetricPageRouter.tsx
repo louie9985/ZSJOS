@@ -7,7 +7,7 @@ const paths: Record<string, string> = {
   student: APP_ROUTES.MY_STUDENTS, registration: APP_ROUTES.REGISTRATION_POOL,
   lead_appeal: APP_ROUTES.LEAD_APPEALS, duplicate_review: APP_ROUTES.LEAD_DUPLICATE_REVIEW,
   media_student: APP_ROUTES.MEDIA_STUDENTS, subordinate_sales: APP_ROUTES.SUBORDINATE_SALES,
-  education_team: APP_ROUTES.EDUCATION_TEAM, cashback: APP_ROUTES.CASHBACK,
+  cashback: APP_ROUTES.CASHBACK,
   withdrawal: APP_ROUTES.WITHDRAWAL, bpm_todo: APP_ROUTES.BPM_TODO,
   business_todo: APP_ROUTES.TODAY_TASKS,
 }

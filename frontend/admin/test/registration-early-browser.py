@@ -9,8 +9,6 @@ with sync_playwright() as p:
   page.goto('http://127.0.0.1:5298/test/registration-early.html')
   page.get_by_role('button',name='查看',exact=True).first.click()
   expect(page.get_by_role('button',name='完成报名履约',exact=True)).to_be_disabled()
-  page.get_by_role('button',name='保存分班',exact=True).click()
-  expect(page.get_by_text('已建立交付服务，报名任务仍需财务审核通过后完成',exact=True)).to_be_visible()
   expect(page.get_by_role('button',name='保存分班',exact=True)).to_have_count(0)
   expect(page.get_by_role('button',name='完成报名履约',exact=True)).to_be_disabled()
   assert page.evaluate('window.registrationRows[1].deliveryEstablished') is False
@@ -21,8 +19,8 @@ with sync_playwright() as p:
    page.get_by_role('button',name='查看',exact=True).first.click()
    expect(page.get_by_role('button',name='完成报名履约',exact=True)).to_be_enabled()
    page.get_by_role('button',name='完成报名履约',exact=True).click()
-   assert page.evaluate('window.registrationRows[0].deliveries[0].serviceRelationId')==1001
+   assert page.evaluate('window.registrationRows[0].status')=='completed'
   assert not errors,errors
   page.close()
  b.close()
-print('PASS Admin desktop/mobile save-to-delivery, finance gate, completion and sibling isolation')
+print('PASS Admin desktop/mobile read-only classes, finance gate, completion and sibling isolation')

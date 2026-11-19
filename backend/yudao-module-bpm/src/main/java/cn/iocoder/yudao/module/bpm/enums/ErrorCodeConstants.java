@@ -57,6 +57,7 @@ public interface ErrorCodeConstants {
 
     // ========== 流程任务 1-009-005-000 ==========
     ErrorCode TASK_OPERATE_FAIL_ASSIGN_NOT_SELF = new ErrorCode(1_009_005_001, "操作失败，原因：该任务的审批人不是你");
+    ErrorCode TASK_OBSOLETE_NODE_ACTIVE_SIGN = new ErrorCode(1_009_005_081, "旧审批节点仍有未处理的加签，请处理后重试迁移");
     ErrorCode TASK_NOT_EXISTS = new ErrorCode(1_009_005_002, "流程任务不存在");
     ErrorCode TASK_IS_PENDING = new ErrorCode(1_009_005_003, "当前任务处于挂起状态，不能操作");
     ErrorCode TASK_TARGET_NODE_NOT_EXISTS = new ErrorCode(1_009_005_004, " 目标节点不存在");

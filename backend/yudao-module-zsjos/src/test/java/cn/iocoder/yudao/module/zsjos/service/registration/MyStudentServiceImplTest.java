@@ -138,6 +138,7 @@ class MyStudentServiceImplTest {
         assertThrows(ServiceException.class, () -> service.getMediaStudent(28L, 3L));
     }
 
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks private MyStudentServiceImpl service;
     @Mock private ServiceRelationMapper relationMapper;
     @Mock private PersonMapper personMapper;

@@ -149,9 +149,6 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 continue;
             }
             if (ROLE_DIRECT_LEADER.equals(role)) {
-                // 教务归属的激活仅提醒教务，不按销售主管链路追加接收人。
-                if (ACTIVATED.equals(event.getSceneCode()) && lead != null
-                        && OWNER_EDUCATION.equals(lead.getOwnerIdentity())) continue;
                 Long ownerId = longValue(payload.get("ownerUserId"));
                 AdminUserRespDTO owner = ownerId == null ? null : adminUserApi.getUser(ownerId);
                 DeptRespDTO dept = owner == null || owner.getDeptId() == null ? null : deptApi.getDept(owner.getDeptId());
@@ -286,7 +283,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         values.put("lead.wechatId", fullContact ? lead.getSubmittedWechatId() : maskWechat(lead.getSubmittedWechatId()));
         values.put("lead.sourceType", lead.getSourceType());
         String entrySource = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
-        values.put("lead.submitterIdentityLabel", SOURCE_EDUCATION_SELF.equals(entrySource) ? "教务" : SOURCE_SALES_SELF.equals(entrySource) ? "销售" : "提交人");
+        values.put("lead.submitterIdentityLabel", SOURCE_SALES_SELF.equals(entrySource) ? "销售" : "提交人");
         values.put("owner.identityLabel", ownerIdentityLabel(lead.getOwnerIdentity()));
         values.put("lead.sourceChannel", lead.getSourceChannelLabelSnapshot());
         values.put("lead.province", lead.getProvinceName());

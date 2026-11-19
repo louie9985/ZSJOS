@@ -40,6 +40,17 @@ describe('unified sales-order approval entry', () => {
     expect(entry).not.toMatch(/提交双中心审批|提交会签|重新提交会签/)
   })
 
+  it('requires the agreed exam month in the shared first purchase, repurchase and revision form', () => {
+    const entry = readFileSync('src/components/SalesOrderEntryModal.tsx', 'utf8')
+
+    expectSourceToContainTokens(entry, 'name="agreedExamMonth" label="商定考试月份" rules={[{ required: true')
+    expectSourceToContainTokens(entry, 'DatePicker picker="month"')
+    expectSourceToContainTokens(entry, "agreedExamMonth: values.agreedExamMonth?.format('YYYY-MM')")
+    expectSourceToContainTokens(entry, 'api.submitSalesOrder(lead.id, request)')
+    expectSourceToContainTokens(entry, 'api.resubmitSalesOrder(orderId, request)')
+    expect(entry).toContain('order: request')
+  })
+
   it('uses approval and rejection wording for supervisor decisions', () => {
     const supervisor = readFileSync('src/components/SalesOrderSupervisorInbox.tsx', 'utf8')
 
@@ -64,12 +75,12 @@ describe('unified sales-order approval entry', () => {
     const api = readFileSync('src/services/api.ts', 'utf8')
     const styles = readFileSync('src/styles/pages/sales-order.css', 'utf8')
 
+    const profile = readFileSync('src/components/OrderLeadProfile.tsx', 'utf8')
     expect(api).toContain('leadProfile?: {')
-    expectSourceToContainTokens(detail, 'leadProfile && <section className="sales-order-info-block sales-order-info-block-wide">')
-    expect(detail).toContain('>客资编号</span>')
-    expect(detail).toContain('leadProfile.leadNo')
-    expect(detail).toContain('<CopyButton value={leadProfile.submittedMobile}/>')
-    expect(detail).not.toMatch(/leadProfile\.leadNo\s*\|\|\s*(order\.)?leadId/)
+    expectSourceToContainTokens(detail, '<OrderLeadProfile leadProfile={leadProfile}')
+    expectSourceToContainTokens(profile, "label: '客资编号', value: leadProfile.leadNo")
+    expect(profile).toContain('<CopyButton value={leadProfile.submittedMobile}/>')
+    expect(profile).not.toMatch(/leadProfile\.leadNo\s*\|\|\s*(order\.)?leadId/)
     expect(styles).toContain('.sales-order-information')
     expect(styles).toContain('.sales-order-detail-layout')
     expect(styles).toContain('.sales-order-approval-sidebar')

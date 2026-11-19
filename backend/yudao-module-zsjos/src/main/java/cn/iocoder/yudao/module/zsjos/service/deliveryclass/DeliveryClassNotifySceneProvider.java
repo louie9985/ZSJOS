@@ -27,8 +27,8 @@ public class DeliveryClassNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneVariableRespDTO("service.id", "课程服务编号", false),
                 new NotifySceneVariableRespDTO("class.id", "目标班级编号", false),
                 new NotifySceneVariableRespDTO("transfer.reason", "变更原因", false)),
-                List.of(new NotifySceneRoleRespDTO(ROLE_PREVIOUS_OWNER, "原学习规划师"),
-                        new NotifySceneRoleRespDTO(ROLE_NEW_OWNER, "新学习规划师")),
+                List.of(new NotifySceneRoleRespDTO(ROLE_PREVIOUS_OWNER, "原班主任"),
+                        new NotifySceneRoleRespDTO(ROLE_NEW_OWNER, "新班主任")),
                 List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false));
     }
 

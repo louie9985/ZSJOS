@@ -86,21 +86,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Override
     public boolean checkContact(LeadContactCheckReqVO request, Long userId,
                                 LeadSubmissionIdentityService.Identity requestedIdentity) {
-        if (requestedIdentity == LeadSubmissionIdentityService.Identity.SALES
-                || requestedIdentity == LeadSubmissionIdentityService.Identity.EDUCATION) {
+        if (requestedIdentity == LeadSubmissionIdentityService.Identity.SALES) {
             return !archiveService.query(request.getMobile(), request.getWechatId(), userId, requestedIdentity).isEmpty();
         }
-        LeadSubmissionIdentityService.Resolution identity = switch (requestedIdentity) {
-            case SALES -> {
-                identityService.requireSales(userId);
-                yield new LeadSubmissionIdentityService.Resolution(requestedIdentity, null);
-            }
-            case EDUCATION -> {
-                identityService.requireEducationSubmitter(userId);
-                yield new LeadSubmissionIdentityService.Resolution(requestedIdentity, null);
-            }
-            case NEW_MEDIA, PARTNER -> identityService.requireOrdinarySubmitter(userId);
-        };
+        LeadSubmissionIdentityService.Resolution identity = identityService.requireOrdinarySubmitter(userId);
         return contactActivationService.activate(request.getMobile(), request.getWechatId(),
                 request.getIdempotencyKey(), userId, sourceType(identity), identity.partnerId());
     }
@@ -163,19 +152,6 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
-    public LeadCreateRespVO createEducationSelfSourced(LeadCreateReqVO reqVO, Long userId) {
-        identityService.requireEducationSubmitter(userId);
-        if (reqVO.getNewMediaProviderUserId() != null) {
-            identityService.requireNewMediaProvider(reqVO.getNewMediaProviderUserId());
-        }
-        reqVO.setDispatchMode(DISPATCH_SELF);
-        reqVO.setSpecifiedSalesUserId(userId);
-        return create(reqVO, userId, selfSourcedSourceUserId(reqVO.getNewMediaProviderUserId(), userId),
-                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.EDUCATION, null), true);
-    }
-
-    @Override
     public List<LeadAssignmentUserRespVO> getNewMediaProviders() {
         List<AdminUserRespDTO> users = identityService.getEnabledNewMediaProviders();
         Set<Long> deptIds = users.stream().map(AdminUserRespDTO::getDeptId)
@@ -225,7 +201,6 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             LeadDuplicateReviewDO existingReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
             if (existingReview != null) {
                 requireSamePartnerIdentity(existingReview.getSubmissionPartnerId(), identity);
-                requireSameEducationSource(existingReview.getSubmissionSourceType(), identity);
                 return duplicateReviewResponse(existingReview);
             }
             LeadDuplicateMatcher.MatchResult match = duplicateMatcher.matchSubmissionWeakRules(reqVO);
@@ -397,8 +372,6 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         LeadDO lead = leadMapper.selectByIdempotencyKey(key);
         if (lead != null) {
             requireSamePartnerIdentity(lead.getPartnerId(), identity);
-            requireSameEducationSource(lead.getSubmissionSourceType() == null
-                    ? lead.getSourceType() : lead.getSubmissionSourceType(), identity);
             return response(lead, "created");
         }
         LeadActivationDO activation = activationMapper.selectByIdempotencyKey(key);
@@ -406,14 +379,6 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         requireSamePartnerIdentity(activation.getPartnerId(), identity);
         LeadDO activatedLead = leadMapper.selectById(activation.getLeadId());
         return response(activatedLead, "activated");
-    }
-
-    private void requireSameEducationSource(String existingSource, LeadSubmissionIdentityService.Resolution identity) {
-        String requestedSource = sourceType(identity);
-        if ((SOURCE_EDUCATION_SELF.equals(existingSource) || SOURCE_EDUCATION_SELF.equals(requestedSource))
-                && !Objects.equals(existingSource, requestedSource)) {
-            throw exception(LEAD_SUBMISSION_DUPLICATE);
-        }
     }
 
     private void requireSamePartnerIdentity(Long existingPartnerId,
@@ -570,7 +535,6 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     private static String sourceType(LeadSubmissionIdentityService.Resolution identity) {
         return identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER ? SOURCE_PARTNER
-                : identity.identity() == LeadSubmissionIdentityService.Identity.EDUCATION ? SOURCE_EDUCATION_SELF
                 : identity.identity() == LeadSubmissionIdentityService.Identity.SALES ? SOURCE_SALES_SELF
                 : SOURCE_INTERNAL_NEW_MEDIA;
     }

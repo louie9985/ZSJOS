@@ -10,12 +10,21 @@ public final class SalesOrderManagementScope {
     private final boolean self;
     private final Set<Long> deptIds;
     private final Set<Long> submitterUserIds;
+    private final Set<Long> boundaryUserIds;
 
     public SalesOrderManagementScope(boolean all, boolean self, Set<Long> deptIds, Set<Long> submitterUserIds) {
+        this(all, self, deptIds, submitterUserIds, null);
+    }
+
+    public SalesOrderManagementScope(boolean all, boolean self, Set<Long> deptIds, Set<Long> submitterUserIds,
+                                     Set<Long> boundaryUserIds) {
         this.all = all;
         this.self = self;
         this.deptIds = immutable(deptIds);
         this.submitterUserIds = immutable(submitterUserIds);
+        // Keep the boundary carrier so mapper predicates still see the actor's own-submission exception.
+        this.boundaryUserIds = boundaryUserIds == null ? null
+                : boundaryUserIds instanceof SalesOrderBoundaryUserIds ? boundaryUserIds : immutable(boundaryUserIds);
     }
 
     public static SalesOrderManagementScope empty() {
@@ -30,5 +39,6 @@ public final class SalesOrderManagementScope {
     public boolean isSelf() { return self; }
     public Set<Long> getDeptIds() { return deptIds; }
     public Set<Long> getSubmitterUserIds() { return submitterUserIds; }
+    public Set<Long> getBoundaryUserIds() { return boundaryUserIds; }
     public boolean isEmpty() { return !all && submitterUserIds.isEmpty(); }
 }

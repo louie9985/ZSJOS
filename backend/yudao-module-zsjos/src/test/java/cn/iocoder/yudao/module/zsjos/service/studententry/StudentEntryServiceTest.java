@@ -34,6 +34,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StudentEntryServiceTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks StudentEntryService service;
     @Mock PermissionApi permissionApi; @Mock PostApi postApi; @Mock AdminUserApi userApi;
     @Mock PersonMapper personMapper; @Mock PersonContactClaimMapper claimMapper;
@@ -60,7 +61,7 @@ class StudentEntryServiceTest {
         when(userApi.getUserListByPostIds(Set.of(5L))).thenReturn(List.of(director));
         when(products.getLeadCatalog()).thenReturn(new LeadProductCatalogRespVO(List.of(),List.of(),List.of()));
         var option = new DeliveryClassOptionRespVO(); option.setId(8L); option.setClassKind(formal ? "NORMAL" : "PENDING"); option.setSystemClass(!formal); option.setHomeroomUserId(formal ? 33L : null);
-        when(classes.options(null,true)).thenReturn(List.of(option));
+        when(classes.options(null,true,9L)).thenReturn(List.of(option));
         lenient().when(classMapper.selectByIdForUpdate(8L,1L)).thenAnswer(i -> {
             var row = new DeliveryClassDO(); row.setId(8L); row.setClassKind(formal ? "NORMAL" : "PENDING");
             row.setStatus("SERVING"); row.setSystemClass(!formal); row.setHomeroomUserId(formal ? 33L : null); return row;
@@ -153,6 +154,7 @@ class StudentEntryServiceTest {
         var provider=new StudentServiceObjectPermissionProvider();
         org.springframework.test.util.ReflectionTestUtils.setField(provider,"relationMapper",relations);
         org.springframework.test.util.ReflectionTestUtils.setField(provider,"permissionApi",permissionApi);
+        org.springframework.test.util.ReflectionTestUtils.setField(provider,"salesBoundary",salesBoundary);
         when(relations.selectById(44L)).thenReturn(row);
         assertTrue(provider.hasPermission(44L,"director-precheck",22L));assertTrue(provider.hasPermission(44L,"read",22L));
         assertFalse(provider.hasPermission(44L,"accept",22L));assertFalse(provider.hasPermission(44L,"contact",22L));
@@ -178,5 +180,15 @@ class StudentEntryServiceTest {
     @Test void unknownOrDisabledSkuDoesNotCreatePersonOrService() {
         var req=new Create("media","姓名","13800000000",null,"disabled",22L,false,null,null,false,"entry-test");base(req,false);
         assertThrows(RuntimeException.class,()->service.create(9L,req));verifyNoInteractions(identities,groups,events);verify(relations,never()).insert(any(ServiceRelationDO.class));
+    }
+    @Test void forgedOutOfBoundaryClassIsRejectedBeforeServiceCreation() {
+        var req = request("teaching", true, 8L); base(req, true);
+        when(salesBoundary.isSalesActor(9L)).thenReturn(true);
+        when(salesBoundary.canTransferTo(9L, 33L)).thenReturn(false);
+        var other = new DeliveryClassDO(); other.setId(8L); other.setStatus("SERVING"); other.setClassKind("NORMAL");
+        other.setDeptId(81L); other.setHomeroomUserId(33L);
+        when(classMapper.selectByIdForUpdate(8L,1L)).thenReturn(other);
+        assertThrows(RuntimeException.class, () -> service.create(9L,req));
+        verify(relations, never()).insert(any(ServiceRelationDO.class));
     }
 }

@@ -13,6 +13,7 @@ class LeadMetricVisibilityScopeTest {
  @InjectMocks LeadManagementServiceImpl service;
  @Mock SecurityFrameworkService securityFrameworkService;
  @Mock LeadObjectPermissionService leadObjectPermissionService;
+ @Mock cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
  @Test void scopePermissionCannotReplaceBaseLeadPagePermission(){
   when(securityFrameworkService.hasPermission(anyString())).thenAnswer(call -> switch ((String) call.getArgument(0)) {
    case "zsjos:lead:query-owned" -> true;

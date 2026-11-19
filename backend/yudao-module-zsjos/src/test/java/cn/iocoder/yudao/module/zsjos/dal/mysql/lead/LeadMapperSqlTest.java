@@ -330,7 +330,7 @@ class LeadMapperSqlTest {
         lead.setId(42L);
         lead.setStatus("submitted");
         lead.setAssignmentStatus("public_pool");
-        lead.setOwnerIdentity("education");
+        lead.setOwnerIdentity("sales");
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPublicPoolAt(LocalDateTime.of(2026, 9, 9, 11, 30));
         lead.setLastActivityAt(LocalDateTime.of(2026, 9, 9, 11, 30));
@@ -361,11 +361,11 @@ class LeadMapperSqlTest {
     void managementOwnerScopeUsesRecycleSourceOnlyWhileRecyclePending() throws Exception {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), LeadDO.class);
         Method method = LeadMapper.class.getDeclaredMethod("applyManagementScope",
-                LambdaQueryWrapperX.class, List.class, List.class);
+                LambdaQueryWrapperX.class, List.class, List.class, boolean.class);
         method.setAccessible(true);
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<>();
 
-        method.invoke(null, query, List.of(), List.of(10L));
+        method.invoke(null, query, List.of(), List.of(10L), false);
 
         String sql = query.getSqlSegment().replaceAll("\\s+", " ");
         assertTrue(sql.contains("owner_user_id IN"), sql);

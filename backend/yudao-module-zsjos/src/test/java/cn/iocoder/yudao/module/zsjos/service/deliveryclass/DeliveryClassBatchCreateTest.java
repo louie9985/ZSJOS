@@ -42,13 +42,10 @@ class DeliveryClassBatchCreateTest {
         mapper = mock(DeliveryClassMapper.class);
         users = mock(AdminUserApi.class);
         permissions = mock(PermissionApi.class);
-        var roles = mock(RoleApi.class);
-        var role = new RoleRespDTO(); role.setId(300L); role.setStatus(0);
-        when(roles.getRoleByCode("study_planner")).thenReturn(role);
         when(users.getUser(9L)).thenReturn(user(9L, 80L, 0));
         for (long id : List.of(20L, 21L)) {
             when(users.getUser(id)).thenReturn(user(id, 80L, 0));
-            when(permissions.getEnabledRoleIdsByUserId(id)).thenReturn(Set.of(300L));
+            when(permissions.hasAnyPermissions(id, "zsjos:sales:eligible")).thenReturn(true);
         }
         var numbers = mock(DeliveryClassNumberService.class);
         var counter = new AtomicLong();
@@ -63,7 +60,6 @@ class DeliveryClassBatchCreateTest {
         ReflectionTestUtils.setField(target, "mapper", mapper);
         ReflectionTestUtils.setField(target, "adminUserApi", users);
         ReflectionTestUtils.setField(target, "permissionApi", permissions);
-        ReflectionTestUtils.setField(target, "roleApi", roles);
         ReflectionTestUtils.setField(target, "deptApi", mock(DeptApi.class));
         ReflectionTestUtils.setField(target, "numberService", numbers);
         var proxy = new ProxyFactory(target);
@@ -98,8 +94,10 @@ class DeliveryClassBatchCreateTest {
     }
 
     @Test void rejectsMissingPlannerRoleBeforeAnyInsert() {
-        when(permissions.getEnabledRoleIdsByUserId(21L)).thenReturn(Set.of());
-        assertInvalidPlanner();
+        when(permissions.hasAnyPermissions(21L, "zsjos:sales:eligible")).thenReturn(false);
+        var error = assertThrows(ServiceException.class, () -> service.createBatch(request(20L, 21L), 9L));
+        assertEquals(DELIVERY_CLASS_SALES_QUALIFICATION_REQUIRED.getCode(), error.getCode());
+        verify(mapper, never()).insert(any(DeliveryClassDO.class));
     }
 
     @Test void rejectsMissingPlannerBeforeAnyInsert() {

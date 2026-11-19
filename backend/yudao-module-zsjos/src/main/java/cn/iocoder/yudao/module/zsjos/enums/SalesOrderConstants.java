@@ -4,6 +4,7 @@ import java.util.Set;
 
 public interface SalesOrderConstants {
 
+    String FINANCE_PROCESS_DEFINITION_KEY = "zsjos_sales_order_finance_approval";
     String PROCESS_DEFINITION_KEY = "zsjos_sales_order_dual_approval";
     String BUSINESS_KEY_PREFIX = "sales-order:";
     String TASK_REGISTRATION = "registrationReview";
@@ -26,6 +27,7 @@ public interface SalesOrderConstants {
     String STATUS_TERMINATED = "terminated";
     Set<String> ACTIVE_ORDER_STATUSES = Set.of(STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED);
 
+    String COMMAND_MIGRATE_LEGACY_APPROVAL = "migrate_legacy_approval";
     String ROUND_PENDING = "pending";
     String ROUND_APPROVED = "approved";
     String ROUND_REJECTED = "rejected";

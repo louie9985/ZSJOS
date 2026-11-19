@@ -26,7 +26,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosPostCodeConstants.*;
 
 @Service
 public class LeadSubmissionIdentityService {
-    public enum Identity { NEW_MEDIA, PARTNER, SALES, EDUCATION }
+    public enum Identity { NEW_MEDIA, PARTNER, SALES }
     public record Resolution(Identity identity, Long partnerId) {}
 
     @Resource private AdminUserApi adminUserApi;
@@ -34,6 +34,7 @@ public class LeadSubmissionIdentityService {
     @Resource private DeptApi deptApi;
     @Resource private PartnerMapper partnerMapper;
     @Resource private PersonnelStateService personnelStateService;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     public Resolution requireOrdinarySubmitter(Long userId) {
         AdminUserRespDTO user = requireEnabledAccount(userId);
@@ -45,21 +46,7 @@ public class LeadSubmissionIdentityService {
         throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
     }
 
-    public void requireEducationSubmitter(Long userId) {
-        if (!isEligibleEducationOwner(userId)) {
-            throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
-        }
-    }
-
-    public Set<Long> getEligibleEducationOwners(List<AdminUserRespDTO> users) {
-        if(users.isEmpty())return Set.of();
-        Set<Long> departments=users.stream().map(AdminUserRespDTO::getDeptId).filter(Objects::nonNull).collect(Collectors.toSet());
-        Map<Long,DeptRespDTO> deptMap=departments.isEmpty()?Map.of():deptApi.getDeptMap(departments);
-        Set<Long> disabled=personnelStateService.getDisabledUserIds(users.stream().map(AdminUserRespDTO::getId).toList());
-        return users.stream().filter(user -> isValidInternalUser(user,deptMap,disabled)).map(AdminUserRespDTO::getId).collect(Collectors.toSet());
-    }
-
-    public boolean isEligibleEducationOwner(Long userId) {
+    public boolean isEligibleRetainedOwner(Long userId) {
         if (userId == null) return false;
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         return user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())
@@ -68,7 +55,7 @@ public class LeadSubmissionIdentityService {
 
     public void requireSales(Long userId) {
         AdminUserRespDTO user = requireEnabledAccount(userId);
-        if (!isValidInternalUser(user) || !hasPost(user, SALES_SPECIALIST)) {
+        if (!isValidInternalUser(user) || !permissionApi.hasAnyPermissions(userId, "zsjos:sales:eligible")) {
             throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
         }
     }
@@ -116,9 +103,6 @@ public class LeadSubmissionIdentityService {
 
     public Resolution resolveHistoricalSubmission(Long userId, String sourceType, Long partnerId) {
         requireEnabledAccount(userId);
-        if (SOURCE_EDUCATION_SELF.equals(sourceType)) {
-            return new Resolution(Identity.EDUCATION, null);
-        }
         if (SOURCE_SALES_SELF.equals(sourceType)) {
             return new Resolution(Identity.SALES, null);
         }

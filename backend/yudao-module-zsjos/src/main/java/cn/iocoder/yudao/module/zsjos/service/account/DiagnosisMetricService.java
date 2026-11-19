@@ -38,11 +38,21 @@ public class DiagnosisMetricService {
         private final Map<CohortKey,List<Map<String,Object>>> cohorts = new HashMap<>();
         private final Map<LocalDateTime,Map<Long,Optional<String>>> states = new HashMap<>();
         private final Map<Long,Boolean> deals = new HashMap<>();
-        private final Map<PublicationKey,Map<String,Object>> publications = new HashMap<>();
+        final Map<Integer,Long> manualPublications = new HashMap<>();
         private final Map<Long,List<MediaAccountProfileEntryDO>> likes = new HashMap<>();
     }
     private record CohortKey(Long tenant,Long partner,LocalDateTime from,LocalDateTime cutoff) {}
-    private record PublicationKey(Long tenant,Long account,LocalDateTime to,LocalDateTime cutoff) {}
+    private static void applyPublication(Metric result, Long manualCount, Metric previous) {
+        if (manualCount != null) {
+            result.setPublishedCount(manualCount);
+            result.setPublicationExplanation("按账号手动填写的实际发布条数。");
+            result.setMissingPublishTimeCount(null);
+        } else if (previous != null) {
+            result.setPublishedCount(previous.getPublishedCount());
+            result.setPublicationExplanation(previous.getPublicationExplanation());
+            result.setMissingPublishTimeCount(previous.getMissingPublishTimeCount());
+        }
+    }
     public Metric read(MediaAccountDO account,String node,String round,Part part,Long likes, boolean persist){
         return read(account,node,round,part,likes,persist,new ReadContext());
     }
@@ -57,22 +67,20 @@ public class DiagnosisMetricService {
             Metric result=JsonUtils.parseObject(saved.getMetricJson(),Metric.class);
             result.setAsOf(now);
             if(result.getValidLeads()!=null) {long deals=metrics.deals(tenant,saved.getId(),now);result.setDeals(deals);result.setConversionRate(rate(deals,result.getValidLeads()));}
+            Long manual = context.manualPublications.get(part.days());
+            applyPublication(result, manual, null);
             if(likes!=null){
                 applyLikes(result,account,round,part,likes,context);
-                if(persist && part.days()==28){saved.setMetricJson(JsonUtils.toJsonString(result));metrics.updateById(saved);}
             }
+            if(persist && (manual != null || (likes != null && part.days()==28))){saved.setMetricJson(JsonUtils.toJsonString(result));metrics.updateById(saved);}
             return result;
         }
         var result=new Metric();result.setAsOf(now);
         LocalDateTime cutoff=now.isBefore(part.to())?now:part.to();
         boolean ended=!now.isBefore(part.to());result.setState(ended?"SETTLED":"OPEN");
         if(part.days()==7 || part.days()==28){
-            // Historical snapshots with nonstandard bounds retain the original query contract.
-            boolean standard=part.from().equals(part.to().minusDays(part.days()));
-            var counts=standard ? context.publications.computeIfAbsent(new PublicationKey(tenant,account.getId(),part.to(),cutoff),
-                    key -> metrics.publicationPeriods(key.tenant(),key.account(),key.to().minusDays(7),key.to().minusDays(28),key.to(),key.cutoff()))
-                    : metrics.publications(tenant,account.getId(),part.from(),part.to(),cutoff);
-            result.setPublishedCount(number(counts,standard ? "published"+part.days() : "published"));result.setMissingPublishTimeCount(number(counts,"missing"));
+            Metric previous = saved == null ? part.metric() : JsonUtils.parseObject(saved.getMetricJson(), Metric.class);
+            applyPublication(result, context.manualPublications.get(part.days()), previous);
         }
         Long partner=saved==null?null:saved.getPartnerId(),linkId=saved==null?null:saved.getPartnerLinkId();
         if(partner==null && account.getStudentPersonId()!=null){var link=links.selectActiveByStudent(account.getStudentPersonId());

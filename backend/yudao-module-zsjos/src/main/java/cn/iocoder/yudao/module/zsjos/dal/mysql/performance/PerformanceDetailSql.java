@@ -7,6 +7,7 @@ public final class PerformanceDetailSql {
         String body = fact.replaceFirst("(?s)\\s*ORDER BY[^<]+</script>", "</script>")
                 .replace("<script>", "").replace("</script>", "");
         // Missing domains predate the split. Preserve legacy sales visibility without assigning a historical domain.
+        // Historical delivery facts are read only through the merged sales view; no other domain is queryable.
         String organizationEvidence = "(f.org_source='frozen'<if test=\"businessDomain == 'sales' and !unclassified\"> OR (f.business_domain IS NULL AND f.resolved_domain IS NULL)</if>)";
         return "SELECT f.* FROM (SELECT raw.*, CASE WHEN raw.business_domain IN ('sales','delivery') THEN raw.business_domain "
                 + "WHEN raw.business_domain IS NULL AND raw.org_source='frozen' THEN "
@@ -14,8 +15,8 @@ public final class PerformanceDetailSql {
                 + "AND org.dept_id=raw.dept_id AND org.create_time &lt;= raw.occurred_at AND org.update_time &lt;= raw.occurred_at) "
                 + "ELSE NULL END resolved_domain FROM (" + body + ") raw) f WHERE "
                 + "<choose><when test=\"unclassified\">f.resolved_domain IS NULL</when>"
-                + "<when test=\"businessDomain == 'sales'\">(f.resolved_domain='sales' OR (f.business_domain IS NULL AND f.resolved_domain IS NULL))</when>"
-                + "<otherwise>f.resolved_domain=#{businessDomain}</otherwise></choose> AND <choose>"
+                + "<when test=\"businessDomain == 'sales'\">(f.resolved_domain IN ('sales','delivery') OR (f.business_domain IS NULL AND f.resolved_domain IS NULL))</when>"
+                + "<otherwise>1=0</otherwise></choose> AND <choose>"
                 + "<when test=\"allDepartments\"><choose><when test=\"missingDepartment\">1=1</when>"
                 + "<otherwise>" + organizationEvidence + " AND f.dept_id IS NOT NULL</otherwise></choose></when>"
                 + "<when test=\"departments != null and !departments.isEmpty()\">" + organizationEvidence + " AND f.dept_id IN "
@@ -106,7 +107,7 @@ public final class PerformanceDetailSql {
                     + "), result AS (SELECT * FROM facts WHERE " + interval("occurred_at", "end")
                     + ("followUps".equals(q.getMetric()) ? "" : " AND group_key='" + ("assigned".equals(q.getMetric()) ? "dispatch" : "timeout") + "'") + ")";
             default -> "facts AS (" + scoped(PerformanceFactSql.TASKS) + "), result AS (SELECT * FROM facts WHERE "
-                    + "NOT (group_key IN ('lead_first_follow_up','lead_qualification') AND COALESCE(generation_source,'') IN ('sales_self_sourced_auto','education_self_sourced_auto')) AND "
+                    + "NOT (group_key IN ('lead_first_follow_up','lead_qualification') AND COALESCE(generation_source,'') IN ('sales_self_sourced_auto')) AND "
                     + switch (q.getMetric()) {
                         case "accept" -> "status='pending' AND group_key='lead_assignment_accept'";
                         case "qualification" -> "current_qualification=TRUE AND (status='pending' OR outcome='overdue') AND group_key='lead_qualification' AND due_at &lt;= #{now}";

@@ -309,13 +309,24 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                             List<Long> matchedLeadIds,
                                                             List<Long> priorityLeadIds) {
         return selectScopedManagementPage(reqVO, visibleSourceUserIds, visibleOwnerUserIds, queryAll,
-                inboxFilter, matchedLeadIds, priorityLeadIds, false);
+                inboxFilter, matchedLeadIds, priorityLeadIds, false, null, null, false);
+    }
+
+    /**
+     * Sales-boundary list. {@code unownedVisible} admits unassigned, non-recycle-pending leads for lead query-all
+     * holders; {@link #selectManagementStatusCountsByBoundary} must apply the identical predicate.
+     */
+    default PageResult<LeadDO> selectManagementPageByBoundary(LeadManagementPageReqVO reqVO,
+            List<Long> sourceIds, List<Long> ownerIds, boolean queryAll, LeadInboxFilterQuery filter,
+            List<Long> matchedIds, List<Long> priorityIds, List<Long> boundaryIds, Long actorId, boolean unownedVisible) {
+        return selectScopedManagementPage(reqVO, sourceIds, ownerIds, queryAll, filter, matchedIds,
+                priorityIds, false, boundaryIds, actorId, unownedVisible);
     }
 
     default PageResult<LeadDO> selectOperationsPage(LeadManagementPageReqVO reqVO, Long memberId,
                                                     LeadInboxFilterQuery inboxFilter, List<Long> matchedLeadIds) {
         return selectScopedManagementPage(reqVO, List.of(memberId), List.of(), false,
-                inboxFilter, matchedLeadIds, List.of(), true);
+                inboxFilter, matchedLeadIds, List.of(), true, null, null, false);
     }
 
     private PageResult<LeadDO> selectScopedManagementPage(LeadManagementPageReqVO reqVO,
@@ -323,7 +334,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                          List<Long> visibleOwnerUserIds, boolean queryAll,
                                                          LeadInboxFilterQuery inboxFilter,
                                                          List<Long> matchedLeadIds, List<Long> priorityLeadIds,
-                                                         boolean operationsOnly) {
+                                                         boolean operationsOnly, List<Long> boundaryIds, Long actorId,
+                                                         boolean unownedVisible) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
@@ -334,6 +346,17 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
         if (operationsOnly) query.isNull(LeadDO::getPartnerId);
+        if (boundaryIds != null) {
+            query.and(w -> {
+                if (!boundaryIds.isEmpty()) w.in(LeadDO::getOwnerUserId, boundaryIds)
+                        .or(r -> r.eq(LeadDO::getAssignmentStatus, ASSIGNMENT_RECYCLE_PENDING)
+                                .in(LeadDO::getRecycleSourceOwnerUserId, boundaryIds)).or();
+                w.isNull(LeadDO::getOwnerUserId).eq(LeadDO::getPendingAssigneeUserId, actorId);
+                // Unassigned leads belong to no department yet; recycle-pending ones stay with the source owner.
+                if (unownedVisible) w.or(u -> u.isNull(LeadDO::getOwnerUserId)
+                        .ne(LeadDO::getAssignmentStatus, ASSIGNMENT_RECYCLE_PENDING));
+            });
+        }
         if (reqVO.isSalesOnly()) query.apply(SubordinateSalesIdentitySql.CONDITION);
         applySubmitterFilters(query, reqVO);
         if (inboxFilter != null && inboxFilter.matchNone()) {
@@ -353,7 +376,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                     && !"submitter".equals(reqVO.getAudience())) {
                 applyFollowUpScope(query, visibleOwnerUserIds);
             } else {
-                applyManagementScope(query, visibleSourceUserIds, visibleOwnerUserIds);
+                applyManagementScope(query, visibleSourceUserIds, visibleOwnerUserIds, unownedVisible);
             }
         }
         if (reqVO.getCursorSubmittedAt() != null && reqVO.getCursorId() != null) {
@@ -389,7 +412,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
 
     private static void applyManagementScope(LambdaQueryWrapperX<LeadDO> query,
                                              List<Long> visibleSourceUserIds,
-                                             List<Long> visibleOwnerUserIds) {
+                                             List<Long> visibleOwnerUserIds, boolean unownedVisible) {
         boolean hasSourceScope = visibleSourceUserIds != null && !visibleSourceUserIds.isEmpty();
         boolean hasOwnerScope = visibleOwnerUserIds != null && !visibleOwnerUserIds.isEmpty();
         if (!hasSourceScope && !hasOwnerScope) {
@@ -404,6 +427,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 wrapper.in(LeadDO::getOwnerUserId, visibleOwnerUserIds)
                         .or(recycled -> recycled.eq(LeadDO::getAssignmentStatus, ASSIGNMENT_RECYCLE_PENDING)
                                 .in(LeadDO::getRecycleSourceOwnerUserId, visibleOwnerUserIds));
+                if (unownedVisible) wrapper.or(u -> u.isNull(LeadDO::getOwnerUserId)
+                        .ne(LeadDO::getAssignmentStatus, ASSIGNMENT_RECYCLE_PENDING));
             }
         });
     }
@@ -412,7 +437,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                          List<Long> ownerUserIds, boolean queryAll) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<>();
         query.eq(LeadDO::getProviderOwnerType, "partner").isNotNull(LeadDO::getPartnerId);
-        if (!queryAll) applyManagementScope(query, sourceUserIds, ownerUserIds);
+        if (!queryAll) applyManagementScope(query, sourceUserIds, ownerUserIds, false);
         return selectList(query.select(LeadDO::getId, LeadDO::getPartnerId, LeadDO::getProviderOwnerType,
                 LeadDO::getProviderOwnerId, LeadDO::getOwnerUserId, LeadDO::getAssignmentStatus,
                 LeadDO::getDispatchMode).orderByAsc(LeadDO::getId));
@@ -801,9 +826,24 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     default Map<String, Long> selectManagementStatusCountsByScope(List<Long> visibleSourceUserIds,
                                                                    List<Long> visibleOwnerUserIds,
                                                                    boolean queryAll) {
+        return selectManagementStatusCountsByBoundary(visibleSourceUserIds, visibleOwnerUserIds, queryAll, null, null, false);
+    }
+
+    /** Same visibility predicate as the management list (boundary, relation scope, recycle and unowned branches). */
+    default Map<String, Long> selectManagementStatusCountsByBoundary(List<Long> visibleSourceUserIds,
+            List<Long> visibleOwnerUserIds, boolean queryAll, List<Long> boundaryIds, Long actorId, boolean unownedVisible) {
         QueryWrapper<LeadDO> query = new QueryWrapper<LeadDO>()
                 .select("status", "COUNT(*) AS total")
                 .groupBy("status");
+        if (boundaryIds != null) {
+            query.and(w -> {
+                if (!boundaryIds.isEmpty()) w.in("owner_user_id", boundaryIds)
+                        .or(r -> r.eq("assignment_status", ASSIGNMENT_RECYCLE_PENDING)
+                                .in("recycle_source_owner_user_id", boundaryIds)).or();
+                w.isNull("owner_user_id").eq("pending_assignee_user_id", actorId);
+                if (unownedVisible) w.or(u -> u.isNull("owner_user_id").ne("assignment_status", ASSIGNMENT_RECYCLE_PENDING));
+            });
+        }
         if (!queryAll) {
             boolean hasSourceScope = visibleSourceUserIds != null && !visibleSourceUserIds.isEmpty();
             boolean hasOwnerScope = visibleOwnerUserIds != null && !visibleOwnerUserIds.isEmpty();
@@ -815,7 +855,11 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                             .in("provider_owner_id", visibleSourceUserIds);
                     if (hasOwnerScope) {
                         if (hasSourceScope) wrapper.or();
-                        wrapper.in("owner_user_id", visibleOwnerUserIds);
+                        wrapper.in("owner_user_id", visibleOwnerUserIds)
+                                .or(recycled -> recycled.eq("assignment_status", ASSIGNMENT_RECYCLE_PENDING)
+                                        .in("recycle_source_owner_user_id", visibleOwnerUserIds));
+                        if (unownedVisible) wrapper.or(u -> u.isNull("owner_user_id")
+                                .ne("assignment_status", ASSIGNMENT_RECYCLE_PENDING));
                     }
                 });
             }
@@ -824,6 +868,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         for (Map<String, Object> row : selectMaps(query)) {
             Object status = row.get("status");
             Object total = row.get("total");
+            if (status == null) status = row.get("STATUS");
+            if (total == null) total = row.get("TOTAL");
             if (status != null && total instanceof Number number) result.put(status.toString(), number.longValue());
         }
         return result;

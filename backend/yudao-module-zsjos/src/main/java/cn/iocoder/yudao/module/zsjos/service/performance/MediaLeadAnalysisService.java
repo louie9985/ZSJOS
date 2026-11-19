@@ -228,8 +228,8 @@ public class MediaLeadAnalysisService {
             if (!access.deptAllowed(user.getDeptId())) continue;
             var row = byKey.get("USER:" + user.getId());
             result.add(new MediaLeadVO.Target(row == null ? null : row.getId(), "USER", user.getId(),
-                    user.getNickname(), periodStart, row == null ? null : row.getTargetCount(), null,
-                    row != null && Boolean.TRUE.equals(row.getManual()), row == null ? null : row.getVersion()));
+                    user.getNickname(), periodStart, row == null || !Boolean.TRUE.equals(row.getManual()) ? null : row.getTargetCount(), null,
+                    row != null && Boolean.TRUE.equals(row.getManual()), row == null ? null : row.getVersion(), row == null ? null : row.getTargetAmount(), row != null && Boolean.TRUE.equals(row.getAmountManual())));
         }
         for (var org : organizations) {
             if (!access.deptAllowed(org.getDeptId())) continue;
@@ -241,7 +241,7 @@ public class MediaLeadAnalysisService {
             result.add(new MediaLeadVO.Target(row == null ? null : row.getId(), org.getKind(), org.getDeptId(),
                     dept == null ? "历史组织" : dept.getName(), periodStart,
                     effectiveTarget(org.getKind(), org.getDeptId(), byKey, users, organizations), null,
-                    row != null && Boolean.TRUE.equals(row.getManual()), row == null ? null : row.getVersion()));
+                    row != null && Boolean.TRUE.equals(row.getManual()), row == null ? null : row.getVersion(), effectiveAmount(org.getKind(), org.getDeptId(), byKey, users, organizations), row != null && Boolean.TRUE.equals(row.getAmountManual())));
         }
         return result;
     }
@@ -256,9 +256,9 @@ public class MediaLeadAnalysisService {
                 throw PerformanceAccess.invalid("同批指标重复");
             if (!edit.periodStart().equals(edit.periodStart().withDayOfMonth(1)))
                 throw PerformanceAccess.invalid("指标月份必须从月初开始");
-            if (edit.restoreAutomatic() && "USER".equals(edit.scopeType()))
+            if ((edit.editsCount() && edit.restoreAutomatic() || edit.editsAmount() && edit.restoresAmount()) && "USER".equals(edit.scopeType()))
                 throw PerformanceAccess.invalid("个人目标不能恢复自动汇总");
-            if (!edit.restoreAutomatic() && edit.targetCount() == null)
+            if (edit.editsCount() && !edit.restoreAutomatic() && edit.targetCount() == null || edit.editsAmount() && !edit.restoresAmount() && edit.targetAmount() == null)
                 throw PerformanceAccess.invalid("请填写非负整数目标");
             access.authorizeTargetWrite(edit.scopeType(), edit.scopeId());
         }
@@ -266,17 +266,35 @@ public class MediaLeadAnalysisService {
             var old = targets.selectOne(new LambdaQueryWrapperX<MediaLeadTargetDO>()
                     .eq(MediaLeadTargetDO::getScopeType, edit.scopeType())
                     .eq(MediaLeadTargetDO::getScopeId, edit.scopeId())
-                    .eq(MediaLeadTargetDO::getPeriodStart, edit.periodStart())
-                    .last("FOR UPDATE"));
+                    .le(MediaLeadTargetDO::getPeriodStart, edit.periodStart())
+                    .orderByDesc(MediaLeadTargetDO::getPeriodStart).last("LIMIT 1 FOR UPDATE"));
             if (old != null && !Objects.equals(old.getVersion(), edit.version()) || old == null && edit.version() != null)
                 throw PerformanceAccess.invalid("指标已被修改，请刷新后重试");
             if (old != null && !access.writeDeptAllowed(old.getDeptId())) throw MediaLeadAccess.denied();
+            if (edit.sourceId() != null && (old == null || !edit.sourceId().equals(old.getId())))
+                throw PerformanceAccess.invalid("指标已被修改，请刷新后重试");
             String before = old == null ? null : JsonUtils.toJsonString(old);
-            var row = old == null ? new MediaLeadTargetDO() : old;
+            boolean insert = old == null || !edit.periodStart().equals(old.getPeriodStart());
+            var row = insert ? new MediaLeadTargetDO() : old;
+            if (insert && old != null) {
+                row.setTargetCount(old.getTargetCount()); row.setManual(old.getManual());
+                row.setTargetAmount(old.getTargetAmount()); row.setAmountManual(old.getAmountManual());
+            }
             row.setScopeType(edit.scopeType()); row.setScopeId(edit.scopeId());
-            row.setPeriodStart(edit.periodStart()); row.setTargetCount(edit.restoreAutomatic() ? 0 : edit.targetCount());
-            row.setManual(!edit.restoreAutomatic()); row.setReason(edit.reason().trim()); row.setVersion(old == null ? 0 : old.getVersion() + 1);
-            if (old == null) {
+            row.setPeriodStart(edit.periodStart());
+            if (old == null) { row.setTargetCount(0); row.setManual(false); row.setAmountManual(false); }
+            if (edit.editsAmount()) {
+                if (edit.targetAmount() != null && (edit.targetAmount().signum() < 0 || edit.targetAmount().scale() > 2
+                        || edit.targetAmount().compareTo(new BigDecimal("999999999999.99")) > 0))
+                    throw PerformanceAccess.invalid("业绩目标须为非负金额，最多两位小数");
+                row.setTargetAmount(edit.restoresAmount() ? BigDecimal.ZERO : edit.targetAmount());
+                row.setAmountManual(!edit.restoresAmount());
+            }
+            if (edit.editsCount()) {
+                row.setTargetCount(edit.restoreAutomatic() ? 0 : edit.targetCount());
+                row.setManual(!edit.restoreAutomatic());
+            } row.setReason(edit.reason().trim()); row.setVersion(insert ? 0 : old.getVersion() + 1);
+            if (insert) {
                 if ("USER".equals(edit.scopeType())) {
                     var user = access.user(edit.scopeId()); row.setDeptId(user.getDeptId());
                     var org = access.organization("DEPT", user.getDeptId());
@@ -286,7 +304,7 @@ public class MediaLeadAnalysisService {
                     row.setDeptId(edit.scopeId()); row.setCenterId(org.getCenterId());
                 }
             }
-            if (old == null) targets.insert(row); else targets.updateById(row);
+            if (insert) targets.insert(row); else targets.updateById(row);
             var revision = new MediaLeadRevisionDO();
             revision.setTargetId(row.getId()); revision.setBeforeJson(before);
             revision.setAfterJson(JsonUtils.toJsonString(row)); revision.setReason(row.getReason());
@@ -312,12 +330,12 @@ public class MediaLeadAnalysisService {
         int actual = (int) leads.stream().filter(x -> VALID.contains(x.getStatus()) && in(x.getSubmittedAt(), month, today.plusDays(1))).count();
         return new MediaLeadVO.Target(row == null ? null : row.getId(), type, id, targetName(type, id), month,
                 effectiveTarget(type, id, byKey, access.mediaUsers(), access.organizations()), actual,
-                row != null && Boolean.TRUE.equals(row.getManual()), row == null ? null : row.getVersion());
+                row != null && Boolean.TRUE.equals(row.getManual()), row == null ? null : row.getVersion(), effectiveAmount(type, id, byKey, access.mediaUsers(), access.organizations()), row != null && Boolean.TRUE.equals(row.getAmountManual()));
     }
 
     private Map<String, MediaLeadTargetDO> targetRows(LocalDate month) {
         return targets.selectList(new LambdaQueryWrapperX<MediaLeadTargetDO>()
-                .eq(MediaLeadTargetDO::getPeriodStart, month)).stream().collect(Collectors.toMap(
+                .le(MediaLeadTargetDO::getPeriodStart, month).orderByDesc(MediaLeadTargetDO::getPeriodStart)).stream().collect(Collectors.toMap(
                 x -> x.getScopeType() + ":" + x.getScopeId(), Function.identity(), (a, b) -> a));
     }
 
@@ -338,6 +356,25 @@ public class MediaLeadAnalysisService {
                 .map(o -> effectiveTarget("DEPT", o.getDeptId(), rows, users, organizations)).forEach(children::add);
         return children.isEmpty() || children.stream().anyMatch(Objects::isNull)
                 ? null : children.stream().mapToInt(Integer::intValue).sum();
+    }
+
+    private BigDecimal effectiveAmount(String type, Long id, Map<String, MediaLeadTargetDO> rows,
+                                    List<cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users,
+                                    List<MediaLeadOrgDO> organizations) {
+        var explicit = rows.get(type + ":" + id);
+        if (explicit != null && Boolean.TRUE.equals(explicit.getAmountManual())) return explicit.getTargetAmount();
+        if ("USER".equals(type)) return null;
+        List<BigDecimal> children = new ArrayList<>();
+        users.stream().filter(u -> Objects.equals(u.getDeptId(), id))
+                .map(u -> effectiveAmount("USER", u.getId(), rows, users, organizations)).forEach(children::add);
+        if ("CENTER".equals(type)) organizations.stream()
+                .filter(o -> "DEPT".equals(o.getKind()) && Objects.equals(o.getCenterId(), id))
+                .filter(o -> users.stream().anyMatch(u -> Objects.equals(u.getDeptId(), o.getDeptId()))
+                        || rows.get("DEPT:" + o.getDeptId()) != null
+                        && Boolean.TRUE.equals(rows.get("DEPT:" + o.getDeptId()).getAmountManual()))
+                .map(o -> effectiveAmount("DEPT", o.getDeptId(), rows, users, organizations)).forEach(children::add);
+        return children.isEmpty() || children.stream().anyMatch(Objects::isNull)
+                ? null : children.stream().reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private List<MediaLeadVO.PeriodStats> periodStats(List<MediaLeadFact> leads, Map<Long, LocalDateTime> orders, Map<Long, BigDecimal> contributions, LocalDate today) {
@@ -392,7 +429,7 @@ public class MediaLeadAnalysisService {
         names.forEach((userId, name) -> {
             var own = byUser.getOrDefault(userId, List.of());
             var row = targetsByKey.get("USER:" + userId);
-            result.add(new MediaLeadVO.Member(userId, name, row == null ? null : row.getTargetCount(),
+            result.add(new MediaLeadVO.Member(userId, name, row == null || !Boolean.TRUE.equals(row.getManual()) ? null : row.getTargetCount(),
                     count(own, today.minusDays(1), today, false), converted(own, orders, today.minusDays(1), today),
                     count(own, today, today.plusDays(1), false), converted(own, orders, today, today.plusDays(1)),
                     count(own, monday, today.plusDays(1), false), count(own, monday, today.plusDays(1), true), converted(own, orders, monday, today.plusDays(1)),

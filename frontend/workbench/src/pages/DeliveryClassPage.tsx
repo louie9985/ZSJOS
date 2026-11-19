@@ -147,7 +147,7 @@ export default function DeliveryClassPage({ permissions = [] }: { permissions?: 
         {editing ? <Form.Item name="homeroomUserId" label="班主任" rules={[{ required: true, message: '请选择班主任' }]}>
           <Select showSearch optionFilterProp="label" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} />
         </Form.Item> : <Form.Item name="homeroomUserIds" label="班主任" rules={[{ required: true, type: 'array', min: 1, message: '请选择至少一位班主任' }]}
-          extra="每位学习规划师分别创建一个同名班级，考期日期相同。">
+          extra="每位班主任分别创建一个同名班级，考期日期相同。">
           <Select mode="multiple" showSearch optionFilterProp="label" placeholder="可选择多位班主任" options={candidates.map(row => ({ label: `${row.name}${row.deptName ? ` · ${row.deptName}` : ''}`, value: row.id }))} />
         </Form.Item>}
         {!editing && !manage && <Form.Item name="groupMode" hidden initialValue="NONE"><Input /></Form.Item>}

@@ -105,7 +105,9 @@ public class SalesOrderContentProvider implements BpmApprovalContentProvider {
         studentFields.add(BpmApprovalFieldVO.of("班型", order.getClassType()));
         studentFields.add(BpmApprovalFieldVO.of("学员性质", historical(order.getStudentNatureLabelSnapshot())));
         studentFields.add(BpmApprovalFieldVO.of("服务周期", historical(order.getServicePeriodLabelSnapshot())));
-        studentFields.add(BpmApprovalFieldVO.of("约定考试时间", order.getAgreedExamTime()));
+        studentFields.add(order.getAgreedExamMonth() == null
+                ? BpmApprovalFieldVO.of("约定考试时间", order.getAgreedExamTime())
+                : BpmApprovalFieldVO.of("商定考试月份", order.getAgreedExamMonth()));
         studentFields.add(BpmApprovalFieldVO.wide("地区", regionText(order.getProvinceName(), order.getCityName())));
         studentFields.add(BpmApprovalFieldVO.wide("学员特殊要求", order.getStudentSpecialRequirements()));
         card.getGroups().add(group("学员信息", studentFields));

@@ -5,8 +5,8 @@ export type Query = Scope & { start?: string; end?: string; grain?: 'day' | 'wee
 export type OrgNode = Scope & { key: string; parentKey?: string; title: string; selectable: boolean }
 export type Metric = { key: string; label: string; start: string; end: string; amount: number; orders: number; converted: number | null; denominator: number | null; rate: number | null; sourceStatus?: 'ready' | 'review_required'; sourceReviewCount?: number; average: number | null; averageAmount: number; averageOrders: number }
 export type Group = { key: string; label: string; amount: number; count: number; share: number | null }
-export type Target = Scope & { id?: number; name: string; periodType: string; periodStart: string; automaticFloor: number | null; automaticSprint: number | null; floorAmount: number | null; sprintAmount: number | null; manual: boolean; complete: boolean; missing: number; version?: number }
-export type TargetEdit = Scope & { id?: number; periodType: string; periodStart: string; floorAmount?: number; sprintAmount?: number; restoreAutomatic?: boolean; reason: string; version?: number }
+export type Target = Scope & { id?: number; name: string; periodType: string; periodStart: string; automaticFloor: number | null; automaticSprint: number | null; floorAmount: number | null; sprintAmount: number | null; manual: boolean; complete: boolean; missing: number; version?: number; sourceToken?: string; sourceConflict?: boolean }
+export type TargetEdit = Scope & { id?: number; periodType: string; periodStart: string; floorAmount?: number; sprintAmount?: number; restoreAutomatic?: boolean; reason: string; version?: number; sourceToken?: string }
 export type Overview = { asOf: string; attributionAvailableSince: string | null; targets: { key: string; label: string; actual: Metric; target: Target }[]; performance: Metric[]; conversion: Metric[]; pending: Record<string, number>; missingAttributionOrders: number; missingAttributionAmount: number; canDetail: boolean }
 export type Analysis = { asOf: string; start: string; end: string; averages: Metric[]; trend: Metric[]; sources: Group[]; products: Group[]; contributors: Group[]; contributionMetrics: { userId: number; name: string; actual: Metric; floorRate: number | null; sprintRate: number | null; share: number | null }[]; averageTrends: Record<string, Metric[]>; target: Target | null }
 export type CalendarDay = { date: string; received: number; valid: number; invalid: number; pending: number; overdue: number; ended: number; lateCompleted: number; onTime: number; dueCount: number; unknown: number }
@@ -69,8 +69,8 @@ return {
  targets: (periodType: string, periodStart: string, signal?: AbortSignal) => get<Target[]>(`${TARGET}/list`, { periodType, periodStart }, signal),
  save: async (items: TargetEdit[]) => unwrap<boolean>(await http.put(`${TARGET}/batch`, { items })),
  candidates: () => get<OrgNode[]>(`${TARGET}/organization-candidates`),
- organizations: () => get<{ deptId: number; centerId: number; kind: 'DEPT' | 'CENTER' }[]>(`${TARGET}/organizations`),
- saveOrg: async (value: { deptId: number; centerId: number; kind: string }) => unwrap<boolean>(await http.put(`${TARGET}/organization`, value)),
+ organizations: () => get<{ deptId: number; centerId: number; kind: 'DEPT' | 'CENTER'; salesBoundaryRoot: boolean }[]>(`${TARGET}/organizations`),
+ saveOrg: async (value: { deptId: number; centerId: number; kind: string; salesBoundaryRoot?: boolean }) => unwrap<boolean>(await http.put(`${TARGET}/organization`, value)),
  revisions: (id: number) => get<{ id: number; reason: string; before: string; after: string; operatorName: string; at: string }[]>(`${TARGET}/history`, { id })
 }
 }
@@ -90,7 +90,7 @@ export function periodRange(key: string, now = new Date()): { start: string; end
 }
 
 export function averageFormula(metric: Metric) { return `${money(metric.averageAmount)} ÷ ${metric.averageOrders} 笔 = ${money(metric.average)} / 笔（剔除整单 0 和 0.01）` }
-export function conversionRule(key?: string) { return '仅按明确业务来源统计；无新媒体引流的销售、教务自拓不计入，来源待核实时暂停该范围成交率。' + (['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时单笔首购订单总金额≥1280元的成交客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资；不跨订单累计，未达标的期间有效客资仍在分母。' : '成交仅计单笔首购订单总金额≥1280元；不跨订单累计，未达标的期间有效客资仍在分母。（本周期新接有效客资中本周期成交数＋往期接收60日内于本周期成交数）÷（本周期新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。') }
+export function conversionRule(key?: string) { return '仅按明确业务来源统计；无新媒体引流的销售自拓不计入，来源待核实时暂停该范围成交率。' + (['last7','last30','last60','last90'].includes(key ?? '') ? '期间接收的有效客资中，截至查询时单笔首购订单总金额≥1280元的成交客资数 ÷ 期间接收有效客资数；不限60日，不补入窗口外客资；不跨订单累计，未达标的期间有效客资仍在分母。' : '成交仅计单笔首购订单总金额≥1280元；不跨订单累计，未达标的期间有效客资仍在分母。（本周期新接有效客资中本周期成交数＋往期接收60日内于本周期成交数）÷（本周期新接有效客资数＋上述往期成交数）。60日从本次接收起算，转派重启，截止不含。') }
 
 export const sourceReviewRequired = (metric: Pick<Metric, 'sourceStatus'>) => metric.sourceStatus === 'review_required'
 export const conversionSummary = (metric: Pick<Metric, 'converted' | 'denominator' | 'sourceStatus' | 'sourceReviewCount'>) => sourceReviewRequired(metric)

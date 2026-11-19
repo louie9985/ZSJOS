@@ -20,27 +20,27 @@ public class StudentSummaryController {
     @Resource private StudentSummaryService service;
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @GetMapping("/columns")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-summary:query')")
+    @PreAuthorize("(@ss.hasPermission('zsjos:student-summary:query')) && @salesDepartmentBoundaryService.canUseTenantWide()")
     public CommonResult<List<Column>> columns() { return success(service.columns()); }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @GetMapping("/classes")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-summary:query')")
+    @PreAuthorize("(@ss.hasPermission('zsjos:student-summary:query')) && @salesDepartmentBoundaryService.canUseTenantWide()")
     public CommonResult<List<ClassOption>> classes() { return success(service.classes()); }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @GetMapping("/page")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-summary:query')")
+    @PreAuthorize("(@ss.hasPermission('zsjos:student-summary:query')) && @salesDepartmentBoundaryService.canUseTenantWide()")
     public CommonResult<PageResult<Row>> page(@Valid Query query, HttpServletResponse response) {
         response.setHeader("Cache-Control","no-store"); return success(service.page(query));
     }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @GetMapping("/coverage")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-summary:query')")
+    @PreAuthorize("(@ss.hasPermission('zsjos:student-summary:query')) && @salesDepartmentBoundaryService.canUseTenantWide()")
     public CommonResult<Coverage> coverage(@Valid Query query, HttpServletResponse response) {
         response.setHeader("Cache-Control","no-store"); return success(service.coverage(query));
     }
     @ApiAccessLog(requestEnable=false, responseEnable=false)
     @PostMapping("/export")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-summary:query') && @ss.hasPermission('zsjos:student-summary:export')")
+    @PreAuthorize("(@ss.hasPermission('zsjos:student-summary:query') && @ss.hasPermission('zsjos:student-summary:export')) && @salesDepartmentBoundaryService.canUseTenantWide()")
     public void export(@Valid @RequestBody Export query, HttpServletResponse response) throws java.io.IOException {
         response.setHeader("Cache-Control","no-store"); service.export(query,response);
     }

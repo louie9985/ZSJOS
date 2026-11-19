@@ -36,12 +36,11 @@ public class AdvancedFilterController {
             + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
             + "'zsjos:lead:appeal:review-chairman'))"
             + " || (#scene == 'duplicate_review' && @ss.hasPermission('zsjos:lead-duplicate-review:query'))"
-            + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-pool'))"
+            + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-my'))"
             + " || (#scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
             + " || (#scene == 'student_service' && @ss.hasPermission('zsjos:student:query-my'))"
             + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
             + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))"
-            + " || (#scene == 'education_team' && @ss.hasPermission('zsjos:education-team:query'))"
             + " || (#scene == 'cashback' && @ss.hasAnyPermissions('zsjos:cashback:my-query','zsjos:cashback:finance-query'))"
             + " || (#scene == 'withdrawal' && @ss.hasAnyPermissions('zsjos:withdrawal:my-query','zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query'))")
     public CommonResult<AdvancedFilterCatalogRespVO> catalog(@RequestParam String scene) {

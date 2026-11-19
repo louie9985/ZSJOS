@@ -71,6 +71,13 @@ class PerformanceSnapshotServiceTest {
         var row=snapshot();assertEquals("repurchase",row.getSourceGroup());
         assertEquals(7651L,row.getAssignmentId());
     }
+    @Test void historicalDeliveryOrganizationWritesSalesDomain() {
+        var access=mock(PerformanceAccess.class);ReflectionTestUtils.setField(service,"access",access);
+        var user=new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO();user.setId(17L);user.setDeptId(1051L);
+        var org=new cn.iocoder.yudao.module.zsjos.dal.dataobject.performance.PerformanceOrgDO();org.setDeptId(1051L);org.setCenterId(1050L);org.setBusinessDomain("delivery");
+        when(access.user(17L)).thenReturn(user);when(access.owningOrganization(1051L)).thenReturn(org);
+        var row=snapshot();assertEquals("sales",row.getBusinessDomain());assertEquals(1050L,row.getCenterId());
+    }
     @Test void noLeadDoesNotReadHistoryOrInventReceipt() {
         order.setLeadId(null);var row=snapshot();
         assertNull(row.getAssignmentId());assertNull(row.getReceivedAt());verifyNoInteractions(histories);

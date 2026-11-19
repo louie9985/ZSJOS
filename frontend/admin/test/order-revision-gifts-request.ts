@@ -17,8 +17,13 @@ export default {
         { id: 2, code: 'new', name: '新礼品', status: 0, sort: 1 }
       ]
     }
+    if (url.startsWith('/zsjos/sales-order/profile/order/')) return {
+      personId: 1, name: '合成学员', mobile: '13800000000', wechatId: 'fixture-wechat', fingerprint: 'fixture-profile'
+    }
     if (url.startsWith('/zsjos/sales-order/management/')) return {
       id: 1, orderNo: 'FIXTURE-ORDER', studentName: '合成学员', studentMobile: '13800000000', studentWechatId: 'fixture-wechat',
+      agreedExamMonth: scenario === 'legacy-month' ? undefined : '2027-01',
+      agreedExamTime: scenario === 'legacy-month' ? '原约定月末' : undefined,
       status: 'revision_required', canRevise: true, canTerminate: false,
       collectionMode: 'offline_paid', transactionLocked: false, items: [], paymentVouchers: [],
       studentNatureLabelSnapshot: '历史性质', servicePeriodLabelSnapshot: '历史周期', studentSourceLabelSnapshot: '历史来源',

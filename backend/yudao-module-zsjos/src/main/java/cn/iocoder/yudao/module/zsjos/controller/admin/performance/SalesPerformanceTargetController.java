@@ -11,7 +11,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import java.time.*;
 import java.util.*;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
-@PerformanceDomainBoundary("sales")
 @RestController @Validated @RequestMapping("/zsjos/sales-performance-target")
 @PreAuthorize("@ss.hasPermission('zsjos:sales-performance-target:query')")
 public class SalesPerformanceTargetController {
@@ -25,7 +24,7 @@ public class SalesPerformanceTargetController {
  }
  @PutMapping("/batch") @PreAuthorize("@ss.hasPermission('zsjos:sales-performance-target:update')") public CommonResult<Boolean> save(@Valid @RequestBody TargetBatch batch){service.save(batch);return success(true);}
  @PutMapping("/organization") @PreAuthorize("@ss.hasPermission('zsjos:sales-performance-target:configure')") public CommonResult<Boolean> org(@Valid @RequestBody OrgEdit req){access.saveOrg(req);return success(true);}
- @GetMapping("/organizations") public CommonResult<List<Organization>> organizations(){return success(access.orgs().stream().filter(x->access.departmentAllowed(x.getDeptId())).map(x->new Organization(x.getDeptId(),x.getCenterId(),x.getKind())).toList());}
- @GetMapping("/organization-candidates") @PreAuthorize("@ss.hasPermission('zsjos:sales-performance-target:configure')") public CommonResult<List<Node>> candidates(){return success(access.departments().stream().filter(x->access.departmentAllowed(x.getId())).map(x->new Node("ORG:"+x.getId(),"ORG:"+x.getParentId(),x.getName(),"DEPT",x.getId(),true)).toList());}
+ @GetMapping("/organizations") public CommonResult<List<Organization>> organizations(){return success(access.orgs().stream().filter(x->access.has("zsjos:sales-performance-target:configure")?access.configurationDepartmentAllowed(x.getDeptId()):access.departmentAllowed(x.getDeptId())).map(x->new Organization(x.getDeptId(),x.getCenterId(),x.getKind(),x.getSalesBoundaryRoot())).toList());}
+ @GetMapping("/organization-candidates") @PreAuthorize("@ss.hasPermission('zsjos:sales-performance-target:configure')") public CommonResult<List<Node>> candidates(){return success(access.departments().stream().filter(x->access.configurationDepartmentAllowed(x.getId())).map(x->new Node("ORG:"+x.getId(),"ORG:"+x.getParentId(),x.getName(),"DEPT",x.getId(),true)).toList());}
  @GetMapping("/history") public CommonResult<List<Revision>> history(@RequestParam Long id){return success(service.revisionDetails(id));}
 }

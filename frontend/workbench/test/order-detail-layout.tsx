@@ -54,6 +54,12 @@ Object.assign(api, {
   advancedFilterCatalog: async () => ({ scene: 'order', fields: [] }),
   advancedFilterTemplates: async () => []
 })
+if (params.has('configuredFlow')) Object.assign(base, {
+  processDefinitionKey: 'zsjos_sales_order_finance_approval', status: 'pending_approval',
+  approvalProgress: { nodes: [{ id: 'review', name: '费用复核', status: 1,
+    candidates: [{ id: 2, name: '候选甲' }], tasks: [{ id: 't1', status: 1 },
+      { id: 't2', parentTaskId: 't1', status: 1, assigneeName: '加签乙' }] }] }
+})
 if (params.has('terminated')) Object.assign(base, { status: 'terminated', terminationReason: '测试撤销原因', canRevise: true })
 const shared = new URLSearchParams(location.search).has('shared')
 createRoot(document.getElementById('root')!).render(<ThemeProvider><App><BrowserRouter>

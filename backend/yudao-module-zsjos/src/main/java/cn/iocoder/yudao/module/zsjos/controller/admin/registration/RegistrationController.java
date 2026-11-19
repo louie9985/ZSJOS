@@ -20,34 +20,41 @@ import org.springframework.web.multipart.MultipartFile;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.PERMISSION_CLOSE;
 
-@Tag(name = "员工工作台 - 报名履约公共池")
+@Tag(name = "员工工作台 - 我的报名履约")
 @RestController
 @RequestMapping("/zsjos/registration")
 public class RegistrationController {
     @Resource private RegistrationService registrationService;
 
     @GetMapping("/pool-page")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
     public CommonResult<PageResult<RegistrationCaseRespVO>> getPoolPage(@Valid RegistrationPoolPageReqVO reqVO) {
         return success(registrationService.getPoolPage(reqVO));
     }
 
     @PostMapping("/pool/search-page")
     @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
     public CommonResult<PageResult<RegistrationCaseRespVO>> searchPoolPage(
             @Valid @RequestBody RegistrationPoolPageReqVO reqVO) {
         return success(registrationService.getPoolPage(reqVO));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
     public CommonResult<RegistrationCaseRespVO> get(@PathVariable Long id) { return success(registrationService.getCase(id)); }
 
-    @GetMapping("/study-planner-candidates")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
-    public CommonResult<List<StudyPlannerSimpleRespVO>> candidates() {
-        return success(registrationService.getStudyPlannerCandidates(SecurityFrameworkUtils.getLoginUserId()));
+    @GetMapping("/{id}/transfer-candidates")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:transfer')")
+    public CommonResult<List<StudyPlannerSimpleRespVO>> transferCandidates(@PathVariable Long id) {
+        return success(registrationService.getTransferCandidates(id, SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/{id}/transfer")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:transfer')")
+    public CommonResult<RegistrationCaseRespVO> transfer(@PathVariable Long id,
+                                                       @Valid @RequestBody RegistrationTransferReqVO request) {
+        return success(registrationService.transfer(id, SecurityFrameworkUtils.getLoginUserId(), request));
     }
 
     @GetMapping("/{id}/routes/{routeId}/candidates")
@@ -63,26 +70,11 @@ public class RegistrationController {
         return success(registrationService.updateChecklistItem(id, itemId, SecurityFrameworkUtils.getLoginUserId(), reqVO));
     }
 
-    @PutMapping("/{id}/study-planner")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
-    public CommonResult<RegistrationCaseRespVO> updatePlanner(@PathVariable Long id,
-                                                @Valid @RequestBody RegistrationPlannerUpdateReqVO reqVO) {
-        return success(registrationService.updateStudyPlanner(id, SecurityFrameworkUtils.getLoginUserId(), reqVO));
-    }
-
     @PutMapping("/{id}/routes")
     @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
     public CommonResult<RegistrationCaseRespVO> updateRoutes(@PathVariable Long id,
                                                 @Valid @RequestBody RegistrationRoutesUpdateReqVO reqVO) {
         return success(registrationService.updateRoutes(id, SecurityFrameworkUtils.getLoginUserId(), reqVO));
-    }
-
-    @PutMapping("/{id}/class-assignments")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
-    public CommonResult<RegistrationCaseRespVO> updateClassAssignments(@PathVariable Long id,
-            @Valid @RequestBody RegistrationClassAssignmentsSaveReqVO reqVO) {
-        return success(registrationService.updateClassAssignments(id,
-                SecurityFrameworkUtils.getLoginUserId(), reqVO));
     }
 
     @PostMapping("/{id}/items/{itemId}/attachments")

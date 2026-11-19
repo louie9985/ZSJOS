@@ -343,6 +343,7 @@ const remainingRouter: AppRouteRecordRaw[] = [
         props: (route) => ({
           id: route.query.id,
           taskId: route.query.taskId,
+          taskView: route.query.taskView,
           activityId: route.query.activityId
         })
       },

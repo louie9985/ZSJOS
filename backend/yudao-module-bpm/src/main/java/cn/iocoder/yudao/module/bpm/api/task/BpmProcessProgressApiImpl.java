@@ -48,6 +48,34 @@ public class BpmProcessProgressApiImpl implements BpmProcessProgressApi {
         return result;
     }
 
+    @Resource private cn.iocoder.yudao.module.bpm.service.comment.BpmCommentService commentService;
+
+    @Override
+    public List<Comment> getComments(String id) {
+        var instance = instanceService.getHistoricProcessInstance(id);
+        if (instance == null || !TenantContextHolder.getRequiredTenantId().toString().equals(instance.getTenantId())) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        var comments = commentService.getCommentListByProcessInstanceId(id);
+        var users = userApi.getUserMap(comments.stream().map(comment -> NumberUtil.parseLong(comment.getUserId(), null))
+                .filter(Objects::nonNull).collect(Collectors.toSet()));
+        return comments.stream().map(comment -> {
+            Long userId = NumberUtil.parseLong(comment.getUserId(), null);
+            var user = userId == null ? null : users.get(userId);
+            return new Comment(comment.getId(), comment.getTaskId(), id, comment.getType(),
+                    comment.getFullMessage(), time(comment.getTime()),
+                    user == null ? null : new CommentUser(userId, user.getNickname()));
+        }).toList();
+    }
+
+    @Override
+    public void createTaskComment(Long userId, String taskId, String message) {
+        var request = new cn.iocoder.yudao.module.bpm.controller.admin.comment.vo.BpmCommentCreateReqVO();
+        request.setTaskId(taskId);
+        request.setMessage(message);
+        commentService.createComment(userId, request);
+    }
+
     @Override
     public boolean isParticipant(String id, Long userId) {
         if (id == null || userId == null) return false;

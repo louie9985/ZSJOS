@@ -102,16 +102,31 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
 
     @Override
     public List<LeadAssignmentUserRespVO> getEligibleSalesUsers() {
-        UserRelationSceneDO scene = sceneService.getEnabledSceneByCode(SCENE);
-        return getEligibleTargetUsers(scene);
+        var users = eligibleSales().stream().sorted(userComparator()).toList();
+        var deptMap = getDeptMap(users, List.of());
+        return users.stream().map(user -> convertUser(user, deptMap)).toList();
     }
 
     @Override
     public boolean isEligibleSalesUser(Long userId) {
         if (userId == null) return false;
-        UserRelationSceneDO scene = sceneService.getEnabledSceneByCode(SCENE);
-        // 状态判断复用场景资格规则，不查询仅供候选列表展示的部门资料。
-        return getEligibleTargetUsersInternal(scene).stream().anyMatch(user -> userId.equals(user.getId()));
+        return eligibleSales().stream().anyMatch(user -> userId.equals(user.getId()));
+    }
+
+    private List<AdminUserRespDTO> eligibleSales() {
+        return adminUserApi.getUserList(permissionApi.getEnabledUserIdsByPermission(PERMISSION_SALES_ELIGIBLE)).stream()
+                .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())).toList();
+    }
+
+    @Override
+    public List<LeadAssignmentUserRespVO> getEligibleReceivers() {
+        Set<Long> receivers = permissionApi.getEnabledUserIdsByPermission(PERMISSION_RECEIVE);
+        return getEligibleSalesUsers().stream().filter(user -> receivers.contains(user.getId())).toList();
+    }
+
+    @Override
+    public boolean isEligibleReceiver(Long userId) {
+        return isEligibleSalesUser(userId) && permissionApi.hasAnyPermissions(userId, PERMISSION_RECEIVE);
     }
 
     private List<LeadAssignmentUserRespVO> getEligibleTargetUsers(UserRelationSceneDO scene) {
@@ -133,7 +148,9 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
         }
         Set<Long> configuredIds = relations.stream().map(LeadAssignmentRelationDO::getTargetUserId)
                 .collect(Collectors.toSet());
-        List<AdminUserRespDTO> users = getEligibleTargetUsersInternal(scene).stream()
+        Set<Long> receiverIds = getEligibleReceivers().stream().map(LeadAssignmentUserRespVO::getId).collect(Collectors.toSet());
+        List<AdminUserRespDTO> users = eligibleSales().stream()
+                .filter(user -> receiverIds.contains(user.getId()))
                 .filter(user -> configuredIds.contains(user.getId()))
                 .sorted(userComparator())
                 .toList();

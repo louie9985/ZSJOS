@@ -18,6 +18,7 @@ import static org.mockito.Mockito.*;
 class DeliveryClassScopeServiceTest {
     @InjectMocks DeliveryClassScopeService service;
     @Mock PermissionApi permissionApi;
+    @Mock cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Mock DeliveryClassMapper classMapper;
     @Mock AdminUserApi adminUserApi;
 

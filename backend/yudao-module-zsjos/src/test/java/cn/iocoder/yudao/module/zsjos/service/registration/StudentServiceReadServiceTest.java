@@ -23,6 +23,7 @@ class StudentServiceReadServiceTest {
                 org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(false);
     }
 
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks StudentServiceReadService service;
     @Mock StudentServicePageMapper pageMapper;
     @Mock ServiceRelationMapper relationMapper;
@@ -218,7 +219,7 @@ class StudentServiceReadServiceTest {
                 + "UNION ALL SELECT 9,1,0,9,NULL,NULL,'active',NULL,NULL,NOW() "
                 + "UNION ALL SELECT 10,1,0,9,91,NULL,'active',NULL,NULL,NOW() "
                 + "UNION ALL SELECT 11,1,0,9,90,NULL,'paused',NULL,NULL,NOW()),"
-                + "zsjos_service_relation AS (SELECT service_rows.*,NULL content_director_user_id,NULL career_planner_user_id,'accepted' acceptance_status FROM service_rows),"
+                + "zsjos_service_relation AS (SELECT service_rows.*,NULL content_director_user_id,NULL career_planner_user_id,'accepted' acceptance_status,1 teaching_delivery,0 teaching_closed FROM service_rows),"
                 + "zsjos_person AS (SELECT 9 id,1 tenant_id,0 deleted UNION ALL SELECT 9,2,0),"
                 + "zsjos_order AS (SELECT 0 id,1 tenant_id,0 deleted,0 lead_id),"
                 + "zsjos_order_item AS (SELECT 0 id,0 order_id,1 tenant_id,0 deleted),"
@@ -246,7 +247,7 @@ class StudentServiceReadServiceTest {
                 + "UNION ALL SELECT 2,1,0,9,82,7 UNION ALL SELECT 3,1,0,9,83,99 "
                 + "UNION ALL SELECT 4,1,0,9,NULL,7 UNION ALL SELECT 5,1,0,9,84,7),"
                 + "zsjos_service_relation AS (SELECT service_rows.*,NULL class_id,NULL order_item_id,"
-                + "NULL content_director_user_id,NULL career_planner_user_id,'accepted' acceptance_status,'active' status,NOW() update_time FROM service_rows),"
+                + "NULL content_director_user_id,NULL career_planner_user_id,'accepted' acceptance_status,'active' status,NOW() update_time,1 teaching_delivery,0 teaching_closed,CASE id WHEN 1 THEN 'FirstOrder' WHEN 2 THEN 'SecondOrder' WHEN 3 THEN 'HiddenOrder' ELSE NULL END student_name_snapshot FROM service_rows),"
                 + "zsjos_person AS (SELECT 9 id,1 tenant_id,0 deleted,'PersonOnly' name,'fixture' person_no,NULL mobile,NULL wechat_id),"
                 + "zsjos_order AS (SELECT 81 id,1 tenant_id,0 deleted,0 lead_id,'FirstOrder' student_name "
                 + "UNION ALL SELECT 82,1,0,0,'SecondOrder' UNION ALL SELECT 83,1,0,0,'HiddenOrder' UNION ALL SELECT 84,1,1,0,'DeletedOrder'),"

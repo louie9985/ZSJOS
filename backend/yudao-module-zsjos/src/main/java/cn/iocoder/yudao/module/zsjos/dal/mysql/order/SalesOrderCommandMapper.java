@@ -15,6 +15,12 @@ public interface SalesOrderCommandMapper extends BaseMapperX<SalesOrderCommandDO
             + "#{row.bpmTaskId},#{row.operatorUserId},#{row.requestFingerprint},'',NOW(),'',NOW(),b'0',#{tenantId})")
     int insertIgnore(@Param("tenantId") Long tenantId, @Param("row") SalesOrderCommandDO row);
 
+    default boolean hasCommand(Long approvalRoundId, String commandType) {
+        return selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SalesOrderCommandDO>()
+                .eq(SalesOrderCommandDO::getApprovalRoundId, approvalRoundId)
+                .eq(SalesOrderCommandDO::getCommandType, commandType)) > 0;
+    }
+
     default SalesOrderCommandDO selectByIdempotencyKey(String key) {
         return selectOne(SalesOrderCommandDO::getIdempotencyKey, key);
     }

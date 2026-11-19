@@ -15,7 +15,6 @@ const methods: Record<string, string[]> = {
   registration: ['registrationPoolPage'],
   media_student: ['page'],
   subordinate_sales: ['subordinateSalesPage'],
-  education_team: ['page'],
   cashback: ['cashbacks'],
   withdrawal: ['withdrawals'],
   business_todo: ['businessTaskList'],
@@ -28,7 +27,7 @@ export function useMetricSourceApi<T extends object>(source: string, original: T
     if (!scope || scope.source !== source) return original
     return new Proxy(original, {
       get(target, key, receiver) {
-        if (typeof key !== 'string' || !methods[source]?.includes(key)) return Reflect.get(target, key, receiver)
+        if (typeof key !== 'string' || !methods[scope.source]?.includes(key)) return Reflect.get(target, key, receiver)
         return async (...args: unknown[]) => {
           const query = [...args].reverse().find(value => value !== null && typeof value === 'object' && !Array.isArray(value)) ?? {}
           if (source === 'bpm_todo' || source === 'business_todo') {

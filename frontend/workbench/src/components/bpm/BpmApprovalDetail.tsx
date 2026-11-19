@@ -2,33 +2,33 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
   App,
-  Avatar,
   Button,
   Collapse,
   Empty,
-  Input,
   Skeleton,
   Space,
   Tag,
   Typography
 } from 'antd'
-import { CopyOutlined, LinkOutlined, SendOutlined } from '@ant-design/icons'
+import { CopyOutlined, LinkOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import DateTimeText from '../DateTimeText'
 import DetailFieldGrid from '../DetailFieldGrid'
 import {
   api,
   type BpmApprovalBrief,
-  type BpmComment,
   type BpmTask,
   type DictData,
   type SimpleUser
 } from '../../services/api'
 import BpmApprovalActions from './BpmApprovalActions'
+import ApprovalComments from './ApprovalComments'
 import ApprovalHistory from './ApprovalHistory'
 import { useApprovalResource } from './useApprovalResource'
 import { approvalStatus } from './approvalHistoryModel'
 import BusinessContentCard from './BusinessContentCard'
+import { FINANCE_ORDER_PROCESS_KEY } from '../../services/salesOrder'
+import SalesOrderDetailCards from '../SalesOrderDetailCards'
 import FeedbackBusinessContent from '../FeedbackBusinessContent'
 import BpmDynamicForm, {
   formatBpmVariable,
@@ -87,82 +87,6 @@ function ProcessIdentifiers({ processInstanceId, taskId }: {
   />
 }
 
-/** 流程评论：与审批意见分开，任何可处理任务的人都能追加。 */
-function CommentList({
-  comments,
-  loading,
-  canComment,
-  taskId,
-  onRefresh, onState, failed, initialText = '', onDraft
-}: {
-  comments: BpmComment[]
-  loading: boolean
-  canComment: boolean
-  taskId?: string
-  onRefresh: () => void
-  onState?: (dirty: boolean, busy: boolean) => void
-  failed?: boolean
-  initialText?: string
-  onDraft?: (text: string) => void
-}) {
-  const { message } = App.useApp()
-  const [text, setText] = useState(initialText)
-  const [submitting, setSubmitting] = useState(false)
-  const lock = useRef(false)
-  useEffect(() => { onState?.(!!text.trim(), submitting) }, [text, submitting, onState])
-  useEffect(() => { onDraft?.(text) }, [text, onDraft])
-
-  const submit = async () => {
-    const trimmed = text.trim()
-    if (!trimmed || !taskId || !canComment || lock.current) return
-    lock.current = true
-    setSubmitting(true)
-    try {
-      await api.createBpmComment({ taskId, message: trimmed })
-      setText('')
-      message.success('评论已提交')
-      onRefresh()
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : '评论提交失败，请重试')
-    } finally {
-      lock.current = false
-      setSubmitting(false)
-    }
-  }
-
-  return <div className="bpm-approval-comments">
-    {(canComment || text) && taskId && <Space.Compact className="bpm-approval-comment-input">
-      <Input.TextArea
-        rows={2}
-        maxLength={500}
-        value={text}
-        readOnly={!canComment || submitting}
-        onChange={event => setText(event.target.value)}
-        placeholder="输入评论内容"
-      />
-      <Button
-        type="primary"
-        icon={<SendOutlined/>}
-        loading={submitting}
-        disabled={!canComment || !text.trim()}
-        onClick={() => void submit()}
-      >发表</Button>
-    </Space.Compact>}
-    {loading
-      ? <Skeleton active paragraph={{ rows: 3 }}/>
-      : !failed && comments.length === 0
-        ? <Empty description="暂无评论"/>
-        : comments.map(comment => <div key={comment.id} className="bpm-approval-comment">
-          <Space size={8}>
-            <Avatar size={28}>{comment.user?.nickname?.slice(0, 1) || '?'}</Avatar>
-            <Typography.Text strong>{comment.user?.nickname || '未知用户'}</Typography.Text>
-            <Typography.Text type="secondary"><DateTimeText value={comment.createTime}/></Typography.Text>
-          </Space>
-          <Typography.Paragraph className="bpm-approval-comment-body">{comment.message}</Typography.Paragraph>
-        </div>)}
-  </div>
-}
-
 export type ApprovalDraft = { reason?: string; signPicUrl?: string; comment?: string }
 export type BpmApprovalDetailProps = {
   /** 列表选中的任务，提供 processInstanceId / taskId 作为查询入口。 */
@@ -217,6 +141,9 @@ export default function BpmApprovalDetail({
   const identity = (taskId ?? '') + detailView
   const { data: detail, loading: detailLoading, error: detailError, reload: loadDetail } = useApprovalResource(identity, () => processInstanceId ? api.bpmApprovalDetail({ processInstanceId, taskId }) : Promise.resolve(undefined))
   const { data: businessCard, loading: businessCardLoading, error: businessCardError, reload: loadBusinessCard } = useApprovalResource(identity, () => taskId ? api.bpmApprovalBusinessDetail(taskId, detailView) : Promise.resolve(null))
+  const financeOrder = task?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY
+  const { data: order, loading: orderLoading, error: orderError, reload: loadOrder } = useApprovalResource(identity, () =>
+    financeOrder && taskId ? api.nativeFinanceOrderDetail(taskId, detailView) : Promise.resolve(undefined))
   const { data: records = [], loading: recordsLoading, error: recordsError, reload: loadRecords } = useApprovalResource(identity, () => processInstanceId ? api.bpmTaskListByProcessInstance(processInstanceId) : Promise.resolve([]))
   const { data: comments = [], loading: commentsLoading, error: commentsError, reload: loadComments } = useApprovalResource(identity, () => processInstanceId ? api.bpmCommentList(processInstanceId) : Promise.resolve([]))
   const [actionDirty, setActionDirty] = useState(false)
@@ -243,7 +170,7 @@ export default function BpmApprovalDetail({
     if (!taskCompleted) reloadAll()
     onActionSuccess?.(taskCompleted)
   }, [reloadAll, onActionSuccess])
-  const ready = view === 'todo' && detail?.todoTask?.status === 1 && !completed && !detailLoading && !detailError && !businessCardLoading && !businessCardError && detail?.todoTask?.id === taskId
+  const ready = view === 'todo' && detail?.todoTask?.status === 1 && !completed && !detailLoading && !detailError && !businessCardLoading && !businessCardError && (!financeOrder || Boolean(order && !orderLoading && !orderError)) && detail?.todoTask?.id === taskId
 
   const processDefinition = detail?.processDefinition
   const processInstance = detail?.processInstance
@@ -327,11 +254,11 @@ export default function BpmApprovalDetail({
 
       <Typography.Title level={5}>审批流程</Typography.Title>
       <p>{subject}</p><p>当前任务：{task.name}</p><p>当前处理人：{todoTask?.assigneeUser?.nickname || todoTask?.ownerUser?.nickname || task.assigneeUser?.nickname || task.ownerUser?.nickname || '待分配'}</p>
-      {detailLoading && !detail ? <Skeleton active/> : <ApprovalHistory detail={detail} records={records} incomplete={!!detailError || !!recordsError || recordsLoading}/>}
+      {detailLoading && !detail ? <Skeleton active/> : <ApprovalHistory detail={detail} records={records} comments={comments} incomplete={!!detailError || !!recordsError || recordsLoading}/>}
       {recordsLoading && <Skeleton active paragraph={{ rows: 2 }}/>}
       <ProcessIdentifiers processInstanceId={processInstanceId} taskId={task.id}/>
       <Typography.Title level={5}>流程评论</Typography.Title>
-      <CommentList comments={comments} loading={commentsLoading} canComment={canUpdate && ready && !actionBusy} taskId={task.id} onRefresh={loadComments} onState={updateComment} failed={!!commentsError} initialText={initialDraft?.comment} onDraft={saveComment}/>
+      <ApprovalComments comments={comments} loading={commentsLoading} canComment={canUpdate && ready && !actionBusy} taskId={task.id} onRefresh={loadComments} onState={updateComment} failed={!!commentsError} initialText={initialDraft?.comment} onDraft={saveComment}/>
     </div><div className={'bpm-unified-action-dock' + (actionOpen ? ' is-open' : '')}>{narrow && view === 'todo' && <Button disabled={actionBusy || commentBusy} onClick={() => setActionOpen(false)}>收起操作区</Button>}{view === 'done' && <section className="bpm-unified-result"><Typography.Title level={5}>本任务处理结果</Typography.Title><p>{approvalStatus(task.status, bpmStatusLabel)}</p><p>{task.reason || '未填写审批意见'}</p><DateTimeText value={task.endTime}/></section>}    {view === 'todo' && canUpdate && (
       (todoTask?.id === task.id || actionDirty)
         ? <BpmApprovalActions
@@ -363,6 +290,10 @@ export default function BpmApprovalDetail({
         <div className="bpm-unified-columns">
           <main className="bpm-unified-content">
             {view === 'done' && <Alert type="info" showIcon message="已办任务 · 本轮内容只读"/>}
+            {financeOrder && (orderError
+              ? <Alert type="error" title={orderError} action={<Button onClick={loadOrder}>重试</Button>}/>
+              : orderLoading ? <Skeleton active/>
+                : order && <SalesOrderDetailCards order={order} mode="approval-done" informationLayout="table"/>)}
             {businessCardError && <Alert type="error" message="业务详情未完整加载" description={businessCardError} action={<Button onClick={loadBusinessCard}>重试</Button>}/>}
             {businessCardLoading ? <Skeleton active paragraph={{ rows: 5 }}/> : businessCard?.message
               ? <Typography.Text type="secondary">{businessCard.message}</Typography.Text>

@@ -3,6 +3,7 @@ import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import { studentInfoApi, studentInfoError, studentInfoStatus, type StudentInfoDetail, type StudentInfoField, type StudentInfoImage } from '../services/studentInfo'
 import { formatTimestamp } from '../services/time'
+import SafeRichText from './SafeRichText'
 import AttachmentCard, { type AttachmentResource } from './AttachmentCard'
 import '../styles/components/student-info-panel.css'
 
@@ -107,6 +108,10 @@ function StudentInfoPanelContent({ caseId, reader, showDraft }: { caseId: number
             })}</dl>
           </section>)}</div>
           <aside className="student-info-aside" aria-label="资料信息">
+          {data.agreementVersion != null && <section className="student-info-section student-info-agreement">
+            <h4>已确认协议 · V{data.agreementVersion}</h4>
+            {data.agreementBody && <details><summary>查看协议全文</summary><SafeRichText html={data.agreementBody}/></details>}
+          </section>}
             <section className="student-info-section"><h4>资料信息</h4>
               <dl className="student-info-fields">
                 <div className="student-info-field"><dt>提交时间</dt><dd>{formatTimestamp(data.submittedAt)}<div className="student-info-field-note">北京时间</div></dd></div>

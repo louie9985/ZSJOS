@@ -61,12 +61,12 @@ export const getTaskManagerPage = async (params: any) => {
   return await request.get({ url: '/bpm/task/manager-page', params })
 }
 
-export const approveTask = async (data: any) => {
-  return await request.put({ url: '/bpm/task/approve', data })
+export const approveTask = async (data: any, preserveBusinessError = false) => {
+  return await request.put({ url: '/bpm/task/approve', data, preserveBusinessError })
 }
 
-export const rejectTask = async (data: any) => {
-  return await request.put({ url: '/bpm/task/reject', data })
+export const rejectTask = async (data: any, preserveBusinessError = false) => {
+  return await request.put({ url: '/bpm/task/reject', data, preserveBusinessError })
 }
 
 export const getTaskListByProcessInstanceId = async (processInstanceId: string) => {
@@ -96,8 +96,8 @@ export const transferTask = async (data: any) => {
 }
 
 // 加签
-export const signCreateTask = async (data: any) => {
-  return await request.put({ url: '/bpm/task/create-sign', data })
+export const signCreateTask = async (data: any, preserveBusinessError = false) => {
+  return await request.put({ url: '/bpm/task/create-sign', data, preserveBusinessError })
 }
 
 // 减签

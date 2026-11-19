@@ -3,12 +3,8 @@ package cn.iocoder.yudao.module.zsjos.service.registration;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import cn.iocoder.yudao.module.system.api.dept.DeptApi;
-import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalConfigDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalConfigMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -16,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
-import java.util.List;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.*;
@@ -28,44 +23,26 @@ class RegistrationNotifySceneProviderTest {
 
     @InjectMocks private RegistrationNotifySceneProvider provider;
     @Mock private PermissionApi permissionApi;
-    @Mock private SalesOrderApprovalConfigMapper approvalConfigMapper;
-    @Mock private DeptApi deptApi;
     @Mock private AdminUserApi adminUserApi;
 
-    @Test
-    void resolvesAllEnabledPoolHandlersWithPermission() {
-        when(permissionApi.getEnabledUserIdsByPermission(PERMISSION_QUERY_POOL)).thenReturn(Set.of(11L, 12L));
-        when(approvalConfigMapper.selectCurrent()).thenReturn(new SalesOrderApprovalConfigDO().setRegistrationDeptId(1030L));
-        when(deptApi.getChildDeptList(1030L)).thenReturn(List.of(new DeptRespDTO().setId(1031L)));
-        when(adminUserApi.getUserListByDeptIds(Set.of(1030L, 1031L))).thenReturn(List.of(user(11L), user(12L)));
-        NotifyBusinessEvent event = NotifyBusinessEvent.builder().tenantId(1L).bizId(7L).payload(Map.of()).build();
-
-        Set<NotifyRecipientDTO> recipients = provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_POOL_HANDLERS));
-
-        assertEquals(Set.of(NotifyRecipientDTO.admin(11L), NotifyRecipientDTO.admin(12L)), recipients);
-    }
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseMapper cases;
 
     @Test
-    void resolvesOnlyPermissionUsersInsideConfiguredDepartmentSubtree() {
-        when(permissionApi.getEnabledUserIdsByPermission(PERMISSION_QUERY_POOL)).thenReturn(Set.of(11L, 12L, 13L));
-        when(approvalConfigMapper.selectCurrent()).thenReturn(new SalesOrderApprovalConfigDO().setRegistrationDeptId(1030L));
-        when(deptApi.getChildDeptList(1030L)).thenReturn(List.of(new DeptRespDTO().setId(1031L)));
-        when(adminUserApi.getUserListByDeptIds(Set.of(1030L, 1031L)))
-                .thenReturn(List.of(user(11L)));
+    void resolvesCurrentFulfillmentOwner() {
+        var item = new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseDO();
+        item.setOwnerUserId(11L);
+        when(cases.selectById(7L)).thenReturn(item);
+        when(adminUserApi.getUser(11L)).thenReturn(user(11L));
+        when(permissionApi.hasAnyPermissions(11L, "zsjos:registration:query-my")).thenReturn(true);
+        var event = NotifyBusinessEvent.builder().sceneCode(NOTIFY_SCENE_TASK_CREATED).tenantId(1L).bizId(7L).build();
+        assertEquals(Set.of(NotifyRecipientDTO.admin(11L)),
+                provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_POOL_HANDLERS)));
 
-        Set<NotifyRecipientDTO> recipients = provider.resolveRecipients(
-                NotifyBusinessEvent.builder().tenantId(1L).bizId(7L).build(), Set.of(NOTIFY_ROLE_POOL_HANDLERS));
-
-        assertEquals(Set.of(NotifyRecipientDTO.admin(11L)), recipients);
-    }
-
-    @Test
-    void sendsNobodyWhenRegistrationDepartmentIsNotConfigured() {
-        when(permissionApi.getEnabledUserIdsByPermission(PERMISSION_QUERY_POOL)).thenReturn(Set.of(11L));
-        when(approvalConfigMapper.selectCurrent()).thenReturn(new SalesOrderApprovalConfigDO());
-
-        assertEquals(Set.of(), provider.resolveRecipients(
-                NotifyBusinessEvent.builder().tenantId(1L).bizId(7L).build(), Set.of(NOTIFY_ROLE_POOL_HANDLERS)));
+        item.setOwnerUserId(12L);
+        when(adminUserApi.getUser(12L)).thenReturn(user(12L));
+        when(permissionApi.hasAnyPermissions(12L, "zsjos:registration:query-my")).thenReturn(true);
+        assertEquals(Set.of(NotifyRecipientDTO.admin(12L)),
+                provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_POOL_HANDLERS)));
     }
 
     @Test
@@ -74,7 +51,7 @@ class RegistrationNotifySceneProviderTest {
                 .payload(Map.of("studyPlannerUserId", 241L)).build();
 
         assertEquals(Set.of(NotifyRecipientDTO.admin(241L)),
-                provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_STUDY_PLANNER)));
+                provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_HEAD_TEACHER)));
     }
 
     @Test
@@ -102,7 +79,7 @@ class RegistrationNotifySceneProviderTest {
     void toleratesMissingPayload() {
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().tenantId(1L).bizId(7L).build();
 
-        assertEquals(Set.of(), provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_STUDY_PLANNER)));
+        assertEquals(Set.of(), provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_HEAD_TEACHER)));
         Map<String, Object> variables = provider.resolveVariables(event, NotifyRecipientDTO.admin(1L));
         assertEquals(null, variables.get("order.no"));
         assertEquals(null, variables.get("student.no"));
@@ -120,6 +97,6 @@ class RegistrationNotifySceneProviderTest {
     }
 
     private static AdminUserRespDTO user(Long id) {
-        return new AdminUserRespDTO().setId(id);
+        return new AdminUserRespDTO().setId(id).setStatus(0);
     }
 }

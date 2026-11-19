@@ -8,7 +8,7 @@ import { buildSalesOrderTableColumns } from '../components/SalesOrderTableColumn
 describe('order source evidence', () => {
   it('distinguishes explicit no-provider evidence from missing historical names', () => {
     expect(orderSourcePersonText('sales_self_sourced', undefined, true)).toBe('销售本人自拓（未关联新媒体）')
-    expect(orderSourcePersonText('education_self_sourced', undefined, true)).toBe('教务本人自拓（未关联新媒体）')
+    expect(orderSourcePersonText('education_self_sourced', undefined, true)).toBe('历史未记录')
     expect(orderSourcePersonText('sales_self_sourced')).toBe('历史未记录')
     expect(orderSourcePersonText('sales_self_sourced', undefined, false)).toBe('历史未记录')
     expect(orderSourcePersonText('sales_self_sourced', '快照姓名', false)).toBe('快照姓名')

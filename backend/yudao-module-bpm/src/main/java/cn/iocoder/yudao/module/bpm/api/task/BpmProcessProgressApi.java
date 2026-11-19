@@ -9,5 +9,12 @@ import java.util.Set;
 public interface BpmProcessProgressApi {
     Map<String, List<BpmProcessProgressDTO.PendingTask>> getCurrentTasks(Set<String> processInstanceIds);
     BpmProcessProgressDTO getProgress(String processInstanceId, Long viewerId);
+    List<Comment> getComments(String processInstanceId);
+    void createTaskComment(Long userId, String taskId, String message);
+
+    record Comment(String id, String taskId, String processInstanceId, String type, String message,
+                   java.time.LocalDateTime createTime, CommentUser user) {}
+    record CommentUser(Long id, String nickname) {}
+
     boolean isParticipant(String processInstanceId, Long userId);
 }

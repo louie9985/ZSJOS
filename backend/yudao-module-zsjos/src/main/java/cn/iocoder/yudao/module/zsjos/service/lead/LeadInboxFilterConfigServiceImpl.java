@@ -66,8 +66,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             INBOX_FILTER_FIELD_SALES_PROGRESS,
             new LinkedHashSet<>(List.of(FOLLOW_UP_FOLLOWING, FOLLOW_UP_DEAL_PENDING_APPROVAL, FOLLOW_UP_WON)),
             INBOX_FILTER_FIELD_SOURCE_TYPE,
-            new LinkedHashSet<>(List.of(SOURCE_INTERNAL_NEW_MEDIA, SOURCE_PARTNER, SOURCE_SALES_SELF,
-                    SOURCE_EDUCATION_SELF)),
+            new LinkedHashSet<>(List.of(SOURCE_INTERNAL_NEW_MEDIA, SOURCE_PARTNER, SOURCE_SALES_SELF)),
             INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION,
             new LinkedHashSet<>(List.of(FOLLOW_UP_CONDITION_TODAY, FOLLOW_UP_CONDITION_OVERDUE,
                     FOLLOW_UP_CONDITION_TRANSFERRED_PENDING)),
@@ -102,7 +101,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         validateAudience(reqVO.getAudience());
         LeadInboxFilterConfigVO config = new LeadInboxFilterConfigVO();
         config.setGroups(reqVO.getGroups());
-        normalizeAndValidate(config, reqVO.getAudience());
+        normalizeAndValidate(config, reqVO.getAudience(), false);
         LeadInboxFilterSchemeDO scheme = requireScheme(reqVO.getAudience());
         LeadInboxFilterSchemeDO update = new LeadInboxFilterSchemeDO();
         update.setId(scheme.getId());
@@ -182,7 +181,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                         value(FOLLOW_UP_WON, "已成交"))),
                 capability(INBOX_FILTER_FIELD_SOURCE_TYPE, "客资来源", List.of(
                         value(SOURCE_INTERNAL_NEW_MEDIA, "新媒体提交"), value(SOURCE_PARTNER, "兼职提交"),
-                        value(SOURCE_SALES_SELF, "销售自拓录"), value(SOURCE_EDUCATION_SELF, "教务自拓录"))),
+                        value(SOURCE_SALES_SELF, "销售自拓录"))),
                 capability(INBOX_FILTER_FIELD_FOLLOW_UP_CONDITION, "快捷条件", List.of(
                         value(FOLLOW_UP_CONDITION_TODAY, "今日待跟进"),
                         value(FOLLOW_UP_CONDITION_OVERDUE, "跟进已逾期"),
@@ -307,6 +306,10 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
     }
 
     private static void normalizeAndValidate(LeadInboxFilterConfigVO config, String audience) {
+        normalizeAndValidate(config, audience, true);
+    }
+
+    private static void normalizeAndValidate(LeadInboxFilterConfigVO config, String audience, boolean historical) {
         validateAudience(audience);
         if (config.getGroups() == null || config.getGroups().isEmpty() || config.getGroups().size() > 20) {
             throw exception(LEAD_INBOX_FILTER_INVALID);
@@ -329,7 +332,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             if (group.getConditions().size() > 2 || group.getSections().size() > 3) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
-            validateConditions(group.getConditions(), audience);
+            validateConditions(group.getConditions(), audience, historical);
             if ("all".equals(group.getKey())) {
                 hasAll = Boolean.TRUE.equals(group.getEnabled()) && group.getConditions().isEmpty();
             }
@@ -363,7 +366,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                     if (option.getConditions().size() > 2) {
                         throw exception(LEAD_INBOX_FILTER_INVALID);
                     }
-                    validateConditions(option.getConditions(), audience);
+                    validateConditions(option.getConditions(), audience, historical);
                     LeadInboxFilterQuery combined = compileCombined(group.getConditions(), option.getConditions());
                     if (combined.matchNone()) {
                         throw exception(LEAD_INBOX_FILTER_INVALID);
@@ -401,7 +404,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         group.setOptions(new ArrayList<>());
     }
 
-    private static void validateConditions(List<LeadInboxFilterConfigVO.ConditionVO> conditions, String audience) {
+    private static void validateConditions(List<LeadInboxFilterConfigVO.ConditionVO> conditions, String audience, boolean historical) {
         Set<String> fields = new HashSet<>();
         for (LeadInboxFilterConfigVO.ConditionVO condition : conditions) {
             if (condition == null || !ALLOWED_FIELDS_BY_AUDIENCE.get(audience).contains(condition.getField())) {
@@ -409,6 +412,10 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             }
             normalizeLegacyLeadStatus(condition, audience);
             Set<String> allowed = ALLOWED_VALUES.get(condition.getField());
+            if (historical && INBOX_FILTER_FIELD_SOURCE_TYPE.equals(condition.getField())) {
+                allowed = new LinkedHashSet<>(allowed);
+                allowed.add("education_self_sourced");
+            }
             if (allowed == null || !fields.add(condition.getField()) || condition.getValues() == null
                     || condition.getValues().isEmpty() || condition.getValues().size() > 20
                     || condition.getValues().stream().anyMatch(value -> value == null || value.isBlank())

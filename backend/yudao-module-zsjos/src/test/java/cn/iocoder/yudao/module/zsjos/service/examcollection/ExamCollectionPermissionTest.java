@@ -16,6 +16,9 @@ class ExamCollectionPermissionTest {
         var provider = new ExamCollectionPermissionProvider();
         var tasks = mock(ExamCollectionTaskMapper.class); var permissions = mock(PermissionApi.class);
         ReflectionTestUtils.setField(provider, "tasks", tasks); ReflectionTestUtils.setField(provider, "permissions", permissions);
+        var boundary = mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class);
+        ReflectionTestUtils.setField(provider, "salesBoundary", boundary);
+        when(boundary.canUseTenantWide(7L)).thenReturn(true);
         TenantContextHolder.setTenantId(1L);
         var row = new ExamCollectionTaskDO(); row.setId(1L); row.setTenantId(1L); row.setDeleted(false);
         when(tasks.selectById(1L)).thenReturn(row);

@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_NOT_EXISTS;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED;
 
 @Service
 @Slf4j
@@ -49,6 +50,7 @@ public class MyStudentServiceImpl implements MyStudentService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private MediaAccountMapper mediaAccountMapper;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Resource private DeliveryClassScopeService classScopeService;
     @Resource private DeliveryClassMapper deliveryClassMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
@@ -78,6 +80,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         if (queryAll || hasManagedStudentReadPermission(userId)) {
             return getManagedPage(userId, reqVO, matchedIds);
         }
+        // Own and explicitly assigned collaborator services stay visible across sales departments.
         PageResult<PersonDO> people = personMapper.selectMyStudentPage(reqVO, userId, matchedIds);
         List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
         Map<Long, List<ServiceRelationDO>> groups = relationMapper
@@ -97,10 +100,13 @@ public class MyStudentServiceImpl implements MyStudentService {
      * class is additionally readable by configured managers even before an owner is assigned.
      */
     private PageResult<MyStudentRespVO> getManagedPage(Long userId, MyStudentPageReqVO reqVO, List<Long> matchedIds) {
-        DeliveryClassScopeService.Scope scope = StudentReadScope.canReadAll(permissionApi, userId)
+        boolean salesScoped = !permissionApi.hasTenantReadAllAccess(userId) && salesBoundary.isSalesActor(userId);
+        DeliveryClassScopeService.Scope scope = salesScoped
+                ? new DeliveryClassScopeService.Scope(false, salesBoundary.accessibleDepartmentIds(userId))
+                : StudentReadScope.canReadAll(permissionApi, userId)
                 ? new DeliveryClassScopeService.Scope(true, Set.of()) : classScopeService.resolveRead(userId);
         Set<Long> ownerUserIds = resolveManagedOwnerIds(userId, scope);
-        Long pendingClassId = scope.allDepartments() ? null : classScopeService.readablePendingClassId(userId);
+        Long pendingClassId = scope.allDepartments() || salesScoped ? null : classScopeService.readablePendingClassId(userId);
         PageResult<PersonDO> people = scope.allDepartments()
                 ? personMapper.selectAllStudentPage(reqVO, matchedIds)
                 : personMapper.selectManagedStudentPage(reqVO, ownerUserIds, matchedIds, pendingClassId, userId);
@@ -131,6 +137,25 @@ public class MyStudentServiceImpl implements MyStudentService {
     @Override
     public PageResult<MyStudentRespVO> getMediaPage(Long userId, MyStudentPageReqVO reqVO) {
         if (StrUtil.isNotBlank(reqVO.getKeyword())) return keywordPage(userId, reqVO, true);
+        if (!permissionApi.hasTenantReadAllAccess(userId) && salesBoundary.isSalesActor(userId)) {
+            Set<Long> owners = salesBoundary.accessibleSalesUserIds(userId);
+            Long subject = reqVO.getReadScope() != null || reqVO.getTargetUserId() != null
+                    ? readScopeService.resolve(reqVO.getReadScope(), reqVO.getTargetUserId(), userId)
+                    : MediaStudentReadScope.canReadAll(permissionApi, userId) ? null : userId;
+            if (subject != null && !owners.contains(subject)) throw exception(STUDENT_PERMISSION_DENIED);
+            var matched = advancedFilterService.matchMediaStudentPersonIds(reqVO.getAdvancedFilter(), userId);
+            var page = personMapper.selectSalesScopedMediaPage(reqVO, subject, owners, matched);
+            var ids = page.getList().stream().map(PersonDO::getId).toList();
+            var relations = ids.isEmpty() ? List.<ServiceRelationDO>of() : relationMapper.selectMediaReadByPersonIds(ids, reqVO.getServiceStatus());
+            var groups = relations.stream().filter(row -> owners.contains(row.getOwnerUserId()) || assignedTo(row, userId))
+                    .filter(row -> reqVO.getClassId() == null || Objects.equals(reqVO.getClassId(), row.getClassId()))
+                    .filter(row -> reqVO.getOperatorUserId() == null || Objects.equals(reqVO.getOperatorUserId(), row.getOperatorUserId()))
+                    .filter(row -> subject == null || Objects.equals(subject, row.getOwnerUserId())
+                            || Objects.equals(subject, row.getContentDirectorUserId()) || Objects.equals(subject, row.getCareerPlannerUserId())
+                            || Objects.equals(subject, row.getOperatorUserId()))
+                    .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId));
+            return new PageResult<>(page.getList().stream().map(person -> convert(userId, person.getId(), groups.get(person.getId()))).toList(), page.getTotal());
+        }
         if (MediaStudentReadScope.canReadAll(permissionApi, userId)
                 && (reqVO.getReadScope() == null && reqVO.getTargetUserId() == null
                     || "ALL".equals(reqVO.getReadScope()) && reqVO.getTargetUserId() == null)) {
@@ -173,6 +198,16 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     @Override
     public MyStudentRespVO getMediaStudent(Long userId, Long personId) {
+        if (!permissionApi.hasTenantReadAllAccess(userId) && salesBoundary.isSalesActor(userId)) {
+            var owners = salesBoundary.accessibleSalesUserIds(userId);
+            var relations = relationMapper.selectMediaReadByPersonIds(List.of(personId), null).stream()
+                    .filter(row -> owners.contains(row.getOwnerUserId()) || assignedTo(row, userId))
+                    .filter(row -> MediaStudentReadScope.canReadAll(permissionApi, userId)
+                            || Objects.equals(userId, row.getOwnerUserId()) || Objects.equals(userId, row.getContentDirectorUserId())
+                            || Objects.equals(userId, row.getCareerPlannerUserId()) || Objects.equals(userId, row.getOperatorUserId())).toList();
+            if (relations.isEmpty()) throw exception(STUDENT_NOT_EXISTS);
+            return convert(userId, personId, relations);
+        }
         if (MediaStudentReadScope.canReadAll(permissionApi, userId)) {
             if (!personMapper.existsMediaStudent(personId)) throw exception(STUDENT_NOT_EXISTS);
             var relations = relationMapper.selectMediaReadByPersonIds(List.of(personId), null);
@@ -212,6 +247,12 @@ public class MyStudentServiceImpl implements MyStudentService {
         return result;
     }
 
+    /** Explicit service collaborators (content director, career planner, media operator). */
+    private static boolean assignedTo(ServiceRelationDO row, Long userId) {
+        return Objects.equals(row.getContentDirectorUserId(), userId) || Objects.equals(row.getCareerPlannerUserId(), userId)
+                || Objects.equals(row.getOperatorUserId(), userId);
+    }
+
     private boolean hasManagedStudentReadPermission(Long userId) {
         return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
                 DeliveryClassService.PERMISSION_QUERY_MANAGED);
@@ -230,6 +271,18 @@ public class MyStudentServiceImpl implements MyStudentService {
     private List<ServiceRelationDO> selectVisibleRelationsForPerson(Long userId, Long personId) {
         if (permissionApi.hasTenantReadAllAccess(userId)) {
             return relationMapper.selectTenantReadByPersonIds(List.of(personId), null).stream().filter(StudentDeliveryParticipation::includes).toList();
+        }
+        if (salesBoundary.isSalesActor(userId)) {
+            Set<Long> owners = salesBoundary.accessibleSalesUserIds(userId);
+            Map<Long, ServiceRelationDO> visible = new LinkedHashMap<>();
+            if (!owners.isEmpty()) relationMapper.selectOwnedByOwnerIdsAndPersonIds(owners, List.of(personId), null)
+                    .forEach(row -> visible.put(row.getId(), row));
+            // Explicit collaborator assignment is a business grant independent of the owner's department.
+            relationMapper.selectAssignedByUserAndPersonIds(userId, List.of(personId), null).stream()
+                    .filter(row -> Objects.equals(row.getOwnerUserId(), userId) || "active".equals(row.getStatus())
+                            && "accepted".equals(row.getAcceptanceStatus()) && assignedTo(row, userId))
+                    .forEach(row -> visible.put(row.getId(), row));
+            return visible.values().stream().filter(StudentDeliveryParticipation::includes).toList();
         }
         if (StudentReadScope.canReadAll(permissionApi, userId)) {
             return relationMapper.selectOwnedByPersonIds(List.of(personId), null).stream()
@@ -267,6 +320,20 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     private PageResult<MyStudentRespVO> getExplicitReadPage(Long actorId, MyStudentPageReqVO req, boolean media) {
         Long subjectId = readScopeService.resolve(req.getReadScope(), req.getTargetUserId(), actorId);
+        if (!media && !permissionApi.hasTenantReadAllAccess(actorId) && salesBoundary.isSalesActor(actorId)) {
+            Set<Long> allowed = salesBoundary.accessibleSalesUserIds(actorId);
+            if (subjectId != null && !allowed.contains(subjectId)) throw exception(STUDENT_PERMISSION_DENIED);
+            Set<Long> selectedOwners = subjectId == null ? allowed : Set.of(subjectId);
+            List<Long> matched = advancedFilterService.matchStudentPersonIds(req.getAdvancedFilter(), actorId);
+            PageResult<PersonDO> scoped = personMapper.selectManagedStudentPage(req, selectedOwners, matched, null, null);
+            List<Long> ids = scoped.getList().stream().map(PersonDO::getId).toList();
+            Map<Long, List<ServiceRelationDO>> groups = selectedOwners.isEmpty() ? Map.of()
+                    : relationMapper.selectOwnedByOwnerIdsAndPersonIds(selectedOwners, ids, teachingSourceStatus(req)).stream()
+                    .filter(StudentDeliveryParticipation::includes).filter(row -> teachingMatches(row, req))
+                    .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId));
+            return new PageResult<>(scoped.getList().stream()
+                    .map(person -> teachingProjection(convert(actorId, person.getId(), groups.get(person.getId())))).toList(), scoped.getTotal());
+        }
         List<Long> matchedIds = media
                 ? advancedFilterService.matchMediaStudentPersonIds(req.getAdvancedFilter(), actorId)
                 : advancedFilterService.matchStudentPersonIds(req.getAdvancedFilter(), subjectId == null ? actorId : subjectId);

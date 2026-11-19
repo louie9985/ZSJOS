@@ -15,6 +15,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class StudentMetricCountTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks StudentServiceReadService service;
     @Mock StudentServicePageMapper mapper;
     @Mock PermissionApi permissions;

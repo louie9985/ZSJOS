@@ -40,7 +40,18 @@ public class StudentInfoTaskService {
         var task=tasks.byItem(item.getOrderItemId());
         if(task==null) throw exception(FIELD_INVALID,"当前报名任务尚未关联收集任务");
         if(!Objects.equals(task.getOrderId(),item.getOrderId())) throw exception(LINK_INVALID);
+        permission.check(task.getId(), "read", getLoginUserId());
         return row(task);
+    }
+
+    public StudentInfoFormDO formForRegistration(
+            cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseDO item) {
+        if (item.getOrderItemId() == null) return forms.byCase(item.getId());
+        var task = tasks.byItem(item.getOrderItemId());
+        if (task == null) return forms.byCase(item.getId());
+        if (!Objects.equals(task.getOrderId(), item.getOrderId())) throw exception(LINK_INVALID);
+        var form = boundForm(task);
+        return form == null ? forms.byCase(item.getId()) : form;
     }
 
     /** Called inside order submission, after its items exist; order lock serializes retries. */
@@ -57,6 +68,9 @@ public class StudentInfoTaskService {
     public PageResult<Row> page(Query query) {
         if (!permission.canList(getLoginUserId())) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         var filter=new LambdaQueryWrapperX<StudentInfoTaskDO>().eqIfPresent(StudentInfoTaskDO::getPersonId,query.getPersonId());
+        filter.apply("EXISTS (SELECT 1 FROM zsjos_registration_case c WHERE c.order_item_id=zsjos_student_info_task.order_item_id "
+                + "AND c.order_id=zsjos_student_info_task.order_id AND c.tenant_id=zsjos_student_info_task.tenant_id "
+                + "AND c.deleted=0 AND c.owner_user_id={0})", getLoginUserId());
         if (query.getOrderStatus()!=null) filter.apply("EXISTS (SELECT 1 FROM zsjos_order o WHERE o.id=zsjos_student_info_task.order_id AND o.tenant_id=zsjos_student_info_task.tenant_id AND o.deleted=0 AND o.status={0})",query.getOrderStatus());
         String cancelledOrder = "EXISTS (SELECT 1 FROM zsjos_order o WHERE o.id=zsjos_student_info_task.order_id AND o.tenant_id=zsjos_student_info_task.tenant_id AND o.deleted=0 AND o.status IN ('revision_required','superseded','terminated'))";
         if ("CANCELLED".equals(query.getStatus())) filter.apply(cancelledOrder);
@@ -88,6 +102,10 @@ public class StudentInfoTaskService {
         var result=new StudentInfoVO.Detail(); result.setCanReadSensitive(collection.canReadSensitive()); result.setCanExport(false);
         result.setStatus(form==null ? "NONE" : StudentInfoFormService.state(form));
         if (form==null) return result;
+        if (form.getAgreementConfirmedBody() != null) {
+            result.setAgreementVersion(form.getAgreementVersion());
+            if (sensitive) result.setAgreementBody(form.getAgreementConfirmedBody());
+        }
         result.setId(form.getId()); result.setCreatedAt(form.getCreateTime()); result.setSubmittedAt(form.getSubmittedAt());
         result.setExpiresAt(form.getExpiresAt()); result.setFields(collection.definitions(form));
         if (!"SUBMITTED".equals(form.getStatus())) {
@@ -154,7 +172,8 @@ public class StudentInfoTaskService {
         var registration=registrationCases.selectByOrderItemId(task.getOrderItemId());
         if(registration!=null && Objects.equals(registration.getOrderId(),task.getOrderId())) row.setRegistrationCaseId(registration.getId());
         row.setOrderNo(order.getOrderNo()); row.setStudentName(order.getStudentName()); row.setOrderStatus(order.getStatus());
-        row.setCanProcess(open(order));
+        row.setCanProcess(open(order) && registration != null
+                && Set.of("pending", "processing").contains(registration.getStatus()));
         var form=task.getFormId()==null ? null : forms.selectById(task.getFormId());
         var target=form==null ? collection.prepareTaskForm(task) : form;
         row.setProductName(target.getProductName());
@@ -192,6 +211,7 @@ public class StudentInfoTaskService {
         var order=orders.selectByIdForUpdate(task.getOrderId(),TenantContextHolder.getRequiredTenantId());
         if (!open(order)) throw exception(LINK_EXPIRED);
         task=tasks.lock(id);
+        if (!permission.canAccess(task, "create", getLoginUserId())) throw exception(LINK_INVALID);
         if (!Objects.equals(task.getPersonId(),order.getPersonId())) throw exception(CONFIG_INVALID);
         return task;
     }
@@ -200,7 +220,8 @@ public class StudentInfoTaskService {
     public GenerationConfig generationConfig(Long id) {
         var task=lock(id);
         if(task.getFormId()!=null) throw exception(VERSION_CONFLICT);
-        var form=collection.prepareTaskForm(task);
+        var preparation=collection.prepareTask(task,true);
+        var form=preparation.form();
         var result=new GenerationConfig(); result.setConfigVersionId(form.getConfigVersionId());
         result.setFields(collection.definitions(form));
         result.setSelectableMaterialKeys(StudentInfoMaterialSelection.selectable(result.getFields()));
@@ -208,7 +229,8 @@ public class StudentInfoTaskService {
         if(order==null) throw exception(LINK_INVALID);
         boolean hasGift=!cn.iocoder.yudao.module.zsjos.service.order.SalesOrderGiftSnapshot.read(order.getGiftItems()).isEmpty();
         result.setDefaultSelectedKeys(result.getSelectableMaterialKeys().stream()
-                .filter(key -> hasGift && "gift_shipping_address".equals(key)).toList());
+                .filter(key -> preparation.education() && StudentInfoProductRules.CONDITIONAL.contains(key)
+                        || hasGift && "gift_shipping_address".equals(key)).toList());
         return result;
     }
     @ZsjosPermission(bizType="student-info-task",bizId="#id",action="link-read")
@@ -270,9 +292,10 @@ public class StudentInfoTaskService {
     private Row create(Long id,Command request,boolean reuse) {
         var task=lock(id);
         var materialKeys=request.getMaterialKeys()==null ? List.<String>of() : request.getMaterialKeys();
+        if (!reuse && request.getMaterialKeys()!=null && request.getConfigVersionId()==null) throw exception(VERSION_CONFLICT);
         if(reuse && (request.getMaterialKeys()!=null || request.getConfigVersionId()!=null)) throw exception(FIELD_INVALID,"复用不支持调整材料");
         String fingerprint=cn.hutool.crypto.digest.DigestUtil.sha256Hex(reuse+":"+request.getSourceFormId()+":"+request.getSourceRevision()+":"+getLoginUserId()
-                +(!reuse ? ":"+request.getConfigVersionId()+":"+JsonUtils.toJsonString(materialKeys.stream().sorted().toList()) : ""));
+                +(!reuse ? ":"+request.getConfigVersionId()+":"+(request.getMaterialKeys()==null && request.getConfigVersionId()!=null ? "default" : JsonUtils.toJsonString(materialKeys.stream().sorted().toList())) : ""));
         if (Objects.equals(task.getLastCommandKey(),request.getIdempotencyKey())) {
             if (!Objects.equals(task.getLastCommandFingerprint(),fingerprint)) throw exception(VERSION_CONFLICT);
             return row(task);
@@ -284,7 +307,10 @@ public class StudentInfoTaskService {
             if(replaced==null || !Objects.equals(replaced.getPersonId(),task.getPersonId()) || !Objects.equals(replaced.getOrderItemId(),task.getOrderItemId()))throw exception(LINK_INVALID);
             if("SUBMITTED".equals(replaced.getStatus()))throw exception(ALREADY_SUBMITTED);
         }
-        var target=replaced==null ? collection.prepareTaskForm(task) : new StudentInfoFormDO();
+        StudentInfoFormDO target;
+        if (replaced!=null) target=new StudentInfoFormDO();
+        else if (!reuse && request.getMaterialKeys()!=null) target=collection.prepareTask(task,true).form();
+        else target=collection.prepareTaskForm(task);
         if(replaced!=null) {
             // Reusing an archive must not change this task's already-issued field contract.
             target.setPersonId(task.getPersonId());target.setOrderItemId(task.getOrderItemId());target.setTenantId(task.getTenantId());
@@ -294,7 +320,7 @@ public class StudentInfoTaskService {
         }
         if(!reuse) {
             if(request.getMaterialKeys()!=null && !Objects.equals(request.getConfigVersionId(),target.getConfigVersionId())) throw exception(VERSION_CONFLICT);
-            target.setFieldsSnapshot(JsonUtils.toJsonString(StudentInfoMaterialSelection.select(collection.definitions(target),materialKeys)));
+            target.setFieldsSnapshot(JsonUtils.toJsonString(StudentInfoMaterialSelection.select(collection.definitions(target),request.getMaterialKeys())));
         }
         StudentInfoFormDO source=null; StudentArchiveRevisionDO revision=null;
         if (request.getSourceFormId()!=null || !reuse) {
@@ -319,16 +345,7 @@ public class StudentInfoTaskService {
             images.copyForCollection(source,target,materials(source,revision),targetFields);
             task.setSourceFormId(source.getId()); task.setSourceRevision(revision==null ? 0 : revision.getRevision());
         }
-        if (reuse) {
-            var sourceFields=collection.definitions(source);
-            for (var value:content(source,revision)) {
-                if (targetFields.stream().noneMatch(f->Objects.equals(f.getKey(),value.getFieldKey())
-                        && sourceFields.stream().anyMatch(s->StudentInfoReusePolicy.compatible(f,s)))) continue;
-                var copy=JsonUtils.parseObject(JsonUtils.toJsonString(value),StudentInfoFormValueDO.class);
-                copy.setId(null); copy.setFormId(target.getId()); answers.insert(copy);
-            }
-            target.setStatus("SUBMITTED"); target.setSubmitSource("reuse"); target.setSubmittedAt(java.time.LocalDateTime.now()); forms.updateById(target);
-        }
+        // Reused answers prefill the new draft. Consent belongs to this form only.
         if(replaced!=null) forms.update(null,new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StudentInfoFormDO>()
                 .eq(StudentInfoFormDO::getId,replaced.getId()).set(StudentInfoFormDO::getStatus,"REVOKED")
                 .set(StudentInfoFormDO::getRevokedAt,java.time.LocalDateTime.now()));

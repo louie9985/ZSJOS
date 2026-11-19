@@ -33,7 +33,7 @@ public class DeliveryClassController {
     @GetMapping("/options")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:registration:update','zsjos:delivery-class:direct-transfer','zsjos:class-transfer:create')")
     public CommonResult<List<DeliveryClassOptionRespVO>> options(@RequestParam(required = false) Long categoryId,
-            @RequestParam(defaultValue = "true") boolean includePending){ return success(service.options(categoryId,includePending)); }
+            @RequestParam(defaultValue = "true") boolean includePending){ return success(service.options(categoryId,includePending,getLoginUserId())); }
     @GetMapping("/homeroom-candidates")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:delivery-class:create','zsjos:delivery-class:update')")
     public CommonResult<List<HomeroomCandidateRespVO>> candidates(){ return success(service.homeroomCandidates(getLoginUserId())); }

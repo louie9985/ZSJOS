@@ -40,7 +40,7 @@ class LeadNotifySceneProviderTest {
     @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper assignmentHistoryMapper;
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced", "education_self_sourced"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced"})
     void sourceAssociationDistinguishesInapplicableAndBrokenSnapshots(String source) {
         var lead = new LeadDO().setId(1L).setSourceType(source);
         when(leadMapper.selectById(1L)).thenReturn(lead);
@@ -153,15 +153,6 @@ class LeadNotifySceneProviderTest {
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(CREATED)
                 .bizId(1L).operatorUserId(10L).payload(Map.of("operatorUserType", 99)).build();
         assertEquals(Set.of(), provider.resolveRecipients(event, Set.of(ROLE_OPERATOR)));
-    }
-
-    @Test
-    void activationNotifiesEducationOwnerWithoutSalesLeader() {
-        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setOwnerIdentity(OWNER_EDUCATION));
-        var event = NotifyBusinessEvent.builder().sceneCode(ACTIVATED).bizId(1L)
-                .payload(Map.of("ownerUserId", 40L)).build();
-        assertEquals(Set.of(NotifyRecipientDTO.admin(40L)),
-                provider.resolveRecipients(event, Set.of(ROLE_OWNER, ROLE_DIRECT_LEADER)));
     }
 
     @Test
@@ -418,7 +409,7 @@ class LeadNotifySceneProviderTest {
         return scene.getVariables().stream().map(NotifySceneVariableRespDTO::getKey).toList();
     }
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced", "education_self_sourced"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced"})
     void mediaAssistedEntryStillNotifiesProvider(String entry) {
         var lead=new LeadDO().setId(1L).setSourceType(SOURCE_INTERNAL_NEW_MEDIA).setSubmissionSourceType(entry)
                 .setSourceUserId(20L).setSourceProviderRecorded(true).setSourceProviderUserId(20L)

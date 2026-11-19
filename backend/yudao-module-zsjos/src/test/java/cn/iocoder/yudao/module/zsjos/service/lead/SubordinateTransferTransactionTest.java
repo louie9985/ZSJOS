@@ -26,8 +26,7 @@ class SubordinateTransferTransactionTest {
   ReflectionTestUtils.setField(target,"qualificationService",qualification);ReflectionTestUtils.setField(target,"auditLogMapper",audit);
   var lead=new LeadDO().setId(1L).setOwnerUserId(20L).setOwnerIdentity("sales").setStatus("suspended").setAssignmentStatus("owned");
   when(leads.selectByIdForUpdate(1L,1L)).thenReturn(lead);when(permission.getManagedUserIds(10L)).thenReturn(Set.of(20L,30L));
-  var member=new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO();member.setId(30L);
-  when(scope.managed(10L)).thenReturn(List.of(member));
+  when(scope.transferTargetIds(10L)).thenReturn(Set.of(30L));
   var assignment=mock(LeadAssignmentService.class);ReflectionTestUtils.setField(target,"assignmentService",assignment);when(assignment.isEligibleSalesUser(30L)).thenReturn(true);
   when(commands.insertIgnore(eq(1L),any())).thenAnswer(call->{jdbc.update("INSERT INTO command_fixture VALUES(1)");return 1;});
   when(commands.complete(anyLong(),anyLong(),anyString(),anyString())).thenReturn(1);

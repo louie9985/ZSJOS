@@ -13,6 +13,15 @@ const templates = [
   { value: 'diagnosis_28d', label: '28天调整触发条件' },
 ];
 
+export function PublicationInput({days, accountId}: {days: number; accountId?: number}) {
+  if (days !== 7 && days !== 28) return null;
+  const key = `published${days}`;
+  return <Form.Item name={accountId == null ? key : ['accounts', String(accountId), key]}
+    label={`${days}天发布条数`} rules={[{required: true, message: '请填写发布条数'}, {type: 'integer', min: 0}]}>
+    <InputNumber min={0} precision={0} max={Number.MAX_SAFE_INTEGER} />
+  </Form.Item>;
+}
+
 export default function AccountDiagnosisForm({ type, seed, disabled, dicts, onFinish, weekly, onLikesChange, accountSection, form: suppliedForm, onValuesChange }: {
   type: DiagnosisRequest['templateType']; seed: Record<string, unknown>; revising: boolean;
   disabled: boolean; dicts: Record<string, DictData[]>; onFinish: (values: Record<string, unknown>) => void;
@@ -42,7 +51,7 @@ export default function AccountDiagnosisForm({ type, seed, disabled, dicts, onFi
     initialValues={{ reposition: false, ...seed }}>
     {accountSection}
     {weekly && !accountSection && <WeeklyDiagnosisMetrics node={weekly}
-      extra={part=>part.days===7 ? <Form.Item name="highestLikes" label={`7天内最高点赞（${formatTimestamp(part.from)} 至 ${formatTimestamp(part.to)}，结束不包含）`} rules={[{required:true,message:'请填写最高点赞量'},{type:'integer',min:0}]}><InputNumber min={0} precision={0} max={Number.MAX_SAFE_INTEGER} /></Form.Item> : null} />}
+      extra={part=><><PublicationInput days={part.days} />{part.days===7 ? <Form.Item name="highestLikes" label={`7天内最高点赞（${formatTimestamp(part.from)} 至 ${formatTimestamp(part.to)}，结束不包含）`} rules={[{required:true,message:'请填写最高点赞量'},{type:'integer',min:0}]}><InputNumber min={0} precision={0} max={Number.MAX_SAFE_INTEGER} /></Form.Item> : null}</>} />}
     {!initial && !weekly && <Typography.Paragraph>
       <Typography.Text strong>本次填写：{templates.find(template => template.value === type)?.label}</Typography.Text>
       <br /><Typography.Text type="secondary">请根据本周期实际情况填写以下内容，表单类型及周期由系统自动关联。</Typography.Text>

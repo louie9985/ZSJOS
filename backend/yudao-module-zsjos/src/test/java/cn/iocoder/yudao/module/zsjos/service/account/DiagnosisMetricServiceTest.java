@@ -91,12 +91,10 @@ class DiagnosisMetricServiceTest {
         verify(metrics,never()).leadDeals(anyLong(),anyLong(),any());
     }
 
-    @Test void publicationWindowsAndLikesReuseEvidenceWithoutChangingResults(){
+    @Test void manualPublicationCountsAndLikesSurviveSaving(){
         var end=DiagnosisMetricService.now().minusDays(1);
         var seven=new Part("diagnosis_7d",4,7,end.minusDays(7),end,1L,null);
         var twentyEight=new Part("diagnosis_28d",1,28,end.minusDays(28),end,2L,null);
-        when(metrics.publicationPeriods(eq(1L),eq(10L),eq(seven.from()),eq(twentyEight.from()),eq(end),eq(end)))
-                .thenReturn(Map.of("published7",3L,"published28",9L,"missing",2L));
         var rows=new ArrayList<MediaAccountProfileEntryDO>();
         for(String json:List.of("{\"roundKey\":\"round\",\"week\":1,\"highestLikes\":8}",
                 "{\"roundKey\":\"round\",\"week\":1,\"highestLikes\":2}",
@@ -107,27 +105,28 @@ class DiagnosisMetricServiceTest {
         }
         when(entries.selectList(any())).thenReturn(rows);
         var context=new DiagnosisMetricService.ReadContext();
+        context.manualPublications.put(7,0L);context.manualPublications.put(28,9L);
         var first=service.read(account,"node","round",seven,0L,false,context);
         var preview=service.read(account,"node","round",twentyEight,0L,false,context);
         var saved=service.read(account,"node","round",twentyEight,0L,true,context);
-        assertEquals(3L,first.getPublishedCount());assertEquals(9L,preview.getPublishedCount());
-        assertEquals(2L,preview.getMissingPublishTimeCount());assertEquals(3,preview.getLikesCoverage());
+        assertEquals(0L,first.getPublishedCount());assertEquals(9L,preview.getPublishedCount());
+        assertNull(preview.getMissingPublishTimeCount());assertEquals(3,preview.getLikesCoverage());
         assertEquals(5L,preview.getHighestLikes());
         assertEquals(JsonUtils.toJsonString(preview),JsonUtils.toJsonString(saved));
-        verify(metrics,times(1)).publicationPeriods(anyLong(),anyLong(),any(),any(),any(),any());
+        verify(metrics,never()).publicationPeriods(anyLong(),anyLong(),any(),any(),any(),any());
         verify(entries,times(1)).selectList(any());
         verify(metrics,never()).publications(anyLong(),anyLong(),any(),any(),any());
-        // A new request must observe current publications and revisions rather than a process-wide cache.
+        // A new request must observe current likes revisions rather than a process-wide cache.
         service.read(account,"node","round",twentyEight,0L,false);
-        verify(metrics,times(2)).publicationPeriods(anyLong(),anyLong(),any(),any(),any(),any());
+        verify(metrics,never()).publicationPeriods(anyLong(),anyLong(),any(),any(),any(),any());
         verify(entries,times(2)).selectList(any());
     }
-    @Test void nonstandardHistoricalBoundsKeepOriginalPublicationQuery(){
+    @Test void emptyHistoricalWindowDoesNotQueryContentReview(){
         var end=DiagnosisMetricService.now().minusDays(1);
         var historical=new Part("diagnosis_7d",1,7,end.minusDays(6),end,1L,null);
-        when(metrics.publications(1L,10L,historical.from(),end,end)).thenReturn(Map.of("published",4L,"missing",1L));
+
         var result=service.read(account,"node","round",historical,null,false);
-        assertEquals(4L,result.getPublishedCount());assertEquals(1L,result.getMissingPublishTimeCount());
+        assertNull(result.getPublishedCount());verify(metrics,never()).publications(anyLong(),anyLong(),any(),any(),any());
         verify(metrics,never()).publicationPeriods(anyLong(),anyLong(),any(),any(),any(),any());
     }
 }

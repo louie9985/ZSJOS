@@ -6,11 +6,9 @@ import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.appeal.LeadAppealPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.duplicate.LeadDuplicateReviewPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateSalesPageReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.educationteam.vo.EducationTeamPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.*;
 import cn.iocoder.yudao.module.zsjos.service.registration.*;
-import cn.iocoder.yudao.module.zsjos.service.educationteam.EducationTeamService;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.homemetric.*;
 import jakarta.annotation.Resource;
@@ -30,16 +28,14 @@ public class ExistingPageMetricSources {
     @Resource private RegistrationService registrations;
     @Resource private MediaStudentService media;
     @Resource private SubordinateSalesService sales;
-    @Resource private EducationTeamService education;
 
     private record Entry(String key,String label,String permission) {}
     private static final List<Entry> ENTRIES = List.of(
             new Entry("lead_appeal","个人待处理申诉","zsjos:lead:appeal:query"),
             new Entry("duplicate_review","客资查重审核记录","zsjos:lead-duplicate-review:query"),
-            new Entry("registration","报名履约记录","zsjos:registration:query-pool"),
+            new Entry("registration","报名履约记录","zsjos:registration:query-my"),
             new Entry("media_student","媒体学员人数","zsjos:media-student:query-my"),
-            new Entry("subordinate_sales","下属销售人数","zsjos:subordinate-sales:query"),
-            new Entry("education_team","教务团队人数","zsjos:education-team:query"));
+            new Entry("subordinate_sales","下属销售人数","zsjos:subordinate-sales:query"));
 
     public boolean supports(String key) { return ENTRIES.stream().anyMatch(e -> e.key().equals(key)); }
     public boolean canRead(String key,Long actor) {
@@ -119,10 +115,6 @@ public class ExistingPageMetricSources {
             case "subordinate_sales" -> {
                 var req=paging(new SubordinateSalesPageReqVO(),pageNo,pageSize);req.setAdvancedFilter(item.filter());
                 yield map(sales.getPage(req,actor),r -> row(r.getUserId(),null,r.getName()));
-            }
-            case "education_team" -> {
-                var req=paging(new EducationTeamPageReqVO(),pageNo,pageSize);req.setAdvancedFilter(item.filter());
-                yield map(education.getPage(req,actor),r -> row(r.getUserId(),null,r.getName()));
             }
             default -> throw new IllegalArgumentException("未知指标来源");
         };

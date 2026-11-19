@@ -13,18 +13,18 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class EnrollmentAgreementController {
     @Resource private EnrollmentAgreementService agreements;
 
-    @Resource private cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductCategoryService categories;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductService products;
 
-    @GetMapping("/categories")
+    @GetMapping("/products")
     @PreAuthorize("@ss.hasPermission('zsjos:agreement:query')")
-    public CommonResult<java.util.List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductCategoryRespVO>> categories() {
-        return success(categories.getTree());
+    public CommonResult<java.util.List<cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductSimpleRespVO>> products() {
+        return success(products.getEnabledSimpleList());
     }
 
     @GetMapping
     @PreAuthorize("@ss.hasPermission('zsjos:agreement:query')")
-    public CommonResult<EnrollmentAgreementService.Template> detail(@RequestParam Long categoryId) {
-        return success(agreements.detail(categoryId));
+    public CommonResult<EnrollmentAgreementService.Template> detail(@RequestParam String productRef) {
+        return success(agreements.detail(productRef));
     }
 
     @PutMapping("/draft")

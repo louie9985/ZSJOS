@@ -37,7 +37,7 @@ class SalesDispatchStatusServiceImplTest {
 
     @Test
     void heartbeatDefaultsEligibleSalesToPausedAndMarksPresenceOnline() {
-        when(assignmentService.isEligibleSalesUser(10L)).thenReturn(true);
+        when(assignmentService.isEligibleReceiver(10L)).thenReturn(true);
         when(preferenceMapper.selectByUserId(10L)).thenReturn(null);
         when(redisRepository.isOnline(10L)).thenReturn(true);
 
@@ -52,7 +52,7 @@ class SalesDispatchStatusServiceImplTest {
 
     @Test
     void ineligibleUserIsRemovedAndNeverAppearsActive() {
-        when(assignmentService.isEligibleSalesUser(10L)).thenReturn(false);
+        when(assignmentService.isEligibleReceiver(10L)).thenReturn(false);
 
         var result = service.heartbeat(10L);
 
@@ -66,7 +66,7 @@ class SalesDispatchStatusServiceImplTest {
         SalesDispatchPreferenceDO preference = new SalesDispatchPreferenceDO();
         preference.setUserId(10L);
         preference.setAcceptingEnabled(true);
-        when(assignmentService.isEligibleSalesUser(10L)).thenReturn(true);
+        when(assignmentService.isEligibleReceiver(10L)).thenReturn(true);
         when(preferenceMapper.selectByUserId(10L)).thenReturn(preference);
         when(redisRepository.isOnline(10L)).thenReturn(true);
 

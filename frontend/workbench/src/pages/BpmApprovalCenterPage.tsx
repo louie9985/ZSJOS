@@ -1,3 +1,5 @@
+import FinanceOrderApprovalDetail from '../components/FinanceOrderApprovalDetail'
+import { FINANCE_ORDER_PROCESS_KEY } from '../services/salesOrder'
 import { useMetricSourceApi } from '../services/metricPageScope'
 import { invalidateMenuTasks } from '../services/menuTaskRefresh'
 import { BUSINESS_APPROVAL_PROCESS_KEYS } from '../services/approvalNavigation'
@@ -278,17 +280,35 @@ export default function BpmApprovalCenterPage({ permissions, initialView, metric
     try {
       const result = await metricApi.bpmTaskPage(view, { pageNo: useTableLayout ? tablePage : 1, pageSize: useTableLayout ? tablePageSize : PAGE_SIZE, name: keyword.trim() || undefined, excludeProcessDefinitionKeys: BUSINESS_APPROVAL_PROCESS_KEYS })
       let linkedTask: BpmTask | undefined
-      if (view === 'todo' && linkedTaskId && !preserveSelection) {
-        try { linkedTask = await feedbackApi.approvalTask(linkedTaskId) }
-        catch { if (seq === requestSeq.current) message.warning('目标审批已处理、已转办或无权处理') }
+      const lookupLinkedTask = !!linkedTaskId && !preserveSelection
+      if (lookupLinkedTask) {
+        try {
+          linkedTask = result.list.find(item => item.id === linkedTaskId)
+          if (!linkedTask && view === 'todo') linkedTask = await feedbackApi.approvalTask(linkedTaskId)
+          if (!linkedTask && view === 'done') {
+            const order = await api.financeApprovalOrder(linkedTaskId, true, 'bpm')
+            linkedTask = { ...order.approvalTask, createTime: order.taskCreateTime, endTime: order.taskEndTime,
+              reason: order.taskReason, processDefinitionKey: order.processDefinitionKey }
+          }
+          if (linkedTask?.id !== linkedTaskId) throw new Error('审批任务身份不匹配')
+        } catch {
+          linkedTask = undefined
+          if (seq === requestSeq.current) message.warning('目标审批已处理、已转办或无权查看')
+        }
       }
       if (seq !== requestSeq.current) return
       setTasks(linkedTask ? appendTasks([linkedTask], result.list) : result.list)
       setTotal(result.total)
       setLoadedPage(useTableLayout ? tablePage : 1)
       setCounts(current => ({ ...current, [view]: result.total }))
-      setSelectedId(current => heldRef.current?.id ?? linkedTask?.id ?? (preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
-      if (linkedTask) setDrawerOpen(true)
+      if (lookupLinkedTask) {
+        heldRef.current = undefined
+        setHeldTask(undefined); setCompleted(false)
+        setSelectedId(linkedTask?.id)
+        setDrawerOpen(Boolean(linkedTask))
+      } else {
+        setSelectedId(current => heldRef.current?.id ?? (preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
+      }
     } catch (loadError) {
       if (seq !== requestSeq.current) return
       console.error('[BpmApprovalCenter] loadFirstPage - error:', loadError)
@@ -412,6 +432,15 @@ export default function BpmApprovalCenterPage({ permissions, initialView, metric
     onComplete={() => {
       invalidateMenuTasks(true)
       heldRef.current = selectedTask; setHeldTask(selectedTask); setCompleted(true)
+      void loadCounts(); void loadFirstPage(true)
+    }}
+  /> : selectedTask?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ? <FinanceOrderApprovalDetail
+    key={selectedTask.id + view} taskId={selectedTask.id} done={view === 'done' || completed} entry="bpm"
+    canUpdate={canUpdate} refreshVersion={refreshVersion} onState={setDraftState}
+    initialDraft={draftValues.current} onDraft={saveDraft}
+    onSuccess={taskCompleted => {
+      invalidateMenuTasks(true)
+      heldRef.current = selectedTask; setHeldTask(selectedTask); setCompleted(!!taskCompleted)
       void loadCounts(); void loadFirstPage(true)
     }}
   /> : <BpmApprovalDetail key={(selectedTask?.id ?? "") + view}

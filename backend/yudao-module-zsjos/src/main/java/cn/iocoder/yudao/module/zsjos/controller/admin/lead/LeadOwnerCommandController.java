@@ -27,8 +27,8 @@ public class LeadOwnerCommandController {
     @GetMapping("/transfer-candidates")
     @Operation(summary = "获得销售本人可转派的销售列表")
     @PreAuthorize("@ss.hasPermission('" + PERMISSION_OWNER_TRANSFER + "')")
-    public CommonResult<List<LeadAssignmentUserRespVO>> getTransferCandidates() {
-        return success(service.getTransferCandidates());
+    public CommonResult<List<LeadAssignmentUserRespVO>> getTransferCandidates(@RequestParam(required = false) Long leadId) {
+        return success(leadId == null ? service.getTransferCandidates(getLoginUserId()) : service.getTransferCandidates(leadId, getLoginUserId()));
     }
 
     @PostMapping("/{leadId}/transfer")

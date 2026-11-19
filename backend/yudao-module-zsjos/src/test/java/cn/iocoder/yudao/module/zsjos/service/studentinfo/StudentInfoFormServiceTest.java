@@ -28,6 +28,50 @@ class StudentInfoFormServiceTest {
  @Mock StudentInfoConfigService configService; @Spy StudentInfoFields fields=new StudentInfoFields();
  @Mock RegistrationCaseMapper cases; @Mock SalesOrderMapper orders; @Mock RegistrationCommandMapper commands;
  @Mock StudentInfoImageService images; @Mock SecurityFrameworkService security; @Mock TenantFrameworkService tenants;
+ @Mock EnrollmentAgreementService agreements;
+ @Test void bothEmptySigningDatesFollowTheDayWithoutRewritingFixedDates() {
+  var template="<p>签订日期：</p><p>签订日期：2020-01-01</p><p>签订日期：</p>";
+  var date=java.time.LocalDate.of(2026,11,19);
+  assertEquals("<p>签订日期：2026-11-19</p><p>签订日期：2020-01-01</p><p>签订日期：2026-11-19</p>", EnrollmentAgreementService.fillSigningDates(template,date));
+  assertNotEquals(EnrollmentAgreementService.fillSigningDates(template,date), EnrollmentAgreementService.fillSigningDates(template,date.plusDays(1)));
+ }
+ @Test void acceptedFormArchivesRenderedBodyWithTheSubmission() {
+  context("processing");
+  var form=form("DRAFT");form.setAgreementVersion(1L);
+  when(forms.byToken(anyString())).thenReturn(form);when(forms.lock(12L)).thenReturn(form);
+  when(agreements.render(eq(form),any())).thenReturn("<p>合成协议</p>");
+  var digest=cn.hutool.crypto.digest.DigestUtil.sha256Hex("<p>合成协议</p>");
+  form.setAgreementReadHash(digest);form.setAgreementReadAt(LocalDateTime.now());
+  var request=new Submit();request.setRevision(0L);request.setAgreementHash(digest);
+  request.setAgreementAccepted(true);request.setValues(Map.of("name","合成学员"));
+  service.submit(token,request);
+  var archive=ArgumentCaptor.forClass(StudentInfoFormDO.class);
+  verify(forms).updateById(archive.capture());
+  assertEquals("<p>合成协议</p>",archive.getValue().getAgreementConfirmedBody());
+  assertEquals(EnrollmentAgreementService.CONSENT,archive.getValue().getAgreementConsent());
+  verify(registrationNotifications).publishInformationSubmitted(eq(12L),eq("合成学员"),any());
+ }
+ @Test void newFormRequiresReadOfCurrentTermsAndExplicitConsent() {
+  context("processing");
+  var form=form("DRAFT");
+  form.setAgreementVersion(1L);
+  when(forms.byToken(anyString())).thenReturn(form);
+  when(forms.lock(12L)).thenReturn(form);
+  when(agreements.render(eq(form),any())).thenReturn("正文");
+  var request=new Submit();
+  request.setRevision(0L);
+  request.setAgreementAccepted(true);
+  request.setAgreementHash(cn.hutool.crypto.digest.DigestUtil.sha256Hex("正文"));
+  assertThrows(ServiceException.class,()->service.submit(token,request));
+  form.setAgreementReadHash(request.getAgreementHash());
+  form.setAgreementReadAt(LocalDateTime.now());
+  request.setAgreementAccepted(false);
+  assertThrows(ServiceException.class,()->service.submit(token,request));
+  request.setAgreementAccepted(true);
+  when(agreements.render(eq(form),any())).thenReturn("更正后的正文");
+  assertThrows(ServiceException.class,()->service.submit(token,request));
+  verifyNoInteractions(values,images);
+ }
  final String token="a".repeat(43);
  @Test void draftTypeHandlerEncryptsStorageAndRestoresText() throws Exception {
   var type=cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class;

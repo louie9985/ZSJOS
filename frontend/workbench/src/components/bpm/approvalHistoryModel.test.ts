@@ -16,6 +16,16 @@ describe('approval history identity', () => {
     expect(result.nodes[0].tasks.map(t => t.id)).toEqual(['p'])
     expect(result.nodes[1].tasks[0].parentTaskId).toBe('p')
   })
+  it('uses migration audit evidence for the exact skipped task and its node', () => {
+    const result = approvalHistory([
+      { id: 'registration', name: '报名审批', status: 1, tasks: [{ id: 'reg', status: 1 }] },
+      { id: 'finance', name: '财务审批', status: 1, tasks: [{ id: 'fin', status: 1 }] },
+    ], [task({ id: 'reg', endTime: 2 }), task({ id: 'fin' })], [
+      { id: 'audit', taskId: 'reg', type: '10', message: '迁移跳过', createTime: 2 },
+    ])
+    expect(result.nodes.map(node => node.status)).toEqual([-2, 1])
+    expect(result.nodes[0].tasks[0]).toMatchObject({ id: 'reg', status: -2, endTime: 2 })
+  })
   it('retains candidate users and missing or unknown status meaning', () => {
     expect(approvalHistory([{ id: 'future', name: '终审', candidateUsers: [{ id: 7, nickname: '候选人' }] }], []).nodes[0].candidateUsers?.[0].id).toBe(7)
     for (const missing of [null, undefined, NaN]) expect(approvalStatus(missing, String)).toBe('状态未返回')

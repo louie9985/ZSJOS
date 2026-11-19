@@ -1,5 +1,7 @@
 # 兼职客资指定分配与教务接单
 
+> **2026-11-16 教务身份退役**：承接身份只接受 `sales`。“教务承接”选项已从 Vue Admin 与 Workbench 删除；`PartnerLeadAssignmentService` 对 `education` 身份的关系配置、派单解析和复核放行一律返回 `PARTNER_ASSIGNMENT_IDENTITY_INVALID`。存量 `zsjos_user_relation.owner_identity=education` 由 [`sales_education_identity_backfill.sql`](../../script/sql/mysql/repair/sales_education_identity_backfill.sql) 回填为 `sales`。下文教务相关内容仅为历史记录。
+
 ## 配置
 
 在已有用户关系场景管理中打开“兼职客资指定分配”（`partner_lead_specified_assignment`），选择兼职、唯一接单人员和销售／教务承接身份。Vue 管理端和 React 工作台使用相同接口与权限。来源主体 `sourceType=partner`，来源 ID 为 Partner ID；旧场景默认 `system_user`。场景创建后主体类型不可修改，禁止把兼职 ID 解析为系统员工。

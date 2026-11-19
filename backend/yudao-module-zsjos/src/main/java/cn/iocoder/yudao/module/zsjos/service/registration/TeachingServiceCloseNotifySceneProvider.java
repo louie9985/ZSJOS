@@ -9,17 +9,17 @@ import java.util.*;
 @Component
 public class TeachingServiceCloseNotifySceneProvider implements NotifySceneProvider {
     public static final String SCENE = "zsjos.student.service_closed";
-    public static final String SUPERVISOR = "delivery_supervisor";
+    public static final String SUPERVISOR = "sales_supervisor";
     private static final List<String> VARIABLES = List.of("student.name","course.name","planner.name","close.reason","close.time");
 
     @Override public List<NotifySceneRespDTO> getScenes() {
         return List.of(new NotifySceneRespDTO(SCENE,"学员教学服务关闭",List.of(
                 new NotifySceneVariableRespDTO("student.name","学员姓名",false),
                 new NotifySceneVariableRespDTO("course.name","课程名称",false),
-                new NotifySceneVariableRespDTO("planner.name","学习规划师",false),
+                new NotifySceneVariableRespDTO("planner.name","班主任",false),
                 new NotifySceneVariableRespDTO("close.reason","关闭原因",false),
                 new NotifySceneVariableRespDTO("close.time","关闭时间",false)),
-                List.of(new NotifySceneRoleRespDTO(SUPERVISOR,"交付主管")),
+                List.of(new NotifySceneRoleRespDTO(SUPERVISOR,"销售主管")),
                 List.of(NotifyActionType.MESSAGE_DETAIL,NotifyActionType.BUSINESS_DETAIL),false));
     }
     @Override public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event,Set<String> roles) {

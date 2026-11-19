@@ -151,7 +151,7 @@ public class ExamCollectionRosterService {
             if (clazz == null || !Objects.equals(clazz.getTenantId(), tenant) || !"SERVING".equals(clazz.getStatus())
                     || !DeliveryClassKind.assignable(clazz) || clazz.getHomeroomUserId() == null) throw exception(CLASS_INVALID);
             var planner = users.getUser(clazz.getHomeroomUserId());
-            if (planner == null || !Objects.equals(planner.getStatus(), 0)) throw exception(FIELD_INVALID, "班级学习规划师不可用，请先维护班级负责人");
+            if (planner == null || !Objects.equals(planner.getStatus(), 0)) throw exception(FIELD_INVALID, "班级班主任不可用，请先维护班级负责人");
             for (var relation : relations.selectClassRelationsForUpdate(classId, tenant)) {
                 if (TeachingServiceLifecycle.closed(relation)) continue;
                 var row = new ExamCollectionMemberDO(); row.setTenantId(tenant); row.setTaskId(id);

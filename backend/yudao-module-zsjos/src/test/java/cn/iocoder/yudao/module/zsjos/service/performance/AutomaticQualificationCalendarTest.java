@@ -6,7 +6,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class AutomaticQualificationCalendarTest {
  @org.junit.jupiter.params.ParameterizedTest
- @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto"})
  void automaticValidityCountsButTimingDoesNotAndLaterManualRoundCountsNormally(String generationSource){
   var now=LocalDateTime.of(2026,9,29,12,0);var received=new PerformanceFact();received.setLeadId(1L);received.setUserId(2L);received.setAssignmentId(3L);received.setReceivedAt(now.minusDays(1));
   var automatic=round(1L,now.minusDays(1),now.minusDays(1));automatic.setGenerationSource(generationSource);

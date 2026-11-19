@@ -33,9 +33,11 @@ public class StudentInfoProductRules {
         return result;
     }
     public List<Field> resolve(List<Field> definitions,List<Long> roots,List<Long> path) {
-        boolean education=path.stream().anyMatch(roots::contains);
+        return resolve(definitions, path.stream().anyMatch(roots::contains));
+    }
+    List<Field> resolve(List<Field> definitions, boolean includeEducation) {
         var copy=JsonUtils.parseArray(JsonUtils.toJsonString(definitions),Field.class);
-        return copy.stream().filter(Field::getEnabled).filter(f -> education || !CONDITIONAL.contains(f.getKey()))
+        return copy.stream().filter(Field::getEnabled).filter(f -> includeEducation || !CONDITIONAL.contains(f.getKey()))
                 .peek(f -> {
                     // Shipping addresses included in a new collection must be complete before submission.
                     if (CONDITIONAL.contains(f.getKey()) || Set.of("textbook_shipping_address", "gift_shipping_address").contains(f.getKey()))

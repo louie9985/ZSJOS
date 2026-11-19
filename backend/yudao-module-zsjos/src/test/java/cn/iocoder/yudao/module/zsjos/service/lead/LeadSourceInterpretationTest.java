@@ -21,11 +21,9 @@ class LeadSourceInterpretationTest {
         lead.setContributionUserIdSnapshot(26L);
         lead.setContributionUserNameSnapshot("历史姓名");
         assertTrue(hasConsistentWriteAttribution(lead));
-        lead.setSubmissionSourceType("education_self_sourced");
-        assertTrue(hasConsistentWriteAttribution(lead));
     }
-    @Test void bothSelfEntriesRequireAnExplicitConsistentDecision() {
-        for (String source : new String[]{"sales_self_sourced", "education_self_sourced"}) {
+    @Test void salesSelfEntryRequiresAnExplicitConsistentDecision() {
+        for (String source : new String[]{"sales_self_sourced"}) {
             assertEquals(State.UNVERIFIED, resolve(source, null, false, null, null, null).state());
             assertEquals(State.UNVERIFIED, resolve(source, null, false, 17L, "system_user", 17L).state());
             assertEquals(State.UNLINKED, resolve(source, source, true, null, null, null).state());
@@ -39,6 +37,6 @@ class LeadSourceInterpretationTest {
         assertEquals(State.NOT_APPLICABLE, resolve("internal_new_media", null, false, null, "system_user", 17L).state());
         assertEquals(State.UNVERIFIED, resolve("internal_new_media", null, true, 400L, "system_user", 527L).state());
         assertEquals(State.UNVERIFIED, resolve("internal_new_media", "sales_self_sourced", false, null, null, null).state());
-        assertEquals(Reason.SOURCE_MISMATCH, resolve("internal_new_media", "education_self_sourced", true, null, null, null).reason());
+        assertEquals(Reason.SOURCE_MISMATCH, resolve("internal_new_media", "sales_self_sourced", true, null, null, null).reason());
     }
 }

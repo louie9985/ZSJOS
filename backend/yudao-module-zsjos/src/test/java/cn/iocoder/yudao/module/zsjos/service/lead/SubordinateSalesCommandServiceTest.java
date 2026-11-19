@@ -43,7 +43,7 @@ class SubordinateSalesCommandServiceTest {
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
-    @Test void educationRestoreIsRejectedBeforeBusinessWrites() {
+    @Test void retiredEducationRestoreIsRejectedBeforeBusinessWrites() {
         var lead = lead(1L,20L); lead.setOwnerIdentity("education");
         when(leadMapper.selectByIdForUpdate(1L,1L)).thenReturn(lead);
         doThrow(new ServiceException(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SUBORDINATE_LEAD_OWNER_CHANGED)).when(scope).requireManagedLead(lead,10L);
@@ -108,7 +108,7 @@ class SubordinateSalesCommandServiceTest {
         assertEquals(Propagation.REQUIRES_NEW, transactional.propagation());
     }
 
-    @Test void educationTransferIsRejectedBeforeDispatch() {
+    @Test void retiredEducationTransferIsRejectedBeforeDispatch() {
         var lead = lead(1L,20L); lead.setOwnerIdentity("education");
         when(leadMapper.selectByIdForUpdate(1L,1L)).thenReturn(lead);
         doThrow(new ServiceException(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SUBORDINATE_LEAD_OWNER_CHANGED)).when(scope).requireManagedLead(lead,10L);

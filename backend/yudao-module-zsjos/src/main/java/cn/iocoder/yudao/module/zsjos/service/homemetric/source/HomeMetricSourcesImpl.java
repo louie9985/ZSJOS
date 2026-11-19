@@ -110,7 +110,8 @@ public class HomeMetricSourcesImpl implements HomeMetricSources {
                 var scope=leads.metricVisibilityScope(actor);
                 if(!scope.queryAll()) {
                     String sourceIds=in(scope.sourceUserIds(),params,"source"),ownerIds=in(scope.ownerUserIds(),params,"owner");
-                    from+=" AND ((l.provider_owner_type='system_user' AND l.provider_owner_id IN ("+sourceIds+")) OR l.owner_user_id IN ("+ownerIds+") OR (l.assignment_status='recycle_pending' AND l.recycle_source_owner_user_id IN ("+ownerIds+")))";
+                    from+=" AND ((l.provider_owner_type='system_user' AND l.provider_owner_id IN ("+sourceIds+")) OR l.owner_user_id IN ("+ownerIds+") OR (l.assignment_status='recycle_pending' AND l.recycle_source_owner_user_id IN ("+ownerIds+"))"
+                            +(scope.unownedVisible()?" OR (l.owner_user_id IS NULL AND l.assignment_status<>'recycle_pending')":"")+")";
                 }
                 identity="l.id";number="l.lead_no";name="NULL";status="l.status";time="l.submitted_at";
                 if("followUpCount".equals(op.field()))value="l.follow_up_count";

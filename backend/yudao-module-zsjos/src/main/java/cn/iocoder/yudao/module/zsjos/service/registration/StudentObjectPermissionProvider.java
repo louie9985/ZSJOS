@@ -19,6 +19,7 @@ public class StudentObjectPermissionProvider implements ZsjosObjectPermissionPro
     @Resource private PermissionApi permissionApi;
     @Resource private DeliveryClassScopeService scopeService;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     private boolean hasManagedStudentReadPermission(Long userId) {
         return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
                 DeliveryClassService.PERMISSION_QUERY_MANAGED);
@@ -36,6 +37,14 @@ public class StudentObjectPermissionProvider implements ZsjosObjectPermissionPro
         if (!"read".equals(action)) return false;
         if (permissionApi.hasTenantReadAllAccess(userId)) {
             return !relationMapper.selectTenantReadByPersonIds(java.util.List.of(bizId), null).isEmpty();
+        }
+        if (salesBoundary.isSalesActor(userId)) {
+            // Own (incl. history) and explicit collaborator services are visible regardless of department.
+            if (!relationMapper.selectByOwnerAndPersonIncludingHistory(userId, bizId).isEmpty()
+                    || relationMapper.existsActiveByCollaboratorAndPerson(userId, bizId)) return true;
+            var accessibleOwners = salesBoundary.accessibleSalesUserIds(userId);
+            return !accessibleOwners.isEmpty() && !relationMapper.selectOwnedByOwnerIdsAndPersonIds(
+                    accessibleOwners, java.util.List.of(bizId), null).isEmpty();
         }
         if (StudentReadScope.canReadAll(permissionApi, userId)
                 && relationMapper.selectOwnedByPersonIds(java.util.List.of(bizId), null).stream()

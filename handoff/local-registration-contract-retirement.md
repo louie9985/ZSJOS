@@ -1,0 +1,6 @@
+# Local registration contract checklist retirement
+
+- ID: local-registration-contract-retirement; owner: current Codex task. Local fallback, main, D:\ZSJ-OS, base 21631a8a98a62c41a3c71596a6739e03a535c3b6. Integration: None.
+- Scope: this record and local ruoyi-vue-pro tenant 1 template 1 and pending/processing case checklist snapshots. No schema, permissions, terminal case or file deletion. Dependency: local MySQL.
+- Verify draft parity, scope, case counts and attachments before commit and read back afterwards. Retire the two items only; retain existing uploads as optional. No automatic completion.
+- Delivered 2026-11-19: matched draft and published item/route definitions, disabled only the two items and published v5. Updated 10 pending and 43 processing cases, logically retired 104 rows, kept both existing uploaded proofs linked and optional. Terminal cases were outside the locked update set. Three other enabled definitions remain. UTF-8 labels/HEX checked. Transaction assertions passed before and after commit. No schema or migration ledger changes. Scoped recovery manifest under the local user profile in ZSJOS-repair; restoration needs review for later changes. No real-account UI test. Ownership released.

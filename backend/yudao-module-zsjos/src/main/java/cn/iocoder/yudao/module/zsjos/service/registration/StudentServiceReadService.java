@@ -33,6 +33,7 @@ public class StudentServiceReadService {
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private MyStudentServiceImpl projection;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Resource private AdminUserApi userApi;
     @Resource private DeliveryClassScopeService classScope;
     @Resource private BusinessReadScopeService readScope;
@@ -129,6 +130,18 @@ public class StudentServiceReadService {
         } else if (!all) {
             params.put("subject", subject);
             clauses.add("(sr.owner_user_id=#{query.parameters.subject} OR ((sr.content_director_user_id=#{query.parameters.subject} OR sr.career_planner_user_id=#{query.parameters.subject}) AND sr.acceptance_status='accepted' AND sr.status='active'))");
+        }
+        if (!permissionApi.hasTenantReadAllAccess(actor) && salesBoundary.isSalesActor(actor)) {
+            var allowedOwners = salesBoundary.accessibleSalesUserIds(actor);
+            if (allowedOwners.isEmpty()) clauses.add("1=0");
+            else {
+                List<String> allowedKeys = new ArrayList<>();
+                for (Long owner : allowedOwners) {
+                    String key = "salesBoundaryOwner" + allowedKeys.size();
+                    params.put(key, owner); allowedKeys.add("#{query.parameters." + key + "}");
+                }
+                clauses.add("sr.owner_user_id IN (" + String.join(",", allowedKeys) + ")");
+            }
         }
         if (req.getServiceStatus() != null) add(clauses,params,TeachingServiceLifecycle.STATUS_SQL,"status",req.getServiceStatus());
         else if (req.getClassId() == null && !TeachingServiceLifecycle.hasExplicitStatus(req.getAdvancedFilter())) clauses.add("sr.teaching_closed=0");

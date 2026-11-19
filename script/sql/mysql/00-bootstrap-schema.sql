@@ -4767,6 +4767,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `city_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '市编码快照',
   `city_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '市名称快照',
   `agreed_exam_time` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商定考试时间文本',
+  `agreed_exam_month` char(7) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商定考试月份 YYYY-MM',
   `class_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '开通班种文本',
   `service_period` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '服务周期字典值',
   `student_source` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学生来源字典值',
@@ -5687,6 +5688,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_delivery_class` (
   `selected_attrs_json` json DEFAULT NULL COMMENT '班级规格条件快照',
   `selected_specs_json` json DEFAULT NULL COMMENT '班级规格标签快照',
   `selected_skus_json` json DEFAULT NULL COMMENT '班级适用 SKU 快照',
+  `exam_month` char(7) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '自动分班考试月份 YYYY-MM',
+  `auto_class_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`class_kind`='NORMAL' AND `deleted`=b'0' AND `status`='SERVING' AND `exam_month` > '') THEN `product_id` ELSE NULL END) STORED,
   `pending_guard` bigint GENERATED ALWAYS AS (CASE WHEN (`class_kind`='PENDING' AND `deleted`=b'0') THEN `tenant_id` ELSE NULL END) STORED,
   `category_id` bigint DEFAULT NULL, `category_name_snapshot` varchar(255) DEFAULT NULL,
   `category_path_snapshot` json DEFAULT NULL, `exam_schedule_id` bigint DEFAULT NULL,
@@ -5701,6 +5704,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_delivery_class` (
   UNIQUE KEY `uk_delivery_pending_guard` (`pending_guard`),
   UNIQUE KEY `uk_delivery_unscheduled_guard` (`tenant_id`,`unscheduled_guard`),
   UNIQUE KEY `uk_delivery_exception_guard` (`tenant_id`,`exception_guard`),
+  UNIQUE KEY `uk_delivery_auto_class` (`tenant_id`,`auto_class_guard`,`exam_month`,`homeroom_user_id`),
   KEY `idx_delivery_class_group` (`tenant_id`,`group_id`,`deleted`,`id`),
   KEY `idx_delivery_class_scope` (`tenant_id`,`dept_id`,`status`,`homeroom_user_id`,`deleted`),
   KEY `idx_delivery_class_category` (`tenant_id`,`category_id`,`exam_schedule_id`,`status`,`deleted`),
@@ -6728,6 +6732,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_media_config_version` (
 CREATE TABLE IF NOT EXISTS `zsjos_media_student_talk_record` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `student_person_id` bigint NOT NULL,
+  `service_relation_id` bigint DEFAULT NULL COMMENT '谈话归属服务关系',
   `account_id` bigint DEFAULT NULL,
   `operator_user_id` bigint NOT NULL,
   `content` varchar(2000) NOT NULL,
@@ -7199,6 +7204,14 @@ CREATE TABLE IF NOT EXISTS zsjos_lead_submitter_feedback_attachment (
 
 -- UTF-8. Student information collection schema; empty business tables only.
 CREATE TABLE IF NOT EXISTS zsjos_student_info_form (
+ agreement_product_name VARCHAR(255) NULL,
+ agreement_category_name VARCHAR(255) NULL,
+ agreement_version bigint NULL,
+ agreement_template mediumtext NULL,
+ agreement_read_hash varchar(64) NULL,
+ agreement_consent varchar(160) NULL,
+ agreement_read_at datetime NULL,
+ agreement_confirmed_body mediumtext NULL,
  id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, lead_id bigint NULL,
  sales_user_id bigint NOT NULL, config_version_id bigint NOT NULL,
  registration_case_id BIGINT NULL, order_item_id BIGINT NULL, person_id BIGINT NULL, product_id BIGINT NULL,
@@ -7899,6 +7912,7 @@ VALUES ('作品目的','zsjos_content_purpose',0,'ZSJOS 内容审核作品目的
 -- Sales performance (V276): empty tenant-owned tables.
 CREATE TABLE IF NOT EXISTS zsjos_performance_org (
  id bigint NOT NULL AUTO_INCREMENT,
+ sales_boundary_root bit(1) NOT NULL DEFAULT b'0' COMMENT '销售业务部门边界根',
  business_domain varchar(16) NOT NULL DEFAULT 'sales',
  dept_id bigint NOT NULL, center_id bigint NOT NULL, kind varchar(16) NOT NULL, version int NOT NULL DEFAULT 0,
   creator varchar(64) NOT NULL DEFAULT '',
@@ -7912,6 +7926,7 @@ CREATE TABLE IF NOT EXISTS zsjos_performance_org (
 
 CREATE TABLE IF NOT EXISTS zsjos_performance_target (
  id bigint NOT NULL AUTO_INCREMENT,
+ merged_delivery_target_id bigint NULL COMMENT '已合并的历史交付目标ID',
  business_domain varchar(16) NOT NULL DEFAULT 'sales',
  scope_type varchar(16) NOT NULL, scope_id bigint NOT NULL, dept_id bigint NULL, center_id bigint NULL, period_type varchar(16) NOT NULL, period_start date NOT NULL, floor_amount decimal(18,2) NULL, sprint_amount decimal(18,2) NULL, manual bit(1) NOT NULL DEFAULT b'0', reason varchar(500) NOT NULL, version int NOT NULL DEFAULT 0,
   creator varchar(64) NOT NULL DEFAULT '',
@@ -8102,6 +8117,8 @@ CREATE TABLE IF NOT EXISTS zsjos_media_lead_target (
   center_id bigint DEFAULT NULL,
   period_start date NOT NULL,
   target_count int NOT NULL,
+  target_amount decimal(14,2) DEFAULT NULL COMMENT '月度业绩贡献目标',
+  amount_manual bit(1) NOT NULL DEFAULT b'0' COMMENT '业绩目标人工覆盖',
   manual bit(1) NOT NULL DEFAULT b'1',
   reason varchar(500) NOT NULL,
   version int NOT NULL DEFAULT 0,
@@ -8672,3 +8689,45 @@ CREATE TABLE IF NOT EXISTS zsjos_student_exam_progress (
   deleted bit(1) NOT NULL DEFAULT b'0',
   PRIMARY KEY(tenant_id,service_relation_id)
  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- V378 empty agreement structure; seed and menu metadata remain in numbered migration.
+CREATE TABLE IF NOT EXISTS zsjos_enrollment_agreement (
+ id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, revision BIGINT NOT NULL, published_version BIGINT NOT NULL,
+ draft_body MEDIUMTEXT NOT NULL, published_body MEDIUMTEXT NOT NULL,
+ creator VARCHAR(64) DEFAULT '', updater VARCHAR(64) DEFAULT '', create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+ update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, deleted BIT NOT NULL DEFAULT 0
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- V379 independent communication notes
+CREATE TABLE IF NOT EXISTS zsjos_contact_note (
+ id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+ tenant_id BIGINT NOT NULL,
+ subject_type VARCHAR(16) NOT NULL,
+ subject_id BIGINT NOT NULL,
+ author_id BIGINT NOT NULL,
+ author_name VARCHAR(128) NOT NULL,
+ content VARCHAR(2000) NOT NULL,
+ request_key VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+ creator VARCHAR(64) DEFAULT '', updater VARCHAR(64) DEFAULT '',
+ create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted BIT NOT NULL DEFAULT 0,
+ UNIQUE KEY uk_note_request (tenant_id,subject_type,subject_id,author_id,request_key),
+ KEY idx_note_subject (tenant_id,subject_type,subject_id,deleted,id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- V380: empty category-owned agreement structure.
+CREATE TABLE IF NOT EXISTS zsjos_enrollment_category_agreement (
+ id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, revision BIGINT NOT NULL, published_version BIGINT NOT NULL,
+ draft_body MEDIUMTEXT NOT NULL, published_body MEDIUMTEXT NOT NULL,
+ creator VARCHAR(64) DEFAULT '', updater VARCHAR(64) DEFAULT '', create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+ update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, deleted BIT NOT NULL DEFAULT 0
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- V381: empty product-owned agreement structure.
+CREATE TABLE IF NOT EXISTS zsjos_enrollment_product_agreement (
+ id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, revision BIGINT NOT NULL, published_version BIGINT NOT NULL,
+ draft_body MEDIUMTEXT NOT NULL, published_body MEDIUMTEXT NOT NULL,
+ creator VARCHAR(64) DEFAULT '', updater VARCHAR(64) DEFAULT '', create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+ update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, deleted BIT NOT NULL DEFAULT 0
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

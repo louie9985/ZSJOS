@@ -13,25 +13,39 @@ import './MediaLeadAnalysisPage.css'
 
 const date = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 const monthRange = (month: string): [string, string] => [month + '-01', month + '-' + new Date(Number(month.slice(0, 4)), Number(month.slice(5)), 0).getDate()]
-function MonthlySummary({ target, onValid }: { onValid?: () => void; target: Overview['target'] }) {
+function MonthlySummary({ target, onValid, amount, onContribution }: { onValid?: () => void; onContribution?: () => void; amount?: number; target: Overview['target'] }) {
   const completion = target.targetCount != null && target.targetCount > 0 ? target.actualCount / target.targetCount : null
   const unavailable = target.targetCount == null ? '目标未设置' : target.targetCount === 0 ? '目标为 0' : ''
-  return <>
+  const amountCompletion = target.targetAmount != null && target.targetAmount > 0 && amount != null ? amount / target.targetAmount : null
+  const money = (value?: number | null) => value == null ? '未设置' : value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return <div className="media-lead-goals">
+    <section className="media-lead-goal" aria-label="有效客资月目标">
     <div className="media-lead-summary">
       <Card size="small" className="media-lead-summary-card"><Typography.Text type="secondary">本月有效客资目标</Typography.Text><div className="media-lead-summary-value">{target.targetCount ?? '未设置'}</div></Card>
-      <Card size="small" className="media-lead-summary-card media-lead-summary-actual"><Typography.Text type="secondary">本月有效客资</Typography.Text><div className="media-lead-summary-value">{onValid ? <Button type="link" onClick={onValid}>{target.actualCount}</Button> : target.actualCount}</div></Card>
+      <button type="button" disabled={!onValid} onClick={onValid} className="performance-metric media-lead-summary-card media-lead-summary-actual"><span>本月有效客资</span><strong className="media-lead-summary-value">{target.actualCount}</strong>{onValid && <span className="performance-subtle">查看明细 ›</span>}</button>
     </div>
     <div className="media-lead-completion">
       <div className="media-lead-completion-label"><span>月度目标完成进度</span><span>完成率 {percent(completion)}{unavailable && ` · ${unavailable}`}</span></div>
       <Progress percent={Math.min(100, (completion ?? 0) * 100)} showInfo={false} status="normal" aria-label={`月度目标完成进度：${unavailable || percent(completion)}`} />
     </div>
-  </>
+    </section>
+    <section className="media-lead-goal" aria-label="业绩贡献月目标">
+    <div className="media-lead-summary">
+      <Card size="small" className="media-lead-summary-card"><Typography.Text type="secondary">本月业绩目标（元）</Typography.Text><div className="media-lead-summary-value">{money(target.targetAmount)}</div></Card>
+      <button type="button" disabled={!onContribution} onClick={onContribution} className="performance-metric media-lead-summary-card media-lead-summary-actual"><span>本月业绩贡献（元）</span><strong className="media-lead-summary-value">{amount == null ? '—' : money(amount)}</strong>{onContribution && <span className="performance-subtle">查看明细 ›</span>}</button>
+    </div>
+    <div className="media-lead-completion">
+      <div className="media-lead-completion-label"><span>月度业绩目标完成进度</span><span>完成率 {percent(amountCompletion)}{target.targetAmount == null ? ' · 目标未设置' : target.targetAmount === 0 ? ' · 目标为 0' : ''}</span></div>
+      <Progress percent={Math.min(100, (amountCompletion ?? 0) * 100)} showInfo={false} status="normal" aria-label={`月度业绩目标完成进度：${percent(amountCompletion)}`} />
+    </div>
+    </section>
+  </div>
 }
 function MemberMetricTags({ submitted, valid, converted, onOpen }: { onOpen?: (metric: DrillMetric) => void; submitted: number; valid?: number; converted: number }) {
   return <Space size={4} wrap className="media-lead-metric-tags">
-    <Tag color="processing" style={{ marginInlineEnd: 0 }}>提交 {onOpen ? <Button type="link" size="small" onClick={() => onOpen("submitted")}>{submitted}</Button> : submitted}</Tag>
-    {valid !== undefined && <Tag color="success" style={{ marginInlineEnd: 0 }}>有效 {onOpen ? <Button type="link" size="small" onClick={() => onOpen("valid")}>{valid}</Button> : valid}</Tag>}
-    <Tag color="warning" style={{ marginInlineEnd: 0 }}>成交 {onOpen ? <Button type="link" size="small" onClick={() => onOpen("memberConverted")}>{converted}</Button> : converted}</Tag>
+    <Tag color="processing" style={{ marginInlineEnd: 0 }}>提交 {onOpen ? <button type="button" className="media-lead-drill" onClick={() => onOpen("submitted")}>{submitted}</button> : submitted}</Tag>
+    {valid !== undefined && <Tag color="success" style={{ marginInlineEnd: 0 }}>有效 {onOpen ? <button type="button" className="media-lead-drill" onClick={() => onOpen("valid")}>{valid}</button> : valid}</Tag>}
+    <Tag color="warning" style={{ marginInlineEnd: 0 }}>成交 {onOpen ? <button type="button" className="media-lead-drill" onClick={() => onOpen("memberConverted")}>{converted}</button> : converted}</Tag>
   </Space>
 }
 const pageSizes = [20, 50, 100]
@@ -67,7 +81,7 @@ function Pie({ title, rows, onOpen }: { title: string; rows: Group[]; onOpen?: (
   const total = rows.reduce((sum, row) => sum + row.count, 0)
   let offset = 0
   const slices = rows.map((row, index) => { const from = offset; offset += row.count / total * 100; return `${colors[index % colors.length]} ${from}% ${offset}%` })
-  return <Card size="small" title={title} style={{ minWidth: 250, flex: '1 1 250px' }}>{total === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无有效客资" /> : <Space align="start"><div role="img" aria-label={`${title}，共 ${total} 条`} style={{ width: 128, height: 128, flexShrink: 0, borderRadius: '50%', background: `conic-gradient(${slices.join(',')})` }} /><div>{rows.map((row, index) => <div key={row.label} style={{ whiteSpace: 'nowrap' }}><span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 6, background: colors[index % colors.length] }} />{onOpen ? <Button type="link" onClick={() => onOpen(row.label)}>{row.label} {row.count}（{percent(row.count / total)}）</Button> : <>{row.label} {row.count}（{percent(row.count / total)}）</>}</div>)}</div></Space>}</Card>
+  return <Card size="small" title={title} style={{ minWidth: 250, flex: '1 1 250px' }}>{total === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无有效客资" /> : <Space align="start"><div role="img" aria-label={`${title}，共 ${total} 条`} style={{ width: 128, height: 128, flexShrink: 0, borderRadius: '50%', background: `conic-gradient(${slices.join(',')})` }} /><div>{rows.map((row, index) => <div key={row.label} style={{ whiteSpace: 'nowrap' }}><span style={{ display: 'inline-block', width: 9, height: 9, marginRight: 6, background: colors[index % colors.length] }} />{onOpen ? <button type="button" className="media-lead-drill" onClick={() => onOpen(row.label)}>{row.label} {row.count}（{percent(row.count / total)}）</button> : <>{row.label} {row.count}（{percent(row.count / total)}）</>}</div>)}</div></Space>}</Card>
 }
 
 function CalendarRing({ day }: { day: CalendarDay }) {
@@ -93,7 +107,7 @@ function MonthlyCohort({ data, month, canDetail, onDay, onMetric }: { onMetric: 
   return <div className="performance-cohort">
     <div><h4>提交批次转化漏斗</h4>{!data.funnel ? <Alert type="warning" showIcon title="月度漏斗暂不可用" description="请更新后端服务后重试，判定日历仍可查看。" /> : data.funnel.submitted === 0 ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="所选月份暂无提交客资" /> : <div className="performance-funnel">{rows.map((row, index) => {
       const top = 190 * row.count / max, bottom = 190 * (rows[index + 1]?.count ?? row.count) / max
-      return <div className="performance-funnel-row" key={row.key}><div><strong>{canDetail ? <Button type="link" onClick={() => onMetric(row.key as DrillMetric)}>{row.label} {row.count}</Button> : <>{row.label} {row.count}</>}</strong><span>{index ? '较上一步 ' + percent(rows[index - 1].count ? row.count / rows[index - 1].count : null) : '所选月提交批次'}</span></div><svg viewBox="0 0 400 50" role="img" aria-label={row.label + ' ' + row.count}><polygon points={[200 - top, 0, 200 + top, 0, 200 + bottom, 48, 200 - bottom, 48].join(' ')} fill={['var(--ant-color-primary)', 'var(--ant-color-success)', 'var(--ant-color-warning)'][index]} /></svg></div>
+      return <div className="performance-funnel-row" key={row.key}><div><strong>{canDetail ? <button type="button" className="media-lead-drill" onClick={() => onMetric(row.key as DrillMetric)}>{row.label} {row.count}</button> : <>{row.label} {row.count}</>}</strong><span>{index ? '较上一步 ' + percent(rows[index - 1].count ? row.count / rows[index - 1].count : null) : '所选月提交批次'}</span></div><svg viewBox="0 0 400 50" role="img" aria-label={row.label + ' ' + row.count}><polygon points={[200 - top, 0, 200 + top, 0, 200 + bottom, 48, 200 - bottom, 48].join(' ')} fill={['var(--ant-color-primary)', 'var(--ant-color-success)', 'var(--ant-color-warning)'][index]} /></svg></div>
     })}</div>}<p className="performance-subtle">按所选月份的提交批次统计；成交为其中已判有效且截至查询时已有单笔总金额≥1280元生效首购的去重客资。</p></div>
     <div><h4>提交日期与判定情况</h4><div className="performance-legend"><span style={{ color: '#397bee' }}>● 有效</span><span style={{ color: '#a8adb7' }}>● 无效</span><span style={{ color: '#eebf45' }}>● 待判或其他</span><span>每日环形图中央为提交客资数</span></div>
       <div className="performance-calendar">{['一', '二', '三', '四', '五', '六', '日'].map(weekday => <strong key={weekday}>周{weekday}</strong>)}{Array.from({ length: leading }, (_, index) => <span key={'pad' + index} />)}{Array.from({ length: dayCount }, (_, index) => {
@@ -202,7 +216,7 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
     if (range) void openDetails(label, range, { metric, cumulative: key === 'all', ...filters })
   }
   const metricValue = (value: React.ReactNode, key: string, label: string, metric: DrillMetric) => canDetail
-    ? <Button type="link" onClick={() => openPeriod(key, label, metric)}>{value}</Button> : value
+    ? <button type="button" className="media-lead-drill" onClick={() => openPeriod(key, label, metric)}>{value}</button> : value
   const scopeTree = <><Input.Search aria-label="搜索组织或人员" placeholder="搜索组织或人员" value={keyword} onChange={event => setKeyword(event.target.value)} allowClear />
     {treeData.length ? <Tree key={keyword} blockNode defaultExpandAll treeData={treeData} selectedKeys={scope ? [scope.key] : []} onSelect={keys => {
       const node = nodes.find(item => item.key === keys[0])
@@ -216,7 +230,7 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
       <div className="performance-heading"><div><Typography.Title level={3} style={{ margin: 0 }}>新媒体客资分析大盘</Typography.Title><Typography.Text type="secondary">按冻结引流贡献人统计，数据使用北京时间</Typography.Text></div></div>
       {error && <Alert type="error" showIcon title={error} action={<Button size="small" onClick={() => void load(scope)}>重试</Button>} />}
       {loading ? <Card><Spin /></Card> : !data ? <Empty description="暂无数据" /> : <>
-        <Card title="团队大盘" className="media-lead-overview"><MonthlySummary target={data.target} onValid={canDetail ? () => openPeriod("month", "本月有效客资", "valid") : undefined} />
+        <Card title="团队大盘" className="media-lead-overview"><MonthlySummary amount={data.periods.find(row => row.key === "month")?.performanceContribution} onContribution={canDetail ? () => openPeriod("month", "本月业绩贡献", "contribution") : undefined} target={data.target} onValid={canDetail ? () => openPeriod("month", "本月有效客资", "valid") : undefined} />
           <details className="media-lead-methodology"><summary>按提交日期统计，判定与成交截至查询时更新 · 查看完整统计口径</summary><div>
             <p>成交率 = 该期间提交的有效客资中，截至查询时已成交的客资数 ÷ 该期间提交的有效客资数 × 100%。有效客资按当前判定统计，包含已转化、已成交客资；无效、待判等不计入分母。无有效客资时显示“—”。</p>
             <p>成交须有关联的已生效首购订单，且单笔订单总金额≥1280元（含1280元）；复购不计，多笔小额订单不累加，同一客资只计一次。</p>
@@ -236,7 +250,7 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
               { title: '成交客资', dataIndex: 'converted', width: 110, render: (value: number, row) => metricValue(value, row.key, row.label + '成交客资', 'converted') },
               { title: '成交率', dataIndex: 'convertedRate', width: 110, render: (v: number, row) => metricValue(percent(v), row.key, row.label + '成交客资', 'converted') },
               {
-                title: '业绩贡献（元）', dataIndex: 'performanceContribution', width: 180, align: 'right',
+                title: '业绩贡献（元）', dataIndex: 'performanceContribution', width: 180, align: 'left',
                 render: (v: number | undefined, row) => v == null ? '—' : metricValue(v.toLocaleString('zh-CN', {
                   minimumFractionDigits: 2, maximumFractionDigits: 2,
                 }), row.key, row.label + '业绩贡献订单', 'contribution'),

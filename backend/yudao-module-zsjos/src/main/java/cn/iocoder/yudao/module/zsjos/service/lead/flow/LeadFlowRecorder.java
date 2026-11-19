@@ -139,6 +139,6 @@ public class LeadFlowRecorder {
     private static String status(String s) { return lookup(s,Map.of("submitted","待判定","suspended","挂起","valid","有效","converted","有效","invalid","无效","won","已成交","closed","已关闭")); }
     private static String assignment(String s) { return lookup(s,Map.of("unassigned","未分配","pending_acceptance","待接单","owned","已归属","public_pool","抢单池","recycle_pending","回收待处理","closed","已关闭")); }
     private static String pool(String s) { return lookup(s,Map.of("waiting_assignment","待分配协作人","assigned","协作中","deal_pending","成交审批中","converted","已成交","exited","已退出")); }
-    private static String source(String s) { return lookup(s,Map.of("partner","兼职","internal_new_media","新媒体","sales_self_sourced","销售自拓","education_self_sourced","教务自拓")); }
+    private static String source(String s) { return lookup(s,Map.of("partner","兼职","internal_new_media","新媒体","sales_self_sourced","销售自拓")); }
     private static String lookup(String s, Map<String,String> labels) { return s==null?null:labels.get(s); }
 }

@@ -24,9 +24,17 @@ with sync_playwright() as p:
             expect(dialog.get_by_role('button', name='重新提交', exact=True)).to_be_enabled()
             page.screenshot(path=str(out / f'{scenario}-{width}.png'), full_page=True, animations='disabled')
             dialog.get_by_role('button', name='重新提交', exact=True).click()
+            page.get_by_role('button', name='确认提交审批', exact=True).click()
             page.wait_for_function('window.orderGiftFixture.submissions.length === 1')
             payload = page.evaluate('window.orderGiftFixture.submissions[0]')
+            assert payload['agreedExamMonth'] == '2027-01' and 'agreedExamTime' not in payload
             assert payload['giftItems'] == ['old'] and payload['giftShippingAddress'] == '原礼品邮寄地址'
+
+        dialog = open_revision('legacy-month')
+        expect(dialog.get_by_text('原商定考试时间（文本）：原约定月末', exact=True)).to_be_visible()
+        dialog.get_by_role('button', name='重新提交', exact=True).click()
+        expect(page.get_by_text('请选择商定考试月份', exact=True)).to_be_visible()
+        assert page.evaluate('window.orderGiftFixture.submissions.length') == 0
 
         dialog = open_revision()
         dialog.locator('.el-select__wrapper').click()
@@ -38,12 +46,14 @@ with sync_playwright() as p:
         assert page.evaluate('window.orderGiftFixture.submissions.length') == 0
         dialog.get_by_label('礼品邮寄地址', exact=True).fill('编辑后的地址')
         dialog.get_by_role('button', name='重新提交', exact=True).click()
+        page.get_by_role('button', name='确认提交审批', exact=True).click()
         page.wait_for_function('window.orderGiftFixture.submissions.length === 1')
         assert page.evaluate('window.orderGiftFixture.submissions[0].giftItems') == ['old', 'new']
 
         dialog = open_revision()
         dialog.locator('.el-tag__close').click()
         dialog.get_by_role('button', name='重新提交', exact=True).click()
+        page.get_by_role('button', name='确认提交审批', exact=True).click()
         page.wait_for_function('window.orderGiftFixture.submissions.length === 1')
         assert page.evaluate('window.orderGiftFixture.submissions[0].giftItems') == []
 
@@ -61,6 +71,7 @@ with sync_playwright() as p:
         dialog = open_revision('forbidden')
         expect(dialog.get_by_text('无权访问礼品目录，可保留或移除原礼品。', exact=True)).to_be_visible()
         dialog.get_by_role('button', name='重新提交', exact=True).click()
+        page.get_by_role('button', name='确认提交审批', exact=True).click()
         page.wait_for_function('window.orderGiftFixture.submissions.length === 1')
         assert page.evaluate('window.orderGiftFixture.submissions[0].giftItems') == ['old']
 

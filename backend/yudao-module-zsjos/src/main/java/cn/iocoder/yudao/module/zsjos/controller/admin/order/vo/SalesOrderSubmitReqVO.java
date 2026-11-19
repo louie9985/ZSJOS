@@ -23,7 +23,9 @@ public class SalesOrderSubmitReqVO {
     @NotBlank @Size(max = 100) private String provinceName;
     @NotBlank @Size(max = 32) private String cityCode;
     @Size(max = 100) private String cityName;
-    @Size(max = 100) private String agreedExamTime;
+    @NotBlank(message = "请选择商定考试月份")
+    @Pattern(regexp = "^\\d{4}-(0[1-9]|1[0-2])$", message = "商定考试月份格式应为 YYYY-MM")
+    private String agreedExamMonth;
     @Size(max = 100) private String classType;
     @NotBlank @Size(max = 64) private String servicePeriod;
     @NotBlank @Size(max = 64) private String studentSource;

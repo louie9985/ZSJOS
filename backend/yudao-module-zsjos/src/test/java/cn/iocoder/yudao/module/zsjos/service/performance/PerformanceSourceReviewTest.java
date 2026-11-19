@@ -31,7 +31,7 @@ class PerformanceSourceReviewTest {
         assertEquals("ready",PerformanceStatisticsService.metric(PerformancePeriods.window("month",now),List.of(o),List.of(r)).sourceStatus());
     }
     @Test void lowAmountOldReceiptCannotBlockByBeingImportedThroughAnOrder() {
-        var r = receipt(1, "education_self_sourced", false, "2026-08-25T12:00:00");
+        var r = receipt(1, "sales_self_sourced", false, "2026-08-25T12:00:00");
         for (String amount : List.of("980", "1279.99", "1280")) {
             var assessment = new PerformanceConversion.Population(List.of(order(r, amount, "2026-09-20T12:00:00")), List.of(r))
                     .assessment(PerformancePeriods.window("lastMonth", now));
@@ -41,8 +41,8 @@ class PerformanceSourceReviewTest {
     @Test void bothConfirmedUnlinkedSourcesAreExcludedInAllSevenWindowsAndUnknownsAreDeduplicated() {
         for (String key : List.of("lastWeek","month","lastMonth","last7","last30","last60","last90")) {
             var w = PerformancePeriods.window(key,now); String at=w.start().plusHours(1).toString();
-            var sales=receipt(1,"sales_self_sourced",true,at); var education=receipt(2,"education_self_sourced",true,at);
-            var unknown=receipt(3,"education_self_sourced",false,at);
+            var sales=receipt(1,"sales_self_sourced",true,at); var education=receipt(2,"sales_self_sourced",true,at);
+            var unknown=receipt(3,"sales_self_sourced",false,at);
             var media=receipt(4,"internal_new_media",false,at);
             var population=new PerformanceConversion.Population(List.of(order(sales,"1280",at),order(education,"1280",at),order(unknown,"1280",at),order(media,"1280",at)),List.of(sales,education,unknown,unknown,media));
             assertEquals(1,population.assessment(w).sourceReviewCount());

@@ -2,13 +2,9 @@ import VersionUpdatesPage from '../pages/VersionUpdatesPage'
 import StudentSummaryPage from '../pages/StudentSummaryPage'
 import ExamCollectionPage from '../pages/ExamCollectionPage'
 import MyOperationsPage from '../pages/MyOperationsPage'
-import StudentInfoTasksPage from '../pages/StudentInfoTasksPage'
 import { lazy, Suspense } from "react"
 const ZsjkqtPage = lazy(() => import("../features/zsjkqt/ZsjkqtPage"))
 import StudentEntryPage from '../pages/StudentEntryPage'
-import EducationTeamPage from '../pages/EducationTeamPage'
-import DeliveryPerformancePage from '../pages/DeliveryPerformancePage'
-import DeliveryPerformanceTargetPage from '../pages/DeliveryPerformanceTargetPage'
 import PointsRedemptionPage from '../pages/PointsRedemptionPage'
 import PointsPackagePage from '../pages/PointsPackagePage'
 import { POINTS_ROUTE, POINTS_PACKAGE_ROUTE } from '../services/pointsRedemptionApi'
@@ -115,7 +111,6 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage/>
   if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.LEAD_EDUCATION_SELF_SOURCED) return <LeadSubmissionPage permissions={permissions} selfSourced educationSelfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage permissions={permissions} selfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_COMPLAINTS) return <LeadComplaintPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}
@@ -128,13 +123,10 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }
   if (menu?.path === APP_ROUTES.LEAD_PUBLIC_SEA_POOL) return <LeadPublicSeaPoolPage/>
-  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE) return <DeliveryPerformancePage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.DELIVERY_PERFORMANCE_TARGET) return <DeliveryPerformanceTargetPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE) return <SalesPerformancePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_PERFORMANCE_TARGET) return <SalesPerformanceTargetPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_LEAD_ANALYSIS) return <MediaLeadAnalysisPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_LEAD_TARGET) return <MediaLeadTargetPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.EDUCATION_TEAM || resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.EDUCATION_TEAM) return <EducationTeamPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage tenantReadAll={tenantReadAll} permissions={permissions} onOpenAssignment={onOpenAssignment}/>
@@ -163,7 +155,6 @@ export default function RouteHost({ menu, permissions, roles, tenantReadAll = fa
   if (menu?.path === APP_ROUTES.VERSION_UPDATES) return <VersionUpdatesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.VERSION_UPDATE_HISTORY) return <Typography.Text>通过右上角更新记录查看已接收的版本更新。</Typography.Text>
   if (menu?.path === APP_ROUTES.EXAM_COLLECTION) return <ExamCollectionPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.STUDENT_INFO_TASKS) return <StudentInfoTasksPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions} tenantReadAll={tenantReadAll}/>
   if (menu?.path === APP_ROUTES.CLASS_MANAGEMENT) return <DeliveryClassPage permissions={permissions} />

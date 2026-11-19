@@ -18,7 +18,7 @@ describe('workbench menu component registry', () => {
     expect(resolveWorkbenchComponent('zsjos/myOperations/index')).toBe(WORKBENCH_COMPONENT.MY_OPERATIONS)
   })
 
-  it('maps education team independently', () => { expect(resolveWorkbenchComponent('zsjos/educationTeam/index')).toBe(WORKBENCH_COMPONENT.EDUCATION_TEAM) })
+  it('no longer maps the retired education team component', () => { expect(resolveWorkbenchComponent('zsjos/educationTeam/index')).toBeUndefined() })
   it('leaves unknown server components on the migration placeholder', () => {
     expect(resolveWorkbenchComponent('zsjos/notMigrated/index')).toBeUndefined()
     expect(resolveWorkbenchComponent()).toBeUndefined()

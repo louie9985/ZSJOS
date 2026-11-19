@@ -79,7 +79,7 @@ export default function MyOperationsPage({ permissions }: { permissions: string[
             { key: 'overview', label: '员工概况', children: <Space direction="vertical">
               <Typography.Text>账号状态：{accountStatusLabel(selected.accountStatus)}</Typography.Text>
               <Typography.Text>名下客资：{selected.leadCount} 条</Typography.Text>
-              <Typography.Text type="secondary">包含本人提交、销售或教务代录并归属于该运营的客资。</Typography.Text>
+              <Typography.Text type="secondary">包含本人提交、销售代录并归属于该运营的客资。</Typography.Text>
             </Space> },
             { key: 'leads', label: '名下客资', children: <LeadManagementPage permissions={permissions} operationsUserId={selected.userId} /> },
           ]} />

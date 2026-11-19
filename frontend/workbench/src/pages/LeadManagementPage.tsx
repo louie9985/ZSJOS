@@ -670,8 +670,10 @@ export default function LeadManagementPage({ permissions, detailOnly = false, me
       try {
         try { setBatchCandidates(salesUserId !== undefined
           ? action === 'transfer' ? await api.subordinateBatchTransferCandidates(selectedRowKeys.map(Number)) : await api.subordinateTransferCandidates()
-          : await api.ownerTransferCandidates()) }
-        catch (error) { if (salesUserId !== undefined) throw error; setBatchCandidates(await api.subordinateTransferCandidates()) }
+          : action === 'transfer' ? await Promise.all(selectedRowKeys.map(id => api.ownerTransferCandidates(Number(id))))
+            .then(lists => (lists[0] ?? []).filter(user => lists.every(list => list.some(item => item.id === user.id))))
+            : await api.ownerTransferCandidates()) }
+        catch (error) { if (salesUserId !== undefined || action === 'transfer') throw error; setBatchCandidates(await api.subordinateTransferCandidates()) }
       }
       catch (error) { setBatchCandidates([]); message.error(error instanceof Error ? error.message : '销售候选加载失败') }
     }

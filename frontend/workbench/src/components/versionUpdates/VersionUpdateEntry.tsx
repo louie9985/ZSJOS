@@ -51,9 +51,14 @@ export default function VersionUpdateEntry({ canAcknowledge, historyInitiallyOpe
   const refresh = useCallback(async () => {
     const request = ++syncRequest.current
     try {
-      const result = await versionUpdates.mine({ pageNo: 1, pageSize: 1, pending: true })
+      const [result, unread] = await Promise.all([
+        versionUpdates.mine({ pageNo: 1, pageSize: 1 }),
+        versionUpdates.mine({ pageNo: 1, pageSize: 1, pending: true }),
+      ])
       if (!alive.current || request !== syncRequest.current) return
-      setPending(result.list[0]); setCount(result.total); setSyncError('')
+      // Only the newest published record may prompt; older unread records remain in history.
+      const latest = result.list[0]
+      setPending(latest && !latest.acknowledgedTime ? latest : undefined); setCount(unread.total); setSyncError('')
       const current = activeRef.current
       const currentDetailRequest = detailRequest.current
       if (current && !savingRef.current && !opening.current) {

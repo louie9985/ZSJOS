@@ -1,0 +1,6 @@
+# local-education-selection
+Owner Codex. Local main, D:\ZSJ-OS, base 21631a8a98. Target/integration None. Goal: per-link education fields. Scope: studentinfo preparation, selection, task command and tests, Workbench and Admin generation dialogs, two student information API documents. Dependencies: published field definitions and category mapping. Verify focused Maven tests, frontend checks and browser selection. Excludes migrations, deployment and historical forms.
+Delivered locally. Includes Admin template hint and generation dialog. Focused Maven tests passed (24), Workbench typecheck passed, Edge with simulated generation API verified matched and unmatched defaults, individual overrides and submitted keys. Admin consumes the same response; its project typecheck reports unrelated unused handleRefresh in MES. No deployment or real-account submission.
+Follow-up ownership: group fields in the Workbench generation dialog shown by the user. Verify typecheck and browser selection across all three sections.
+Grouped dialog verified on Edge at 1280px and 390px with simulated configuration and generation. Checked section membership, default checks, cross-section payload and horizontal fit. Workbench typecheck passed.
+Moved default-selection notes beside the gift and education headings. Workbench typecheck and Edge fixture checks at 1280px and 390px passed.

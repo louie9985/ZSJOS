@@ -33,10 +33,9 @@ class DeliveryClassLegacyGroupCompatibilityTest {
             var manager=new AdminUserRespDTO().setId(9L).setDeptId(80L).setStatus(0);
             var teacher=new AdminUserRespDTO().setId(20L).setDeptId(80L).setStatus(0);
             when(users.getUser(9L)).thenReturn(manager);when(users.getUser(20L)).thenReturn(teacher);
-            var role=new RoleRespDTO();role.setId(3L);role.setStatus(0);when(roles.getRoleByCode("study_planner")).thenReturn(role);
-            when(permissions.getEnabledRoleIdsByUserId(20L)).thenReturn(Set.of(3L));
+            when(permissions.hasAnyPermissions(20L,"zsjos:sales:eligible")).thenReturn(true);
             var service=new DeliveryClassServiceImpl();
-            Object[][] fields={{"mapper",mapper},{"adminUserApi",users},{"permissionApi",permissions},{"roleApi",roles},{"taskCommandService",tasks}};
+            Object[][] fields={{"mapper",mapper},{"adminUserApi",users},{"permissionApi",permissions},{"taskCommandService",tasks}};
             for(var f:fields)ReflectionTestUtils.setField(service,(String)f[0],f[1]);
             var request=new DeliveryClassSaveReqVO();request.setClassName("新班名");request.setHomeroomUserId(20L);
             request.setStartDate(java.time.LocalDate.of(2026,12,1));request.setPreserveExamDate(true);request.setVersion(0);

@@ -7,7 +7,7 @@ public final class PerformanceReportSql {
     private static String between(String column, String end) {
         return column + " &gt;= #{start} AND " + column + " &lt; #{" + end + "}";
     }
-    private static final String MANUAL = "NOT (group_key IN ('lead_first_follow_up','lead_qualification') AND COALESCE(generation_source,'') IN ('sales_self_sourced_auto','education_self_sourced_auto'))";
+    private static final String MANUAL = "NOT (group_key IN ('lead_first_follow_up','lead_qualification') AND COALESCE(generation_source,'') IN ('sales_self_sourced_auto'))";
     // CAST preserves case-sensitive historical grouping while remaining compatible with the tenant SQL parser.
     private static final String SOURCE = "CASE WHEN CAST(order_type AS BINARY)='repurchase' THEN 'self' WHEN CAST(group_key AS BINARY) IN ('inbound','self') THEN group_key ELSE 'unknown' END";
 

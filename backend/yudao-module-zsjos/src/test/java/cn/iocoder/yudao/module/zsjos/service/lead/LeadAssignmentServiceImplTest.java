@@ -41,6 +41,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosPostCodeConstants.NEW_MED
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosPostCodeConstants.SALES_SPECIALIST;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_ASSIGNMENT_SCOPE_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -78,44 +79,23 @@ class LeadAssignmentServiceImplTest {
     }
 
     @Test
-    void permissionEligibilityExcludesDisabledAndMissingUsersWithoutDepartmentLookup() {
-        var scene = leadScene();
-        scene.setTargetEligibilityType("permission");
-        scene.setTargetPermissionCode("zsjos:lead:accept");
-        when(sceneService.getEnabledSceneByCode(SCENE)).thenReturn(scene);
-        when(permissionApi.getEnabledUserIdsByPermission("zsjos:lead:accept")).thenReturn(Set.of(2L, 3L));
+    void receiverRequiresBothPermissionsAndAnEnabledUser() {
+        when(permissionApi.getEnabledUserIdsByPermission(PERMISSION_SALES_ELIGIBLE)).thenReturn(Set.of(2L, 3L));
         when(adminUserApi.getUserList(Set.of(2L, 3L))).thenReturn(List.of(
                 user(2L, 20L, "enabled", 0), user(3L, 20L, "disabled", 1)));
-
-        assertTrue(service.isEligibleSalesUser(2L));
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(3L));
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(4L));
+        when(permissionApi.hasAnyPermissions(2L, PERMISSION_RECEIVE)).thenReturn(true);
+        assertTrue(service.isEligibleReceiver(2L));
+        assertFalse(service.isEligibleReceiver(3L));
+        assertFalse(service.isEligibleReceiver(4L));
         verifyNoInteractions(deptApi, postApi);
     }
 
     @Test
-    void postEligibilityExcludesDisabledPostsAndUsersWithoutDepartmentLookup() {
-        var scene = leadScene();
-        scene.setTargetPostCodes(List.of("enabled", "disabled", "missing"));
-        when(sceneService.getEnabledSceneByCode(SCENE)).thenReturn(scene);
-        when(postApi.getPostByCode("enabled")).thenReturn(post(12L));
-        var disabledPost = post(13L);
-        disabledPost.setStatus(1);
-        when(postApi.getPostByCode("disabled")).thenReturn(disabledPost);
-        when(adminUserApi.getUserListByPostIds(Set.of(12L))).thenReturn(List.of(
-                user(2L, 20L, "enabled", 0), user(3L, 20L, "disabled", 1)));
-
+    void salesWithoutReceivePermissionRemainsEligibleForSalesWork() {
+        when(permissionApi.getEnabledUserIdsByPermission(PERMISSION_SALES_ELIGIBLE)).thenReturn(Set.of(2L));
+        when(adminUserApi.getUserList(Set.of(2L))).thenReturn(List.of(user(2L, 20L, "sales", 0)));
         assertTrue(service.isEligibleSalesUser(2L));
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(3L));
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(4L));
-        verifyNoInteractions(deptApi, permissionApi);
-    }
-
-    @Test
-    void emptyCandidateSetAndNullUserAreIneligible() {
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(null));
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleSalesUser(2L));
-        verifyNoInteractions(deptApi, adminUserApi);
+        assertFalse(service.isEligibleReceiver(2L));
     }
 
     @Test
@@ -133,43 +113,17 @@ class LeadAssignmentServiceImplTest {
     }
 
     @Test
-    void multipleTargetPostsUnionUsersAndExcludeDisabledPostsAndUsers() {
-        var scene = leadScene();
-        scene.setTargetPostCodes(List.of("first", "second", "disabled", "missing"));
-        when(sceneService.getEnabledSceneByCode(SCENE)).thenReturn(scene);
-        when(postApi.getPostByCode("first")).thenReturn(post(12L));
-        when(postApi.getPostByCode("second")).thenReturn(post(13L));
-        var disabledPost = post(14L);
-        disabledPost.setStatus(CommonStatusEnum.DISABLE.getStatus());
-        when(postApi.getPostByCode("disabled")).thenReturn(disabledPost);
-        var first = user(2L, 20L, "候选一", 0);
-        var second = user(3L, 20L, "候选二", 0);
-        when(adminUserApi.getUserListByPostIds(Set.of(12L, 13L)))
-                .thenReturn(List.of(first, second, first, user(4L, 20L, "停用候选", 1)));
+    void assignableReceiversMustHaveActiveRelationAndBothQualifications() {
+        var sales = user(2L, 20L, "销售甲", 0);
+        var noReceive = user(3L, 20L, "销售乙", 0);
+        when(permissionApi.getEnabledUserIdsByPermission(PERMISSION_SALES_ELIGIBLE)).thenReturn(Set.of(2L, 3L));
+        when(permissionApi.getEnabledUserIdsByPermission(PERMISSION_RECEIVE)).thenReturn(Set.of(2L));
+        when(adminUserApi.getUserList(Set.of(2L, 3L))).thenReturn(List.of(sales, noReceive));
         when(relationMapper.selectListBySourceUserIds(SCENE, Set.of(1L))).thenReturn(List.of(
-                relation(1L, 2L, 0), relation(1L, 3L, 0), relation(1L, 4L, 0)));
+                relation(1L, 2L, 0), relation(1L, 3L, 0)));
         when(deptApi.getDeptMap(Set.of(20L))).thenReturn(Map.of(20L, dept(20L)));
-        assertEquals(List.of(2L, 3L), service.getAssignableSalesUsers(1L).stream()
+        assertEquals(List.of(2L), service.getAssignableSalesUsers(1L).stream()
                 .map(LeadAssignmentUserRespVO::getId).toList());
-    }
-
-    @Test
-    void getAssignableSalesUsersReturnsOnlyActiveBoundSales() {
-        AdminUserRespDTO enabledSales = user(2L, 20L, "销售甲", CommonStatusEnum.ENABLE.getStatus());
-        AdminUserRespDTO disabledSales = user(3L, 20L, "销售乙", CommonStatusEnum.DISABLE.getStatus());
-        when(postApi.getPostByCode(SALES_SPECIALIST)).thenReturn(post(12L));
-        when(adminUserApi.getUserListByPostIds(Set.of(12L)))
-                .thenReturn(List.of(enabledSales, disabledSales));
-        when(relationMapper.selectListBySourceUserIds(SCENE, Set.of(1L))).thenReturn(List.of(
-                relation(1L, 2L, CommonStatusEnum.ENABLE.getStatus()),
-                relation(1L, 3L, CommonStatusEnum.ENABLE.getStatus()),
-                relation(1L, 4L, CommonStatusEnum.ENABLE.getStatus()),
-                relation(1L, 5L, CommonStatusEnum.DISABLE.getStatus())));
-        when(deptApi.getDeptMap(Set.of(20L))).thenReturn(Map.of(20L, dept(20L)));
-
-        List<LeadAssignmentUserRespVO> result = service.getAssignableSalesUsers(1L);
-
-        assertEquals(List.of(2L), result.stream().map(LeadAssignmentUserRespVO::getId).toList());
     }
 
     @Test

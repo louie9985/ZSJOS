@@ -7,17 +7,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 
-/** Keeps education ownership within the current manager's team during reassignment. */
+/** Resolves the persisted owner identity, proving recycled ownership from the latest transition. */
 @Service
 public class LeadTeamTransferPolicy {
-    @Resource private LeadSubmissionIdentityService identityService;
-    @Resource private LeadObjectPermissionService permissionService;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper historyMapper;
-    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
-
-    public boolean isEducation(LeadDO lead) {
-        return OWNER_EDUCATION.equals(resolveIdentity(lead));
-    }
 
     public String resolveIdentity(LeadDO lead) {
         if (!ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
@@ -49,32 +42,6 @@ public class LeadTeamTransferPolicy {
     }
 
     private static boolean known(String identity) {
-        return OWNER_EDUCATION.equals(identity) || OWNER_SALES.equals(identity);
-    }
-
-    public void requireSupportedSource(LeadDO lead) {
-        if (!EducationOwnershipPolicy.supports(lead)) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
-    }
-
-    public boolean eligibleTarget(Long target, Long manager) {
-        return target != null && permissionService.getManagedUserIds(manager).contains(target)
-                && identityService.isEligibleEducationOwner(target)
-                && permissionApi.hasAnyPermissions(target, "zsjos:lead-follow-up:create")
-                && permissionApi.hasAnyPermissions(target, "zsjos:lead:qualify")
-                && permissionApi.hasAnyPermissions(target, "zsjos:sales-order:create");
-    }
-    public java.util.Set<Long> eligibleTargets(java.util.List<cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users) {
-        return identityService.getEligibleEducationOwners(users).stream()
-                .filter(id -> permissionApi.hasAnyPermissions(id,"zsjos:lead-follow-up:create")
-                        && permissionApi.hasAnyPermissions(id,"zsjos:lead:qualify")
-                        && permissionApi.hasAnyPermissions(id,"zsjos:sales-order:create"))
-                .collect(java.util.stream.Collectors.toSet());
-    }
-
-    public void requireTarget(LeadDO lead, Long target, Long manager) {
-        requireSupportedSource(lead);
-        if (!isEducation(lead) || !eligibleTarget(target, manager)) {
-            throw exception(SUBORDINATE_SALES_TARGET_INVALID);
-        }
+        return OWNER_SALES.equals(identity);
     }
 }

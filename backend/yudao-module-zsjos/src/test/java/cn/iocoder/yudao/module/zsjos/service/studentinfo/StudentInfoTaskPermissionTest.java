@@ -20,6 +20,28 @@ class StudentInfoTaskPermissionTest {
     @AfterEach void clear(){SecurityContextHolder.clearContext();}
     void login(UserTypeEnum type){SecurityFrameworkUtils.setLoginUser(new LoginUser().setId(20L).setUserType(type.getValue()),new MockHttpServletRequest());}
     @Test void anonymousAndPartnerCannotRead(){assertFalse(provider.canList(20L));login(UserTypeEnum.PARTNER);assertFalse(provider.hasPermission(1L,"read",20L));verifyNoInteractions(tasks,permissions);}
-    @Test void pageGrantDoesNotReplacePoolScope(){login(UserTypeEnum.ADMIN);when(permissions.hasAnyPermissions(20L,"zsjos:student-info-task:query")).thenReturn(true);assertFalse(provider.hasPermission(1L,"read",20L));verifyNoInteractions(tasks);}
-    @Test void missingTaskAndUnknownActionsAreDenied(){login(UserTypeEnum.ADMIN);when(permissions.hasAnyPermissions(eq(20L),any(String[].class))).thenReturn(true);assertFalse(provider.hasPermission(1L,"read",20L));when(tasks.selectById(1L)).thenReturn(new StudentInfoTaskDO());assertTrue(provider.hasPermission(1L,"read",20L));assertFalse(provider.hasPermission(1L,"invented",20L));}
+    @Mock cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseMapper cases;
+    @Mock cn.iocoder.yudao.module.zsjos.service.registration.RegistrationCaseObjectPermissionProvider casePermissions;
+
+    @Test void readRequiresConfiguredPagePermission() {
+        login(UserTypeEnum.ADMIN);
+        assertFalse(provider.hasPermission(1L, "read", 20L));
+        verifyNoInteractions(tasks);
+    }
+
+    @Test void rejectsAnotherOwnerAndUnknownActions() {
+        login(UserTypeEnum.ADMIN);
+        when(permissions.hasAnyPermissions(20L, "zsjos:registration:query-my")).thenReturn(true);
+        var task = new StudentInfoTaskDO(); task.setOrderId(31L); task.setOrderItemId(42L);
+        when(tasks.selectById(1L)).thenReturn(task);
+        var registration = new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseDO();
+        registration.setOrderId(31L);
+        when(cases.selectByOrderItemId(42L)).thenReturn(registration);
+        assertFalse(provider.hasPermission(1L, "read", 20L));
+        when(casePermissions.isOwner(registration, 20L)).thenReturn(true);
+        when(casePermissions.isOpen(registration)).thenReturn(true);
+        assertTrue(provider.hasPermission(1L, "read", 20L));
+        assertTrue(provider.hasPermission(1L, "reuse", 20L));
+        assertFalse(provider.hasPermission(1L, "invented", 20L));
+    }
 }

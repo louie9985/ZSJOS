@@ -11,7 +11,6 @@ const Appeals = lazy(() => import('../pages/LeadAppealPage'))
 const Duplicates = lazy(() => import('../pages/LeadDuplicateReviewPage'))
 const MediaStudents = lazy(() => import('../pages/MediaStudentsPage'))
 const Sales = lazy(() => import('../pages/SubordinateSalesPage'))
-const Education = lazy(() => import('../pages/EducationTeamPage'))
 const Cashbacks = lazy(() => import('../pages/ManagementPages').then(m => ({ default: m.CashbackPage })))
 const Withdrawals = lazy(() => import('../pages/ManagementPages').then(m => ({ default: m.WithdrawalPage })))
 const Approvals = lazy(() => import('../pages/BpmApprovalCenterPage'))
@@ -32,7 +31,6 @@ export default function HomeMetricBusinessPage({ contextId, operand, source, per
       case 'duplicate_review': return <Duplicates {...props}/>
       case 'media_student': return <MediaStudents {...props}/>
       case 'subordinate_sales': return <Sales {...props}/>
-      case 'education_team': return <Education {...props}/>
       case 'cashback': return <Cashbacks {...props}/>
       case 'withdrawal': return <Withdrawals {...props}/>
       case 'bpm_todo': return <Approvals {...props} initialView="todo" metricTodo/>

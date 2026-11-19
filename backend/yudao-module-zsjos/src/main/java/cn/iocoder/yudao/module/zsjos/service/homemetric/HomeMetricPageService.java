@@ -7,7 +7,6 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.appeal.LeadAppealPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.duplicate.LeadDuplicateReviewPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateSalesPageReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.educationteam.vo.EducationTeamPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackPageReqVO;
@@ -15,7 +14,6 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.withdrawal.vo.WithdrawalPa
 import cn.iocoder.yudao.module.zsjos.service.lead.*;
 import cn.iocoder.yudao.module.zsjos.service.registration.*;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderService;
-import cn.iocoder.yudao.module.zsjos.service.educationteam.EducationTeamService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import cn.iocoder.yudao.module.zsjos.service.withdrawal.WithdrawalService;
 import jakarta.annotation.Resource;
@@ -35,7 +33,6 @@ public class HomeMetricPageService {
     @Resource private LeadAppealService appeals;
     @Resource private LeadDuplicateReviewService duplicates;
     @Resource private SubordinateSalesService sales;
-    @Resource private EducationTeamService education;
     @Resource private RegistrationService registrations;
     @Resource private StudentServiceReadService students;
     @Resource private MediaStudentService media;
@@ -75,7 +72,6 @@ public class HomeMetricPageService {
             case "registration" -> registrations.getPoolPage(convert(query, RegistrationPoolPageReqVO.class));
             case "media_student" -> media.getPage(actor, convert(query, MyStudentPageReqVO.class));
             case "subordinate_sales" -> sales.getPage(convert(query, SubordinateSalesPageReqVO.class), actor);
-            case "education_team" -> education.getPage(convert(query, EducationTeamPageReqVO.class), actor);
             case "cashback" -> permissions.hasAnyPermissions(actor, "zsjos:cashback:finance-query")
                     ? cashbacks.getFinancePage(convert(query, CashbackPageReqVO.class))
                     : cashbacks.getPage(convert(query, CashbackPageReqVO.class), actor);

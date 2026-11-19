@@ -69,6 +69,7 @@ class LeadQualificationServiceImplTest {
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private AdvancedFilterService advancedFilterService;
     @Mock private CashbackService cashbackService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Mock private LeadCategorySnapshotService categorySnapshotService;
 
     @org.junit.jupiter.api.BeforeEach
@@ -80,7 +81,7 @@ class LeadQualificationServiceImplTest {
 
     @Test
     void restoreRejectsIneligibleOwnerBeforeAnyMutation() {
-        LeadDO lead = pendingLead(); lead.setStatus("suspended"); lead.setOwnerIdentity("education");
+        LeadDO lead = pendingLead(); lead.setStatus("suspended"); lead.setOwnerIdentity("sales");
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         LeadDispositionReqVO request = new LeadDispositionReqVO();
         request.setIdempotencyKey("disabled-owner"); request.setReason("恢复");
@@ -244,11 +245,11 @@ class LeadQualificationServiceImplTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"education_self_sourced,self", "partner,specified"})
-    void restoreEducationKeepsOriginalOwnerAndIdentity(String source, String dispatchMode) {
+    @CsvSource({"sales_self_sourced,self", "partner,specified"})
+    void restoreFormerEducationSourcesKeepsOriginalOwnerAndSalesIdentity(String source, String dispatchMode) {
         LeadDO lead = pendingLead();
         lead.setStatus("suspended");
-        lead.setOwnerIdentity("education");
+        lead.setOwnerIdentity("sales");
         lead.setSourceType(source);
         lead.setDispatchMode(dispatchMode);
         lead.setSuspendedAt(LocalDateTime.now().minusHours(1));
@@ -257,7 +258,7 @@ class LeadQualificationServiceImplTest {
         LeadRestoreOwnerPolicy policy = new LeadRestoreOwnerPolicy();
         org.springframework.test.util.ReflectionTestUtils.setField(policy, "teamTransferPolicy", new LeadTeamTransferPolicy());
         LeadSubmissionIdentityService identityService = mock(LeadSubmissionIdentityService.class);
-        when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
+        when(identityService.isEligibleRetainedOwner(20L)).thenReturn(true);
         org.springframework.test.util.ReflectionTestUtils.setField(policy, "identityService", identityService);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "restoreOwnerPolicy", policy);
         LeadDispositionReqVO request = new LeadDispositionReqVO();
@@ -269,7 +270,7 @@ class LeadQualificationServiceImplTest {
         assertNull(lead.getSuspendedAt());
         verify(leadMapper).updateClearingSuspension(lead);
         assertEquals(20L, lead.getOwnerUserId());
-        assertEquals("education", lead.getOwnerIdentity());
+        assertEquals("sales", lead.getOwnerIdentity());
         assertEquals(source, lead.getSourceType());
         assertEquals(dispatchMode, lead.getDispatchMode());
         verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
@@ -295,6 +296,8 @@ class LeadQualificationServiceImplTest {
         when(eventMapper.selectByIdempotencyKey("lead-disposition:request-transfer")).thenReturn(null);
         when(permissionService.hasQualificationManageAll()).thenReturn(true);
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate(30L)));
+        when(salesBoundary.canTransferTo(99L, 30L)).thenReturn(true);
+        when(assignmentService.isEligibleReceiver(30L)).thenReturn(true);
         doAnswer(invocation -> {
             invocation.<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO>getArgument(0).setId(77L);
             return 1;
@@ -348,6 +351,8 @@ class LeadQualificationServiceImplTest {
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(permissionService.hasQualificationManageAll()).thenReturn(true);
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate(30L)));
+        when(salesBoundary.canTransferTo(99L, 30L)).thenReturn(true);
+        when(assignmentService.isEligibleReceiver(30L)).thenReturn(true);
         doAnswer(invocation -> {
             invocation.<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO>getArgument(0).setId(77L);
             return 1;
@@ -368,6 +373,54 @@ class LeadQualificationServiceImplTest {
                 () -> service.releaseToClaimPool(1L, 99L, disposition("release-suspended"))));
         assertEquals("suspended", lead.getStatus());
         verifyNoInteractions(lifecycleTaskService);
+    }
+
+    @Test
+    void formerEducationPartnerLeadTransfersUnderSalesRules() {
+        LeadDO lead = pendingLead();
+        lead.setStatus("suspended"); lead.setOwnerIdentity("sales");
+        lead.setSourceType("partner"); lead.setDispatchMode("specified");
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("sales");
+        when(permissionService.hasQualificationManageAll()).thenReturn(true);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate(30L)));
+        when(salesBoundary.canTransferTo(99L, 30L)).thenReturn(true);
+        when(assignmentService.isEligibleReceiver(30L)).thenReturn(true);
+        doAnswer(invocation -> {
+            invocation.<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO>getArgument(0).setId(78L);
+            return 1;
+        }).when(historyMapper).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
+        var transfer = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.qualification.LeadTransferReqVO();
+        transfer.setIdempotencyKey("former-education-transfer"); transfer.setReason("主管转派"); transfer.setSalesUserId(30L);
+
+        withTenant(() -> service.transfer(1L, 99L, transfer));
+
+        assertEquals(30L, lead.getOwnerUserId());
+        assertEquals("sales", lead.getOwnerIdentity());
+        verify(salesBoundary).canTransferTo(99L, 30L);
+        verify(historyMapper, never()).updateById(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
+    }
+
+    @Test
+    void retiredEducationIdentityFailsClosedForSupervisorDispositions() {
+        LeadDO lead = pendingLead(); lead.setStatus("suspended"); lead.setOwnerIdentity("education");
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        when(teamTransferPolicy.resolveIdentity(lead)).thenThrow(
+                cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                        cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_RECYCLED_IDENTITY_UNKNOWN));
+        var transfer = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.qualification.LeadTransferReqVO();
+        transfer.setIdempotencyKey("retired-transfer"); transfer.setReason("主管转派"); transfer.setSalesUserId(30L);
+        withTenant(() -> {
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.transfer(1L, 99L, transfer));
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.recycle(1L, 99L, disposition("retired-recycle")));
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.releaseToClaimPool(1L, 99L, disposition("retired-release")));
+        });
+        assertEquals("suspended", lead.getStatus());
+        assertEquals("education", lead.getOwnerIdentity());
+        verifyNoInteractions(lifecycleTaskService, publicSeaPoolService);
     }
 
     @Test
@@ -459,6 +512,8 @@ class LeadQualificationServiceImplTest {
         }).when(historyMapper).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
         var transfer = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.qualification.LeadTransferReqVO();
         transfer.setIdempotencyKey("sales-transfer"); transfer.setReason("主管转派"); transfer.setSalesUserId(30L);
+        when(salesBoundary.canTransferTo(99L, 30L)).thenReturn(true);
+        lenient().when(assignmentService.isEligibleReceiver(30L)).thenReturn(true);
         withTenant(() -> service.salesSupervisorTransferRecycled(1L, 99L, transfer));
         assertEquals(status, lead.getStatus());
         assertEquals("owned", lead.getAssignmentStatus());
@@ -469,8 +524,6 @@ class LeadQualificationServiceImplTest {
 
     @Test
     void dispositionTransitionsAdvanceLeadActivityTime() {
-        LeadDO suspended = pendingLead();
-        suspended.setId(11L); suspended.setStatus("suspended");
         LeadDO recycled = pendingLead();
         recycled.setId(12L); recycled.setAssignmentStatus("recycle_pending");
         recycled.setOwnerUserId(null); recycled.setRecycleSourceOwnerUserId(20L);
@@ -478,8 +531,6 @@ class LeadQualificationServiceImplTest {
         ownedForRecycle.setId(13L);
         LeadDO ownedForRelease = pendingLead();
         ownedForRelease.setId(14L);
-        when(leadMapper.selectByIdForUpdate(11L, 9L)).thenReturn(suspended);
-        when(teamTransferPolicy.isEducation(suspended)).thenReturn(true);
         when(leadMapper.selectByIdForUpdate(12L, 9L)).thenReturn(recycled);
         when(leadMapper.selectByIdForUpdate(13L, 9L)).thenReturn(ownedForRecycle);
         when(leadMapper.selectByIdForUpdate(14L, 9L)).thenReturn(ownedForRelease);
@@ -490,18 +541,15 @@ class LeadQualificationServiceImplTest {
         }).when(historyMapper).insert(any(
                 cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
 
-        withTenant(() -> service.recycle(11L, 99L, disposition("recycle")));
         withTenant(() -> service.releaseToClaimPool(12L, 99L, disposition("release")));
         withTenant(() -> service.supervisorRecycleOwned(13L, 99L, disposition("supervisor-recycle")));
         withTenant(() -> service.supervisorReleaseOwnedToClaimPool(14L, 99L,
                 disposition("supervisor-release")));
 
         assertAll(
-                () -> assertNotNull(suspended.getLastActivityAt()),
                 () -> assertNotNull(recycled.getLastActivityAt()),
                 () -> assertNotNull(ownedForRecycle.getLastActivityAt()),
                 () -> assertNotNull(ownedForRelease.getLastActivityAt()),
-                () -> assertNull(suspended.getOwnerUserId()),
                 () -> assertNull(recycled.getOwnerUserId()),
                 () -> assertNull(ownedForRecycle.getOwnerUserId()),
                 () -> assertNull(ownedForRelease.getOwnerUserId()),
@@ -511,7 +559,6 @@ class LeadQualificationServiceImplTest {
                 () -> assertNull(ownedForRelease.getRecycleSourceOwnerUserId()),
                 () -> assertEquals(20L, ownedForRecycle.getRecycleSourceOwnerUserId()),
                 () -> assertNull(ownedForRelease.getQualificationDeadlineAt()));
-        verify(leadMapper).updateAfterOwnershipCleared(suspended);
         verify(leadMapper).updateAfterOwnershipCleared(recycled);
         verify(leadMapper).updateAfterOwnershipCleared(ownedForRecycle);
         verify(leadMapper).updateAfterOwnershipCleared(ownedForRelease);
@@ -538,11 +585,43 @@ class LeadQualificationServiceImplTest {
         lead.setStatus("suspended");
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(permissionService.hasQualificationManageAll()).thenReturn(true);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate(20L), candidate(30L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(candidate(20L), candidate(30L), candidate(40L)));
+        // Transfer targets use the department boundary only, never the reader's data-scope filter.
+        when(salesBoundary.filterTransferTargets(99L, List.of(20L, 30L, 40L))).thenReturn(java.util.Set.of(20L, 30L));
 
         var result = service.getTransferCandidates(1L, 99L);
 
         assertEquals(List.of(30L), result.stream().map(item -> item.getId()).toList());
+        verify(salesBoundary, never()).filterAccessibleUsers(any(), any());
+    }
+
+    @Test
+    void suspendedSalesTransferRejectsTargetOutsideDepartmentBoundary() {
+        assertSuspendedTransferDenied(false, true);
+    }
+
+    @Test
+    void suspendedSalesTransferRejectsTargetWithoutReceivePermission() {
+        assertSuspendedTransferDenied(true, false);
+    }
+
+    private void assertSuspendedTransferDenied(boolean withinBoundary, boolean receiver) {
+        LeadDO lead = pendingLead(); lead.setStatus("suspended"); lead.setSourceType("internal_new_media");
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        when(permissionService.hasQualificationManageAll()).thenReturn(true);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate(30L)));
+        when(salesBoundary.canTransferTo(99L, 30L)).thenReturn(withinBoundary);
+        lenient().when(assignmentService.isEligibleReceiver(30L)).thenReturn(receiver);
+        var transfer = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.qualification.LeadTransferReqVO();
+        transfer.setIdempotencyKey("denied-transfer"); transfer.setReason("主管转派"); transfer.setSalesUserId(30L);
+        withTenant(() -> {
+            var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.transfer(1L, 99L, transfer));
+            assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+        });
+        assertEquals(20L, lead.getOwnerUserId());
+        verifyNoInteractions(lifecycleTaskService);
+        verify(historyMapper, never()).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
     }
 
     private LeadDO pendingLead() {

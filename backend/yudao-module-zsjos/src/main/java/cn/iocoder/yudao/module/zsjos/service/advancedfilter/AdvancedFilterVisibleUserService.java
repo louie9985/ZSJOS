@@ -36,12 +36,10 @@ public class AdvancedFilterVisibleUserService {
     @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Resource private cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassScopeService deliveryScope;
 
-    @Resource private cn.iocoder.yudao.module.system.api.permission.RoleApi roleApi;
 
     public List<AdvancedFilterCatalogRespVO.OptionVO> studyPlannerOptions(List<AdvancedFilterCatalogRespVO.OptionVO> visible) {
-        var role = roleApi.getRoleByCode("study_planner");
-        if (role == null || !CommonStatusEnum.ENABLE.getStatus().equals(role.getStatus())) return List.of();
-        var members = permissionApi.getUserRoleIdListByRoleIds(Set.of(role.getId()));
+        // Head teachers (former study planners) are identified by the configured sales qualification, not a role code.
+        var members = permissionApi.getEnabledUserIdsByPermission("zsjos:sales:eligible");
         return visible.stream().filter(option -> members.contains(Long.valueOf(option.value()))).toList();
     }
 

@@ -9,16 +9,18 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 public interface RegistrationService {
+    Long ensureCasesOnOrderSubmitted(Long orderId, LocalDateTime submittedAt);
+
+    List<StudyPlannerSimpleRespVO> getTransferCandidates(Long caseId, Long userId);
+
+    RegistrationCaseRespVO transfer(Long caseId, Long userId, RegistrationTransferReqVO request);
+
     Long ensureCaseAfterRegistrationApproval(Long orderId, LocalDateTime approvedAt);
     PageResult<RegistrationCaseRespVO> getPoolPage(RegistrationPoolPageReqVO reqVO);
     RegistrationCaseRespVO getCase(Long caseId);
-    List<StudyPlannerSimpleRespVO> getStudyPlannerCandidates(Long userId);
     List<StudyPlannerSimpleRespVO> getRouteCandidates(Long caseId, Long routeId, Long userId);
     RegistrationCaseRespVO updateChecklistItem(Long caseId, Long itemId, Long userId, RegistrationChecklistItemUpdateReqVO reqVO);
-    RegistrationCaseRespVO updateStudyPlanner(Long caseId, Long userId, RegistrationPlannerUpdateReqVO reqVO);
     RegistrationCaseRespVO updateRoutes(Long caseId, Long userId, RegistrationRoutesUpdateReqVO reqVO);
-    RegistrationCaseRespVO updateClassAssignments(Long caseId, Long userId,
-                                                   RegistrationClassAssignmentsSaveReqVO reqVO);
     RegistrationAttachmentUploadRespVO uploadAttachment(Long caseId, Long itemId, Long userId, Integer version,
                                                          String idempotencyKey, MultipartFile file) throws IOException;
     RegistrationCaseRespVO deleteAttachment(Long caseId, Long itemId, Long attachmentId, Long userId,

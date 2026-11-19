@@ -33,7 +33,7 @@ class CashbackBatchPermissionTest {
     static DeptRespDTO dept(long id,long leader) { var d=new DeptRespDTO();d.setId(id);d.setLeaderUserId(leader);return d; }
 
     @Test void identityBatchEqualsBothSingleChecksAndResolvesDepartmentOnce() {
-        var service=new LeadObjectPermissionService(); var permissions=mock(PermissionApi.class);
+        var service=new LeadObjectPermissionService();inject(service,"salesBoundary",mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class)); var permissions=mock(PermissionApi.class);
         var security=mock(SecurityFrameworkService.class);var users=mock(AdminUserApi.class);var depts=mock(DeptApi.class);
         inject(service,"permissionApi",permissions);inject(service,"securityFrameworkService",security);inject(service,"adminUserApi",users);inject(service,"deptApi",depts);
         when(depts.getDeptListByLeaderUserId(7L)).thenReturn(List.of(dept(10,7)));
@@ -55,7 +55,7 @@ class CashbackBatchPermissionTest {
     }
 
     @Test void detailBatchMatchesEveryExistingRelationshipBranch() {
-        var service=spy(new LeadObjectPermissionService());var permissions=mock(PermissionApi.class);var security=mock(SecurityFrameworkService.class);
+        var service=spy(new LeadObjectPermissionService());inject(service,"salesBoundary",mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class));var permissions=mock(PermissionApi.class);var security=mock(SecurityFrameworkService.class);
         var users=mock(AdminUserApi.class);var depts=mock(DeptApi.class);var publicSeaPool=mock(LeadPublicSeaPoolService.class);
         var sea=mock(LeadPublicSeaPoolCompatibilityRecordMapper.class);var history=mock(ServiceRelationMapper.class);var media=mock(MediaAccountMapper.class);
         var batch=mock(LeadReadBatchMapper.class);var partner=mock(PartnerOwnershipService.class);var orders=mock(SalesOrderMapper.class);var orderAccess=mock(SalesOrderObjectPermissionService.class);
@@ -89,7 +89,7 @@ class CashbackBatchPermissionTest {
     }
 
     @Test void orderBatchMatchesOwnOwnerAgingSupervisorTeamAndApprovalBranches() {
-        var service=spy(new SalesOrderObjectPermissionService());var leads=mock(LeadMapper.class);var publicSeaPool=mock(LeadPublicSeaPoolService.class);
+        var service=spy(new SalesOrderObjectPermissionService());inject(service,"salesBoundary",mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class));var leads=mock(LeadMapper.class);var publicSeaPool=mock(LeadPublicSeaPoolService.class);
         var supervisors=mock(SalesOrderSupervisorConfirmationMapper.class);inject(service,"leadMapper",leads);inject(service,"publicSeaPoolService",publicSeaPool);inject(service,"supervisorConfirmationMapper",supervisors);
         doReturn(false).when(service).isApprovalPoolMember(7L);doReturn(Set.of(20L)).when(service).teamUserIds(7L);
         var rows=new ArrayList<SalesOrderDO>();for(long i=1;i<=7;i++)rows.add(new SalesOrderDO().setId(i).setLeadId(i).setSubmitterUserId(99L));
@@ -105,7 +105,7 @@ class CashbackBatchPermissionTest {
     }
 
     @Test void financeOrderBatchKeepsPagePermissionsAndManagementScopeDistinct() {
-        var service=spy(new SalesOrderObjectPermissionService());var permissions=mock(PermissionApi.class);inject(service,"permissionApi",permissions);
+        var service=spy(new SalesOrderObjectPermissionService());inject(service,"salesBoundary",mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class));var permissions=mock(PermissionApi.class);inject(service,"permissionApi",permissions);
         var rows=List.of(new SalesOrderDO().setId(1L).setSubmitterUserId(7L),new SalesOrderDO().setId(2L).setSubmitterUserId(20L),new SalesOrderDO().setId(3L).setSubmitterUserId(99L));
         when(permissions.hasTenantReadAllAccess(7L)).thenReturn(true);
         assertTrue(service.filterFinanceReadable(rows,7L).isEmpty(),"global data access alone is not page permission");

@@ -15,11 +15,9 @@ public interface RegistrationConstants {
     String ROUTE_NEW_MEDIA = "new_media";
     String ASSIGNEE_STUDY_PLANNER = "study_planner";
     String ASSIGNEE_CONTENT_DIRECTOR = "content_director";
-    String STUDY_PLANNER_ROLE_CODE = "study_planner";
     String CONTENT_DIRECTOR_POST_CODE = "content_director";
     String RELATION_REGISTRATION_MANAGER_PLANNER = "registration_manager_study_planner";
     String RELATION_REGISTRATION_SPECIALIST_PLANNER = "registration_specialist_study_planner";
-    String PERMISSION_QUERY_POOL = "zsjos:registration:query-pool";
     String PERMISSION_CLOSE = "zsjos:registration:close";
     String NOTIFY_SCENE_DELIVERY_CANCELLED = "zsjos.registration.delivery_cancelled";
     String NOTIFY_SCENE_INFO_SUBMITTED = "zsjos.registration.info_submitted";
@@ -27,7 +25,7 @@ public interface RegistrationConstants {
     String NOTIFY_SCENE_PLANNER_ASSIGNED = "zsjos.registration.planner_assigned";
     String NOTIFY_SCENE_DIRECTOR_ASSIGNED = "zsjos.registration.director_assigned";
     String NOTIFY_ROLE_POOL_HANDLERS = "pool_handlers";
-    String NOTIFY_ROLE_STUDY_PLANNER = "study_planner";
+    String NOTIFY_ROLE_HEAD_TEACHER = "head_teacher";
     String NOTIFY_ROLE_CONTENT_DIRECTOR = "content_director";
     String COMPLETION_BLOCK_FINANCE_PENDING = "finance_pending";
     String COMPLETION_BLOCK_FINANCE_REVISION_REQUIRED = "finance_revision_required";

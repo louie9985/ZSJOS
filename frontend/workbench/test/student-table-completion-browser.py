@@ -18,7 +18,7 @@ with sync_playwright() as p:
             expect(page.locator('tr.ant-table-row')).to_have_count(2)
             expect(page.locator('tr.ant-table-row .ant-avatar')).to_have_count(0)
             expect(page.locator('tr.ant-table-row').first.locator('td').first).to_contain_text('同一学员')
-            expect(page.locator('thead').get_by_text('学习规划师（班主任）', exact=True)).to_be_visible()
+            expect(page.locator('thead').get_by_text('班主任', exact=True)).to_be_visible()
             expect(page.locator('tr.ant-table-row').first).to_contain_text('规划师1')
             page.locator('tr.ant-table-row').nth(1).click()
         else:
@@ -36,8 +36,8 @@ with sync_playwright() as p:
     expect(page.locator('tr.ant-table-row')).to_have_count(2)
     expect(page.locator('thead').get_by_text('手机号', exact=True)).to_have_count(0)
     expect(page.locator('thead').get_by_text('激活时间', exact=True)).to_have_count(1)
-    expect(page.locator('thead').get_by_text('学习规划师（班主任）', exact=True)).to_have_count(1)
-    page.get_by_role('combobox', name='全部学习规划师').click()
+    expect(page.locator('thead').get_by_text('班主任', exact=True)).to_have_count(1)
+    page.get_by_role('combobox', name='全部班主任').click()
     page.locator('.ant-select-dropdown').get_by_title('规划师2', exact=True).click()
     expect(page.locator('tr.ant-table-row')).to_have_count(1)
     assert page.evaluate('subjectFixture.requests.at(-1).ownerUserId') == 21

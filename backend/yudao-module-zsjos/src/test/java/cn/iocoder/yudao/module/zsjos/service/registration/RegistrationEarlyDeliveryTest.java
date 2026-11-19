@@ -22,13 +22,11 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationEarlyDeliveryTest {
+    @Mock cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+    @Mock cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks RegistrationServiceImpl service;
-    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper informationForms;
-    @org.junit.jupiter.api.BeforeEach void sentInformationFixture() {
-        var form=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
-        form.setStatus("DRAFT"); form.setSentAt(java.time.LocalDateTime.now());
-        lenient().when(informationForms.byCase(anyLong())).thenReturn(form);
-    }
+    @Mock private RegistrationCaseObjectPermissionProvider casePermission;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoTaskService studentInfoTaskService;
     @Mock RegistrationCaseMapper caseMapper;
     @Mock SalesOrderMapper orderMapper;
     @Mock SalesOrderItemMapper orderItemMapper;
@@ -59,23 +57,9 @@ class RegistrationEarlyDeliveryTest {
         lenient().when(orderMapper.selectByIdForUpdate(10L,1L)).thenReturn(order);
     }
     @AfterEach void clear() { TenantContextHolder.clear(); }
-    @Test void missingOrUnsentCollectionBlocksCompletion() {
-        when(informationForms.byCase(1L)).thenReturn(null);
-        var req=new RegistrationVersionReqVO();req.setVersion(3);req.setIdempotencyKey("unsent");
-        assertThrows(ServiceException.class,()->service.complete(1L,7L,req));
-        var form=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
-        form.setStatus("DRAFT");when(informationForms.byCase(1L)).thenReturn(form);
-        assertThrows(ServiceException.class,()->service.complete(1L,7L,req));
-        verifyNoInteractions(serviceRelationMapper);
-    }
-
-    @Test void submittedWithoutManualSentConfirmationCanComplete() {
-        var form = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
-        form.setStatus("SUBMITTED"); form.setSubmitSource("public");
-        when(informationForms.byCase(1L)).thenReturn(form);
+    @Test void fulfillmentCanCompleteWithoutRequestingStudentInformation() {
         completionPreservesAcceptedOrTransferredService("active");
-        assertNull(form.getSentAt());
-        assertNull(form.getSentByUserId());
+        verifyNoInteractions(studentInfoTaskService);
     }
 
     @ParameterizedTest @ValueSource(strings={"active","paused","completed"})
@@ -117,10 +101,8 @@ class RegistrationEarlyDeliveryTest {
     @ParameterizedTest @ValueSource(strings={"revision_required","terminated","superseded"})
     void rejectedOrTerminatedOrderCannotStartDelivery(String status) {
         order.setStatus(status);
-        var req = new RegistrationClassAssignmentsSaveReqVO(); req.setVersion(3); req.setIdempotencyKey("blocked");
-        var assignment = new RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO(); assignment.setOrderItemId(101L); assignment.setClassId(900L);
-        req.setAssignments(List.of(assignment));
-        assertThrows(ServiceException.class,()->service.updateClassAssignments(1L,7L,req));
+        var req = new RegistrationVersionReqVO(); req.setVersion(3); req.setIdempotencyKey("blocked");
+        assertThrows(ServiceException.class,()->service.complete(1L,7L,req));
         verifyNoInteractions(serviceRelationMapper,classAssignmentMapper);
     }
 
@@ -149,12 +131,10 @@ class RegistrationEarlyDeliveryTest {
         verify(registrationNotifyPublisher).publishDeliveryCancelled(eq(relation),eq("订单终止"),any());
     }
 
-    @Test void staleAssignmentVersionNeverCreatesDelivery() {
-        var req = new RegistrationClassAssignmentsSaveReqVO(); req.setVersion(2); req.setIdempotencyKey("stale");
-        var assignment = new RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO(); assignment.setOrderItemId(101L); assignment.setClassId(900L);
-        req.setAssignments(List.of(assignment));
+    @Test void staleCompletionVersionNeverCreatesDelivery() {
+        var req = new RegistrationVersionReqVO(); req.setVersion(2); req.setIdempotencyKey("stale");
         assertEquals(REGISTRATION_VERSION_CONFLICT.getCode(), assertThrows(ServiceException.class,
-                () -> service.updateClassAssignments(1L,7L,req)).getCode());
+                () -> service.complete(1L,7L,req)).getCode());
         verifyNoInteractions(serviceRelationMapper,classAssignmentMapper);
         var locks = inOrder(orderMapper,caseMapper);
         locks.verify(caseMapper).selectById(1L);

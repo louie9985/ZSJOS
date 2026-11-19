@@ -15,6 +15,7 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceReadAccess;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.flowable.engine.task.Comment;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertList;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
 
@@ -41,6 +43,8 @@ public class BpmCommentController {
     private BpmCommentService commentService;
     @Resource
     private BpmTaskService taskService;
+    @Resource
+    private BpmProcessInstanceReadAccess processInstanceReadAccess;
 
     @Resource
     private AdminUserApi adminUserApi;
@@ -51,6 +55,7 @@ public class BpmCommentController {
     @PreAuthorize("@ss.hasPermission('bpm:task:query')")
     public CommonResult<List<BpmCommentRespVO>> getCommentListByProcessInstanceId(
             @RequestParam("processInstanceId") String processInstanceId) {
+        processInstanceReadAccess.requireReadable(getLoginUserId(), processInstanceId);
         // 获得评论列表
         List<Comment> commentList = commentService.getCommentListByProcessInstanceId(processInstanceId);
         if (CollUtil.isEmpty(commentList)) {
@@ -74,7 +79,7 @@ public class BpmCommentController {
     @Operation(summary = "创建流程评论")
     @PreAuthorize("@ss.hasPermission('bpm:task:update')")
     public CommonResult<Boolean> createComment(@Valid @RequestBody BpmCommentCreateReqVO reqVO) {
-        commentService.createComment(reqVO);
+        commentService.createComment(getLoginUserId(), reqVO);
         return success(true);
     }
 

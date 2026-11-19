@@ -1,8 +1,6 @@
 export const WORKBENCH_COMPONENT = {
   STUDENT_ENTRY: 'studentEntry',
   LEAD_FOLLOW_UP_CALENDAR: 'leadFollowUpCalendar',
-  DELIVERY_PERFORMANCE: 'deliveryPerformance',
-  DELIVERY_PERFORMANCE_TARGET: 'deliveryPerformanceTarget',
   SALES_PERFORMANCE: 'salesPerformance',
   SALES_PERFORMANCE_TARGET: 'salesPerformanceTarget',
   MEDIA_LEAD_ANALYSIS: 'mediaLeadAnalysis',
@@ -10,7 +8,6 @@ export const WORKBENCH_COMPONENT = {
   LEAD_APPEAL: 'leadAppeal',
   MY_OPERATIONS: 'myOperations',
   SUBORDINATE_SALES: 'subordinateSales',
-  EDUCATION_TEAM: 'educationTeam',
   SUBORDINATE_PARTNER: 'subordinatePartner',
   MEDIA_CALENDAR: 'mediaCalendar',
   PERSONAL_CALENDAR: 'personalCalendar',
@@ -25,8 +22,6 @@ export type WorkbenchComponent = typeof WORKBENCH_COMPONENT[keyof typeof WORKBEN
 const COMPONENT_REGISTRY: Record<string, WorkbenchComponent> = {
   'zsjos/studentEntry/index': WORKBENCH_COMPONENT.STUDENT_ENTRY,
   'zsjos/leadFollowUpCalendar/index': WORKBENCH_COMPONENT.LEAD_FOLLOW_UP_CALENDAR,
-  'zsjos/deliveryPerformance/index': WORKBENCH_COMPONENT.DELIVERY_PERFORMANCE,
-  'zsjos/deliveryPerformanceTarget/index': WORKBENCH_COMPONENT.DELIVERY_PERFORMANCE_TARGET,
   'zsjos/salesPerformance/index': WORKBENCH_COMPONENT.SALES_PERFORMANCE,
   'zsjos/salesPerformanceTarget/index': WORKBENCH_COMPONENT.SALES_PERFORMANCE_TARGET,
   'zsjos/mediaLeadAnalysis/index': WORKBENCH_COMPONENT.MEDIA_LEAD_ANALYSIS,
@@ -34,7 +29,6 @@ const COMPONENT_REGISTRY: Record<string, WorkbenchComponent> = {
   'zsjos/leadAppeal/index': WORKBENCH_COMPONENT.LEAD_APPEAL,
   'zsjos/myOperations/index': WORKBENCH_COMPONENT.MY_OPERATIONS,
   'zsjos/subordinateSales/index': WORKBENCH_COMPONENT.SUBORDINATE_SALES,
-  'zsjos/educationTeam/index': WORKBENCH_COMPONENT.EDUCATION_TEAM,
   'zsjos/subordinatePartner/index': WORKBENCH_COMPONENT.SUBORDINATE_PARTNER,
   'zsjos/mediaCalendar/index': WORKBENCH_COMPONENT.MEDIA_CALENDAR,
   'zsjos/personalCalendar/index': WORKBENCH_COMPONENT.PERSONAL_CALENDAR,

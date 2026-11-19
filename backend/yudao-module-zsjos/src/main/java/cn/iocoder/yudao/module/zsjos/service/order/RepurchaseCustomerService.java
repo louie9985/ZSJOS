@@ -26,7 +26,7 @@ public class RepurchaseCustomerService implements ZsjosObjectPermissionProvider 
 
     public void requireActor(Long userId) {
         if (!permissionApi.hasAnyPermissions(userId, "zsjos:sales-order:create")) throw exception(SALES_ORDER_PERMISSION_DENIED);
-        identityService.requireEducationSubmitter(userId); // Existing enabled internal-personnel contract.
+        identityService.requireSales(userId); // Existing enabled internal-personnel contract.
     }
 
     public RepurchaseCustomerCheckRespVO checkCustomer(Long userId, RepurchaseCustomerCheckReqVO req) {

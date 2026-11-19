@@ -14,6 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.TASK_OPERATE_FAIL_ASSIGN_NOT_SELF;
+
 /**
  * 流程评论 Service 实现类
  *
@@ -35,8 +38,11 @@ public class BpmCommentServiceImpl implements BpmCommentService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void createComment(@Valid BpmCommentCreateReqVO reqVO) {
-        Task task = bpmTaskService.validateTaskExists(reqVO.getTaskId());
+    public void createComment(Long userId, @Valid BpmCommentCreateReqVO reqVO) {
+        Task task = bpmTaskService.validateTask(userId, reqVO.getTaskId());
+        if (userId == null || !userId.toString().equals(task.getAssignee())) {
+            throw exception(TASK_OPERATE_FAIL_ASSIGN_NOT_SELF);
+        }
         createComment(task.getId(), task.getProcessInstanceId(), BpmCommentTypeEnum.COMMENT, reqVO.getMessage());
     }
 

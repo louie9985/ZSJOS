@@ -46,7 +46,7 @@ function PlannerDialog({initialTaskId,onClose}:{initialTaskId?:number;onClose:()
         <Typography.Text>本次负责班级：{selected.classes.join('、')}</Typography.Text>
         {receiptError&&<Alert type="warning" title="提醒已读状态尚未保存" description={receiptError} action={<Button size="small" onClick={()=>void planner.markSeen([selected.todoId]).then(()=>setReceiptError('')).catch(e=>setReceiptError(errorText(e)))}>重试</Button>}/>}
         <Space wrap><Tag color="processing">已收齐 {selected.collected}/{selected.expected} 人</Tag></Space>
-        <ExamCollectionShare key={selected.url} url={selected.url}/>
+        <ExamCollectionShare key={selected.url} url={selected.url} title={selected.title}/>
         <BusinessTable<ExamPlannerMember> mode="full" options={{reload:false}} tableKey="exam-planner-members" rowKey="serviceRelationId" columns={columns} dataSource={rows} loading={loading} error={error}
           onChange={(_, __, sorter, extra)=>{if(extra.action!=='sort')return;const current=Array.isArray(sorter)?sorter[0]:sorter;setSort(current.order?{sortField:String(current.columnKey),sortOrder:current.order==='ascend'?'asc':'desc'}:{});setPage(1)}} onReload={()=>setReload(v=>v+1)}
           filters={<div className="exam-collection-filters"><Input.Search aria-label="搜索本人应收学员" placeholder="姓名、手机号" allowClear value={searchText} maxLength={200} onChange={e=>setSearchText(e.target.value)} onSearch={v=>{setKeyword(v);setPage(1)}}/><Select aria-label="填写状态" placeholder="全部填写状态" allowClear value={filled===undefined?undefined:String(filled)} options={[{value:'false',label:'未填写'},{value:'true',label:'已填写'}]} onChange={v=>{setFilled(v===undefined?undefined:v==='true');setPage(1)}}/></div>}
@@ -126,7 +126,7 @@ export default function ExamPlannerProvider({enabled,children}:PropsWithChildren
         <Typography.Paragraph>请通知所负责班级填写，并跟进收齐。关闭提醒不会完成任务。</Typography.Paragraph>
         {unread.length>100&&<Typography.Text type="secondary">当前显示前 100 个提醒，确认后继续显示其余提醒。</Typography.Text>}
         {activeAckError&&<Alert type="error" title={activeAckError} action={<Button onClick={()=>void dismiss()}>重试</Button>}/>}
-        {unread.slice(0,100).map(todo=><section key={todo.todoId} className="exam-planner-reminder-item"><Typography.Text strong>{todo.title}</Typography.Text><p>{todo.classes.join('、')}</p><Space wrap><Tag color="processing">已收齐 {todo.collected}/{todo.expected} 人</Tag><Button disabled={acknowledging} onClick={()=>void dismiss(todo.collectionTaskId)}>查看并跟进</Button></Space><ExamCollectionShare key={todo.url} url={todo.url}/></section>)}
+        {unread.slice(0,100).map(todo=><section key={todo.todoId} className="exam-planner-reminder-item"><Typography.Text strong>{todo.title}</Typography.Text><p>{todo.classes.join('、')}</p><Space wrap><Tag color="processing">已收齐 {todo.collected}/{todo.expected} 人</Tag><Button disabled={acknowledging} onClick={()=>void dismiss(todo.collectionTaskId)}>查看并跟进</Button></Space><ExamCollectionShare key={todo.url} url={todo.url} title={todo.title}/></section>)}
       </Space>
     </Modal>
     {enabled&&opened&&<PlannerDialog initialTaskId={opened.taskId} onClose={()=>setOpened(undefined)}/>}

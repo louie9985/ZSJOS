@@ -5,7 +5,7 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationCaseRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationCloseReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationVersionReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationPlannerUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationRoutesUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderItemDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
@@ -38,7 +38,6 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductMapper;
 import cn.iocoder.yudao.module.zsjos.service.deliveryclass.DeliveryClassService;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
-import cn.iocoder.yudao.module.system.api.permission.RoleApi;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -47,7 +46,6 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationClassAssignmentsSaveReqVO;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.InOrder;
@@ -87,12 +85,14 @@ import static org.mockito.Mockito.verifyNoInteractions;
 @ExtendWith(MockitoExtension.class)
 class RegistrationServiceImplTest {
 
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks private RegistrationServiceImpl service;
-    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper informationForms;
+    @Mock private RegistrationCaseObjectPermissionProvider casePermission;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoTaskService studentInfoTaskService;
     @org.junit.jupiter.api.BeforeEach void sentInformationFixture() {
         var form=new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
-        form.setStatus("DRAFT"); form.setSentAt(java.time.LocalDateTime.now());
-        org.mockito.Mockito.lenient().when(informationForms.byCase(org.mockito.ArgumentMatchers.anyLong())).thenReturn(form);
+        form.setStatus("SUBMITTED"); form.setSentAt(java.time.LocalDateTime.now());
+        org.mockito.Mockito.lenient().when(studentInfoTaskService.formForRegistration(org.mockito.ArgumentMatchers.any())).thenReturn(form);
     }
     @Mock private RegistrationCaseMapper caseMapper;
     @Mock private RegistrationCaseChecklistItemMapper caseItemMapper;
@@ -112,7 +112,6 @@ class RegistrationServiceImplTest {
     @Mock private PersonMapper personMapper;
     @Mock private LeadAssignmentRelationMapper userRelationMapper;
     @Mock private FileApi fileApi;
-    @Mock private RoleApi roleApi;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
@@ -366,12 +365,14 @@ class RegistrationServiceImplTest {
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
         when(serviceRelationMapper.selectByCaseForUpdate(1L, 1L)).thenReturn(List.of(new ServiceRelationDO()));
-        RegistrationPlannerUpdateReqVO request = new RegistrationPlannerUpdateReqVO();
-        request.setVersion(0); request.setIdempotencyKey("delivered-planner"); request.setStudyPlannerUserId(30L);
+        RegistrationRoutesUpdateReqVO.RouteReqVO route = new RegistrationRoutesUpdateReqVO.RouteReqVO();
+        route.setRouteId(201L); route.setSelected(true); route.setAssigneeUserId(30L);
+        RegistrationRoutesUpdateReqVO request = new RegistrationRoutesUpdateReqVO();
+        request.setVersion(0); request.setIdempotencyKey("delivered-planner"); request.setRoutes(List.of(route));
         TenantContextHolder.setTenantId(1L);
         try {
             assertEquals(REGISTRATION_ALREADY_DELIVERED.getCode(),
-                    assertThrows(ServiceException.class, () -> service.updateStudyPlanner(1L, 9L, request)).getCode());
+                    assertThrows(ServiceException.class, () -> service.updateRoutes(1L, 9L, request)).getCode());
         } finally { TenantContextHolder.clear(); }
         verifyNoInteractions(caseRouteMapper, registrationNotifyPublisher);
     }
@@ -425,8 +426,8 @@ class RegistrationServiceImplTest {
     }
 
     @ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"false,false", "true,false", "false,true", "true,true"})
-    void classModeCompletesEachOrderItemIntoItsSelectedClass(boolean singleItemTask, boolean unscheduled) {
+    @org.junit.jupiter.params.provider.CsvSource({"false,false,false", "true,false,false", "false,true,false", "true,true,false", "false,false,true"})
+    void classModeCompletesEachOrderItemIntoItsSelectedClass(boolean singleItemTask, boolean unscheduled, boolean missingSecond) {
         RegistrationCaseDO registrationCase = editableCase();
         registrationCase.setAssignmentMode("class_per_item");
         if (singleItemTask) registrationCase.setOrderItemId(301L);
@@ -450,9 +451,12 @@ class RegistrationServiceImplTest {
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(checklist));
         when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(formalItem, pendingItem));
         when(classAssignmentMapper.selectByCaseIdForUpdate(1L, 1L))
-                .thenReturn(singleItemTask ? List.of(formalAssignment) : List.of(formalAssignment, pendingAssignment));
+                .thenReturn(singleItemTask || missingSecond ? List.of(formalAssignment) : List.of(formalAssignment, pendingAssignment));
         when(productMapper.selectById(401L)).thenReturn(new ZsjosProductDO().setCategoryId(999L));
-        if (!singleItemTask) when(deliveryClassMapper.selectByIdForUpdate(201L, 1L)).thenReturn(pendingClass);
+        if (missingSecond) {
+            order.setFormalSalesUserId(30L);
+            when(unscheduledClasses.ensure(30L)).thenReturn(deliveryClass(299L, true, null, 30L));
+        } else if (!singleItemTask) when(deliveryClassMapper.selectByIdForUpdate(201L, 1L)).thenReturn(pendingClass);
         when(deliveryClassMapper.selectByIdForUpdate(202L, 1L)).thenReturn(formalClass);
         when(deliveryClassService.validateHomeroom(31L))
                 .thenReturn(new AdminUserRespDTO().setId(31L).setStatus(0));
@@ -472,8 +476,9 @@ class RegistrationServiceImplTest {
         List<ServiceRelationDO> relations = relationCaptor.getAllValues();
         assertEquals(202L, relations.get(0).getClassId());
         assertEquals(31L, relations.get(0).getOwnerUserId());
-        if (!singleItemTask) assertEquals(201L, relations.get(1).getClassId());
-        if (!singleItemTask) assertNull(relations.get(1).getOwnerUserId());
+        if (!singleItemTask) assertEquals(missingSecond ? 299L : 201L, relations.get(1).getClassId());
+        if (missingSecond) assertEquals(30L, relations.get(1).getOwnerUserId());
+        else if (!singleItemTask) assertNull(relations.get(1).getOwnerUserId());
         if (singleItemTask) verify(registrationNotifyPublisher).publishPlannerAssigned(
                 registrationCase, order, "XY202609080001", 31L, 501L, relations.getFirst().getId());
         else verify(registrationNotifyPublisher).publishPlannerAssigned(
@@ -481,7 +486,7 @@ class RegistrationServiceImplTest {
         verify(orderMapper, times(2)).selectByIdForUpdate(10L, 1L);
         verify(orderItemMapper).selectListByOrderIdForUpdate(10L, 1L);
         InOrder classLockOrder = inOrder(deliveryClassMapper);
-        if (!singleItemTask) classLockOrder.verify(deliveryClassMapper).selectByIdForUpdate(201L, 1L);
+        if (!singleItemTask && !missingSecond) classLockOrder.verify(deliveryClassMapper).selectByIdForUpdate(201L, 1L);
         else verify(deliveryClassMapper, never()).selectByIdForUpdate(201L, 1L);
         classLockOrder.verify(deliveryClassMapper).selectByIdForUpdate(202L, 1L);
         verify(orderItemMapper, never()).selectListByOrderId(10L);
@@ -575,79 +580,11 @@ class RegistrationServiceImplTest {
         verify(serviceRelationMapper, never()).cancelDelivery(any(), any(), any(), any());
     }
 
-    @Test
-    void itemTaskRejectsSiblingClassAssignmentBeforeWriting() {
-        var registrationCase = editableCase(); registrationCase.setOrderItemId(301L);
-        registrationCase.setAssignmentMode("class_per_item");
-        var order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_PENDING_APPROVAL);
-        var first = new SalesOrderItemDO(); first.setId(301L);
-        var second = new SalesOrderItemDO(); second.setId(302L);
-        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
-        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
-        when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
-        when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(first, second));
-        var request = new RegistrationClassAssignmentsSaveReqVO(); request.setVersion(0);
-        request.setIdempotencyKey("foreign-item");
-        var assignment = new RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO();
-        assignment.setOrderItemId(302L); assignment.setClassId(201L); request.setAssignments(List.of(assignment));
-        TenantContextHolder.setTenantId(1L);
-        try {
-            var error = assertThrows(ServiceException.class, () -> service.updateClassAssignments(1L, 9L, request));
-            assertEquals(REGISTRATION_CLASS_ASSIGNMENT_INVALID.getCode(), error.getCode());
-        } finally { TenantContextHolder.clear(); }
-        verifyNoInteractions(classAssignmentMapper, deliveryClassMapper);
-        verify(serviceRelationMapper, never()).insert(any(ServiceRelationDO.class));
-    }
-
     private RegistrationCaseDO editableCase() {
         RegistrationCaseDO registrationCase = new RegistrationCaseDO();
         registrationCase.setId(1L); registrationCase.setOrderId(10L);
         registrationCase.setStatus(STATUS_PENDING); registrationCase.setVersion(0);
         return registrationCase;
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void saveWithoutProductCategoryAcceptsFormalAndPendingAndClearsOldOwner(boolean pending) {
-        RegistrationCaseDO registrationCase = editableCase();
-        registrationCase.setAssignmentMode("class_per_item");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(10L); order.setStatus(STATUS_PENDING_APPROVAL); order.setPersonId(501L);
-        SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(301L);
-        DeliveryClassDO target = deliveryClass(201L, pending, 88L, pending ? null : 31L);
-        RegistrationClassAssignmentDO existing = assignment(301L, 200L);
-        existing.setId(71L); existing.setVersion(0); existing.setHomeroomUserId(99L);
-        existing.setHomeroomUserNameSnapshot("旧班主任"); existing.setCategoryId(77L);
-        org.mockito.Mockito.lenient().when(caseMapper.selectById(1L)).thenReturn(registrationCase);
-        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
-        when(orderMapper.selectById(10L)).thenReturn(order);
-        when(orderItemMapper.selectListByOrderId(10L)).thenReturn(List.of(item));
-        when(orderMapper.selectByIdForUpdate(10L, 1L)).thenReturn(order);
-        when(orderItemMapper.selectListByOrderIdForUpdate(10L, 1L)).thenReturn(List.of(item));
-        when(classAssignmentMapper.selectByCaseIdForUpdate(1L, 1L)).thenReturn(List.of(existing));
-        when(deliveryClassMapper.selectByIdForUpdate(201L, 1L)).thenReturn(target);
-        when(classAssignmentMapper.selectByCaseAndItem(1L, 301L)).thenReturn(existing);
-        if (!pending) when(deliveryClassService.validateHomeroom(31L))
-                .thenReturn(new AdminUserRespDTO().setId(31L).setStatus(0));
-        RegistrationClassAssignmentsSaveReqVO req = new RegistrationClassAssignmentsSaveReqVO();
-        req.setVersion(0); req.setIdempotencyKey("save-no-category-" + pending);
-        RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO value = new RegistrationClassAssignmentsSaveReqVO.AssignmentReqVO();
-        value.setOrderItemId(301L); value.setClassId(201L); req.setAssignments(List.of(value));
-        TenantContextHolder.setTenantId(1L);
-        try { service.updateClassAssignments(1L, 9L, req); }
-        finally { TenantContextHolder.clear(); }
-        verify(classAssignmentMapper).updateById(existing);
-        ArgumentCaptor<ServiceRelationDO> created = ArgumentCaptor.forClass(ServiceRelationDO.class);
-        verify(serviceRelationMapper).insert(created.capture());
-        assertEquals("active", created.getValue().getStatus());
-        assertEquals("pending", created.getValue().getAcceptanceStatus());
-        assertEquals(pending ? null : 31L, created.getValue().getOwnerUserId());
-        assertEquals("processing", registrationCase.getStatus());
-        if (pending) verifyNoInteractions(registrationNotifyPublisher);
-        else verify(registrationNotifyPublisher).publishPlannerAssigned(registrationCase, order, null, 31L, 501L, null);
-        assertEquals(201L, existing.getClassId());
-        assertNull(existing.getCategoryId());
-        assertEquals(pending ? null : 31L, existing.getHomeroomUserId());
-        if (pending) assertNull(existing.getHomeroomUserNameSnapshot());
     }
 
     private static RegistrationClassAssignmentDO assignment(Long orderItemId, Long classId) {
@@ -674,5 +611,13 @@ class RegistrationServiceImplTest {
         } finally {
             cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
         }
+    }
+    @Test void salesCannotSelectClassOutsidePermittedDepartment() {
+        when(salesBoundary.isSalesActor(9L)).thenReturn(true);
+        var other = new DeliveryClassDO().setId(201L).setDeptId(81L).setHomeroomUserId(33L);
+        when(salesBoundary.canTransferTo(9L, 33L)).thenReturn(false);
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> org.springframework.test.util.ReflectionTestUtils.invokeMethod(service, "requireClassBoundary", 9L, other));
+        verifyNoInteractions(serviceRelationMapper);
     }
 }

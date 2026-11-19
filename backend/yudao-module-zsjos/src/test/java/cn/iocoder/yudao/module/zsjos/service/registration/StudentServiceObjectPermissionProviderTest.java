@@ -35,6 +35,7 @@ class StudentServiceObjectPermissionProviderTest {
     @Mock private DeliveryClassMapper deliveryClassMapper;
     @Mock private DeliveryClassScopeService deliveryClassScopeService;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Mock private AdminUserApi adminUserApi;
 
     @Test void queryAllReadsOnlyTeachingServicesAndDoesNotGrantCommandsOrTransferActions() {

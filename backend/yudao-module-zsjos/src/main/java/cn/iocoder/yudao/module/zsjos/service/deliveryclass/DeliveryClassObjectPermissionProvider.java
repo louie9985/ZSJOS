@@ -8,6 +8,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
 import java.util.Objects;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.DELIVERY_CLASS_PERMISSION_DENIED;
@@ -28,6 +29,17 @@ public class DeliveryClassObjectPermissionProvider implements ZsjosObjectPermiss
     boolean hasPermission(DeliveryClassDO row, String action, Long userId) {
         if (row == null) return false;
         if ("read".equals(action) && permissionApi.hasTenantReadAllAccess(userId)) return true;
+        Set<Long> homerooms = scopeService.salesHomerooms(userId).orElse(null);
+        if (homerooms != null) {
+            // Sales classes follow the head teacher's current department; the actor always sees their own classes.
+            if (row.getHomeroomUserId() == null || !homerooms.contains(row.getHomeroomUserId())) return false;
+            if ("read".equals(action) && Objects.equals(row.getHomeroomUserId(), userId))
+                return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_ALL,
+                        DeliveryClassService.PERMISSION_QUERY_MANAGED, DeliveryClassService.PERMISSION_QUERY_MY);
+            if ("read".equals(action)) return permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:query",
+                    DeliveryClassService.PERMISSION_QUERY_ALL, DeliveryClassService.PERMISSION_QUERY_MANAGED);
+            return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED);
+        }
         if ("read".equals(action) && permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_ALL)) return true;
         if ("read".equals(action) && DeliveryClassKind.pending(row)) {
             return permissionApi.hasAnyPermissions(userId, DeliveryClassService.PERMISSION_QUERY_MANAGED);

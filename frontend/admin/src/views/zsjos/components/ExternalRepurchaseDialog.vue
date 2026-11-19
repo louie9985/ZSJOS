@@ -119,6 +119,10 @@
                 :label="i.label"
                 :value="i.value" /></el-select></el-form-item></el-col
       ></el-row>
+      <el-form-item label="商定考试月份" prop="agreedExamMonth">
+        <el-date-picker v-model="form.agreedExamMonth" type="month" value-format="YYYY-MM"
+          format="YYYY年M月" placeholder="请选择商定考试月份" class="w-100%" />
+      </el-form-item>
       <el-form-item label="复购原因" prop="repurchaseReason"
         ><el-input
           v-model="form.repurchaseReason"
@@ -243,6 +247,7 @@ const empty = () => ({
   studentSource: '',
   feeMode: '',
   paymentMethod: '',
+  agreedExamMonth: '',
   repurchaseReason: ''
 })
 const form = reactive(empty())
@@ -269,9 +274,10 @@ const rules: FormRules = {
   studentSource: [{ required: true }],
   feeMode: [{ required: true }],
   paymentMethod: [{ required: true }],
+  agreedExamMonth: [{ required: true, message: '请选择商定考试月份' }],
   repurchaseReason: [{ required: true }]
 }
-const option = (type: string) => dicts.value.filter((i) => i.dictType === type && i.status === 0)
+const option = (type: string) => dicts.value.filter((i) => i.dictType === type)
 const skuOptions = computed(() => catalog.skus.filter((i) => i.spuRef === form.spuRef))
 const loadOptions = async () => {
   optionLoading.value = true
@@ -392,6 +398,7 @@ const submit = async () => {
           provinceName: province?.name || '',
           cityCode,
           cityName: city?.name || '',
+          agreedExamMonth: form.agreedExamMonth,
           servicePeriod: form.servicePeriod,
           studentSource: form.studentSource,
           customerPaidAt: form.customerPaidAt.getTime(),

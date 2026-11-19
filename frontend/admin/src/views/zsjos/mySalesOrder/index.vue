@@ -95,7 +95,7 @@
     >
   </el-dialog>
   <el-dialog v-model="revisionOpen" title="补正并重新提交" width="min(620px, calc(100vw - 24px))">
-    <el-alert title="未展示字段沿用当前订单快照；补正后教务和财务将重新审批。" type="info" show-icon class="mb-12px" />
+    <el-alert title="未展示字段沿用当前订单快照；补正提交后将进入财务审核。" type="info" show-icon class="mb-12px" />
     <el-alert v-if="revision.collectionMode === 'online_link'" title="线上已到账：本次仅补正资料，原课程、规格和金额保持不变。" type="info" show-icon class="mb-12px" />
     <el-form label-width="100px">
       <template v-for="field in revisionDictionaryFields" :key="field.key">
@@ -105,6 +105,10 @@
           </el-select>
         </el-form-item>
       </template>
+      <el-form-item label="商定考试月份" required>
+        <el-date-picker v-model="revision.agreedExamMonth" type="month" value-format="YYYY-MM" format="YYYY年M月" placeholder="请选择商定考试月份" class="w-100%" />
+        <div v-if="revision.agreedExamTime" class="text-12px text-gray-500">原商定考试时间（文本）：{{ revision.agreedExamTime }}</div>
+      </el-form-item>
       <el-form-item label="购买人"><el-input v-model="revision.buyerName" /></el-form-item>
       <el-form-item label="学员姓名" required
         ><el-input v-model="revision.studentName"
@@ -292,6 +296,7 @@ const resubmit = async () => {
   if (!/^1\d{10}$/.test(revision.studentMobile.trim())) return message.warning('手机号格式不正确')
   if (!revision.studentWechatId?.trim()) return message.warning('请填写微信号')
   if (revision.studentWechatId.trim().length > 64) return message.warning('微信号最多64个字符')
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(revision.agreedExamMonth || '')) return message.warning('请选择商定考试月份')
   if (refreshedDictionaryFields.value.some(key => !revision[key])) return message.warning('请重新选择历史未记录的字典项')
   if (revisionGiftLoading.value) return
   let gifts: ReturnType<typeof revisionGiftPayload>
@@ -317,7 +322,7 @@ const resubmit = async () => {
       provinceName: revision.provinceName,
       cityCode: revision.cityCode,
       cityName: revision.cityName,
-      agreedExamTime: revision.agreedExamTime,
+      agreedExamMonth: revision.agreedExamMonth,
       classType: revision.classType,
       servicePeriod: revision.servicePeriod,
       studentSource: revision.studentSource,

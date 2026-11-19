@@ -12,6 +12,8 @@ import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerLeadFollow
 import java.util.List;
 
 public interface LeadManagementService {
+    void checkNoteSubject(Long id, Long userId);
+
     LeadManagementRespVO getOperationsLead(Long memberId, Long id, Long userId);
 
     PageResult<LeadManagementRespVO> getOperationsLeadPage(LeadManagementPageReqVO reqVO, Long memberId, Long userId);

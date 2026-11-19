@@ -37,6 +37,9 @@ export interface RegistrationRoute {
 }
 
 export interface RegistrationCase {
+  ownerUserId?: number
+  ownerName?: string
+  canTransfer?: boolean
   id: number
   orderId: number
   orderItemId?: number
@@ -50,7 +53,7 @@ export interface RegistrationCase {
   leadNo?: string
   status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'ended'
   statusLabel?: string
-  assignmentMode?: 'legacy_planner' | 'class_per_item'
+  assignmentMode?: 'legacy_planner' | 'class_per_item' | 'sales_owner' | 'auto_class'
   studyPlannerUserId?: number
   studyPlannerUserName?: string
   registrationApprovedAt: string
@@ -137,7 +140,7 @@ export const getRegistrationPoolPage = (
   : request.get<PageResult<RegistrationCase[]>>({ url: '/zsjos/registration/pool-page', params })
 
 export const getRegistrationCase = (id: number) =>
-  request.get<RegistrationCase>({ url: `/zsjos/registration/${id}` })
+  request.get<RegistrationCase>({ url: `/zsjos/registration/${id}`, preserveBusinessError: true })
 
 export const getRouteCandidates = (id: number, routeId: number) =>
   request.get<StudyPlanner[]>({ url: `/zsjos/registration/${id}/routes/${routeId}/candidates` })
@@ -151,12 +154,6 @@ export const updateRegistrationRoutes = (
     url: `/zsjos/registration/${id}/routes`,
     data: { routes, version, idempotencyKey: crypto.randomUUID() }
   })
-
-export const updateRegistrationClassAssignments = (
-  id: number,
-  assignments: Array<{ orderItemId: number; classId: number }>,
-  version: number
-) => request.put<RegistrationCase>({ url: `/zsjos/registration/${id}/class-assignments`, data: { assignments, version, idempotencyKey: crypto.randomUUID() } })
 
 export const uploadRegistrationAttachment = (
   id: number,
@@ -216,3 +213,9 @@ export const getMyStudentService = (id: number) => request.get<StudentServiceSub
 
 export const closeRegistration = (id: number, version: number, reason: string) =>
   request.post({ url: `/zsjos/registration/${id}/close`, data: { version, reason, idempotencyKey: crypto.randomUUID() } })
+
+export const getRegistrationTransferCandidates = (id: number) =>
+  request.get<Array<{ id: number; nickname: string }>>({ url: `/zsjos/registration/${id}/transfer-candidates`, preserveBusinessError: true })
+
+export const transferRegistration = (id: number, data: { version: number; idempotencyKey: string; targetUserId: number; reason: string }) =>
+  request.post<RegistrationCase>({ url: `/zsjos/registration/${id}/transfer`, data, preserveBusinessError: true })

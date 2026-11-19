@@ -55,6 +55,15 @@ class SalesOrderSubmitReqVOValidationTest {
         assertTrue(validator.validate(validRequest()).isEmpty());
     }
 
+    @Test void agreedExamMonthIsRequiredAndMonthPrecise() {
+        for (String invalid : new String[] { null, "", "  ", "2027-3", "2027-13", "2027-03-01", "2027年3月" }) {
+            var request = validRequest(); request.setAgreedExamMonth(invalid);
+            assertTrue(validator.validate(request).stream().anyMatch(v -> v.getPropertyPath().toString().equals("agreedExamMonth")), invalid);
+        }
+        var request = validRequest(); request.setAgreedExamMonth("2027-12");
+        assertTrue(validator.validateProperty(request, "agreedExamMonth").isEmpty());
+    }
+
     private static SalesOrderSubmitReqVO validRequest() {
         SalesOrderSubmitReqVO request = new SalesOrderSubmitReqVO();
         request.setStudentName("测试学员");
@@ -65,6 +74,7 @@ class SalesOrderSubmitReqVOValidationTest {
         request.setProvinceName("澳门特别行政区");
         request.setCityCode("OTHER");
         request.setCityName("");
+        request.setAgreedExamMonth("2027-03");
         request.setServicePeriod("two_year");
         request.setStudentSource("agent_referral");
         request.setCustomerPaidAt(java.time.LocalDateTime.now());

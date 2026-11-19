@@ -35,11 +35,13 @@ public class SalesOrderObjectPermissionService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private PermissionApi permissionApi;
     @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolService publicSeaPoolService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     public void check(Long orderId, String action) {
         SalesOrderDO order = orderMapper.selectById(orderId);
         if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
         Long userId = getLoginUserId();
+        if (!withinSalesBoundary(order, userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
         boolean allowed = switch (action) {
             case "read" -> permissionApi.hasTenantReadAllAccess(userId) || canRead(order, userId);
             case "read-management" -> canReadManagement(order, userId);
@@ -48,6 +50,7 @@ public class SalesOrderObjectPermissionService {
             case "continue-revise" -> canContinue(order, userId);
             case "terminate" -> Objects.equals(order.getSubmitterUserId(), userId)
                     || Objects.equals(order.getFormalSalesUserId(), userId);
+            case "migrate-approval" -> canReadManagement(order, userId);
             case "review" -> isApprovalPoolMember(userId);
             default -> false;
         };
@@ -55,6 +58,7 @@ public class SalesOrderObjectPermissionService {
     }
 
     public boolean canRead(SalesOrderDO order, Long userId) {
+        if (!withinSalesBoundary(order, userId)) return false;
         LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         return Objects.equals(order.getSubmitterUserId(), userId)
                 || Objects.equals(order.getFormalSalesUserId(), userId)
@@ -65,11 +69,12 @@ public class SalesOrderObjectPermissionService {
     }
 
     public boolean canRevise(SalesOrderDO order, Long userId) {
-        return (Objects.equals(order.getSubmitterUserId(), userId) || Objects.equals(order.getFormalSalesUserId(), userId))
+        return withinSalesBoundary(order, userId) && (Objects.equals(order.getSubmitterUserId(), userId) || Objects.equals(order.getFormalSalesUserId(), userId))
                 && order.getSupersededByOrderId() == null;
     }
 
     public boolean canContinue(SalesOrderDO order, Long userId) {
+        if (!withinSalesBoundary(order, userId)) return false;
         if (order.getLeadId() == null) return false;
         var cycle = publicSeaPoolService.getActiveCycle(order.getLeadId());
         return cycle != null && Objects.equals(cycle.getCollaboratorUserId(), userId)
@@ -120,6 +125,13 @@ public class SalesOrderObjectPermissionService {
      * This only expands reads; command ownership and page permissions remain separate.
      */
     public SalesOrderManagementScope resolveManagementScope(Long userId) {
+        SalesOrderManagementScope original = resolveOriginalManagementScope(userId);
+        if (permissionApi.hasTenantReadAllAccess(userId) || !salesBoundary.isSalesActor(userId)) return original;
+        return new SalesOrderManagementScope(original.isAll(), original.isSelf(), original.getDeptIds(),
+                original.getSubmitterUserIds(), boundaryUserIds(userId));
+    }
+
+    private SalesOrderManagementScope resolveOriginalManagementScope(Long userId) {
         if (permissionApi == null) return SalesOrderManagementScope.empty();
         if (permissionApi.hasTenantReadAllAccess(userId)
                 || permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_ALL)) {
@@ -141,6 +153,7 @@ public class SalesOrderObjectPermissionService {
     }
 
     public boolean canReadManagement(SalesOrderDO order, Long userId) {
+        if (!withinSalesBoundary(order, userId)) return false;
         SalesOrderManagementScope scope = resolveManagementScope(userId);
         if (scope.isAll()) return true;
         if (scope.isEmpty()) return false;
@@ -171,6 +184,9 @@ public class SalesOrderObjectPermissionService {
 
     public Set<Long> filterReadable(java.util.Collection<SalesOrderDO> orders, Long userId) {
         if (orders.isEmpty()) return Set.of();
+        var boundary = salesBoundaryFilter(userId);
+        orders = orders.stream().filter(boundary).toList();
+        if (orders.isEmpty()) return Set.of();
         if (isApprovalPoolMember(userId)) return orders.stream().map(SalesOrderDO::getId)
                 .collect(java.util.stream.Collectors.toSet());
         var leadIds = orders.stream().map(SalesOrderDO::getLeadId).filter(Objects::nonNull)
@@ -198,6 +214,9 @@ public class SalesOrderObjectPermissionService {
     /** Same page/object OR branches as finance source projection; no command authorization is granted. */
     public Set<Long> filterFinanceReadable(java.util.Collection<SalesOrderDO> orders, Long userId) {
         if (orders.isEmpty() || userId == null) return Set.of();
+        var boundary = salesBoundaryFilter(userId);
+        orders = orders.stream().filter(boundary).toList();
+        if (orders.isEmpty()) return Set.of();
         boolean management = permissionApi.hasAnyPermissions(userId, "zsjos:sales-order:query-management");
         boolean own = permissionApi.hasAnyPermissions(userId, "zsjos:sales-order:query-own");
         boolean general = permissionApi.hasAnyPermissions(userId, "zsjos:sales-order:query", PERMISSION_QUERY_TEAM);
@@ -212,5 +231,29 @@ public class SalesOrderObjectPermissionService {
         }
         if (general) result.addAll(filterReadable(orders.stream().filter(order -> !result.contains(order.getId())).toList(), userId));
         return result;
+    }
+
+    /**
+     * Orders follow the formal owner's current department; a sales actor additionally keeps the orders it submitted,
+     * even when the formal owner is unset or in another department. Same rule as the mapper boundary predicate.
+     */
+    public boolean withinSalesBoundary(SalesOrderDO order, Long userId) {
+        if (permissionApi.hasTenantReadAllAccess(userId) || !salesBoundary.isSalesActor(userId)) return true;
+        return Objects.equals(order.getSubmitterUserId(), userId)
+                || order.getFormalSalesUserId() != null && salesBoundary.canAccessUser(userId, order.getFormalSalesUserId());
+    }
+
+    /** Batch form of {@link #withinSalesBoundary}: the accessible owner set is resolved once. */
+    private java.util.function.Predicate<SalesOrderDO> salesBoundaryFilter(Long userId) {
+        Set<Long> boundary = boundaryUserIds(userId);
+        if (boundary == null) return order -> true;
+        return order -> Objects.equals(order.getSubmitterUserId(), userId)
+                || order.getFormalSalesUserId() != null && boundary.contains(order.getFormalSalesUserId());
+    }
+
+    /** Null for unrestricted actors; otherwise boundary owners carrying the actor for its own submissions. */
+    public Set<Long> boundaryUserIds(Long userId) {
+        return permissionApi.hasTenantReadAllAccess(userId) || !salesBoundary.isSalesActor(userId)
+                ? null : new SalesOrderBoundaryUserIds(userId, salesBoundary.accessibleSalesUserIds(userId));
     }
 }

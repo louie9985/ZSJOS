@@ -18,21 +18,17 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @ExtendWith(MockitoExtension.class)
 class LeadSelfSourcedAutomationServiceTest {
- @Test void educationUsesItsOwnCreatePermissionAndStillRequiresFollowAndQualify() {
-  when(permissionApi.hasAnyPermissions(eq(1L),any(String.class))).thenAnswer(call -> !"zsjos:lead:self-sourced:create".equals(call.getArgument(1)));
-  dictionaries();service.validate(request(),1L,SOURCE_EDUCATION_SELF);
-  verify(permissionApi,never()).hasAnyPermissions(1L,"zsjos:lead:self-sourced:create");
-  for(String denied:List.of("zsjos:lead:education-self-sourced:create","zsjos:lead-follow-up:create","zsjos:lead:qualify")) {
-   reset(permissionApi);when(permissionApi.hasAnyPermissions(eq(1L),any(String.class))).thenAnswer(call -> !denied.equals(call.getArgument(1)));
-   assertEquals(LEAD_PERMISSION_DENIED.getCode(),assertThrows(ServiceException.class,()->service.validate(request(),1L,SOURCE_EDUCATION_SELF)).getCode());
-  }
- }
- @Test void educationProvenanceIsExactAndDistinctFromHistoricalSalesKeys() {
-  assertEquals(LeadAutomaticGeneration.EDUCATION_SOURCE,LeadAutomaticGeneration.sourceForLead(SOURCE_EDUCATION_SELF));
+ @Test void salesProvenanceIsExactAndRetiredEducationSourceIsRejected() {
+  assertEquals(LeadAutomaticGeneration.SOURCE,LeadAutomaticGeneration.sourceForLead(SOURCE_SALES_SELF));
   assertEquals(LeadAutomaticGeneration.followUpKey(1L),LeadAutomaticGeneration.followUpKey(1L,SOURCE_SALES_SELF));
-  assertNotEquals(LeadAutomaticGeneration.followUpKey(1L),LeadAutomaticGeneration.followUpKey(1L,SOURCE_EDUCATION_SELF));
-  assertTrue(LeadAutomaticGeneration.isAutomatic("{\"generationSource\":\"education_self_sourced_auto\"}"));
-  assertFalse(LeadAutomaticGeneration.isAutomatic("{\"remark\":\"education_self_sourced_auto\"}"));
+  assertThrows(IllegalArgumentException.class,()->LeadAutomaticGeneration.sourceForLead("education_self_sourced"));
+  assertTrue(LeadAutomaticGeneration.isAutomatic("{\"generationSource\":\"sales_self_sourced_auto\"}"));
+  assertFalse(LeadAutomaticGeneration.isAutomatic("{\"generationSource\":\"education_self_sourced_auto\"}"));
+  assertFalse(LeadAutomaticGeneration.isAutomatic("{\"remark\":\"sales_self_sourced_auto\"}"));
+ }
+ @Test void retiredEducationSourceHasNoCreatePermission() {
+  assertEquals(LEAD_FOLLOW_UP_STATE_INVALID.getCode(),assertThrows(ServiceException.class,()->service.validate(request(),1L,"education_self_sourced")).getCode());
+  verifyNoInteractions(permissionApi,dictDataApi,followUpRuleService);
  }
  @InjectMocks LeadSelfSourcedAutomationService service;
  @Mock PermissionApi permissionApi;
@@ -43,7 +39,7 @@ class LeadSelfSourcedAutomationServiceTest {
  private void permissions(){when(permissionApi.hasAnyPermissions(eq(1L),any(String.class))).thenReturn(true);}
  private void dictionaries(){when(dictDataApi.getDictDataList(DICT_FOLLOW_UP_METHOD)).thenReturn(List.of(dict("other",0)));when(dictDataApi.getDictDataList(DICT_FOLLOW_UP_RESULT)).thenReturn(List.of(dict("interested",0)));}
  @Test void requiredReminderAndTrimmedRemark(){permissions();dictionaries();var req=request();service.validate(req,1L,SOURCE_SALES_SELF);assertEquals("已联系客户，有意向",req.getRemark());assertNotNull(req.getSelfSourcedNextFollowUpAt());verify(followUpRuleService).requireEnabledRule();}
- @Test void missingReminderRejectedForSalesAndEducation(){permissions();for(String source:List.of(SOURCE_SALES_SELF,SOURCE_EDUCATION_SELF)){var req=request();req.setSelfSourcedNextFollowUpAt(null);assertEquals(LEAD_FOLLOW_UP_TIME_INVALID.getCode(),assertThrows(ServiceException.class,()->service.validate(req,1L,source)).getCode());}verifyNoInteractions(dictDataApi,followUpRuleService);}
+ @Test void missingReminderRejectedForSales(){permissions();for(String source:List.of(SOURCE_SALES_SELF)){var req=request();req.setSelfSourcedNextFollowUpAt(null);assertEquals(LEAD_FOLLOW_UP_TIME_INVALID.getCode(),assertThrows(ServiceException.class,()->service.validate(req,1L,source)).getCode());}verifyNoInteractions(dictDataApi,followUpRuleService);}
  @Test void futureReminder(){permissions();dictionaries();var req=request();req.setSelfSourcedNextFollowUpAt(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).plusDays(1));assertDoesNotThrow(()->service.validate(req,1L,SOURCE_SALES_SELF));}
  @Test void blankRemark(){permissions();for(String remark:Arrays.asList(null,"","  ")){var req=request();req.setRemark(remark);assertEquals(LEAD_SELF_SOURCED_REMARK_REQUIRED.getCode(),assertThrows(ServiceException.class,()->service.validate(req,1L,SOURCE_SALES_SELF)).getCode());}verifyNoInteractions(dictDataApi,followUpRuleService);}
  @Test void expiredReminder(){permissions();var req=request();req.setSelfSourcedNextFollowUpAt(LocalDateTime.now(ZoneId.of("Asia/Shanghai")).minusSeconds(1));assertEquals(LEAD_FOLLOW_UP_TIME_INVALID.getCode(),assertThrows(ServiceException.class,()->service.validate(req,1L,SOURCE_SALES_SELF)).getCode());verifyNoInteractions(dictDataApi);}

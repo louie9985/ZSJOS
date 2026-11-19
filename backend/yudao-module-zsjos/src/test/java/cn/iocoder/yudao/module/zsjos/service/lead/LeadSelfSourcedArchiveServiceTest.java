@@ -33,11 +33,6 @@ class LeadSelfSourcedArchiveServiceTest {
         assertEquals(2,candidates.size()); assertEquals("13800000000",candidates.getFirst().getMobile());
         assertEquals("测试档案",candidates.getFirst().getName()); verify(identityService).requireSales(7L);
     }
-    @Test void educationUsesItsOwnIdentityBoundary() {
-        when(personMapper.selectDuplicateCandidates(null,"wx_test")).thenReturn(List.of());
-        assertTrue(service.query(null,"wx_test",7L,EDUCATION).isEmpty());
-        verify(identityService).requireEducationSubmitter(7L); verify(identityService,never()).requireSales(any());
-    }
     @Test void deniedIdentityCannotReadCandidates() {
         doThrow(new ServiceException(LEAD_PERMISSION_DENIED)).when(identityService).requireSales(7L);
         assertThrows(ServiceException.class,()->service.query(null,"wx_test",7L,SALES)); verifyNoInteractions(personMapper);

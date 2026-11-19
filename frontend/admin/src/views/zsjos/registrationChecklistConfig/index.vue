@@ -39,22 +39,18 @@
         >
         <el-table-column label="事项" min-width="280"
           ><template #default="{ row }"
-            ><el-input v-model="row.title" :disabled="row.systemRequired" /></template
+            ><el-input v-model="row.title" /></template
         ></el-table-column>
         <el-table-column label="类型" width="150"
           ><template #default="{ row }"
             ><el-select
               v-model="row.itemType"
-              :disabled="row.systemRequired"
               @change="
                 row.attachmentRequired = row.itemType === 'attachment' && row.attachmentRequired
               "
               ><el-option label="人工确认" value="checkbox" /><el-option
                 label="上传附件"
-                value="attachment" /><el-option
-                v-if="row.systemRequired"
-                label="系统固定项"
-                value="study_planner" /></el-select></template
+                value="attachment" /></el-select></template
         ></el-table-column>
         <el-table-column label="必传" width="90"
           ><template #default="{ row }"
@@ -66,17 +62,11 @@
         >
         <el-table-column label="启用" width="90"
           ><template #default="{ row }"
-            ><el-switch v-model="row.enabled" :disabled="row.systemRequired" /></template
+            ><el-switch v-model="row.enabled" /></template
         ></el-table-column>
         <el-table-column label="操作" width="90"
           ><template #default="{ row }"
-            ><el-button
-              link
-              type="danger"
-              :disabled="row.systemRequired"
-              @click="removeItem(row.id)"
-              >删除</el-button
-            ></template
+            ><el-button link type="danger" @click="removeItem(row.id)">删除</el-button></template
           ></el-table-column
         >
       </el-table>
@@ -110,10 +100,8 @@
         ></el-table-column>
         <el-table-column label="负责人类型" width="180"
           ><template #default="{ row }"
-            ><el-select v-model="row.assigneeType"
-              ><el-option label="学习规划师" value="study_planner" /><el-option
-                label="编导"
-                value="content_director" /></el-select></template
+            ><el-select v-model="row.assigneeType" disabled
+              ><el-option label="编导" value="content_director" /></el-select></template
         ></el-table-column>
         <el-table-column label="启用" width="90"
           ><template #default="{ row }"><el-switch v-model="row.enabled" /></template
@@ -143,10 +131,19 @@ const load = async () => {
   loading.value = true
   error.value = ''
   try {
-    ;[config.value, departments.value] = await Promise.all([
+    const [nextConfig, nextDepartments] = await Promise.all([
       Api.getRegistrationChecklistConfig(),
       DeptApi.getSimpleDeptList()
     ])
+    // 学习规划师固定项和规划师流转已随自动分班退役；旧草稿中的残留行不再展示，保存时一并移除。
+    if (nextConfig.draft) {
+      nextConfig.draft.items = nextConfig.draft.items.filter((item) => item.itemType !== 'study_planner')
+      nextConfig.draft.routeOptions = nextConfig.draft.routeOptions.filter(
+        (route) => route.assigneeType !== 'study_planner'
+      )
+    }
+    config.value = nextConfig
+    departments.value = nextDepartments
   } catch (e: any) {
     error.value = e?.msg || e?.message || '配置加载失败'
   } finally {
@@ -177,8 +174,8 @@ const addRoute = () => {
     optionKey: `custom_${crypto.randomUUID().replaceAll('-', '')}`,
     departmentId: dept.id,
     departmentName: dept.name,
-    assigneeType: 'study_planner',
-    assigneeTypeLabel: '学习规划师',
+    assigneeType: 'content_director',
+    assigneeTypeLabel: '编导',
     sort: 0,
     enabled: true,
     systemRequired: false

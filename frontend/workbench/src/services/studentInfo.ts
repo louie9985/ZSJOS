@@ -7,6 +7,7 @@ export interface StudentInfoField {
   enabled: boolean; required: boolean; sort: number; note?: string; options?: string[]; dictType?: string; sensitive: boolean
 }
 export interface StudentInfoDetail {
+  agreementBody?: string; agreementVersion?: number
   id?: number; status: string; createdAt?: Timestamp; submittedAt?: Timestamp; expiresAt?: Timestamp
   configVersion?: number; fields: StudentInfoField[]; values: Record<string,string>
   canReadSensitive: boolean; canExport: boolean; images: StudentInfoImage[]

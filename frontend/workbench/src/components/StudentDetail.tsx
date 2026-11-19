@@ -1,3 +1,4 @@
+import ContactNotes from './ContactNotes'
 import { useState, type ReactNode } from 'react'
 import { Tabs, Typography } from 'antd'
 import { ClockCircleOutlined } from '@ant-design/icons'
@@ -29,6 +30,9 @@ export default function StudentDetail({ student, service, contactContext, contac
     label: '概览',
     children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview student={student} showFollowUp={false} categoryLabel={() => '-'} channelLabel={() => '-'} toolbar={toolbar} studentContext={studentContext} studentService={service} slots={overviewSlots} />}</div>
   }, ...(overviewOnly ? [] : (service?.serviceRelationId && contactContext?.visibleTabs.includes('student-info') ? [{ key: 'student-info', label: '学员档案', children: <StudentArchivePanel key={service.serviceRelationId} relationId={service.serviceRelationId} /> }] : [])), ...extraTabs]
+  if (!overviewOnly && service && contactContext) {
+    items.push({ key: 'communication-notes', label: '沟通记录', children: <ContactNotes key={service.serviceRelationId} subject="student" id={service.serviceRelationId} /> })
+  }
   const keys = new Set(items.map(item => item.key))
   const activeTab = controlledActiveTab && keys.has(controlledActiveTab)
     ? controlledActiveTab : keys.has(internalActiveTab) ? internalActiveTab : items[0]?.key

@@ -38,6 +38,22 @@ class LeadInboxFilterConfigServiceImplTest {
     private LeadInboxFilterVersionMapper versionMapper;
 
     @Test
+    void managementReadsLegacySourceButRejectsNewDraftWithRetiredValue() {
+        var config = validRequest();
+        config.setAudience("management");
+        var source = condition("source_type", "education_self_sourced");
+        source.setValues(List.of("sales_self_sourced", "education_self_sourced"));
+        config.getGroups().get(1).setConditions(List.of(source));
+        var scheme = scheme(config);
+        scheme.setAudience("management");
+        scheme.setPublishedConfigJson(scheme.getDraftConfigJson());
+        when(schemeMapper.selectByAudience("management")).thenReturn(scheme);
+        assertEquals(source.getValues(), service.getAdminConfig("management").getDraftGroups().get(1).getConditions().getFirst().getValues());
+        assertEquals(source.getValues(), service.getPublishedConfig("management").getGroups().get(1).getConditions().getFirst().getValues());
+        assertEquals(LEAD_INBOX_FILTER_INVALID.getCode(), assertThrows(ServiceException.class, () -> service.saveDraft(config)).getCode());
+    }
+
+    @Test
     void saveDraftRejectsUnknownConditionValue() {
         LeadInboxFilterSaveReqVO reqVO = validRequest();
         reqVO.getGroups().get(1).getConditions().getFirst().setValues(List.of("invented"));

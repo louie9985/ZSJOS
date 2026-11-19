@@ -118,3 +118,7 @@ use `--apply-local`. It backs up the 41 target tables and both ledgers under
 `backups/mysql/`, compares all original row hashes/definitions, applies only V331 and
 replays it once. It never applies other pending versions or discovers remote targets.
 Preserve the private backup and generated verification JSON; they are not release seeds.
+
+## Flowable 8 首次启动
+
+Core 初始化后的 Flowable 表须先应用 V377，再使用应用默认的自动 schema 检查启动。V377 在已验证的 8.0.0 结构上补齐或校准引擎元数据，保留既有流程、任务和历史。升级环境应在所有应用实例停机的窗口执行，并遵循迁移文件的备份、失败处理和恢复规则。有关结构检查与执行顺序，见 [Core migrations](../../script/sql/mysql/migrations/README.md#v377-flowable-8-启动元数据)。

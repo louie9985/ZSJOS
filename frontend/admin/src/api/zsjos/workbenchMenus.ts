@@ -35,9 +35,9 @@ export interface OrderProfile { personId?: number; name?: string; mobile?: strin
 export interface OrderProfileUpdate { fingerprint: string; fields: OrderProfileField[] }
 export const orderProfile = (id: number): Promise<OrderProfile> => request.get({ url: `/zsjos/sales-order/profile/order/${id}` })
 export const customerOrderProfile = (data: RepurchaseCustomerIdentity): Promise<OrderProfile> => request.post({ url: '/zsjos/sales-order/profile/customer', data })
-export const createLead = (data: Record<string, unknown>, selfSourced = false, educationSelfSourced = false) =>
+export const createLead = (data: Record<string, unknown>, selfSourced = false) =>
   request.post({
-    url: educationSelfSourced ? '/zsjos/lead/education-self-sourced/create' : selfSourced ? '/zsjos/lead/self-sourced/create' : '/zsjos/lead/create',
+    url: selfSourced ? '/zsjos/lead/self-sourced/create' : '/zsjos/lead/create',
     data
   })
 export const createExternalRepurchase = (data: Record<string, unknown>) =>
@@ -81,7 +81,7 @@ export const decideSalesOrder = (
 ) => request.put({ url: `/zsjos/sales-order/${id}/${decision}`, data })
 export const terminateSalesOrder = (id: number, data: Record<string, unknown>) =>
   request.put({ url: `/zsjos/sales-order/${id}/terminate`, data })
-export type SalesOrderSubmission = Record<string, unknown> & { studentMobile: string; studentWechatId: string; giftItems?: string[]; giftShippingAddress?: string }
+export type SalesOrderSubmission = Record<string, unknown> & { studentMobile: string; studentWechatId: string; agreedExamMonth: string; giftItems?: string[]; giftShippingAddress?: string }
 export const resubmitSalesOrder = (id: number, data: SalesOrderSubmission) =>
   request.put({ url: `/zsjos/sales-order/${id}/resubmit`, data })
 export const bpmTodoPage = (params: Record<string, unknown>): Promise<WorkbenchListResult> =>
@@ -119,8 +119,8 @@ export const subordinateBatchTransferCandidates = (leadIds: number[]): Promise<A
 export interface LeadArchiveCandidate {
   personId: number; personNo?: string; name: string; mobile?: string; wechatId?: string; snapshotKey: string
 }
-export const querySelfSourcedArchive = (education: boolean, data: { mobile?: string; wechatId?: string; idempotencyKey: string }): Promise<LeadArchiveCandidate[]> =>
-  request.post({ url: education ? '/zsjos/lead/education-self-sourced/archive-query' : '/zsjos/lead/self-sourced/archive-query', data, preserveBusinessError: true })
+export const querySelfSourcedArchive = (data: { mobile?: string; wechatId?: string; idempotencyKey: string }): Promise<LeadArchiveCandidate[]> =>
+  request.post({ url: '/zsjos/lead/self-sourced/archive-query', data, preserveBusinessError: true })
 
 export interface OrderLeadCandidate {
   id: number; status: string; statusLabel: string
@@ -134,3 +134,7 @@ export interface OrderLeadCandidate {
 }
 export const orderLeadCandidates = (data: RepurchaseCustomerIdentity): Promise<OrderLeadCandidate[]> =>
   request.post({ url: '/zsjos/sales-order/repurchase/lead-candidates', data, preserveBusinessError: true })
+
+export const FINANCE_ORDER_PROCESS_KEY = 'zsjos_sales_order_finance_approval'
+export const getNativeFinanceOrderDetail = (taskId: string, view: 'todo' | 'done') =>
+  request.get({ url: '/zsjos/sales-order/approval/native-detail', params: { taskId, view } })

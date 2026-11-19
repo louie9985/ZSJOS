@@ -27,7 +27,7 @@ public interface BpmCommentService {
      *
      * @param reqVO 评论请求
      */
-    void createComment(@Valid BpmCommentCreateReqVO reqVO);
+    void createComment(Long userId, @Valid BpmCommentCreateReqVO reqVO);
 
     /**
      * 创建流程评论

@@ -308,8 +308,7 @@ public class LeadFlowHistoryService {
     ).get(status); }
     private static String eventSource(BusinessEventDO event, LeadAssignmentHistoryDO assignment, boolean system) {
         String automaticSource = LeadAutomaticGeneration.sourceFromJson(event.getRelatedObjectRefs());
-        if (automaticSource != null) return LeadAutomaticGeneration.EDUCATION_SOURCE.equals(automaticSource)
-                ? "教务自拓录单自动生成" : "销售自拓录单自动生成";
+        if (automaticSource != null) return "销售自拓录单自动生成";
         return assignment == null ? (system ? "系统任务" : "员工工作台") : assignmentSource(assignment);
     }
     private static String eventReason(BusinessEventDO event, LeadAssignmentHistoryDO assignment) {

@@ -262,7 +262,7 @@ public class BusinessTaskReminderService {
 
     private void createAssistanceTask(BusinessTaskDO task, Long supervisorId) {
         taskCommandService.create(new BusinessTaskCreateCommand(TYPE_ASSISTANCE, BIZ_TYPE, task.getBizId(), supervisorId,
-                "协助完成学员首次联系", "请协助学习规划师完成已到期的首次联系任务", ACTION_ASSISTANCE,
+                "协助完成学员首次联系", "请协助班主任完成已到期的首次联系任务", ACTION_ASSISTANCE,
                 null, null, JsonUtils.toJsonString(Map.of("sourceTaskId", task.getId(),
                         "serviceRelationId", task.getBizId())), "student-assistance:" + task.getId()));
     }

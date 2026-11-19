@@ -23,7 +23,6 @@ public class LeadSelfSourcedArchiveService {
     public List<LeadArchiveCandidateRespVO> query(String mobile, String wechat, Long userId,
                                                  LeadSubmissionIdentityService.Identity identity) {
         if (identity == LeadSubmissionIdentityService.Identity.SALES) identityService.requireSales(userId);
-        else if (identity == LeadSubmissionIdentityService.Identity.EDUCATION) identityService.requireEducationSubmitter(userId);
         else throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
         mobile = StrUtil.trimToNull(mobile);
         wechat = normalizeWechat(wechat);

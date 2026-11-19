@@ -7,6 +7,7 @@ import java.util.List;
 
 @Data
 public class MediaStudentTalkSaveReqVO {
+    private Long serviceRelationId;
     private Long accountId;
     @NotBlank @Size(max = 2000) private String content;
     private List<Long> attachmentFileIds;

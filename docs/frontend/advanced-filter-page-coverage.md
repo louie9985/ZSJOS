@@ -1,3 +1,5 @@
+> 2026-11-16：`education_team` 场景、兼容输入和 Vue Admin `leadEducationSelfSourced` 页面已删除，存量模板/指标由修复脚本并入 `subordinate_sales`，详见 [教务团队退役](../api/education-team.md)。以下旧教务团队说明仅记录历史。
+
 # 中视简筛选页面接入扫描矩阵
 
 2026-09-23 当前工作树快照；[主矩阵](advanced-filter-inventory.md)记录人工核对结论，[字段目录](advanced-filter-field-catalog.md)记录可用字段。

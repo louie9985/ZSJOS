@@ -20,10 +20,7 @@ final class LeadProviderDisplay {
             return "员工（身份待核实）";
         }
         // A missing provider alone cannot prove that an old self-sourced record was unassisted.
-        if (source.unlinked()) {
-            if (SOURCE_SALES_SELF.equals(lead.getSourceType())) return "销售本人（未关联新媒体）";
-            if (SOURCE_EDUCATION_SELF.equals(lead.getSourceType())) return "教务本人（未关联新媒体）";
-        }
+        if (source.unlinked() && SOURCE_SALES_SELF.equals(lead.getSourceType())) return "销售本人（未关联新媒体）";
         return "提供方待核实";
     }
 }

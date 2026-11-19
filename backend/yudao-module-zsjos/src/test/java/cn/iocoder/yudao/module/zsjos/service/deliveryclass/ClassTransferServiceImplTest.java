@@ -31,6 +31,7 @@ class ClassTransferServiceImplTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
     @Mock private DeliveryClassServiceImpl deliveryClassService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -52,8 +53,8 @@ class ClassTransferServiceImplTest {
         when(classMapper.selectById(100L)).thenReturn(source);
         when(classMapper.selectByIdForUpdate(200L, 1L)).thenReturn(target);
         when(adminUserApi.getUser(20L)).thenReturn(new AdminUserRespDTO().setId(20L).setStatus(0));
-        when(permissionApi.hasAnyPermissions(20L, DeliveryClassService.PERMISSION_QUERY_MY)).thenReturn(true);
-        when(permissionApi.hasAnyPermissions(20L, "zsjos:student:query-my")).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, "zsjos:sales:eligible")).thenReturn(true);
+        when(salesBoundary.canTransferTo(any(), eq(20L))).thenReturn(true);
 
         service.handleProcessResult("process-1", BpmProcessInstanceStatusEnum.APPROVE.getStatus(), "同意");
 
@@ -75,8 +76,8 @@ class ClassTransferServiceImplTest {
         when(classMapper.selectById(100L)).thenReturn(sourceClass());
         when(classMapper.selectByIdForUpdate(200L, 1L)).thenReturn(targetClass());
         when(adminUserApi.getUser(20L)).thenReturn(new AdminUserRespDTO().setId(20L).setStatus(0));
-        when(permissionApi.hasAnyPermissions(20L, DeliveryClassService.PERMISSION_QUERY_MY)).thenReturn(true);
-        when(permissionApi.hasAnyPermissions(20L, "zsjos:student:query-my")).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, "zsjos:sales:eligible")).thenReturn(true);
+        when(salesBoundary.canTransferTo(any(), eq(20L))).thenReturn(true);
 
         service.handleProcessResult("process-1", BpmProcessInstanceStatusEnum.APPROVE.getStatus(), "同意");
 
@@ -108,7 +109,7 @@ class ClassTransferServiceImplTest {
         when(classMapper.selectById(100L)).thenReturn(sourceClass());
         when(classMapper.selectByIdForUpdate(200L, 1L)).thenReturn(targetClass());
         when(adminUserApi.getUser(20L)).thenReturn(new AdminUserRespDTO().setId(20L).setStatus(0));
-        when(permissionApi.hasAnyPermissions(20L, DeliveryClassService.PERMISSION_QUERY_MY)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, "zsjos:sales:eligible")).thenReturn(false);
 
         service.handleProcessResult("process-1", BpmProcessInstanceStatusEnum.APPROVE.getStatus(), "同意");
 

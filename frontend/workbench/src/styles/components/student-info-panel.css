@@ -17,6 +17,11 @@
 .student-info-layout { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--crm-sp-5); }
 .student-info-main { grid-column: span 9; min-width: 0; }
 .student-info-aside { grid-column: span 3; min-width: 0; }
+@container (min-width: 761px) {
+  .student-info-layout:has(.student-info-agreement) { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); }
+  .student-info-layout:has(.student-info-agreement) > * { grid-column: auto; }
+}
+.student-info-agreement details { overflow-wrap: anywhere; }
 .student-info-section + .student-info-section { margin-top: var(--crm-sp-5); }
 .student-info-section > h4 {
   margin: 0 0 var(--crm-sp-3);

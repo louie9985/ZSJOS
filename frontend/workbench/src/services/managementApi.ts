@@ -20,7 +20,7 @@ export type Withdrawal = { applicantName?: string; partnerName?: string; paidByN
 export type WithdrawalPayoutRequest = { paidAt?: string; remark?: string }
 export type RelationScene = { id?: number; name: string; code: string; sourceLabel: string; targetLabel: string; sourceType?: 'system_user' | 'partner'; sourcePostCode?: string; targetPostCode?: string; sourcePostCodes?: string[]; targetPostCodes?: string[]; targetEligibilityType: 'post' | 'permission'; targetPermissionCode?: string; status: number; remark?: string }
 export type RelationUser = { id: number; nickname: string; maskedMobile?: string; deptId?: number; deptName?: string; status: number }
-export type UserRelation = RelationUser & { ownerIdentity?: 'sales' | 'education'; targetUsers: RelationUser[]; validTargetCount: number; invalidTargetCount: number; updateTime?: Timestamp }
+export type UserRelation = RelationUser & { ownerIdentity?: 'sales'; targetUsers: RelationUser[]; validTargetCount: number; invalidTargetCount: number; updateTime?: Timestamp }
 export type UserRelationLog = { id: number; sourceUsers: string; targetUsers: string; actionType: 'append' | 'replace' | 'remove'; operatorName: string; createTime: Timestamp }
 export type SimplePost = { id: number; name: string; code: string }
 export type NotifyScene = { code: string; name: string; recipientRoles: Array<{ code: string; name: string }>; allowedActions: Array<'none' | 'message_detail' | 'business_detail'>; timed?: boolean }
@@ -75,7 +75,7 @@ export const managementApi = {
   deleteRelationScene: async (id: number) => unwrap<boolean>(await http.delete('/zsjos/user-relation/scene/delete', { params: { id } })),
   relations: async (sceneCode: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<UserRelation>>(await http.get('/zsjos/user-relation/relation/page', { params: { sceneCode, pageNo, pageSize } })),
   relationTargets: async (sceneCode: string) => unwrap<RelationUser[]>(await http.get('/zsjos/user-relation/target/simple-list', { params: { sceneCode } })),
-  saveRelations: async (data: { sceneCode: string; sourceUserIds: number[]; targetUserIds: number[]; ownerIdentity?: 'sales' | 'education'; mode: 'append' | 'replace' | 'remove' }) => unwrap<boolean>(await http.put('/zsjos/user-relation/relation/save', data)),
+  saveRelations: async (data: { sceneCode: string; sourceUserIds: number[]; targetUserIds: number[]; ownerIdentity?: 'sales'; mode: 'append' | 'replace' | 'remove' }) => unwrap<boolean>(await http.put('/zsjos/user-relation/relation/save', data)),
   relationLogs: async (sceneCode: string, pageNo = 1, pageSize = 20) => unwrap<PageResult<UserRelationLog>>(await http.get('/zsjos/user-relation/log/page', { params: { scene: sceneCode, pageNo, pageSize } })),
   maintenance: async () => unwrap<{ enabled: boolean }>(await http.get('/system/maintenance-mode')),
   updateMaintenance: async (enabled: boolean) => unwrap<boolean>(await http.put('/system/maintenance-mode', { enabled })),

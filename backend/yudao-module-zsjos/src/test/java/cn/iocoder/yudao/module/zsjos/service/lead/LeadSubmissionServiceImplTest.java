@@ -45,7 +45,6 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_R
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMISSION_DUPLICATE;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DICT_SOURCE_CHANNEL;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_INTERNAL_NEW_MEDIA;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_EDUCATION_SELF;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_SALES_SELF;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_SELF;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -200,14 +199,14 @@ class LeadSubmissionServiceImplTest {
     void partnerSpecifiedResolvesServerIdentityAndPreservesItForReview() {
         LeadCreateReqVO req = baseRequest(); req.setDispatchMode("specified"); req.setSpecifiedOwnerIdentity("sales");
         when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L).setStatus(0));
-        when(partnerAssignmentService.resolve(10L)).thenReturn(new PartnerLeadAssignmentService.Target(8L,"education"));
+        when(partnerAssignmentService.resolve(10L)).thenReturn(new PartnerLeadAssignmentService.Target(8L,"sales"));
         // Deliberately invalid contact stops after resolution, before any database mutation.
         assertEquals(LEAD_CONTACT_REQUIRED.getCode(),assertThrows(ServiceException.class,()->service.createForPartner(req,20L,10L)).getCode());
-        assertEquals(8L,req.getSpecifiedSalesUserId()); assertEquals("education",req.getSpecifiedOwnerIdentity());
-        verify(partnerAssignmentService).validateTarget(8L,"education");
+        assertEquals(8L,req.getSpecifiedSalesUserId()); assertEquals("sales",req.getSpecifiedOwnerIdentity());
+        verify(partnerAssignmentService).validateTarget(8L,"sales");
         String snapshot=cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(req);
         LeadCreateReqVO restored=cn.iocoder.yudao.framework.common.util.json.JsonUtils.parseObject(snapshot,LeadCreateReqVO.class);
-        assertEquals("education",restored.getSpecifiedOwnerIdentity()); assertEquals(8L,restored.getSpecifiedSalesUserId());
+        assertEquals("sales",restored.getSpecifiedOwnerIdentity()); assertEquals(8L,restored.getSpecifiedSalesUserId());
     }
 
     @Test
@@ -491,27 +490,26 @@ class LeadSubmissionServiceImplTest {
         org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    void linkedProviderAndDuplicateReviewKeepExistingFlow(boolean education) {
+    @Test
+    void linkedProviderAndDuplicateReviewKeepExistingFlow() {
         LeadCreateReqVO req=validDuplicateRequest();req.setNewMediaProviderUserId(2L);prepareDuplicateValidation(req);
         when(archiveService.requireSelection(req)).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();
         doAnswer(call->{LeadDO lead=call.getArgument(0);lead.setId(90L);saved.set(lead);return 1;}).when(leadMapper).insert(any(LeadDO.class));
         when(leadMapper.selectById(90L)).thenAnswer(call->saved.get());
-        if (education) service.createEducationSelfSourced(req,1L); else service.createSelfSourced(req,1L);
+        service.createSelfSourced(req,1L);
         org.mockito.Mockito.verifyNoInteractions(selfSourcedAutomation);
         assertEquals(2L,saved.get().getSourceProviderUserId());
         assertEquals(2L,saved.get().getSourceUserId());
         assertEquals(SOURCE_INTERNAL_NEW_MEDIA,saved.get().getSourceType());
-        assertEquals(education ? SOURCE_EDUCATION_SELF : SOURCE_SALES_SELF,saved.get().getSubmissionSourceType());
+        assertEquals(SOURCE_SALES_SELF,saved.get().getSubmissionSourceType());
         assertEquals(DISPATCH_SELF,saved.get().getDispatchMode());
         verify(identityService).requireNewMediaProvider(2L);
         verify(dispatchService).start(saved.get(),1L,1L);
         // Entry identity survives later owner transfers and a retry cannot create another Lead.
         saved.get().setOwnerIdentity("sales"); saved.get().setOwnerUserId(99L);
         when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(saved.get());
-        if (education) service.createEducationSelfSourced(req,1L); else service.createSelfSourced(req,1L);
+        service.createSelfSourced(req,1L);
         verify(leadMapper,org.mockito.Mockito.times(1)).insert(any(LeadDO.class));
         org.mockito.Mockito.verifyNoInteractions(contactActivationService, duplicateMatcher, personIdentityWriteService);
         verify(leadMapper, never()).selectNonClosedByPersonForUpdate(any(), any());
@@ -589,55 +587,12 @@ class LeadSubmissionServiceImplTest {
         user.setStatus(CommonStatusEnum.ENABLE.getStatus());
         return user;
     }
-    @Test
-    void educationCreateForcesSelfOwnershipAndDoesNotRequireSalesPost() {
-        LeadCreateReqVO req = baseRequest();
-        req.setDispatchMode("specified"); req.setSpecifiedSalesUserId(999L);
-        LeadDO existing = new LeadDO(); existing.setId(20L); existing.setLeadNo("KZ-test");
-        existing.setSourceType(SOURCE_EDUCATION_SELF);
-        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(existing);
-        service.createEducationSelfSourced(req, 42L);
-        assertEquals(DISPATCH_SELF, req.getDispatchMode());
-        assertEquals(42L, req.getSpecifiedSalesUserId());
-        verify(identityService).requireEducationSubmitter(42L);
-        verify(identityService, never()).requireSales(any());
-        verify(dispatchService, never()).start(any(), any(), any());
-    }
-
-    @Test
-    void educationCannotReplaySalesSubmissionKey() {
-        LeadCreateReqVO req = baseRequest();
-        LeadDO existing = new LeadDO(); existing.setId(20L); existing.setSourceType(SOURCE_SALES_SELF);
-        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(existing);
-        assertThrows(ServiceException.class, () -> service.createEducationSelfSourced(req, 42L));
-    }
-
-    @Test
-    void approvedDuplicateReviewPreservesEducationSourceAndSelfDispatch() {
-        LeadCreateReqVO req = validDuplicateRequest(); req.setDispatchMode(DISPATCH_SELF); req.setSpecifiedSalesUserId(1L);
-        prepareDuplicateValidation(req);
-        when(identityService.resolveHistoricalSubmission(1L, SOURCE_EDUCATION_SELF, null)).thenReturn(
-                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.EDUCATION, null));
-        when(personIdentityWriteService.resolveForLead(any(), any(), any())).thenReturn(new PersonDO().setId(50L));
-        java.util.concurrent.atomic.AtomicReference<LeadDO> saved = new java.util.concurrent.atomic.AtomicReference<>();
-        doAnswer(call -> { LeadDO lead = call.getArgument(0); lead.setId(90L); saved.set(lead); return 1; })
-                .when(leadMapper).insert(any(LeadDO.class));
-        when(leadMapper.selectById(90L)).thenAnswer(call -> saved.get());
-        service.createApprovedFromReview(req, 1L, null, SOURCE_EDUCATION_SELF, null, "分类快照", "渠道快照");
-        assertEquals(SOURCE_EDUCATION_SELF, saved.get().getSourceType());
-        assertEquals(DISPATCH_SELF, saved.get().getDispatchMode());
-        assertEquals(1L, saved.get().getSourceUserId());
-        verify(dispatchService).start(saved.get(), 1L, 1L);
-        verify(identityService, never()).requireSales(any());
-    }
-
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced", "education_self_sourced"})
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"sales_self_sourced"})
     void approvedAssistedReviewPreservesEntryAndProvider(String entry) {
         LeadCreateReqVO req=validDuplicateRequest(); req.setDispatchMode(DISPATCH_SELF);
         req.setSpecifiedSalesUserId(1L); req.setNewMediaProviderUserId(2L); prepareDuplicateValidation(req);
-        var identity=new LeadSubmissionIdentityService.Resolution(SOURCE_EDUCATION_SELF.equals(entry)
-                ? LeadSubmissionIdentityService.Identity.EDUCATION : LeadSubmissionIdentityService.Identity.SALES,null);
+        var identity=new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.SALES,null);
         when(identityService.resolveHistoricalSubmission(1L,entry,null)).thenReturn(identity);
         when(personIdentityWriteService.resolveForLead(any(),any(),any())).thenReturn(new PersonDO().setId(50L));
         java.util.concurrent.atomic.AtomicReference<LeadDO> saved=new java.util.concurrent.atomic.AtomicReference<>();

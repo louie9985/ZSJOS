@@ -1,0 +1,86 @@
+{
+  "key": "zsjos_sales_order_finance_approval",
+  "name": "成交订单财务审批",
+  "category": "general-module",
+  "description": "财务审批及原生前后加签",
+  "type": 20,
+  "formType": 10,
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "financeReview",
+      "type": 11,
+      "name": "财务结算中心审批",
+      "showText": "业务服务提交时指定审批人",
+      "candidateStrategy": 35,
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "signEnable": false,
+      "reasonRequire": false,
+      "childNode": {
+        "id": "EndEvent",
+        "type": 1,
+        "name": "结束"
+      },
+      "buttonsSetting": [
+        {
+          "id": 1,
+          "displayName": "通过",
+          "enable": true
+        },
+        {
+          "id": 2,
+          "displayName": "拒绝",
+          "enable": true
+        },
+        {
+          "id": 3,
+          "displayName": "转办",
+          "enable": false
+        },
+        {
+          "id": 4,
+          "displayName": "委派",
+          "enable": false
+        },
+        {
+          "id": 5,
+          "displayName": "加签",
+          "enable": true
+        },
+        {
+          "id": 6,
+          "displayName": "退回",
+          "enable": false
+        }
+      ],
+      "rejectHandler": {
+        "type": 1
+      }
+    }
+  }
+}

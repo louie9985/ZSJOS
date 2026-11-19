@@ -17,7 +17,7 @@ public final class StudentInfoTaskVO {
     @Data public static class Command {
         @NotNull private Integer version;
         @NotBlank @Size(max=64) private String idempotencyKey;
-        @Size(max=13) private List<@NotBlank String> materialKeys;
+        @Size(max=16) private List<@NotBlank String> materialKeys;
         private Long configVersionId;
         private Long sourceFormId;
         private Integer sourceRevision;

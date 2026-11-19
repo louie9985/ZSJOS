@@ -21,7 +21,7 @@ public class StudentInfoFormDO extends TenantBaseDO {
     @lombok.ToString.Exclude
     private String draftSnapshot;
     private Long agreementVersion;
-    private String agreementCategoryName;
+    private String agreementCategoryName, agreementProductName;
     private String agreementTemplate, agreementReadHash, agreementConsent;
     private java.time.LocalDateTime agreementReadAt;
     @com.baomidou.mybatisplus.annotation.TableField(typeHandler = cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class)

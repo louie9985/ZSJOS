@@ -296,12 +296,15 @@ SELECT 'registration_route_tables' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
             AND table_name IN ('zsjos_registration_route_option','zsjos_registration_case_route','zsjos_registration_item_attachment'))=3,
           'PASS','FAIL') AS result;
+-- V083 binds each default route to an existing department by name. The fresh seed no longer creates
+-- 学生服务与交付中心 (merged into sales by V371), so only the new-media route is a fresh-install invariant;
+-- upgraded environments may keep their historical student_delivery route as administrator data.
 SELECT 'registration_exact_default_routes' AS check_name,
        IF(NOT EXISTS (SELECT version_row.id FROM zsjos_registration_checklist_version version_row
             WHERE version_row.status='published' AND version_row.deleted=b'0'
               AND (SELECT COUNT(*) FROM zsjos_registration_route_option option_row
                    WHERE option_row.tenant_id=version_row.tenant_id AND option_row.version_id=version_row.id
-                     AND option_row.option_key IN ('student_delivery','new_media') AND option_row.deleted=b'0')<>2),
+                     AND option_row.option_key='new_media' AND option_row.deleted=b'0')<>1),
           'PASS','FAIL') AS result;
 -- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
 SELECT 'employee_birthday_care_job' AS check_name,
@@ -1060,6 +1063,8 @@ SELECT 'V071 partner uses independent identity (V247)' AS check_name,
 -- every role its workbench baseline, so the original zero-menu assertion is obsolete. It now
 -- asserts the durable intent instead: none of these roles may hold the global Lead read scope.
 -- Role assignment is checked through optional administrator audits, not bootstrap acceptance.
+-- Fresh installs no longer seed delivery_manager (retired by the V371 sales/delivery merge), so this
+-- clause only constrains upgraded environments that still keep the historical role.
 SELECT 'V205 delivery manager department student scope' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V205')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
@@ -1116,14 +1121,25 @@ SELECT 'V073 fixed planner checklist item' AS check_name,
              WHERE item_key='study_planner' AND item_type='study_planner'
                AND enabled=b'1' AND system_required=b'1' AND deleted=b'0') >=
           (SELECT COUNT(*) FROM system_tenant WHERE status=0 AND deleted=b'0'),'PASS','FAIL') AS result;
+SET @v374_applied = EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V374')
+    AND EXISTS(SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V374');
+SET @registration_page_id = IF(@v374_applied,
+    (SELECT MIN(id) FROM system_menu WHERE permission='zsjos:registration:query-my' AND deleted=b'0' AND status=0),
+    73000);
 SELECT 'V073 registration menus' AS check_name,
-       IF((SELECT COUNT(*) FROM system_menu WHERE id IN (73000,73010,73020)
+       IF((SELECT COUNT(*) FROM system_menu WHERE id IN (@registration_page_id,73010,73020)
              AND deleted=b'0')=3,'PASS','FAIL') AS result;
 SELECT 'V073 registration menus under workbench' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu child
              JOIN system_menu parent ON parent.id=child.parent_id AND parent.deleted=b'0'
-            WHERE child.id IN (73000,73010,73020) AND child.deleted=b'0'
+            WHERE child.id IN (@registration_page_id,73010,73020) AND child.deleted=b'0'
               AND parent.path='/zsjos' AND parent.parent_id=0)=3,'PASS','FAIL') AS result;
+SELECT 'V374 owner-scoped registration page and transfer action' AS check_name,
+       IF(NOT @v374_applied OR (
+            NOT EXISTS(SELECT 1 FROM system_menu WHERE permission IN ('zsjos:registration:query-pool','zsjos:student-info-task:query') AND deleted=b'0')
+            AND EXISTS(SELECT 1 FROM system_menu WHERE id=@registration_page_id AND path='registration-pool')
+            AND (SELECT COUNT(*) FROM system_menu WHERE parent_id=@registration_page_id AND permission='zsjos:registration:transfer'
+                AND type=3 AND status=0 AND deleted=b'0')=1),'PASS','FAIL') AS result;
 SELECT 'V074 registration notification template' AS check_name,
        IF((SELECT COUNT(*) FROM system_notify_template
              WHERE code='ZSJOS_REGISTRATION_TASK_CREATED'
@@ -2125,7 +2141,7 @@ SELECT 'V160 registration close-service button' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V160')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V160')
           AND EXISTS (SELECT 1 FROM system_menu
-               WHERE id=73003 AND parent_id=73000 AND name='关闭服务'
+               WHERE id=73003 AND parent_id=@registration_page_id AND name='关闭服务'
                  AND permission='zsjos:registration:close' AND deleted=b'0'),
           'PASS','FAIL') AS result;
 
@@ -2460,3 +2476,11 @@ SELECT 'V208 viral account template V3 layout' AS check_name,
           'PASS','FAIL') AS result;
 
 SOURCE script/sql/mysql/verify-media-account-profile.sql;
+SELECT 'V371 retired sales-delivery merge menus' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V371')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V371')
+          AND NOT EXISTS (SELECT 1 FROM system_menu
+            WHERE (permission LIKE 'zsjos:education-team:%' OR permission LIKE 'zsjos:delivery-performance%'
+                   OR permission='zsjos:lead:education-self-sourced:create')
+              AND (deleted<>b'1' OR status<>1 OR visible<>b'0')),
+          'PASS','FAIL') AS result;

@@ -698,6 +698,7 @@ export default function AccountProfilePanel({
       if(weeklyPreview){
         await weeklyDiagnosisApi.submit(account.id,{nodeKey:weeklyPreview.node.key,common,
           changeDirection:String(values.changeDirection),trafficNormal:String(values.trafficNormal),directionSummary:String(values.directionSummary),
+          published7:values.published7 as number, published28:values.published28 as number,
           highestLikes:values.highestLikes as number,metricToken:weeklyPreview.metricToken});
       }else await accountProfileApi.diagnosis(account.id,common);
       if (gen !== generation.current) return;

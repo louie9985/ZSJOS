@@ -7,6 +7,7 @@ public class PerformanceOrgDO extends TenantBaseDO {
  @TableId private Long id;
  private Long deptId;
  private String businessDomain;
+ private Boolean salesBoundaryRoot;
  private Long centerId;
  private String kind;
  private Integer version;

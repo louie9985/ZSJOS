@@ -193,7 +193,7 @@ describe('BPM 通用审批组件', () => {
   it('审批详情同页展示流程记录与评论，不再分页签', () => {
     expect(detail).not.toContain('<Tabs')
     expect(detail).toContain('<ApprovalHistory')
-    expect(detail).toContain('<CommentList')
+    expect(detail).toContain('<ApprovalComments')
     expect(detail).toContain('bpm-unified-action-dock')
     expect(detail).toContain('useApprovalResource')
   })

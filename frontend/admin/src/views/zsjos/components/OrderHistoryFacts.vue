@@ -16,10 +16,7 @@ const props = defineProps<{ order: Record<string, unknown> }>()
 const leadProfile = computed(() => props.order.leadProfile as { sourceType?: string; sourceUserName?: string; selfSourcedWithoutProvider?: boolean | null; partnerOwnerSnapshot?: OrderPartnerOwnerSnapshot | null } | undefined)
 const sourcePersonText = computed(() => {
   const profile = leadProfile.value
-  if (profile?.selfSourcedWithoutProvider === true) {
-    if (profile.sourceType === 'sales_self_sourced') return '销售本人自拓（未关联新媒体）'
-    if (profile.sourceType === 'education_self_sourced') return '教务本人自拓（未关联新媒体）'
-  }
+  if (profile?.selfSourcedWithoutProvider === true && profile.sourceType === 'sales_self_sourced') return '销售本人自拓（未关联新媒体）'
   return profile?.sourceUserName || '历史未记录'
 })
 const fields = [

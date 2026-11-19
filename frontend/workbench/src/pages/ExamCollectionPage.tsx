@@ -45,9 +45,9 @@ function TaskDetails({task,permissions,onSummary,onReload,refreshing}:{task:Exam
         {!open&&can('reopen')&&<Button disabled={refreshing} onClick={()=>setTransition('reopen')}>重新开启</Button>}
       </Space>
     </header>
-    <ExamCollectionShare key={task.url} url={task.url} open={open}/>
+    <ExamCollectionShare key={task.url} url={task.url} title={task.title} open={open}/>
     {exporting&&<ExamExportDrawer task={task} onClose={()=>setExporting(false)}/>}
-    {!task.classIds.length&&<Alert type="info" showIcon title="链接已生成，尚未通知班级" description="请选择服务中的班级，固定本次应收名单并通知对应学习规划师。"/>}
+    {!task.classIds.length&&<Alert type="info" showIcon title="链接已生成，尚未通知班级" description="请选择服务中的班级，固定本次应收名单并通知对应班主任。"/>}
     <Tabs className="business-inbox-card exam-collection-tabs" activeKey={tab} onChange={setTab} destroyOnHidden items={[
       {key:'members',label:'应收名单',children:<ExamMembers task={task} canAdjust={open&&can('members')&&task.classIds.length>0} canResolve={can('resolve')} onChanged={onReload}/>},
       {key:'submissions',label:'填写记录',children:<ExamSubmissions taskId={task.id} canResolve={can('resolve')} onChanged={onReload}/>},

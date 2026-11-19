@@ -39,8 +39,9 @@ class DeliveryClassMysqlOptionsTest {
         config.addMapper(DeliveryClassMapper.class);
         try (var session = new MybatisSqlSessionFactoryBuilder().build(config).openSession()) {
             session.getConnection().setReadOnly(true);
-            var service = new DeliveryClassServiceImpl();
+            var service = new DeliveryClassServiceImpl(); org.springframework.test.util.ReflectionTestUtils.setField(service, "scopeService", org.mockito.Mockito.mock(DeliveryClassScopeService.class));
             ReflectionTestUtils.setField(service, "mapper", session.getMapper(DeliveryClassMapper.class));
+            ReflectionTestUtils.setField(service, "permissionApi", org.mockito.Mockito.mock(cn.iocoder.yudao.module.system.api.permission.PermissionApi.class));
             List<Long> expected = new ArrayList<>();
             try (var stmt = session.getConnection().prepareStatement("SELECT id FROM zsjos_delivery_class WHERE tenant_id=? AND deleted=0 AND status='SERVING' ORDER BY system_class DESC,class_name,id")) {
                 stmt.setLong(1, tenant);
@@ -48,13 +49,13 @@ class DeliveryClassMysqlOptionsTest {
                 while (rs.next()) expected.add(rs.getLong(1));
             }
             assertFalse(expected.isEmpty(), "Choose a development tenant with serving classes for this regression");
-            var all = service.options(null, true);
+            var all = service.options(null, true, 7L);
             assertEquals(expected, all.stream().map(row -> row.getId()).toList());
             assertEquals(all.stream().filter(row -> !Boolean.TRUE.equals(row.getSystemClass())).map(row -> row.getId()).toList(),
-                    service.options(null, false).stream().map(row -> row.getId()).toList());
+                    service.options(null, false, 7L).stream().map(row -> row.getId()).toList());
             assertEquals(all.stream().filter(row -> Boolean.TRUE.equals(row.getSystemClass())).map(row -> row.getId()).toList(),
-                    service.options(-1L, true).stream().map(row -> row.getId()).toList());
-            assertEquals(List.of(), service.options(-1L, false));
+                    service.options(-1L, true, 7L).stream().map(row -> row.getId()).toList());
+            assertEquals(List.of(), service.options(-1L, false, 7L));
         }
     }
 }

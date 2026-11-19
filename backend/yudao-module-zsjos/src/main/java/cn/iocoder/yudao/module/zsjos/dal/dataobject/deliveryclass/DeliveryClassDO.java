@@ -25,6 +25,8 @@ public class DeliveryClassDO extends TenantBaseDO {
     private String selectedAttrsJson;
     private String selectedSpecsJson;
     private String selectedSkusJson;
+    /** YYYY-MM of an order-driven class; with product and homeroom it forms the auto-class key. */
+    private String examMonth;
     private Long categoryId;
     private String categoryNameSnapshot;
     private String categoryPathSnapshot;

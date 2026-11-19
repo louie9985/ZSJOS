@@ -66,7 +66,7 @@ public class SubordinateSalesCommandService {
         if (Objects.equals(beforeOwner, targetUserId)) {
             throw exception(SUBORDINATE_SALES_TARGET_INVALID);
         }
-        if (scope.managed(managerUserId).stream().noneMatch(user -> Objects.equals(user.getId(), targetUserId))
+        if (!scope.transferTargetIds(managerUserId).contains(targetUserId)
                 || !assignmentService.isEligibleSalesUser(targetUserId)) throw exception(SUBORDINATE_SALES_TARGET_INVALID);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
@@ -176,10 +176,12 @@ public class SubordinateSalesCommandService {
     public void validateManagedLeads(Collection<Long> leadIds, Long managerUserId) {
         var rows=leadMapper.selectBatchIds(new java.util.LinkedHashSet<>(leadIds)).stream()
                 .collect(java.util.stream.Collectors.toMap(LeadDO::getId,java.util.function.Function.identity()));
+        java.util.Set<Long> managed = null;
         for (Long leadId : new java.util.LinkedHashSet<>(leadIds)) {
             LeadDO lead = rows.get(leadId);
             if (lead == null) throw exception(LEAD_NOT_EXISTS);
-            scope.requireManagedLead(lead, managerUserId);
+            if (managed == null) managed = scope.managedIds(managerUserId);
+            scope.requireManagedLead(lead, managed);
         }
     }
 

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import OrderLeadProfile from './OrderLeadProfile'
 import { giftSummary } from '../services/orderGifts'
 import BusinessTable from './BusinessTable'
@@ -6,7 +7,8 @@ import { Alert, Button, Empty, Image, Space, Tag, Timeline, Typography } from 'a
 import { CheckOutlined, CloseOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import { type SalesOrder, type SalesOrderApprovalStatus, type SalesOrderListItem, type SalesOrderSupervisorApproval, type SalesOrderSupervisorConfirmation } from '../services/api'
 import { formatTimestamp } from '../services/time'
-import { canReviewSalesOrderTask } from '../services/salesOrder'
+import SalesOrderApprovalHistory from './SalesOrderApprovalHistory'
+import { FINANCE_ORDER_PROCESS_KEY, canReviewSalesOrderTask } from '../services/salesOrder'
 import DetailFieldGrid from './DetailFieldGrid'
 import SalesOrderInformationTable from './SalesOrderInformationTable'
 import SalesOrderVoucherAttachments from './SalesOrderVoucherAttachments'
@@ -21,7 +23,7 @@ export const SALES_ORDER_TASK_LABELS: Record<string, string> = {
   registrationReview: '报名履约中心', financeReview: '财务结算中心'
 }
 const TASK_STATUS_LABELS: Record<number, string> = { 1: '审批中', 2: '审批通过', 3: '审批不通过', 4: '已取消', 5: '已退回', 7: '审批通过中' }
-const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消' }
+const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消', skipped: '已跳过' }
 const APPROVAL_NODE_STATUS_COLORS: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', cancelled: 'default' }
 
 type ApprovalNode = {
@@ -102,9 +104,10 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
   </section>
 }
 
-export default function SalesOrderDetailCards({ order, approvalContext, mode, informationLayout = 'cards', reloadVouchers, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate, onWithdraw }: {
+export default function SalesOrderDetailCards({ order, approvalContext, mode, approvalSidebar, informationLayout = 'cards', reloadVouchers, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate, onWithdraw }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
+  approvalSidebar?: ReactNode
   mode: 'mine' | 'team' | 'approval-todo' | 'approval-done'
   informationLayout?: 'cards' | 'table'
   reloadVouchers?: () => Promise<SalesOrder['paymentVouchers']>
@@ -118,6 +121,10 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
   const tableLayout = informationLayout === 'table'
   const InformationFields = tableLayout ? SalesOrderInformationTable : DetailFieldGrid
   const task = approvalContext || order
+  const nativeFlow = order.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY
+  const nodeName = task.taskName || (nativeFlow
+    ? order.approvalProgress?.nodes.filter(node => node.status === 1).map(node => node.name).join('、')
+    : SALES_ORDER_TASK_LABELS[task.taskDefinitionKey || ''])
   const canReview = approvalContext ? canReviewSalesOrderTask(order, approvalContext) : false
   const supervisorConfirmation = task.taskDefinitionKey === 'registrationReview'
     ? order.registrationSupervisorConfirmation : task.taskDefinitionKey === 'financeReview' ? order.financeSupervisorConfirmation : undefined
@@ -156,13 +163,13 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
     }
     if (order.status === 'effective') return {
       type: 'success' as const, title: '订单审批已通过',
-      description: order.effectiveAt ? `通过时间：${formatTimestamp(order.effectiveAt)}` : '双中心审批已完成'
+      description: order.effectiveAt ? `通过时间：${formatTimestamp(order.effectiveAt)}` : '审批已完成'
     }
     return {
       type: 'info' as const, title: supervisorPending ? '负责人主管会签中' : '订单待审核',
       description: supervisorPending
         ? supervisorConfirmation.requestReason || '等待负责人主管确认'
-        : `等待${SALES_ORDER_TASK_LABELS[task.taskDefinitionKey || ''] || '审批中心'}处理`
+        : `等待${nodeName || '审批人'}处理`
     }
   })()
   return <div className="sales-order-detail">
@@ -187,7 +194,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
           { key: 'orderType', label: '订单类型', value: order.orderType === 'repurchase' ? '复购' : '首购' },
           { key: 'round', label: '审批轮次', value: `第 ${order.approvalRoundNo || 1} 轮` },
           { key: 'status', label: '当前状态', value: tableLayout ? <Tag color={SALES_ORDER_STATUS_COLORS[order.status]}>{SALES_ORDER_STATUS_LABELS[order.status]}</Tag> : SALES_ORDER_STATUS_LABELS[order.status] },
-          { key: 'center', label: '当前中心', value: SALES_ORDER_TASK_LABELS[task.taskDefinitionKey || ''] || '-' },
+          { key: 'center', label: '审批节点', value: nodeName || '-' },
           { key: 'submittedAt', label: '提交时间', value: formatTimestamp(order.submittedAt) },
           { key: 'effectiveAt', label: '通过时间', value: formatTimestamp(order.effectiveAt) },
           ...(mode === 'approval-done' ? [
@@ -214,7 +221,8 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
           { key: 'paidAt', label: '客户付款时间', value: formatTimestamp(order.customerPaidAt) },
           { key: 'feeMode', label: '缴费方式', value: order.feeModeLabelSnapshot || "历史未记录" },
           { key: 'paymentMethod', label: '支付方式', value: order.paymentMethodLabelSnapshot || "历史未记录" },
-          { key: 'examTime', label: '商定考试时间', value: order.agreedExamTime },
+          { key: 'examMonth', label: '商定考试月份', value: order.agreedExamMonth },
+          ...(order.agreedExamTime ? [{ key: 'examTime', label: '原商定考试时间（文本）', value: order.agreedExamTime }] : []),
           { key: 'classType', label: '开通班种', value: order.classType },
           { key: 'servicePeriod', label: '服务周期', value: order.servicePeriodLabelSnapshot || "历史未记录" },
           { key: 'studentSource', label: '学生来源', value: order.studentSourceLabelSnapshot || "历史未记录" }
@@ -256,13 +264,17 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, in
       </main>
       <aside className="sales-order-approval-sidebar" aria-label="审批状态">
         <Alert className="sales-order-approval-status" showIcon {...statusAlert}/>
+        {approvalSidebar ?? <>
         {hasApprovalActions && <Space wrap className="sales-order-approval-actions">
           {mode === 'mine' && (order.status === 'revision_required') && order.canRevise && onRevise && <Button className="sales-order-revise-button" type="primary" icon={<EditOutlined/>} onClick={onRevise}>修改并重新提交</Button>}
           {mode === 'mine' && order.status === 'pending_approval' && order.canTerminate && onWithdraw && <Button onClick={onWithdraw}>撤回修改</Button>}
           {mode === 'mine' && order.canTerminate && onTerminate && <Button danger icon={<StopOutlined/>} onClick={onTerminate}>终止订单</Button>}
           {mode === 'approval-todo' && canReview && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button>{onRequestSupervisor && order.canRequestSupervisorConfirmation && <Button icon={<UserSwitchOutlined/>} onClick={onRequestSupervisor}>申请主管确认</Button>}</>}
         </Space>}
-        <SalesOrderApprovalRail nodes={approvalNodes}/>
+        {nativeFlow ? <section><Typography.Title level={5}>审批流程</Typography.Title>
+          <SalesOrderApprovalHistory progress={order.approvalProgress}/>
+        </section> : <SalesOrderApprovalRail nodes={approvalNodes}/>}
+        </>}
       </aside>
     </div>
   </div>

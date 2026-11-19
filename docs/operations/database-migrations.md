@@ -1380,3 +1380,21 @@ Fresh installations start with the empty baseline and still run V365 â†’ V366 â†
 Scoped MySQL checks use `test_class_exam_progress.py` and `test_exam_collection_export.py` without `--apply-local`; they retain isolated synthetic schemas. The 2026-11-12 read-only application comparison already matches the corrected progress/export definitions, so no direct application-database correction is needed. Complete fresh-chain verification and residual findings are recorded in the same handoff.
 
 Final isolated acceptance on 2026-11-12 passed bootstrap plus all 391 pending migrations across Core/EAM/FMS/HRM/PMS, zero final schema drift, zero pending migrations and zero fresh data-grade findings, followed by replay, UTF-8 HEX and nonempty-bootstrap rejection checks. The V366/V368 upgrade fixtures passed prerequisite and second-ledger failure/recovery cases. Evidence is retained in [the synchronization handoff](../../handoff/local-v367-baseline-20261112.md). This synthetic acceptance does not certify production data or authorize replaying initialization against installed databases.
+
+## V378 desired structure synchronization
+
+Core desired schema and fresh baseline include the empty enrollment agreement table and six nullable agreement snapshot fields on student forms. Existing databases apply V378 in numbered order after its V370 prerequisites; no historical consent or agreement snapshots are invented. The migration owns the initial tenant-1 agreement and menu metadata, without role grants. Repeat execution preserves recorded agreement data; inspect actual DDL and both ledgers after failure. Back up before upgrade; rollback retains added columns and signed snapshots.
+
+### V377 verified UUID generator execution
+
+SQL cannot infer the active Java ID generator from historical ID shapes. Confirm all application executors are stopped and review the deployed Flowable configuration. This repository uses Flowable 8 Spring Boot StrongUuidGenerator by default with no generator override. Only after that verification, set `@zsjos_v377_id_generator='strong-uuid'` in the same connection before executing V377. UUID mode permits a missing next.dbid without inventing one; existing counters remain unchanged and malformed counters still fail. Unset/database mode continues to refuse populated engines missing a counter. Unknown mode values fail. Existing applied artifacts/checksums require separate rollout review; never reconcile them automatically. Preserve full schema fingerprints, metadata/ledger transaction and backup requirements.
+
+## V380 category agreement schema
+
+Core desired schema and fresh baseline include the empty category agreement table and nullable form agreement_category_name snapshot. Existing databases run V380 after the V378 tenant-1 starter. The upgrade preserves all existing agreement/form rows and grants. CREATE/column guards permit repeat and partial recovery; both ledgers follow postconditions. Back up first; DDL is not transactional rollback, and application rollback retains new snapshots. This additive upgrade does not require stopping writers, but ordinary MySQL metadata locks can briefly delay requests.
+
+V380 uses an explicit table definition equivalent to the V378 starter instead of CREATE TABLE LIKE, allowing preflight to identify every pending column. Existing deployed copies require artifact/checksum review, never automatic reconciliation.
+
+## V381 product agreement schema
+
+Core desired schema and fresh baseline include the empty product agreement table and nullable agreement_product_name form snapshot. Apply V381 after V380 with the tenant-1 starter present. Existing category drafts/publications and historical form snapshots are not copied or rewritten; role grants are unchanged. Initial/repeat/partial/error/ledger recovery checks use test_enrollment_product_agreement.py. Back up before upgrade; DDL cannot roll back transactionally, so preserve new structure and signed snapshots when reverting the application.

@@ -61,6 +61,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LeadManagementServiceImplTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Mock private cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService myOperationsService;
 
     @InjectMocks
@@ -170,7 +171,9 @@ class LeadManagementServiceImplTest {
         when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
         when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-recycle")).thenReturn(true);
         when(publicSeaPoolService.canOperate(1L, 20L, 20L)).thenReturn(false);
-        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("sales", "education");
+        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("sales").thenThrow(
+                cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                        cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_RECYCLED_IDENTITY_UNKNOWN));
         assertActions(lead, null, "SUPERVISOR_RECYCLE");
         assertActions(lead, null);
     }
@@ -255,23 +258,23 @@ class LeadManagementServiceImplTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"education_self_sourced,self", "partner,specified"})
-    void educationRestoreProjectionNeedsPermissionAndManagedOwner(String source, String dispatchMode) {
+    @org.junit.jupiter.params.provider.CsvSource({"sales_self_sourced,self", "partner,specified"})
+    void formerEducationSourcesUseSalesRestoreProjection(String source, String dispatchMode) {
         LeadDO lead = actionLead("suspended", "owned", true);
-        lead.setOwnerIdentity("education"); lead.setSourceType(source); lead.setDispatchMode(dispatchMode);
+        lead.setOwnerIdentity("sales"); lead.setSourceType(source); lead.setDispatchMode(dispatchMode);
         assertActions(lead, null);
         when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of(20L));
         LeadRestoreOwnerPolicy policy = new LeadRestoreOwnerPolicy();
         LeadSubmissionIdentityService identityService = org.mockito.Mockito.mock(LeadSubmissionIdentityService.class);
-        when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
-        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("education");
+        when(identityService.isEligibleRetainedOwner(20L)).thenReturn(true);
+        when(teamTransferPolicy.resolveIdentity(lead)).thenReturn("sales");
         org.springframework.test.util.ReflectionTestUtils.setField(policy, "teamTransferPolicy", teamTransferPolicy);
         org.springframework.test.util.ReflectionTestUtils.setField(policy, "identityService", identityService);
         org.springframework.test.util.ReflectionTestUtils.setField(service, "restoreOwnerPolicy", policy);
         assertActions(lead, null);
         when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-restore")).thenReturn(true);
         assertActions(lead, null, "SUPERVISOR_RESTORE");
-        when(identityService.isEligibleEducationOwner(20L)).thenReturn(false);
+        when(identityService.isEligibleRetainedOwner(20L)).thenReturn(false);
         assertActions(lead, null);
         when(leadObjectPermissionService.getManagedUserIds(20L)).thenReturn(Set.of());
         assertActions(lead, null);
@@ -1034,6 +1037,36 @@ class LeadManagementServiceImplTest {
 
         assertEquals(Map.of("valid", 2L), result);
         verify(leadMapper).selectManagementStatusCountsByScope(List.of(10L, 20L), List.of(10L, 20L), false);
+    }
+
+    @Test
+    void salesQueryAllListAndCountShareBoundaryPredicateIncludingUnassignedLeads() {
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        when(salesBoundary.isSalesActor(10L)).thenReturn(true);
+        when(salesBoundary.accessibleSalesUserIds(10L)).thenReturn(Set.of(20L, 10L));
+        when(leadMapper.selectManagementPageByBoundary(any(), org.mockito.ArgumentMatchers.eq(List.of()),
+                org.mockito.ArgumentMatchers.eq(List.of(10L, 20L)), org.mockito.ArgumentMatchers.eq(false), any(), any(),
+                org.mockito.ArgumentMatchers.eq(List.of()), org.mockito.ArgumentMatchers.eq(List.of(10L, 20L)),
+                org.mockito.ArgumentMatchers.eq(10L), org.mockito.ArgumentMatchers.eq(true))).thenReturn(PageResult.empty());
+        when(leadMapper.selectManagementStatusCountsByBoundary(List.of(), List.of(10L, 20L), false, List.of(10L, 20L), 10L, true))
+                .thenReturn(Map.of("submitted", 1L));
+
+        assertTrue(service.getLeadPage(new LeadManagementPageReqVO(), 10L).getList().isEmpty());
+        assertEquals(Map.of("submitted", 1L), service.getStatusCounts(10L));
+    }
+
+    @Test
+    void salesWithoutQueryAllDoesNotSeeUnassignedLeadsOfOthers() {
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(false);
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
+        when(salesBoundary.isSalesActor(10L)).thenReturn(true);
+        when(salesBoundary.accessibleSalesUserIds(10L)).thenReturn(Set.of(10L));
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
+        when(leadMapper.selectManagementStatusCountsByBoundary(List.of(), List.of(10L), false, List.of(10L), 10L, false))
+                .thenReturn(Map.of("valid", 1L));
+
+        assertEquals(Map.of("valid", 1L), service.getStatusCounts(10L));
     }
 
     @Test

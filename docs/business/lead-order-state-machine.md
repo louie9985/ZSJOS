@@ -708,9 +708,9 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 | `valid` | 有效客资 | `lead.status in (valid, won)` |
 | `invalid` | 无效客资 | `lead.status = invalid` |
 | `closed` | 已关闭客资 | `lead.status = closed` |
-| `manual` | 手动录入客资 | `lead.source_type in (sales_self_sourced, education_self_sourced)` |
+| `manual` | 手动录入客资 | `lead.source_type in (sales_self_sourced)`（教务来源已于 2026-11-16 回填为销售） |
 
-`suspended` 归入待判定客资：挂起由判定超时产生，业务上仍属待判定，不单列一级归类。手动录入客资复用已有的自拓语义（销售自拓录、教务自拓录），与 `dispatch_mode = self` 等价，不新增存储字段；新媒体提交与兼职提交不属于手动录入。
+`suspended` 归入待判定客资：挂起由判定超时产生，业务上仍属待判定，不单列一级归类。手动录入客资复用已有的自拓语义（销售自拓录），与 `dispatch_mode = self` 等价，不新增存储字段；新媒体提交与兼职提交不属于手动录入。
 
 统一客资管理不再按提交人/负责人拆分页面，改为三行分级筛选：一级业务归类（取自上表，互斥）× 二级当前环节 × 三级快捷条件，三行各取一个选中项并按交集执行。筛选项全部由服务端筛选方案（视角 `management`）下发，前端不维护静态筛选数组。各行的映射为：
 

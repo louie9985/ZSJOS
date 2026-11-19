@@ -65,6 +65,8 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
         draft.setStatus("draft");
         versionMapper.insert(draft);
         for (RegistrationChecklistTemplateItemDO source : itemMapper.selectByVersionId(published.getId())) {
+            // The retired study-planner fixed item is never carried into new drafts.
+            if (isRetiredPlannerItem(source.getItemKey(), source.getItemType())) continue;
             RegistrationChecklistTemplateItemDO copy = new RegistrationChecklistTemplateItemDO();
             copy.setVersionId(draft.getId()); copy.setItemKey(source.getItemKey()); copy.setItemType(source.getItemType());
             copy.setTitle(source.getTitle()); copy.setSort(source.getSort()); copy.setEnabled(source.getEnabled());
@@ -72,6 +74,7 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
             itemMapper.insert(copy);
         }
         for (RegistrationRouteOptionDO source : routeOptionMapper.selectByVersionId(published.getId())) {
+            if (ASSIGNEE_STUDY_PLANNER.equals(source.getAssigneeType())) continue;
             RegistrationRouteOptionDO copy = new RegistrationRouteOptionDO();
             copy.setVersionId(draft.getId()); copy.setOptionKey(source.getOptionKey());
             copy.setDepartmentId(source.getDepartmentId()); copy.setDepartmentNameSnapshot(source.getDepartmentNameSnapshot());
@@ -89,57 +92,56 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
         RegistrationChecklistTemplateDO template = lockTemplate(reqVO.getTemplateVersion());
         RegistrationChecklistVersionDO draft = versionMapper.selectById(template.getDraftVersionId());
         if (draft == null || !"draft".equals(draft.getStatus())) throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
-        long plannerCount = reqVO.getItems().stream().filter(item -> ITEM_KEY_STUDY_PLANNER.equals(item.getItemKey())).count();
-        RegistrationChecklistDraftSaveReqVO.ItemReqVO planner = reqVO.getItems().stream()
-                .filter(item -> ITEM_KEY_STUDY_PLANNER.equals(item.getItemKey())).findFirst().orElse(null);
-        if (plannerCount != 1 || planner == null || !Boolean.TRUE.equals(planner.getEnabled())) {
-            throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
-        }
-        if (reqVO.getItems().isEmpty() || reqVO.getItems().stream()
+        // Classes are assigned automatically, so drafts no longer carry the study-planner fixed item;
+        // a stale client resubmitting it from an older draft simply drops it.
+        List<RegistrationChecklistDraftSaveReqVO.ItemReqVO> requestedItems = reqVO.getItems().stream()
+                .filter(item -> !isRetiredPlannerItem(item.getItemKey(), item.getItemType())).toList();
+        List<RegistrationChecklistDraftSaveReqVO.RouteOptionReqVO> requestedRoutes = reqVO.getRouteOptions() == null
+                ? List.of() : reqVO.getRouteOptions();
+        if (requestedItems.isEmpty() || requestedItems.stream()
                 .anyMatch(item -> item.getTitle() == null || item.getTitle().isBlank())) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
-        Set<String> requestedItemKeys = reqVO.getItems().stream()
+        Set<String> requestedItemKeys = requestedItems.stream()
                 .map(RegistrationChecklistDraftSaveReqVO.ItemReqVO::getItemKey)
                 .filter(Objects::nonNull).collect(Collectors.toSet());
-        long suppliedItemKeyCount = reqVO.getItems().stream().filter(item -> item.getItemKey() != null).count();
+        long suppliedItemKeyCount = requestedItems.stream().filter(item -> item.getItemKey() != null).count();
         if (requestedItemKeys.size() != suppliedItemKeyCount) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
-        if (reqVO.getRouteOptions() == null || reqVO.getRouteOptions().stream().noneMatch(item -> Boolean.TRUE.equals(item.getEnabled()))) {
-            throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
-        }
-        Set<String> routeKeys = reqVO.getRouteOptions().stream().map(RegistrationChecklistDraftSaveReqVO.RouteOptionReqVO::getOptionKey)
+        // Route options are optional legacy content-director routes; study-planner routing is retired.
+        Set<String> routeKeys = requestedRoutes.stream().map(RegistrationChecklistDraftSaveReqVO.RouteOptionReqVO::getOptionKey)
                 .collect(Collectors.toSet());
-        if (routeKeys.size() != reqVO.getRouteOptions().size() || reqVO.getRouteOptions().stream()
-                .anyMatch(item -> !Set.of(ASSIGNEE_STUDY_PLANNER, ASSIGNEE_CONTENT_DIRECTOR).contains(item.getAssigneeType()))) {
+        if (routeKeys.size() != requestedRoutes.size() || requestedRoutes.stream()
+                .anyMatch(item -> !ASSIGNEE_CONTENT_DIRECTOR.equals(item.getAssigneeType()))) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
-        Set<Long> deptIds = reqVO.getRouteOptions().stream().map(RegistrationChecklistDraftSaveReqVO.RouteOptionReqVO::getDepartmentId)
+        Set<Long> deptIds = requestedRoutes.stream().map(RegistrationChecklistDraftSaveReqVO.RouteOptionReqVO::getDepartmentId)
                 .collect(Collectors.toSet());
-        if (deptIds.size() != reqVO.getRouteOptions().size()) {
+        if (deptIds.size() != requestedRoutes.size()) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
-        deptApi.validateDeptList(deptIds);
-        Map<Long, DeptRespDTO> departments = deptApi.getDeptList(deptIds).stream()
-                .collect(Collectors.toMap(DeptRespDTO::getId, Function.identity()));
+        Map<Long, DeptRespDTO> departments = Map.of();
+        if (!deptIds.isEmpty()) {
+            deptApi.validateDeptList(deptIds);
+            departments = deptApi.getDeptList(deptIds).stream()
+                    .collect(Collectors.toMap(DeptRespDTO::getId, Function.identity()));
+        }
         if (departments.size() != deptIds.size()) throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         itemMapper.deleteByVersionId(draft.getId());
-        for (RegistrationChecklistDraftSaveReqVO.ItemReqVO requested : reqVO.getItems()) {
+        for (RegistrationChecklistDraftSaveReqVO.ItemReqVO requested : requestedItems) {
             RegistrationChecklistTemplateItemDO item = new RegistrationChecklistTemplateItemDO();
             item.setVersionId(draft.getId());
-            boolean system = ITEM_KEY_STUDY_PLANNER.equals(requested.getItemKey());
-            item.setItemKey(system ? ITEM_KEY_STUDY_PLANNER : normalizeKey(requested.getItemKey()));
-            item.setItemType(system ? ITEM_TYPE_STUDY_PLANNER
-                    : ITEM_TYPE_ATTACHMENT.equals(requested.getItemType()) ? ITEM_TYPE_ATTACHMENT : ITEM_TYPE_CHECKBOX);
-            item.setTitle(system ? "配置学习规划师" : requested.getTitle().trim());
-            item.setSort(requested.getSort()); item.setEnabled(requested.getEnabled()); item.setSystemRequired(system);
+            item.setItemKey(normalizeKey(requested.getItemKey()));
+            item.setItemType(ITEM_TYPE_ATTACHMENT.equals(requested.getItemType()) ? ITEM_TYPE_ATTACHMENT : ITEM_TYPE_CHECKBOX);
+            item.setTitle(requested.getTitle().trim());
+            item.setSort(requested.getSort()); item.setEnabled(requested.getEnabled()); item.setSystemRequired(false);
             item.setAttachmentRequired(ITEM_TYPE_ATTACHMENT.equals(item.getItemType())
                     && Boolean.TRUE.equals(requested.getAttachmentRequired()));
             itemMapper.insert(item);
         }
         routeOptionMapper.deleteByVersionId(draft.getId());
-        for (RegistrationChecklistDraftSaveReqVO.RouteOptionReqVO requested : reqVO.getRouteOptions()) {
+        for (RegistrationChecklistDraftSaveReqVO.RouteOptionReqVO requested : requestedRoutes) {
             DeptRespDTO department = departments.get(requested.getDepartmentId());
             RegistrationRouteOptionDO option = new RegistrationRouteOptionDO();
             option.setVersionId(draft.getId()); option.setOptionKey(requested.getOptionKey());
@@ -158,13 +160,12 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
         RegistrationChecklistVersionDO draft = versionMapper.selectById(template.getDraftVersionId());
         List<RegistrationChecklistTemplateItemDO> items = draft == null ? List.of()
                 : itemMapper.selectByVersionId(draft.getId());
-        long plannerCount = items.stream().filter(item -> ITEM_KEY_STUDY_PLANNER.equals(item.getItemKey())
-                && ITEM_TYPE_STUDY_PLANNER.equals(item.getItemType())
-                && Boolean.TRUE.equals(item.getEnabled())
-                && Boolean.TRUE.equals(item.getSystemRequired())).count();
         List<RegistrationRouteOptionDO> routes = draft == null ? List.of() : routeOptionMapper.selectByVersionId(draft.getId());
-        if (draft == null || !"draft".equals(draft.getStatus()) || items.isEmpty() || plannerCount != 1
-                || routes.stream().noneMatch(item -> Boolean.TRUE.equals(item.getEnabled()))) {
+        // Drafts saved before the planner retirement must be re-saved so the retired item/route is removed.
+        if (draft == null || !"draft".equals(draft.getStatus())
+                || items.stream().noneMatch(item -> Boolean.TRUE.equals(item.getEnabled()))
+                || items.stream().anyMatch(item -> isRetiredPlannerItem(item.getItemKey(), item.getItemType()))
+                || routes.stream().anyMatch(item -> ASSIGNEE_STUDY_PLANNER.equals(item.getAssigneeType()))) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
         draft.setStatus("published"); draft.setPublishedAt(LocalDateTime.now()); versionMapper.updateById(draft);
@@ -204,11 +205,15 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
             RegistrationChecklistConfigRespVO.RouteOptionVO row = new RegistrationChecklistConfigRespVO.RouteOptionVO();
             row.setId(item.getId()); row.setOptionKey(item.getOptionKey()); row.setDepartmentId(item.getDepartmentId());
             row.setDepartmentName(item.getDepartmentNameSnapshot()); row.setAssigneeType(item.getAssigneeType());
-            row.setAssigneeTypeLabel(ASSIGNEE_STUDY_PLANNER.equals(item.getAssigneeType()) ? "学习规划师" : "编导");
+            row.setAssigneeTypeLabel(ASSIGNEE_STUDY_PLANNER.equals(item.getAssigneeType()) ? "学习规划师（历史）" : "编导");
             row.setSort(item.getSort()); row.setEnabled(item.getEnabled()); row.setSystemRequired(item.getSystemRequired());
             return row;
         }).toList());
         return result;
+    }
+
+    private boolean isRetiredPlannerItem(String itemKey, String itemType) {
+        return ITEM_KEY_STUDY_PLANNER.equals(itemKey) || ITEM_TYPE_STUDY_PLANNER.equals(itemType);
     }
 
     private String normalizeKey(String key) {

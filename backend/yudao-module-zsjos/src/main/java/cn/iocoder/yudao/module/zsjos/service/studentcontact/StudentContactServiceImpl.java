@@ -101,6 +101,12 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceObjectPermissionProvider serviceReadPermission;
 
     @Override
+    @ZsjosPermission(bizType = "student-service", bizId = "#id", action = "read")
+    public void checkNoteSubject(Long id, Long userId) {
+        requireReadable(id, userId);
+    }
+
+    @Override
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
     public StudentContactContextRespVO getContext(Long relationId, Long userId) {
         ServiceRelationDO relation = requireReadable(relationId, userId);

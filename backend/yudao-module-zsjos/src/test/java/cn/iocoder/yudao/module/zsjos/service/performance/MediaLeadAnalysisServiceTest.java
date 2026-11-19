@@ -56,7 +56,7 @@ class MediaLeadAnalysisServiceTest {
     }
     private MediaLeadTargetDO target(String type, long id, int count) {
         var row = new MediaLeadTargetDO(); row.setScopeType(type); row.setScopeId(id);
-        row.setTargetCount(count); row.setManual(true); row.setVersion(0); return row;
+        row.setPeriodStart(MONTH); row.setTargetCount(count); row.setManual(true); row.setVersion(0); return row;
     }
     private void organizationFixture(List<MediaLeadTargetDO> saved) {
         when(access.has(MediaLeadAccess.TARGET_QUERY)).thenReturn(true);
@@ -106,6 +106,20 @@ class MediaLeadAnalysisServiceTest {
         assertEquals(12, rows.stream().filter(x -> "DEPT".equals(x.scopeType())).findFirst().orElseThrow().targetCount());
         assertEquals(12, rows.stream().filter(x -> "CENTER".equals(x.scopeType())).findFirst().orElseThrow().targetCount());
         assertTrue(rows.stream().filter(x -> "DEPT".equals(x.scopeType())).noneMatch(MediaLeadVO.Target::manual));
+    }
+
+    @Test void amountTargetsSumDecimalsIndependentlyAndRestoreWithoutChangingCounts() {
+        var first = target("USER", 1, 5); first.setTargetAmount(new java.math.BigDecimal("100.25")); first.setAmountManual(true);
+        var second = target("USER", 2, 7); second.setTargetAmount(new java.math.BigDecimal("200.50")); second.setAmountManual(true);
+        var department = target("DEPT", 10, 20); department.setTargetAmount(new java.math.BigDecimal("999.99")); department.setAmountManual(true);
+        organizationFixture(List.of(first, second, department));
+        var center = service.listTargets(MONTH).stream().filter(x -> "CENTER".equals(x.scopeType())).findFirst().orElseThrow();
+        assertEquals(20, center.targetCount()); assertEquals(new java.math.BigDecimal("999.99"), center.targetAmount());
+        department.setAmountManual(false);
+        center = service.listTargets(MONTH).stream().filter(x -> "CENTER".equals(x.scopeType())).findFirst().orElseThrow();
+        assertEquals(20, center.targetCount()); assertEquals(new java.math.BigDecimal("300.75"), center.targetAmount());
+        second.setAmountManual(false);
+        assertNull(service.listTargets(MONTH).stream().filter(x -> "CENTER".equals(x.scopeType())).findFirst().orElseThrow().targetAmount());
     }
 
     @Test void manualDepartmentOverridesAutomaticCenterSum() {
@@ -259,6 +273,30 @@ class MediaLeadAnalysisServiceTest {
         var second = new MediaLeadVO.TargetEdit("USER", 2L, MONTH, 7, null, "月度设置", false);
         assertThrows(RuntimeException.class, () -> service.saveTargets(List.of(first, second)));
         verifyNoInteractions(targets, revisions);
+    }
+
+    @Test void savingAndRestoringAmountPreservesCountAndChecksVersion() {
+        var row = target("DEPT", 10, 25); row.setId(9L); row.setDeptId(10L); row.setVersion(3);
+        when(access.has(MediaLeadAccess.TARGET_UPDATE)).thenReturn(true);
+        when(access.writeDeptAllowed(10L)).thenReturn(true);
+        when(targets.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(row);
+        service.saveTargets(List.of(new MediaLeadVO.TargetEdit("DEPT", 10L, MONTH, null, 3, "金额设置", false, new java.math.BigDecimal("123.45"), true)));
+        assertEquals(25, row.getTargetCount()); assertTrue(row.getManual()); assertTrue(row.getAmountManual());
+        assertEquals(new java.math.BigDecimal("123.45"), row.getTargetAmount()); assertEquals(4, row.getVersion());
+        assertThrows(RuntimeException.class, () -> service.saveTargets(List.of(new MediaLeadVO.TargetEdit("DEPT", 10L, MONTH, null, 3, "过期版本", true, null, true))));
+        service.saveTargets(List.of(new MediaLeadVO.TargetEdit("DEPT", 10L, MONTH, null, 4, "恢复金额汇总", true, null, true)));
+        assertEquals(25, row.getTargetCount()); assertTrue(row.getManual()); assertFalse(row.getAmountManual());
+        verify(targets, times(2)).updateById(row);
+        verify(revisions, times(2)).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.performance.MediaLeadRevisionDO.class));
+    }
+
+    @Test void combinedNextMonthSaveRetainsHistoryAndChangesBothMetrics() {
+        var old=target("USER",1,25);old.setId(11L);old.setDeptId(10L);old.setTargetAmount(new java.math.BigDecimal("100.50"));old.setAmountManual(true);
+        when(access.has(MediaLeadAccess.TARGET_UPDATE)).thenReturn(true);when(access.writeDeptAllowed(10L)).thenReturn(true);
+        when(access.user(1L)).thenReturn(user(1));when(targets.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(old);
+        service.saveTargets(List.of(new MediaLeadVO.TargetEdit("USER",1L,MONTH.plusMonths(1),30,0,"同时调整",false,new java.math.BigDecimal("200.75"),false,true,true,false,11L)));
+        verify(targets).insert(argThat((MediaLeadTargetDO x)->x.getPeriodStart().equals(MONTH.plusMonths(1))&&x.getTargetCount()==30&&x.getTargetAmount().equals(new java.math.BigDecimal("200.75"))));
+        verify(targets,never()).updateById(any(MediaLeadTargetDO.class));assertEquals(25,old.getTargetCount());assertEquals(MONTH,old.getPeriodStart());
     }
 
     @Test void pagePermissionRequiredBeforeReadingTargetRows() {

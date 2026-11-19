@@ -14,9 +14,11 @@ import static cn.iocoder.yudao.module.zsjos.service.examcollection.ExamCollectio
 public class ExamCollectionPermissionProvider implements ZsjosObjectPermissionProvider {
     @Resource private ExamCollectionTaskMapper tasks;
     @Resource private PermissionApi permissions;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     public String getBizType() { return "exam-collection"; }
     public boolean hasPermission(Long id, String action, Long userId) {
-        if (id == null || userId == null || action == null || !ACTIONS.contains(action) || TenantContextHolder.getTenantId() == null) return false;
+        if (id == null || userId == null || action == null || !ACTIONS.contains(action) || TenantContextHolder.getTenantId() == null
+                || !salesBoundary.canUseTenantWide(userId)) return false;
         var task = tasks.selectById(id);
         return task != null && !Boolean.TRUE.equals(task.getDeleted())
                 && Objects.equals(task.getTenantId(), TenantContextHolder.getTenantId())

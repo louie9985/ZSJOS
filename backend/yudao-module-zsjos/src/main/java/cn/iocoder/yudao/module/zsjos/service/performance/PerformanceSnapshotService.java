@@ -54,14 +54,15 @@ public class PerformanceSnapshotService {
   var row=new PerformanceAttributionDO();row.setFactType(type);row.setFactId(id);row.setUserId(userId);
   // 本路径在业务事实发生的同一事务后立即写入，组织取当时归属，可作为历史组织证据。
   // 事后补写的历史快照由离线脚本显式标注 current，不得走本路径。
+  // 销售与交付已合并：新快照一律归 sales；历史 delivery 组织映射仅说明有组织证据，不再产生 delivery 事实。
   row.setOrgSource("frozen");
   var user=userId==null?null:access.user(userId);
-  if(user!=null){row.setUserName(user.getNickname());row.setDeptId(user.getDeptId());var dept=access.dept(user.getDeptId());if(dept!=null)row.setDeptName(dept.getName());var m=access.owningOrganization(user.getDeptId());if(m!=null){if(("sales".equals(m.getBusinessDomain())||"delivery".equals(m.getBusinessDomain())))row.setBusinessDomain(m.getBusinessDomain());row.setCenterId(m.getCenterId());var c=access.dept(m.getCenterId());if(c!=null)row.setCenterName(c.getName());}}
+  if(user!=null){row.setUserName(user.getNickname());row.setDeptId(user.getDeptId());var dept=access.dept(user.getDeptId());if(dept!=null)row.setDeptName(dept.getName());var m=access.owningOrganization(user.getDeptId());if(m!=null){if(("sales".equals(m.getBusinessDomain())||"delivery".equals(m.getBusinessDomain())))row.setBusinessDomain("sales");row.setCenterId(m.getCenterId());var c=access.dept(m.getCenterId());if(c!=null)row.setCenterName(c.getName());}}
   if(lead!=null){row.setLeadId(lead.getId());row.setAssignmentId(lead.getCurrentAssignmentHistoryId());row.setReceivedAt(lead.getOwnershipStartedAt());row.setChannelCode(lead.getSourceChannelId());row.setChannelLabel(lead.getSourceChannelLabelSnapshot());row.setSourceGroup(sourceGroup(lead.getSourceType()));}
   else row.setSourceGroup("unknown");
   return row;
  }
- // 客资来源 -> 业绩来源分组。销售自拓与教务自拓同为内部人员手动录单自拓，都归 self；
+ // 客资来源 -> 业绩来源分组。销售自拓（含合并前回填的教务自拓）为内部人员手动录单自拓，归 self；
  // 用 isSelfSourced 而不是枚举字面量，避免再加一类自拓时又漏分支（曾漏过 education_self_sourced）。
  static String sourceGroup(String sourceType) {
   if(LeadConstants.isSelfSourced(sourceType))return "self";

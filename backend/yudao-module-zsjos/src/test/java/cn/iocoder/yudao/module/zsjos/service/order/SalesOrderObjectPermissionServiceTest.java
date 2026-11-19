@@ -38,7 +38,52 @@ class SalesOrderObjectPermissionServiceTest {
     @Mock private DeptApi deptApi;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadPublicSeaPoolService publicSeaPoolService;
+
+    @Test
+    void salesActorReadsOwnSubmissionsButNotOtherDepartmentOrders() {
+        when(salesBoundary.isSalesActor(30L)).thenReturn(true);
+        when(salesBoundary.canAccessUser(30L, 40L)).thenReturn(false);
+        // Orders the actor submitted stay visible even when the formal owner is elsewhere or not yet set.
+        var ownOther = new SalesOrderDO().setId(1L).setSubmitterUserId(30L).setFormalSalesUserId(40L);
+        org.junit.jupiter.api.Assertions.assertTrue(service.canRead(ownOther, 30L));
+        var ownMissing = new SalesOrderDO().setId(2L).setSubmitterUserId(30L);
+        org.junit.jupiter.api.Assertions.assertTrue(service.canRead(ownMissing, 30L));
+        var foreign = new SalesOrderDO().setId(3L).setSubmitterUserId(31L).setFormalSalesUserId(40L);
+        org.junit.jupiter.api.Assertions.assertFalse(service.withinSalesBoundary(foreign, 30L));
+        var foreignMissing = new SalesOrderDO().setId(4L).setSubmitterUserId(31L);
+        org.junit.jupiter.api.Assertions.assertFalse(service.withinSalesBoundary(foreignMissing, 30L));
+    }
+
+    @Test
+    void batchReadFilterResolvesBoundaryOnceAndKeepsOwnSubmissions() {
+        when(salesBoundary.isSalesActor(30L)).thenReturn(true);
+        when(salesBoundary.accessibleSalesUserIds(30L)).thenReturn(Set.of(30L, 31L));
+        var ownElsewhere = new SalesOrderDO().setId(1L).setSubmitterUserId(30L).setFormalSalesUserId(40L);
+        var formalSelf = new SalesOrderDO().setId(2L).setSubmitterUserId(99L).setFormalSalesUserId(30L);
+        var foreign = new SalesOrderDO().setId(3L).setSubmitterUserId(99L).setFormalSalesUserId(40L);
+        assertEquals(Set.of(1L, 2L), service.filterReadable(List.of(ownElsewhere, formalSelf, foreign), 30L));
+        verify(salesBoundary, never()).canAccessUser(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void nonSalesActorOrderBoundaryUnchanged() {
+        var foreign = new SalesOrderDO().setId(3L).setSubmitterUserId(99L).setFormalSalesUserId(40L);
+        org.junit.jupiter.api.Assertions.assertTrue(service.withinSalesBoundary(foreign, 30L));
+        org.junit.jupiter.api.Assertions.assertNull(service.boundaryUserIds(30L));
+    }
+
+    @Test
+    void salesManagementAllRetainsFormalOwnerBoundary() {
+        when(salesBoundary.isSalesActor(30L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(30L, "zsjos:sales-order:query-all")).thenReturn(true);
+        when(salesBoundary.accessibleSalesUserIds(30L)).thenReturn(Set.of(30L, 31L));
+        var scope = service.resolveManagementScope(30L);
+        org.junit.jupiter.api.Assertions.assertTrue(scope.isAll());
+        assertEquals(Set.of(30L, 31L), scope.getBoundaryUserIds());
+        assertEquals(30L, SalesOrderBoundaryUserIds.actorOf(scope.getBoundaryUserIds()));
+    }
 
     @Test
     void enabledUsersIncludesDepartmentLeadersAndExcludesDisabledUser() {

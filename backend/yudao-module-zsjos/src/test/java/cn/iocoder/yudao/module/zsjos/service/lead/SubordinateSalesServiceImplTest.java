@@ -43,6 +43,7 @@ class SubordinateSalesServiceImplTest {
     @Mock private BusinessTaskMapper taskMapper;
     @Mock private AdminUserApi adminUserApi;
     @Mock private PostApi postApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Mock private cn.iocoder.yudao.module.system.api.dept.DeptApi deptApi;
     @Mock private LeadSubmissionIdentityService identityService;
     @Mock private LeadTeamTransferPolicy teamTransferPolicy;
@@ -52,11 +53,14 @@ class SubordinateSalesServiceImplTest {
         cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
         var scope = new SubordinateSalesScope();
         org.springframework.test.util.ReflectionTestUtils.setField(scope,"users",adminUserApi);
-        org.springframework.test.util.ReflectionTestUtils.setField(scope,"posts",postApi);
+        org.springframework.test.util.ReflectionTestUtils.setField(scope,"salesBoundary",salesBoundary);
         org.springframework.test.util.ReflectionTestUtils.setField(scope,"permissions",permissionApi);
         org.springframework.test.util.ReflectionTestUtils.setField(scope,"managers",permissionService);
         org.springframework.test.util.ReflectionTestUtils.setField(scope,"ownership",teamTransferPolicy);
         org.springframework.test.util.ReflectionTestUtils.setField(service,"scope",scope);
+        org.mockito.Mockito.lenient().when(salesBoundary.accessibleSalesUserIds(org.mockito.ArgumentMatchers.anyLong())).thenReturn(Set.of(20L,30L,40L));
+        org.mockito.Mockito.lenient().when(salesBoundary.filterTransferTargets(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anyCollection()))
+                .thenAnswer(i -> new java.util.HashSet<Long>(i.<java.util.Collection<Long>>getArgument(1)));
         org.mockito.Mockito.lenient().when(teamTransferPolicy.resolveIdentity(org.mockito.ArgumentMatchers.any())).thenAnswer(i -> ((LeadDO)i.getArgument(0)).getOwnerIdentity());
     }
     @org.junit.jupiter.api.AfterEach void clearTenant() { cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear(); }
@@ -67,7 +71,7 @@ class SubordinateSalesServiceImplTest {
         var user = subordinate(20L, 0, 5L);
         var post = new PostRespDTO(); post.setId(5L);
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+
         when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(user));
         var candidate = new LeadAssignmentUserRespVO(); candidate.setId(20L);
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate));
@@ -87,7 +91,7 @@ class SubordinateSalesServiceImplTest {
         var user = subordinate(20L, 1, 5L);
         var post = new PostRespDTO(); post.setId(5L);
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+
         when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(user));
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of());
         assertThrows(ServiceException.class, () -> service.updateNewcomerPool(20L, newcomerRequest(), 10L));
@@ -112,7 +116,7 @@ class SubordinateSalesServiceImplTest {
         var user = subordinate(20L, 0, 5L);
         var post = new PostRespDTO(); post.setId(5L);
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+
         when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(user));
         var dispatch = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.SalesDispatchStatusRespVO();
         dispatch.setPresence("online"); dispatch.setMode("accepting");
@@ -176,8 +180,9 @@ class SubordinateSalesServiceImplTest {
     }
 
     @Test void nonSalesEmployeesAreDeniedBeforeTaskQueries() {
+        when(salesBoundary.accessibleSalesUserIds(10L)).thenReturn(Set.of());
         var post = new PostRespDTO(); post.setId(5L);
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L,30L));
         when(adminUserApi.getUserList(Set.of(20L,30L))).thenReturn(List.of(subordinate(20L,0,7L),subordinate(30L,1,8L)));
         assertThrows(ServiceException.class, () -> service.getTaskPage(20L,new SubordinateTaskPageReqVO(),10L));
@@ -199,7 +204,7 @@ class SubordinateSalesServiceImplTest {
     @Test
     void administratorReadsDisabledSalesWithoutGainingBulkPauseAuthority() {
         var post = new PostRespDTO(); post.setId(5L);
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+
         when(permissionApi.hasTenantReadAllAccess(10L)).thenReturn(true);
         when(adminUserApi.getUserListByStatus(0)).thenReturn(List.of());
         when(adminUserApi.getUserListByStatus(1)).thenReturn(List.of(subordinate(30L, 1, 5L)));
@@ -232,12 +237,7 @@ class SubordinateSalesServiceImplTest {
 
     @Test
     void batchTransferReturnsPartialSuccessPerLead() {
-        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L));
-        when(leadMapper.selectById(2L)).thenReturn(new LeadDO().setId(2L));
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L));
-        var post = new PostRespDTO(); post.setId(5L);
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
-        when(adminUserApi.getUserList(Set.of(20L,30L))).thenReturn(List.of(subordinate(20L,0,5L),subordinate(30L,0,5L)));
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(30L)));
         when(leadMapper.selectBatchIds(Set.of(1L, 2L))).thenReturn(List.of(
                 new LeadDO().setId(1L).setLeadNo("KZ202608141200000001"),
@@ -316,7 +316,7 @@ class SubordinateSalesServiceImplTest {
         AdminUserRespDTO subordinate = new AdminUserRespDTO();
         subordinate.setId(20L); subordinate.setPostIds(Set.of(5L));
         when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(subordinate));
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(salesPost);
+
         when(taskMapper.selectMyPending(20L)).thenReturn(List.of());
         SubordinateTaskPageReqVO request = new SubordinateTaskPageReqVO();
 
@@ -331,7 +331,7 @@ class SubordinateSalesServiceImplTest {
         AdminUserRespDTO enabled = subordinate(20L, 0, 5L);
         AdminUserRespDTO disabled = subordinate(30L, 1, 5L);
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L, 40L));
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(salesPost);
+
         when(adminUserApi.getUserList(Set.of(20L, 30L, 40L))).thenReturn(List.of(enabled, disabled));
         when(dispatchStatusService.pausePreferenceByManager(20L)).thenReturn(true);
         when(dispatchStatusService.pausePreferenceByManager(30L)).thenReturn(false);
@@ -367,14 +367,25 @@ class SubordinateSalesServiceImplTest {
     }
     @Test void batchCandidatesExcludeEveryCurrentOwner() {
         var post = new PostRespDTO(); post.setId(5L);
-        when(postApi.getPostByCode("sales_specialist")).thenReturn(post);
+
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L,30L,40L));
-        when(adminUserApi.getUserList(Set.of(20L,30L,40L))).thenReturn(List.of(subordinate(20L,0,5L),subordinate(30L,0,5L),subordinate(40L,0,5L)));
-        when(leadMapper.selectBatchIds(List.of(1L,2L))).thenReturn(List.of(
-            new LeadDO().setId(1L).setOwnerUserId(20L).setStatus("submitted").setAssignmentStatus("owned"),
-            new LeadDO().setId(2L).setOwnerUserId(30L).setStatus("submitted").setAssignmentStatus("owned")));
+        var first = new LeadDO().setId(1L).setOwnerUserId(20L).setSourceType("sales_self_sourced").setStatus("submitted").setAssignmentStatus("owned");
+        var second = new LeadDO().setId(2L).setOwnerUserId(30L).setSourceType("internal_new_media").setStatus("submitted").setAssignmentStatus("owned");
+        when(leadMapper.selectBatchIds(List.of(1L,2L))).thenReturn(List.of(first,second));
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(20L),sales(30L),sales(40L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(sales(30L),sales(40L)));
         assertEquals(List.of(40L),service.getBatchTransferCandidates(10L,List.of(1L,2L)).stream().map(LeadAssignmentUserRespVO::getId).toList());
+        // Candidates and receivers are loaded once for the whole batch, never per lead.
+        verify(assignmentService).getEligibleSalesUsers();
+        verify(assignmentService).getEligibleReceivers();
+        verify(leadMapper, never()).selectById(org.mockito.ArgumentMatchers.anyLong());
+    }
+    @Test void transferCandidatesUseDepartmentBoundaryNotManagerDataScope() {
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L,30L));
+        when(salesBoundary.filterTransferTargets(10L, Set.of(20L,30L))).thenReturn(Set.of(30L));
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(20L),sales(30L)));
+        assertEquals(List.of(30L),service.getTransferCandidates(10L).stream().map(LeadAssignmentUserRespVO::getId).toList());
+        verify(salesBoundary, never()).accessibleSalesUserIds(10L);
     }
     @Test void completedBatchReplaysWithoutRecheckingChangedOwnership() {
         var request=new SubordinateBatchLeadActionReqVO();request.setLeadIds(List.of(1L));request.setTargetUserId(30L);request.setReason("转派");request.setIdempotencyKey("completed");

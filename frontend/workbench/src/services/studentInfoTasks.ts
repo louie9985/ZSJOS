@@ -1,5 +1,5 @@
 import type { ProductSpec } from './productSpecs'
-import { http, unwrap, type PageResult } from './api'
+import { http, unwrap } from './api'
 import type { StudentInfoLink, StudentInfoDetail, StudentInfoImage, StudentInfoField } from './studentInfo'
 export interface CollectionCandidate { formId: number; productName: string; revision: number; missing: string[] }
 export interface CollectionTask {
@@ -14,7 +14,6 @@ export const collectionTasksApi = {
   generationConfig: async (id: number) => unwrap<CollectionGenerationConfig>(await http.get(`${base}/${id}/generation-config`)),
   byRegistration: async (caseId:number) => unwrap<CollectionTask>(await http.get(`${base}/by-registration/${caseId}`)),
   detail: async (id: number) => unwrap<CollectionTask>(await http.get(`${base}/${id}`)),
-  page: async (pageNo: number, keyword: string, personId?: number, status?: string, orderStatus?: string) => unwrap<PageResult<CollectionTask>>(await http.get(`${base}/page`, { params: { pageNo, pageSize: 20, keyword, personId, status, orderStatus } })),
   command: async (id: number, operation: 'generate' | 'reuse' | 'sent' | 'regenerate' | 'revoke', command: CollectionCommand) => unwrap<CollectionTask>(await http.post(`${base}/${id}/${operation}`, command)),
   link: async (id: number) => unwrap<StudentInfoLink | null>(await http.get(`${base}/${id}/link`)),
 }

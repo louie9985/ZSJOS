@@ -28,7 +28,7 @@ final class AdvancedFilterMetadata {
 
     static List<String> pages(Collection<String> scenes) {
         return scenes.stream().sorted().flatMap(scene -> {
-            var pages = "education_team".equals(scene) ? List.of("education_team") : PAGES.get("student_service".equals(scene) ? "student" : scene);
+            var pages = PAGES.get("student_service".equals(scene) ? "student" : scene);
             if (pages == null) throw new IllegalStateException("Missing filter page metadata for scene: " + scene);
             return pages.stream();
         }).distinct().toList();

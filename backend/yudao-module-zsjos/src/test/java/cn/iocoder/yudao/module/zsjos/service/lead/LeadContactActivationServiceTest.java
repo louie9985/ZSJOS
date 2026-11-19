@@ -42,7 +42,7 @@ class LeadContactActivationServiceTest {
         PersonDO second = new PersonDO(); second.setId(2L);
         when(personMapper.selectDuplicateCandidates("13800000000", "wx_test")).thenReturn(List.of(first, second));
         LeadDO a = new LeadDO().setId(10L).setPersonId(1L).setStatus("closed").setOwnerUserId(30L);
-        LeadDO b = new LeadDO().setId(20L).setPersonId(2L).setStatus("won").setOwnerIdentity("education").setOwnerUserId(40L);
+        LeadDO b = new LeadDO().setId(20L).setPersonId(2L).setStatus("won").setOwnerIdentity("sales").setOwnerUserId(40L);
         LeadDO c = new LeadDO().setId(21L).setPersonId(2L).setStatus("submitted");
         when(leadMapper.selectContactActivationLeads(List.of(1L, 2L))).thenReturn(List.of(b, a, a, c));
         for (LeadDO lead : List.of(a,b,c)) when(leadMapper.selectByIdForUpdate(lead.getId(), 9L)).thenReturn(lead);

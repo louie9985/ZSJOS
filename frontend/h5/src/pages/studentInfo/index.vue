@@ -31,8 +31,24 @@
         </div>
           </div>
         </details>
-        <div class="collection-submit norem"><van-button type="primary" block native-type="submit" :loading="saving" :disabled="saving || hasUploads || hasUploadErrors">提交信息</van-button><p v-if="hasUploads">附件正在上传，请稍候</p><p v-else-if="hasUploadErrors">请重试或移除上传失败的附件后提交</p><p>资料仅用于报名与履约服务，请放心填写。</p></div>
+        <section v-if="runtime.agreementBody" class="agreement-card collection-group norem">
+          <van-button native-type="button" round plain type="primary" aria-label="阅读协议" icon="description-o" @click="openAgreement">阅读协议</van-button>
+          <label class="agreement-consent norem"><input v-model="agreed" type="checkbox" :disabled="saving" :aria-disabled="!readDone || saving" @click="guardConsent" />{{ runtime.agreementConsent }}</label>
+        </section>
+        <div class="collection-submit norem"><van-button type="primary" block native-type="submit" :loading="saving" :disabled="saving || hasUploads || hasUploadErrors || (!!runtime.agreementBody && !agreed)">{{ runtime.agreementBody ? '同意协议并提交报名信息' : '提交信息' }}</van-button><p v-if="hasUploads">附件正在上传，请稍候</p><p v-else-if="hasUploadErrors">请重试或移除上传失败的附件后提交</p><p>资料仅用于报名与履约服务，请放心填写。</p></div>
       </form>
+      <van-button v-if="runtime?.status === 'SUBMITTED' && runtime.agreementBody" round plain type="primary" block @click="openAgreement">查看已确认协议</van-button>
+      <van-popup v-model:show="reading" position="bottom" round aria-label="报名协议" @opened="checkEnd" @keydown.esc="reading = false">
+        <section class="agreement-sheet norem">
+          <article ref="reader" tabindex="0" class="agreement-reader" @scroll="checkEnd" v-html="runtime?.agreementBody"></article>
+          <p v-if="runtime?.agreementConfirmedDate">学员确认日期：{{ runtime.agreementConfirmedDate }}</p>
+          <template v-if="runtime?.status === 'DRAFT'">
+            <p class="reading-hint norem" role="status">{{ atEnd ? '已到协议末尾，如同意，请点击下方按钮。' : readingHint }}</p>
+            <van-button round type="primary" block :class="{ 'reading-locked': !atEnd }" :aria-disabled="!atEnd || marking" :loading="marking" @click="markRead">我已完整阅读并同意该协议</van-button>
+          </template>
+          <van-button v-else round type="primary" block @click="reading = false">返回报名信息</van-button>
+        </section>
+      </van-popup>
     </template>
   </main>
 </template>
@@ -40,7 +56,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import { showConfirmDialog, showDialog } from 'vant'
+import { showConfirmDialog, showDialog, showToast } from 'vant'
 import { collectionApi, CollectionError, type CollectionArea, type CollectionRuntime, type CollectionImage, type IdentityAreaInput } from '@/api/studentInfo'
 import CollectionImages from './CollectionImages.vue'
 import CollectionSelect from './CollectionSelect.vue'
@@ -50,6 +66,56 @@ const route = useRoute()
 const token = computed(() => new URLSearchParams(route.hash.slice(1)).get('token') || '')
 let loadSequence = 0
 const runtime = ref<CollectionRuntime>()
+const reading = ref(false), readDone = ref(false), agreed = ref(false), atEnd = ref(false), marking = ref(false)
+const reader = ref<HTMLElement>()
+const readingHint = '请向下滑动至协议末尾，完整阅读后即可确认。'
+function guardConsent(event: MouseEvent) {
+  if (!readDone.value) {
+    event.preventDefault()
+    showToast('请先完整阅读协议，再勾选同意。')
+  }
+}
+function checkEnd() {
+  const el = reader.value
+  if (el && el.clientHeight > 0 && el.scrollHeight - el.scrollTop <= el.clientHeight + 2) atEnd.value = true
+}
+function openAgreement() {
+  atEnd.value = false
+  reading.value = true
+  nextTick(() => { if (reader.value) reader.value.scrollTop = 0 })
+}
+async function markRead() {
+  if (!atEnd.value) { showToast(readingHint); return }
+  const digest = runtime.value?.agreementHash, current = token.value
+  if (!digest || marking.value) return
+  marking.value = true
+  try {
+    await collectionApi.markRead(current, digest)
+    if (current === token.value && runtime.value?.agreementHash === digest) {
+      readDone.value = true
+      agreed.value = true
+      reading.value = false
+    }
+  } catch (cause) {
+    if (current === token.value) {
+      if (cause instanceof CollectionError && cause.code === 1900090030) await refreshAgreement(current)
+      if (current === token.value) await reportSubmitError(cause instanceof Error ? cause.message : '请重试阅读确认')
+    }
+  } finally { marking.value = false }
+}
+watch([token, () => runtime.value?.agreementHash], () => { reading.value = false; agreed.value = false; readDone.value = false })
+async function refreshAgreement(current: string) {
+  readDone.value = false
+  agreed.value = false
+  try {
+    const latest = await collectionApi.detail(current)
+    if (current !== token.value || !runtime.value) return
+    if (latest.status !== 'DRAFT') { runtime.value = latest; return }
+    Object.assign(runtime.value, { agreementHash: latest.agreementHash, agreementBody: latest.agreementBody, agreementConsent: latest.agreementConsent })
+  } catch (cause) {
+    if (current === token.value) error.value = cause instanceof Error ? cause.message : '协议刷新失败，请重试'
+  }
+}
 const answers = ref<Record<string,string>>({})
 const areas = ref<CollectionArea[]>([])
 const areaPath = ref<number[]>([])
@@ -241,6 +307,7 @@ const reloadConflictedDraft = async () => {
 }
 const submit = async () => {
   if (!runtime.value || saving.value || hasUploads.value || hasUploadErrors.value) return
+  if (runtime.value.agreementBody && (!agreed.value || !readDone.value)) { await reportSubmitError('请阅读完整协议并勾选同意'); return }
   if (draftConflict.value) { await reportSubmitError(draftError.value); return }
   error.value = ''; fieldErrors.value = {}
   if (answers.value.mobile && !/^1[3-9][0-9]{9}$/.test(answers.value.mobile)) { await reportSubmitError('请填写正确的11位手机号码', 'mobile'); return }
@@ -261,14 +328,19 @@ const submit = async () => {
   try {
     const values: Record<string,string | number[]> = {}
     for (const f of runtime.value.fields) values[f.key] = f.type==='images' ? (runtime.value.images||[]).filter(i=>i.fieldKey===f.key).map(i=>i.id) : f.type === 'area' ? areaPath.value : (answers.value[f.key] || '')
-    await collectionApi.submit(requestToken, values, draftRevision.value, identityArea.value)
+    await collectionApi.submit(requestToken, values, draftRevision.value, identityArea.value, runtime.value.agreementHash, agreed.value)
     if (requestToken !== token.value) return
     runtime.value = { ...runtime.value, status: 'SUBMITTED', fields: [], options: {}, images: [] }
     answers.value = {}; areaPath.value = []; areaLabel.value = ''
+    if (runtime.value.agreementHash) {
+      const archived = await collectionApi.detail(requestToken).catch(() => undefined)
+      if (token.value === requestToken && archived?.status === 'SUBMITTED') runtime.value = archived
+    }
   } catch (e) {
     if (requestToken !== token.value) return
     if (e instanceof CollectionError && e.code === 1900090011) { draftConflict.value = true; draftError.value = e.message }
-    if (e instanceof CollectionError && [1900090006, 1900090007].includes(e.code)) await load()
+    if (e instanceof CollectionError && e.code === 1900090030) { await refreshAgreement(requestToken); await reportSubmitError(e.message) }
+    else if (e instanceof CollectionError && [1900090006, 1900090007].includes(e.code)) await load()
     else await reportSubmitError(e instanceof Error ? e.message : '提交失败，请重试')
   }
   finally { saving.value = false }
@@ -300,4 +372,11 @@ h1 { margin: 0 0 24px; font-size: 22px; font-weight: 600; letter-spacing: 0; }
 .area-control { text-align: left; }
 .collection-field p { margin: 6px 0 0; color: #666; font-size: 13px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .collection-loading { padding: 24px; text-align: center; }
+.agreement-card.norem,.agreement-sheet.norem { padding:16px; }
+.agreement-sheet.norem { padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+.agreement-consent.norem { display:flex; align-items:baseline; gap:8px; margin-top:8px; padding:10px 0; font-size:14px; line-height:1.5; }
+.agreement-consent.norem input { accent-color:var(--h5-primary); flex:none; margin:0; }
+.reading-hint.norem { text-align:center; margin:12px 0 8px; color:var(--h5-text-secondary); font-size:13px; }
+.reading-locked { opacity:var(--van-button-disabled-opacity, .5); }
+.agreement-reader { max-height:60vh; overflow:auto; line-height:1.8; overflow-wrap:anywhere; }
 </style>

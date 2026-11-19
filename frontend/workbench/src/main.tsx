@@ -1,9 +1,8 @@
 import ApprovalNavigationMenu from './layouts/ApprovalNavigationMenu'
 import DeliveryReminder from "./components/DeliveryReminder";
 import ExamPlannerProvider from './components/examCollection/ExamPlannerProvider';
-import { hasPermission } from './services/managementAccess';
-import { readEducationNavigationContext, replaceDeliveryEmployeeEntry } from './services/educationTeamNavigation'
 import DiagnosisReminder from "./components/DiagnosisReminder";
+import { hasPermission } from './services/managementAccess';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
@@ -603,11 +602,6 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
     let active = true
     api.permissionInfo()
       .then(async permissionInfo => {
-        const navigationContext = await readEducationNavigationContext()
-        permissionInfo = { ...permissionInfo,
-          menus: replaceDeliveryEmployeeEntry(permissionInfo.menus || [], navigationContext.delivery),
-          workbenchMenus: permissionInfo.workbenchMenus
-            ? replaceDeliveryEmployeeEntry(permissionInfo.workbenchMenus, navigationContext.delivery) : undefined }
         const canReadNavigation = permissionInfo.permissions?.includes(NAVIGATION_QUERY) || permissionInfo.permissions?.includes('*:*:*')
         const order = canReadNavigation ? await getNavigationPreference().catch(() => ({ groups: [] })) : { groups: [] }
         if (!active) return

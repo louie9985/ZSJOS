@@ -121,6 +121,17 @@ describe('SalesOrderDetailCards Lead profile', () => {
     expect(html).not.toContain('审核中心')
   })
 
+  it('shows the completed registration node skipped by migration', () => {
+    const html = renderToStaticMarkup(<SalesOrderDetailCards mode="approval-done" order={order({
+      status: 'effective',
+      registrationApproval: { status: 'skipped', endTime: Date.parse('2026-11-18T13:41:00+08:00') },
+      financeApproval: { status: 'approved' }
+    })}/>)
+    expect(html).toContain('已跳过')
+    expect(html).toContain('完成时间')
+    expect(html).not.toContain('审批中')
+  })
+
   it('separates the dense business canvas from status and available actions', () => {
     const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({
       status: 'revision_required',
@@ -178,14 +189,13 @@ describe('SalesOrderDetailCards Lead profile', () => {
   })
 })
 
-it('shows education conversion identity from the order snapshot', () => {
+it('shows sales conversion identity from the order snapshot', () => {
   const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({
-    formalOwnerIdentity: 'education', formalOwnerIdentityLabel: '教务',
-    leadProfile: { submittedName: '测试学员', leadNo: 'KZ-test', sourceLabel: '教务自拓录', ownerUserName: '测试负责人',
-      ownerIdentity: 'education', ownerIdentityLabel: '教务' } as SalesOrder['leadProfile']
+    formalOwnerIdentity: 'sales', formalOwnerIdentityLabel: '销售',
+    leadProfile: { submittedName: '测试学员', leadNo: 'KZ-test', sourceLabel: '销售自拓录', ownerUserName: '测试负责人',
+      ownerIdentity: 'sales', ownerIdentityLabel: '销售' } as SalesOrder['leadProfile']
   })} />)
   expect(html).toContain('成交归属身份')
-  expect(html).toContain('教务自拓录')
-  expect(html).toContain('教务')
+  expect(html).toContain('销售自拓录')
   expect(html).not.toContain('所属销售')
 })

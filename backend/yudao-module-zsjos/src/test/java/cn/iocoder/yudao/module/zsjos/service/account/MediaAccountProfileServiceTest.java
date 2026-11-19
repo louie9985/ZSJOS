@@ -87,7 +87,7 @@ class MediaAccountProfileServiceTest {
     Patch patch(Map<String,Object> changes){var r=new Patch();r.setVersion(3);r.setConfigVersionId(8L);r.setIdempotencyKey("test-command");r.setChanges(changes);return r;}
     @Test void policyMatrixFailsClosedForBothOwnersAndUnknownKeys(){
         for(var f:config.getFields()) for(Long user:List.of(10L,20L,30L)) {
-            boolean allowed=f.getOwnerType().equals("DIRECTOR")&&user==10L||f.getOwnerType().equals("OPERATOR")&&user==20L;
+            boolean allowed=List.of("DIRECTOR", "OPERATOR").contains(f.getOwnerType()) && (user == 10L || user == 20L);
             assertEquals(allowed,MediaAccountFieldPolicy.canWrite(f,account,user));
             if(!allowed || "record".equals(f.getType())) assertThrows(ServiceException.class,()->MediaAccountFieldPolicy.validate(config.getFields(),Map.of(f.getKey(),"x"),account,user));
         }
@@ -184,41 +184,29 @@ class MediaAccountProfileServiceTest {
         assertEquals(MEDIA_ACCOUNT_ATTACHMENT_INVALID.getCode(),assertThrows(ServiceException.class,()->service.upload(1L,"avatar","<html>".getBytes(),"fake.png","image/png",20L)).getCode());
         verifyNoInteractions(fileApi);
     }
-    @Test void operatorCanUploadCoverThroughConfiguredResponsibility() {
+    @Test void directorCanUploadOperatorCover() {
         when(accounts.require(1L)).thenReturn(account);
-        when(objects.hasPermission(1L,"edit",20L)).thenReturn(true);
-        when(permissionApi.hasAnyPermissions(20L,"zsjos:media-account:edit","zsjos:media-account:maintenance")).thenReturn(true);
+        when(objects.hasPermission(1L,"edit",10L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(10L,"zsjos:media-account:edit","zsjos:media-account:maintenance")).thenReturn(true);
         config.setFields(List.of(field("cover","OPERATOR","image")));
         when(configs.getPublished()).thenReturn(config);
         byte[] png={(byte)0x89,'P','N','G',13,10,26,10};
         var info=new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO();
         info.setId(99L);info.setName("cover.png");info.setType("image/png");
-        info.setCreator("20");info.setPath("zsjos/media-account/7/1/20/cover.png");
-        when(fileApi.createFileInfo(png,"cover.png","zsjos/media-account/7/1/20","image/png")).thenReturn(info);
+        info.setCreator("10");info.setPath("zsjos/media-account/7/1/10/cover.png");
+        when(fileApi.createFileInfo(png,"cover.png","zsjos/media-account/7/1/10","image/png")).thenReturn(info);
         when(fileApi.getFileInfo(99L)).thenReturn(info);
-        assertEquals(99L,service.upload(1L,"cover",png,"cover.png","image/png",20L).getId());
+        assertEquals(99L,service.upload(1L,"cover",png,"cover.png","image/png",10L).getId());
     }
-    @Test void directorCannotUploadOrClearOperatorCover() {
+    @Test void directorCanClearOperatorCoverWithoutChangingOtherFields() {
         writable(10L);
-        config.setFields(List.of(field("cover","OPERATOR","image")));
-        when(accounts.require(1L)).thenReturn(account);
-        assertEquals(MEDIA_ACCOUNT_PERMISSION_DENIED.getCode(),assertThrows(ServiceException.class,
-            ()->service.upload(1L,"cover",new byte[]{1},"cover.png","image/png",10L)).getCode());
-        Map<String,Object> clear=new HashMap<>();clear.put("cover",null);
-        assertEquals(MEDIA_ACCOUNT_PERMISSION_DENIED.getCode(),assertThrows(ServiceException.class,
-            ()->service.patch(1L,patch(clear),10L)).getCode());
-        verifyNoInteractions(fileApi);
-        verify(entries,never()).insert(any(MediaAccountProfileEntryDO.class));
-    }
-    @Test void operatorCanClearCoverWithoutChangingOtherFields() {
-        writable(20L);
         config.setFields(List.of(field("cover","OPERATOR","image")));
         account.setDetailValuesJson("{\"cover\":99,\"goal\":\"keep\"}");
         when(configs.validateAndSnapshot(anyMap(),anyList())).thenAnswer(call ->
             new MediaAccountFieldConfigService.DetailSnapshot(8L,call.getArgument(0),List.of()));
         when(mapper.update(isNull(),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(1);
         Map<String,Object> clear=new HashMap<>();clear.put("cover",null);
-        assertEquals(4,service.patch(1L,patch(clear),20L));
+        assertEquals(4,service.patch(1L,patch(clear),10L));
         assertFalse(account.getDetailValuesJson().contains("cover"));
         assertTrue(account.getDetailValuesJson().contains("keep"));
     }

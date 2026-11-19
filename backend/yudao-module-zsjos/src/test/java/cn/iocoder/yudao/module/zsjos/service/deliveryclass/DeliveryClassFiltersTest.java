@@ -24,7 +24,7 @@ class DeliveryClassFiltersTest {
         var query = new LambdaQueryWrapperX<DeliveryClassDO>();
         when(mapper.classQuery(any(), eq(Set.of()), isNull(), eq(true), eq(true))).thenReturn(query);
         when(mapper.selectList(query)).thenReturn(List.of());
-        var service = new DeliveryClassServiceImpl();
+        var service = new DeliveryClassServiceImpl(); org.springframework.test.util.ReflectionTestUtils.setField(service, "scopeService", org.mockito.Mockito.mock(DeliveryClassScopeService.class));
         ReflectionTestUtils.setField(service, "mapper", mapper); ReflectionTestUtils.setField(service, "permissionApi", permissions);
         assertTrue(service.filterContext(7L, new DeliveryClassPageReqVO(), true).projects().isEmpty());
         verify(mapper).classQuery(any(), eq(Set.of()), isNull(), eq(true), eq(true));
@@ -44,7 +44,8 @@ class DeliveryClassFiltersTest {
         var query = new LambdaQueryWrapperX<DeliveryClassDO>();
         when(mapper.classQuery(any(), eq(Set.of()), eq(7L), eq(false), eq(false))).thenReturn(query);
         when(mapper.selectList(query)).thenReturn(List.of());
-        var service = new DeliveryClassServiceImpl(); ReflectionTestUtils.setField(service, "mapper", mapper);
+        var service = new DeliveryClassServiceImpl(); org.springframework.test.util.ReflectionTestUtils.setField(service, "scopeService", org.mockito.Mockito.mock(DeliveryClassScopeService.class)); ReflectionTestUtils.setField(service, "mapper", mapper);
+        ReflectionTestUtils.setField(service, "permissionApi", mock(PermissionApi.class));
         var context = service.filterContext(7L, new DeliveryClassPageReqVO(), false);
         assertTrue(context.projects().isEmpty()); assertTrue(context.homerooms().isEmpty()); assertNull(context.pendingClass());
         verify(mapper).classQuery(any(), eq(Set.of()), eq(7L), eq(false), eq(false));
@@ -65,7 +66,7 @@ class DeliveryClassFiltersTest {
                 Map.of("classId",10L,"snapshot","{\"categoryId\":12,\"categoryName\":\"项目甲\"}"),
                 Map.of("classId",10L,"snapshot","{\"categoryId\":12,\"categoryName\":\"项目甲\"}"),
                 Map.of("classId",10L,"snapshot","{\"categoryId\":13,\"categoryName\":\"项目乙\"}")));
-        var service = new DeliveryClassServiceImpl();
+        var service = new DeliveryClassServiceImpl(); org.springframework.test.util.ReflectionTestUtils.setField(service, "scopeService", org.mockito.Mockito.mock(DeliveryClassScopeService.class));
         ReflectionTestUtils.setField(service,"mapper",mapper); ReflectionTestUtils.setField(service,"permissionApi",permissions); ReflectionTestUtils.setField(service,"scopeService",scopes);
         var users = mock(cn.iocoder.yudao.module.system.api.user.AdminUserApi.class);
         when(users.getUserMap(Set.of(8L))).thenReturn(Map.of(8L,
@@ -80,7 +81,7 @@ class DeliveryClassFiltersTest {
     @Test void explicitReadScopeCannotBypassScopeResolver() {
         var scope = mock(BusinessReadScopeService.class);
         when(scope.resolve("ALL",null,7L)).thenThrow(new IllegalArgumentException("denied"));
-        var service = new DeliveryClassServiceImpl(); ReflectionTestUtils.setField(service,"readScopeService",scope);
+        var service = new DeliveryClassServiceImpl(); org.springframework.test.util.ReflectionTestUtils.setField(service, "scopeService", org.mockito.Mockito.mock(DeliveryClassScopeService.class)); ReflectionTestUtils.setField(service,"readScopeService",scope);
         var req = new DeliveryClassPageReqVO(); req.setReadScope("ALL");
         assertThrows(IllegalArgumentException.class,()->service.filterContext(7L,req,true));
     }

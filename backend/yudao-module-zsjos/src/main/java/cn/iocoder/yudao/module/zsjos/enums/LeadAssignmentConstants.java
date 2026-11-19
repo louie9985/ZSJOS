@@ -7,6 +7,8 @@ public interface LeadAssignmentConstants {
 
     String PARTNER_SCENE = "partner_lead_specified_assignment";
     String PERMISSION_ACCEPT = "zsjos:lead:accept";
+    String PERMISSION_RECEIVE = "zsjos:lead:receive";
+    String PERMISSION_SALES_ELIGIBLE = "zsjos:sales:eligible";
 
     String SCENE = "lead_specified_assignment";
 

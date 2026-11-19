@@ -1,3 +1,4 @@
+import ContactNotes from './ContactNotes'
 import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Tabs, Typography, message } from 'antd'
 import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, EditOutlined, ExportOutlined, FileAddOutlined, MessageOutlined, PlusOutlined, RollbackOutlined, SwapOutlined, WarningOutlined } from '@ant-design/icons'
@@ -210,7 +211,7 @@ export default function LeadDetail({ lead, permissions = [], refreshVersion = 0,
     setQualificationCandidatesLoading(true)
     try { setQualificationCandidates(managerMode || supervisorAction
       ? await api.subordinateTransferCandidates(action === 'transfer' ? lead.id : undefined)
-      : actions.has('OWNER_TRANSFER') ? await api.ownerTransferCandidates() : await api.leadTransferCandidates(lead.id)) }
+      : actions.has('OWNER_TRANSFER') ? await api.ownerTransferCandidates(lead.id) : await api.leadTransferCandidates(lead.id)) }
     catch (error) { message.error(error instanceof Error ? error.message : '转派销售加载失败') }
     finally { setQualificationCandidatesLoading(false) }
   }
@@ -320,6 +321,9 @@ export default function LeadDetail({ lead, permissions = [], refreshVersion = 0,
     if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id} refreshVersion={refreshVersion + followUpRefreshVersion}/></div> }
     return { key: tab, label: `订单记录${orderTotal === undefined ? '' : ` (${orderTotal})`}`, children: <div className="lead-detail-tab-content"><LeadCustomerOrders leadId={lead.id} onCount={setOrderTotal}/></div> }
   }); tabItems.push(...extraTabs)
+  if (!studentContext && mode !== 'student-readonly') {
+    tabItems.push({ key: 'communication-notes', label: '沟通记录', children: <ContactNotes key={lead.id} subject="lead" id={lead.id} /> })
+  }
   const validTabKeys = new Set(tabItems.map(item => item.key))
   const fallbackTab = validTabKeys.has(internalActiveTab) ? internalActiveTab : tabItems[0]?.key
   const activeTab = controlledActiveTab && validTabKeys.has(controlledActiveTab)

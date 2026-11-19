@@ -12,7 +12,6 @@ public class SubordinateSalesRespVO {
     private String departmentName;
     private List<String> postNames;
     private Boolean salesDispatchSupported;
-    private Boolean educationOwnershipSupported;
     private Boolean orderCreationSupported;
     private String avatar;
     private String username;
@@ -34,6 +33,9 @@ public class SubordinateSalesRespVO {
     private Long todayReceivedCount;
     private Long todayQualifiedCount;
     private Long todayFollowUpRecordCount;
+    private Long todayNewIntentionCount;
+    private Long todayOldIntentionFollowUpRecordCount;
+    private Long todayStudentContactCount;
     private BigDecimal todayOrderAmount;
     private Long pendingQualificationCount;
     private String todayFollowUpStatus;

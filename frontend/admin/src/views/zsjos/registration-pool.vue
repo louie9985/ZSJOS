@@ -38,8 +38,8 @@
       <el-table-column label="客资编号" min-width="210">
         <template #default="{ row }">{{ row.leadNo || '客资编号暂未生成' }}</template>
       </el-table-column>
-      <el-table-column label="学业规划师" min-width="130">
-        <template #default="{ row }">{{ row.studyPlannerUserName || '待分配' }}</template>
+      <el-table-column label="班主任" min-width="130">
+        <template #default="{ row }">{{ row.deliveries?.[0]?.ownerUserName || row.studyPlannerUserName || '待分配' }}</template>
       </el-table-column>
       <el-table-column label="履约状态" width="110">
         <template #default="{ row }">
@@ -47,7 +47,9 @@
         </template>
       </el-table-column>
       <el-table-column label="交付流转" width="120"><template #default="{ row }">{{ row.deliveryEstablished ? '已建立交付' : '尚未流转' }}</template></el-table-column>
-      <el-table-column label="报名审核通过" prop="registrationApprovedAt" min-width="170" />
+      <el-table-column label="进入履约时间" min-width="170">
+        <template #default="{ row }">{{ formatDate(row.registrationApprovedAt) || '—' }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="90" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row.id)">查看</el-button>
@@ -81,6 +83,7 @@
         <el-descriptions :column="2" border>
           <el-descriptions-item label="订单编号">{{ detail.orderNo }}</el-descriptions-item>
           <el-descriptions-item label="履约产品">{{ detail.productName || (detail.orderItemId ? '历史产品信息缺失' : '历史整单任务') }}<ProductSpecs :product="detail" /></el-descriptions-item>
+          <el-descriptions-item label="履约负责人">{{ detail.ownerName || "未记录" }}</el-descriptions-item>
           <el-descriptions-item label="订单状态">{{
             detail.orderStatusLabel || '未知状态'
           }}</el-descriptions-item>
@@ -96,7 +99,7 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <RegistrationStudentInfo :key="detail.id" :case-id="detail.id" :version="detail.version" :status="detail.status" :sent="detail.informationSent" :disabled="classSaving || completing || closing || !!savingItemId" @busy="informationBusy = $event" @changed="refreshCollection" />
+        <RegistrationStudentInfo :key="detail.id" :case-id="detail.id" :version="detail.version" :status="detail.status" :sent="detail.informationSent" :disabled="completing || closing || !!savingItemId || transferOpen" @busy="informationBusy = $event" @changed="refreshCollection" />
 
         <el-alert
           v-if="detail.completionBlockReason"
@@ -107,31 +110,24 @@
           class="mt-16px"
         />
 
-        <el-alert class="mt-16px" type="info" show-icon :closable="false"
-          :title="detail.deliveryEstablished ? '已建立交付服务，报名任务仍需财务审核通过后完成' : '保存分班后将流转至学生交付中心'"
-          :description="detail.assignmentBlockReason || '已保存但尚未流转的历史分班，请再次保存。待分班暂不分配学习规划师。'" />
+        <el-alert v-if="detail.assignmentMode === 'sales_owner'" class="mt-16px" type="info" show-icon :closable="false"
+          title="完成报名履约后，服务自动归订单成交负责人"
+          :description="detail.assignmentBlockReason || '之后可在班级管理中分班，负责人随班主任调整。'" />
+        <el-alert v-else-if="legacyPlannerMode" class="mt-16px" type="info" show-icon :closable="false"
+          :title="detail.deliveryEstablished ? '已建立交付服务，报名任务仍需财务审核通过后完成' : '历史任务完成报名履约后建立交付服务'"
+          :description="detail.assignmentBlockReason || '历史任务可保存负责人选择，完成报名履约后建立服务。'" />
         <el-descriptions v-for="delivery in detail.deliveries" :key="delivery.serviceRelationId" :column="1" border class="mt-16px">
           <el-descriptions-item label="当前交付班级">{{ delivery.className || '待分班' }}</el-descriptions-item>
-          <el-descriptions-item label="当前学习规划师">{{ delivery.ownerUserName || '尚未分配' }}</el-descriptions-item>
+          <el-descriptions-item label="当前班主任">{{ delivery.ownerUserName || '尚未分配' }}</el-descriptions-item>
           <el-descriptions-item label="交付状态">{{ delivery.status === 'cancelled' ? '已停止交付' : delivery.acceptanceStatus === 'accepted' ? '已接收' : '待接收' }}</el-descriptions-item>
         </el-descriptions>
-        <p v-if="detail.deliveryEstablished">下方保留首次分班记录，变更班级请通过班级管理办理转班。</p>
-        <div class="section-heading">{{ detail.assignmentMode === 'class_per_item' ? (detail.orderItemId ? '本产品分班' : '逐商品分班') : '历史学习规划师分配' }}</div>
-        <div v-if="detail.assignmentMode === 'class_per_item'" class="checklist">
-          <el-alert v-if="classOptionsError" type="error" :closable="false" title="班级加载失败" :description="classOptionsError" show-icon />
-          <el-button v-if="classOptionsError" :loading="classOptionsLoading" @click="loadClassOptions">重试加载班级</el-button>
-          <el-alert v-if="classesDirty" type="info" :closable="false" title="分班选择尚未保存，保存后将流转至学生交付中心" />
-          <div v-for="assignment in detail.classAssignments" :key="assignment.orderItemId" class="checklist-item">
-            <div><strong>{{ assignment.productName || '历史产品信息缺失' }}</strong><ProductSpecs :product="assignment" /><div class="checklist-meta">{{ assignment.categoryName || '产品分类' }}<span v-if="assignment.errorReason"> · {{ assignment.errorReason }}</span></div></div>
-            <el-select v-model="classDraft[assignment.orderItemId]" class="!w-320px" filterable placeholder="选择班级（含待分班）" :disabled="!canUpdate || detail.assignable !== true || !isEditable(detail.status) || classSaving" :loading="classOptionsLoading" :no-data-text="classOptionsError ? '班级加载失败，请重试' : '暂无未结课班级，请联系班级管理员'" @visible-change="(visible) => visible && loadClassOptions()">
-              <el-option v-for="option in classOptions" :key="option.id" :value="option.id" :label="option.classKind === 'PENDING' || (option.systemClass && !option.classKind) ? '待分班' : `${option.className} · ${option.homeroomUserName || '未配置班主任'}`" />
-              <el-option v-if="assignment.classId && !classOptions.some(option => option.id === assignment.classId)" :value="assignment.classId" :label="assignment.classKind === 'PENDING' || (assignment.systemClass && !assignment.classKind) ? '待分班' : `${assignment.className || '已选班级'} · ${assignment.homeroomUserName || '班主任姓名未记录'}`" disabled />
-            </el-select>
-          </div>
-          <el-button v-if="canUpdate && detail.assignable === true && isEditable(detail.status)" type="primary" :loading="classSaving" @click="saveClasses">保存分班</el-button>
-        </div>
+        <el-descriptions v-for="item in detail.classAssignments?.filter(row => row.classId)" :key="item.orderItemId" :column="1" border class="mt-16px">
+          <el-descriptions-item label="报名产品">{{ item.productName || '历史产品信息缺失' }}</el-descriptions-item>
+          <el-descriptions-item label="首次班级">{{ item.className || '历史班级信息缺失' }}</el-descriptions-item>
+        </el-descriptions>
+        <div v-if="legacyPlannerMode" class="section-heading">历史学习规划师分配</div>
         <div class="checklist">
-          <div v-for="route in detail.assignmentMode === 'class_per_item' ? [] : detail.routes" :key="route.id" class="checklist-item">
+          <div v-for="route in legacyPlannerMode ? detail.routes : []" :key="route.id" class="checklist-item">
             <el-checkbox
               :model-value="route.selected"
               :disabled="!canUpdate || detail.assignable !== true || !isEditable(detail.status) || routeSaving"
@@ -218,32 +214,54 @@
                 ><el-button :loading="savingItemId === item.id">上传附件</el-button></el-upload></ClipboardUploadActions
               >
             </div>
-            <el-tag v-else type="info">系统固定项</el-tag>
+            <el-tag v-else type="info">{{ item.itemType === 'study_planner' ? '历史固定项' : '系统固定项' }}</el-tag>
           </div>
         </div>
       </template>
     </div>
     <template #footer>
       <el-button @click="detailOpen = false">关闭</el-button>
+      <el-button v-if="canTransfer && detail?.canTransfer && isEditable(detail.status)" :disabled="informationBusy || routeSaving || completing || closing || !!savingItemId" @click="openTransfer">转交履约任务</el-button>
       <el-button v-if="canClose && detail && isEditable(detail.status)" :loading="closing" @click="closeService">{{ detail.orderItemId ? '结束本产品（无需交付）' : '关闭服务' }}</el-button>
       <el-button
         v-if="canComplete && detail && isEditable(detail.status)"
         type="primary"
         :loading="completing"
-        :disabled="!detail.completable || classesDirty || classSaving || informationBusy"
+        :disabled="!detail.completable || informationBusy"
         @click="complete"
         >完成报名履约</el-button
       >
     </template>
   </el-drawer>
+  <el-dialog v-model="transferOpen" title="转交履约任务" width="min(480px, 95vw)"
+    :close-on-click-modal="!transferSaving" :close-on-press-escape="!transferSaving" :show-close="!transferSaving">
+    <el-alert v-if="transferError" type="error" :title="transferError" :closable="false">
+      <el-button v-if="transferNeedsRefresh" link @click="refreshAfterTransferConflict">刷新任务</el-button>
+      <el-button v-else-if="!transferCandidates.length" link @click="loadTransferCandidates">重试</el-button>
+    </el-alert>
+    <el-form label-position="top" @submit.prevent="submitTransfer">
+      <el-form-item label="接手人" required>
+        <el-select v-model="targetUserId" filterable placeholder="选择接手人" :loading="transferLoading" no-data-text="暂无符合条件的接手人">
+          <el-option v-for="user in transferCandidates" :key="user.id" :label="user.nickname" :value="user.id" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="转交原因" required>
+        <el-input v-model="transferReason" type="textarea" :rows="3" :maxlength="100" />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button :disabled="transferSaving" @click="transferOpen = false">取消</el-button>
+      <el-button type="primary" :disabled="!targetUserId || !transferReason.trim() || transferNeedsRefresh" :loading="transferSaving" @click="submitTransfer">确认转交</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script lang="ts" setup>
 import { ElMessageBox } from 'element-plus'
 import ProductSpecs from './components/ProductSpecs.vue'
 import RegistrationStudentInfo from './components/RegistrationStudentInfo.vue'
+import { formatDate } from '@/utils/formatTime'
 import * as RegistrationApi from '@/api/zsjos/registration'
-import * as DeliveryClassApi from '@/api/zsjos/deliveryClass'
 import { useUserStore } from '@/store/modules/user'
 import { useMessage } from '@/hooks/web/useMessage'
 import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
@@ -264,14 +282,19 @@ const detail = ref<RegistrationApi.RegistrationCase>()
 const detailId = ref<number>()
 const routeCandidates = ref<Record<number, RegistrationApi.StudyPlanner[]>>({})
 const routeSaving = ref(false)
-const classSaving = ref(false)
 const informationBusy = ref(false)
-const refreshCollection = async () => { const id=detail.value?.id; if(!id)return; const updated=await RegistrationApi.getRegistrationCase(id); if(detail.value?.id===id)detail.value=updated }
-const classDraft = reactive<Record<number, number | undefined>>({})
-const classOptions = ref<DeliveryClassApi.DeliveryClassOption[]>([])
-const classOptionsLoading = ref(false)
-const classOptionsError = ref('')
-const classesDirty = computed(() => detail.value?.assignmentMode === 'class_per_item' && detail.value.classAssignments?.some(item => (classDraft[item.orderItemId] ?? null) !== (item.classId ?? null)))
+const refreshCollection = async () => {
+  const id = detail.value?.id
+  if (!id) return
+  try {
+    const updated = await RegistrationApi.getRegistrationCase(id)
+    if (detail.value?.id === id) detail.value = updated
+  } catch (error) {
+    if (detail.value?.id === id) detailError.value = error instanceof Error ? error.message : '履约详情加载失败'
+  }
+}
+// Only historical tasks without a frozen class/owner mode still select a planner route.
+const legacyPlannerMode = computed(() => !['class_per_item', 'sales_owner', 'auto_class'].includes(detail.value?.assignmentMode || 'legacy_planner'))
 const savingItemId = ref<number>()
 const completing = ref(false)
 import ClipboardUploadActions from '@/components/UploadFile/src/ClipboardUploadActions.vue'
@@ -289,6 +312,64 @@ const hasPermission = (permission: string) =>
 const canUpdate = computed(() => hasPermission('zsjos:registration:update'))
 const closing = ref(false)
 const canClose = computed(() => hasPermission('zsjos:registration:close'))
+const canTransfer = computed(() => hasPermission('zsjos:registration:transfer'))
+const transferOpen = ref(false)
+const transferLoading = ref(false)
+const transferSaving = ref(false)
+const transferError = ref('')
+const transferNeedsRefresh = ref(false)
+const transferCandidates = ref<RegistrationApi.StudyPlanner[]>([])
+const targetUserId = ref<number>()
+const transferReason = ref('')
+const loadTransferCandidates = async () => {
+  if (!detail.value) return
+  transferLoading.value = true
+  transferError.value = ''
+  try {
+    transferCandidates.value = await RegistrationApi.getRegistrationTransferCandidates(detail.value.id)
+  } catch (error) {
+    transferError.value = error instanceof Error ? error.message : '接手人加载失败'
+  } finally {
+    transferLoading.value = false
+  }
+}
+const refreshAfterTransferConflict = async () => {
+  const id = detail.value?.id
+  transferOpen.value = false
+  if (id) await openDetail(id)
+  await load()
+}
+const openTransfer = () => {
+  transferNeedsRefresh.value = false
+  targetUserId.value = undefined
+  transferReason.value = ''
+  transferCandidates.value = []
+  transferOpen.value = true
+  void loadTransferCandidates()
+}
+const submitTransfer = async () => {
+  const current = detail.value
+  const reason = transferReason.value.trim()
+  if (!current || !targetUserId.value || !reason || transferSaving.value) return
+  transferSaving.value = true
+  transferError.value = ''
+  try {
+    await RegistrationApi.transferRegistration(current.id, {
+      version: current.version, idempotencyKey: crypto.randomUUID(), targetUserId: targetUserId.value, reason
+    })
+    transferOpen.value = false
+    detailOpen.value = false
+    detail.value = undefined
+    message.success('履约任务已转交')
+    await load()
+  } catch (error) {
+    const code = (error as { code?: number })?.code
+    transferNeedsRefresh.value = code === 1900010004 || code === 1900010005
+    transferError.value = error instanceof Error ? error.message : '转交失败，请重试'
+  } finally {
+    transferSaving.value = false
+  }
+}
 const canComplete = computed(() => hasPermission('zsjos:registration:complete'))
 const statusLabel = (status: string) =>
   statusOptions.find((item) => item.value === status)?.label || '未知状态'
@@ -329,7 +410,6 @@ const openDetail = async (id: number) => {
   detailError.value = ''
   try {
     detail.value = await RegistrationApi.getRegistrationCase(id)
-    if (detail.value.assignmentMode === 'class_per_item') for (const item of detail.value.classAssignments || []) classDraft[item.orderItemId] = item.classId
   } catch (cause: any) {
     detail.value = undefined
     detailError.value = cause?.msg || cause?.message || '报名履约详情加载失败'
@@ -406,28 +486,6 @@ const saveRoutes = async (
   } finally {
     routeSaving.value = false
   }
-}
-const loadClassOptions = async () => {
-  if (classOptionsLoading.value) return
-  classOptionsLoading.value = true
-  classOptionsError.value = ''
-  try {
-    classOptions.value = await DeliveryClassApi.getDeliveryClassOptions()
-  } catch (cause: any) {
-    classOptions.value = []
-    classOptionsError.value = cause?.msg || cause?.message || '可选班级加载失败'
-  } finally {
-    classOptionsLoading.value = false
-  }
-}
-const saveClasses = async () => {
-  if (!detail.value?.classAssignments) return
-  const assignments = detail.value.classAssignments.map((item) => ({ orderItemId: item.orderItemId, classId: classDraft[item.orderItemId] }))
-  if (assignments.some((item) => !item.classId)) { message.warning('请为每个订单商品选择班级'); return }
-  classSaving.value = true
-  try { detail.value = await RegistrationApi.updateRegistrationClassAssignments(detail.value.id, assignments as Array<{ orderItemId: number; classId: number }>, detail.value.version); message.success('分班已保存'); await load() }
-  catch (cause: any) { message.error(cause?.msg || cause?.message || '分班保存失败'); await openDetail(detail.value.id) }
-  finally { classSaving.value = false }
 }
 const changeRouteSelection = async (
   route: RegistrationApi.RegistrationRoute,

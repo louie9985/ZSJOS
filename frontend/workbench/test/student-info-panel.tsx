@@ -72,6 +72,7 @@ const pdfFile = makePdf();
 function detail(caseId: number, sensitive = false): StudentInfoDetail {
   return {
     id: 880001 + caseId, status: options.has('empty') ? 'NONE' : 'SUBMITTED',
+    ...(options.has('agreement') ? { agreementVersion: 1, agreementBody: '<p>合成协议正文用于验证右侧阅读宽度。</p>'.repeat(40) } : {}),
     submittedAt: Date.parse('2026-10-22T10:30:00+08:00'), configVersion: 3, fields,
     canReadSensitive: !options.has('denied'), canExport: !options.has('no-export'),
     values: {

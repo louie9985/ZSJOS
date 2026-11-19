@@ -671,6 +671,9 @@ export type RegistrationRoute = {
   sort: number;
 };
 export type RegistrationCase = {
+  ownerUserId?: number;
+  ownerName?: string
+  canTransfer?: boolean;
   id: number;
   orderId: number;
   orderItemId?: number;
@@ -684,7 +687,7 @@ export type RegistrationCase = {
   leadNo?: string;
   status: string;
   statusLabel?: string;
-  assignmentMode?: "legacy_planner" | "class_per_item";
+  assignmentMode?: "legacy_planner" | "class_per_item" | "sales_owner" | "auto_class";
   studyPlannerUserId?: number;
   studyPlannerUserName?: string;
   registrationApprovedAt?: Timestamp;
@@ -1225,7 +1228,6 @@ export type AdvancedFilterScene =
   | "student_service"
   | "media_student"
   | "subordinate_sales"
-  | "education_team"
   | "cashback"
   | "withdrawal";
 export type AdvancedFilterField = {
@@ -1881,6 +1883,8 @@ export type SalesOrderSubmitRequest = {
   cityCode: string;
   cityName: string;
   agreedExamTime?: string;
+  /** 商定考试月份 YYYY-MM；新订单必填，历史订单可能为空 */
+  agreedExamMonth?: string;
   classType?: string;
   servicePeriod: string;
   studentSource: string;
@@ -1966,7 +1970,46 @@ export type PaymentRefund = {
   lastQueriedAt?: Timestamp;
   lastErrorMessage?: string;
 };
+export type FinanceApprovalEntry = 'business' | 'bpm'
+export type FinanceApprovalCommand = {
+  taskId: string;
+  action: 'approve' | 'reject' | 'sign';
+  reason: string;
+  type?: 'before' | 'after';
+  userIds?: number[];
+  signPicUrl?: string;
+};
+export type FinanceApprovalProgress = {
+  status?: number;
+  nodes: Array<{
+    id: string;
+    name: string;
+    status?: number;
+    candidates?: Array<{ id: number; name: string }>;
+    tasks?: Array<Omit<BpmApprovalNodeTask, 'assigneeUser' | 'ownerUser'> & {
+      parentTaskId?: string;
+      assigneeName?: string;
+      ownerName?: string;
+    }>;
+  }>;
+};
+export type FinanceApprovalOrder = SalesOrder & {
+  taskId: string;
+  processDefinitionKey: string;
+  processInstanceId: string;
+  taskStatus?: number;
+  taskReason?: string;
+  taskCreateTime: Timestamp;
+  taskEndTime?: Timestamp;
+  approvalTask: Pick<BpmTask, 'id' | 'name' | 'status' | 'processInstanceId' | 'taskDefinitionKey' | 'parentTaskId' | 'reasonRequire' | 'signEnable' | 'buttonsSetting'> & {
+    canAct: boolean;
+    canSign: boolean;
+  };
+  approvalComments?: BpmComment[];
+};
 export type SalesOrder = {
+  approvalProgress?: FinanceApprovalProgress;
+  processDefinitionKey?: string;
   collectionMode?: CollectionMode;
   paymentStatus?: string;
   transactionLocked?: boolean;
@@ -2002,6 +2045,8 @@ export type SalesOrder = {
   cityCode: string;
   cityName: string;
   agreedExamTime?: string;
+  /** 商定考试月份 YYYY-MM；新订单必填，历史订单可能为空 */
+  agreedExamMonth?: string;
   classType?: string;
   servicePeriod: string;
   servicePeriodLabelSnapshot?: string;
@@ -2038,6 +2083,7 @@ export type SalesOrder = {
   processInstanceId?: string;
   taskId?: string;
   approvalReasonRequired?: boolean;
+  taskName?: string;
   taskDefinitionKey?: "registrationReview" | "financeReview";
   taskStatus?: number;
   taskReason?: string;
@@ -2094,7 +2140,7 @@ export type SalesOrderSupervisorConfirmation = {
   decidedAt?: Timestamp;
 };
 export type SalesOrderApprovalStatus = {
-  status: "pending" | "approved" | "rejected" | "cancelled";
+  status: "pending" | "approved" | "rejected" | "cancelled" | "skipped";
   reviewerUserId?: number;
   reviewerUserName?: string;
   createTime?: Timestamp;
@@ -2119,11 +2165,13 @@ export type SalesOrderListItem = Pick<
   | "effectiveAt"
 > & Partial<Pick<
   SalesOrder,
+  | "processDefinitionKey"
   | "buyerName"
   | "studentWechatId"
   | "provinceName"
   | "cityName"
   | "agreedExamTime"
+  | "agreedExamMonth"
   | "classType"
   | "customerPaidAt"
   | "remark"
@@ -2155,7 +2203,9 @@ export type SalesOrderListItem = Pick<
   leadProvinceName?: string;
   leadCityName?: string;
   taskId?: string;
+  processDefinitionKey?: string;
   approvalReasonRequired?: boolean;
+  taskName?: string;
   taskDefinitionKey?: "registrationReview" | "financeReview";
   taskStatus?: number;
   taskReason?: string;
@@ -2220,6 +2270,7 @@ export type SalesOrderApprovalFilterProfile = {
 };
 export type SalesOrderApprovalTaskTarget = {
   workType: "approval" | "supervisor";
+  processDefinitionKey?: string;
   orderId: number;
   taskId: string;
   approvalReasonRequired?: boolean;
@@ -2444,9 +2495,9 @@ export type BpmApprovalDetailCard = {
 export type BpmApprovalNodeTask = {
   id: string;
   owner?: number;
-  ownerUser?: { id: number; nickname: string; avatar?: string };
+  ownerUser?: { id?: number; nickname: string; avatar?: string };
   assignee?: number;
-  assigneeUser?: { id: number; nickname: string; avatar?: string };
+  assigneeUser?: { id?: number; nickname: string; avatar?: string };
   status?: number;
   reason?: string;
   signPicUrl?: string;
@@ -2885,7 +2936,6 @@ export type SubordinateSales = {
   departmentName?: string;
   postNames?: string[];
   salesDispatchSupported?: boolean;
-  educationOwnershipSupported?: boolean;
   orderCreationSupported?: boolean;
   userId: number;
   name: string;
@@ -2909,6 +2959,9 @@ export type SubordinateSales = {
   todayReceivedCount?: number;
   todayQualifiedCount?: number;
   todayFollowUpRecordCount?: number;
+  todayNewIntentionCount?: number;
+  todayOldIntentionFollowUpRecordCount?: number;
+  todayStudentContactCount?: number;
   todayOrderAmount?: number;
   pendingQualificationCount?: number;
   todayFollowUpStatus: "completed" | "incomplete";
@@ -3725,14 +3778,12 @@ export const api = {
     notify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyResult>(await http.post('/zsjos/calendar-notification/send', data)),
     previewNotify: async (data: CalendarNotifyInput) => unwrap<CalendarNotifyPreview>(await http.post('/zsjos/calendar-notification/preview', data)),
   },
-  querySelfSourcedArchive: async (education: boolean, data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
-    unwrap<LeadArchiveCandidate[]>(await http.post(education ? "/zsjos/lead/education-self-sourced/archive-query" : "/zsjos/lead/self-sourced/archive-query", data)),
+  querySelfSourcedArchive: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
+    unwrap<LeadArchiveCandidate[]>(await http.post("/zsjos/lead/self-sourced/archive-query", data)),
   checkLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
     unwrap<boolean>(await http.post("/zsjos/lead/contact-check", data)),
   checkSelfSourcedLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
     unwrap<boolean>(await http.post("/zsjos/lead/self-sourced/contact-check", data)),
-  checkEducationSelfSourcedLeadContact: async (data: { mobile?: string; wechatId?: string; idempotencyKey: string }) =>
-    unwrap<boolean>(await http.post("/zsjos/lead/education-self-sourced/contact-check", data)),
   leadCatalog: async () =>
     unwrap<LeadCatalog>(await http.get("/zsjos/lead/product/catalog")),
   uploadLeadAttachment: async (file: File) => {
@@ -3744,8 +3795,6 @@ export const api = {
   },
   createLead: async (data: LeadCreateRequest) =>
     unwrap<LeadCreateResult>(await http.post("/zsjos/lead/create", data)),
-  createEducationSelfSourcedLead: async (data: LeadCreateRequest) =>
-    unwrap<LeadCreateResult>(await http.post("/zsjos/lead/education-self-sourced/create", data)),
   createSelfSourcedLead: async (data: LeadCreateRequest) =>
     unwrap<LeadCreateResult>(
       await http.post("/zsjos/lead/self-sourced/create", data),
@@ -4668,8 +4717,8 @@ export const api = {
     unwrap<AssignmentUser[]>(
       await http.get(`/zsjos/lead/${id}/transfer-candidates`),
     ),
-  ownerTransferCandidates: async () =>
-    unwrap<AssignmentUser[]>(await http.get("/zsjos/lead/owner/transfer-candidates")),
+  ownerTransferCandidates: async (leadId?: number) =>
+    unwrap<AssignmentUser[]>(await http.get("/zsjos/lead/owner/transfer-candidates", { params: { leadId } })),
   ownerTransferLead: async (
     id: number,
     data: { salesUserId: number; reason: string; idempotencyKey: string },
@@ -4916,6 +4965,8 @@ export const api = {
     unwrap<number>(
       await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data),
     ),
+  nativeFinanceOrderDetail: async (taskId: string, view: 'todo' | 'done') =>
+    unwrap<SalesOrder>(await http.get('/zsjos/sales-order/approval/native-detail', { params: { taskId, view } })),
   salesOrder: async (orderId: number, taskId?: string) =>
     unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`, { params: { taskId } })),
   managementSalesOrder: async (orderId: number) =>
@@ -4993,6 +5044,25 @@ export const api = {
     unwrap<SalesOrderStatusCounts>(
       await http.get("/zsjos/sales-order/team-status-counts"),
     ),
+  financeApprovalOrder: async (taskId: string, done: boolean, entry: FinanceApprovalEntry, orderId?: number) => {
+    const order = unwrap<FinanceApprovalOrder>(
+      await http.get(entry === 'business' ? '/zsjos/sales-order/approval/business-detail' : '/zsjos/sales-order/approval/native-detail', {
+        params: { taskId, done },
+      }),
+    );
+    if (order?.taskId !== taskId || order.approvalTask?.id !== taskId
+        || !order.processInstanceId || order.approvalTask.processInstanceId !== order.processInstanceId
+        || (orderId !== undefined && order.id !== orderId)) {
+      throw new Error('目标审批任务与订单不匹配');
+    }
+    return order;
+  },
+  financeApprovalAction: async (data: FinanceApprovalCommand) =>
+    unwrap<boolean>(await http.put('/zsjos/sales-order/approval/native-action', data)),
+  createFinanceApprovalComment: async (entry: FinanceApprovalEntry, data: { taskId: string; message: string }) =>
+    unwrap<boolean>(await http.post('/zsjos/sales-order/approval/comment', data, { params: { entry } })),
+  financeApprovalSignCandidates: async (taskId: string, entry: FinanceApprovalEntry) =>
+    unwrap<SimpleUser[]>(await http.get('/zsjos/sales-order/approval/sign-candidates', { params: { taskId, entry } })),
   salesOrderApprovalFilterProfile: async () =>
     unwrap<SalesOrderApprovalFilterProfile>(
       await http.get("/zsjos/sales-order/approval/filter-profile"),
@@ -5958,12 +6028,12 @@ export const api = {
       : unwrap<PageResult<RegistrationCase>>(
           await http.get("/zsjos/registration/pool-page", { params }),
         ),
+  registrationTransferCandidates: async (id: number) =>
+    unwrap<Array<{ id: number; nickname: string }>>(await http.get(`/zsjos/registration/${id}/transfer-candidates`)),
+  transferRegistration: async (id: number, data: { version: number; idempotencyKey: string; targetUserId: number; reason: string }) =>
+    unwrap<RegistrationCase>(await http.post(`/zsjos/registration/${id}/transfer`, data)),
   registrationCase: async (id: number) =>
     unwrap<RegistrationCase>(await http.get(`/zsjos/registration/${id}`)),
-  registrationPlannerCandidates: async () =>
-    unwrap<StudyPlanner[]>(
-      await http.get("/zsjos/registration/study-planner-candidates"),
-    ),
   registrationRouteCandidates: async (id: number, routeId: number) =>
     unwrap<StudyPlanner[]>(
       await http.get(`/zsjos/registration/${id}/routes/${routeId}/candidates`),
@@ -5975,17 +6045,6 @@ export const api = {
   ) =>
     unwrap<RegistrationCase>(
       await http.put(`/zsjos/registration/${id}/items/${itemId}`, data),
-    ),
-  updateRegistrationPlanner: async (
-    id: number,
-    data: {
-      studyPlannerUserId: number;
-      version: number;
-      idempotencyKey: string;
-    },
-  ) =>
-    unwrap<RegistrationCase>(
-      await http.put(`/zsjos/registration/${id}/study-planner`, data),
     ),
   updateRegistrationRoutes: async (
     id: number,
@@ -6002,8 +6061,6 @@ export const api = {
     unwrap<RegistrationCase>(
       await http.put(`/zsjos/registration/${id}/routes`, data),
     ),
-  updateRegistrationClassAssignments: async (id: number, data: { version: number; idempotencyKey: string; assignments: Array<{ orderItemId: number; classId: number }> }) =>
-    unwrap<RegistrationCase>(await http.put(`/zsjos/registration/${id}/class-assignments`, data)),
   uploadRegistrationAttachment: async (
     id: number,
     itemId: number,
@@ -6103,6 +6160,7 @@ export const api = {
     createTalk: async (
       personId: number,
       data: {
+        serviceRelationId?: number;
         accountId?: number;
         content: string;
         attachmentFileIds?: number[];

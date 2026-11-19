@@ -29,6 +29,10 @@ describe('metric business-page scope', () => {
     const original = { allLeadPage: vi.fn() }
     expect(bind('lead', original, 'subordinate_sales')).toBe(original)
   })
+  it('does not apply a retired education team context to the sales team list', () => {
+    const original = { subordinateSalesPage: vi.fn() }
+    expect(bind('subordinate_sales', original, 'education_team')).toBe(original)
+  })
   it('retains cursor mode and the owning request shape', async () => {
     const api = bind('lead_appeal', { leadAppealInboxCursor: vi.fn() })
     await api.leadAppealInboxCursor(false, { cursor: 'next', limit: 20, keyword: 'search' })

@@ -93,6 +93,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource
     private LeadInboxFilterConfigService inboxFilterConfigService;
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Resource private LeadAssignmentService leadAssignmentService;
     @Resource private LeadIdentityMaskingService leadIdentityMaskingService;
     @Resource private OpportunityMapper opportunityMapper;
@@ -108,6 +109,23 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private MenuTaskSummaryService menuTaskSummaryService;
 
     @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService myOperationsService;
+
+    private LeadDO requireReadableLead(Long id, Long userId) {
+        LeadDO lead = leadMapper.selectById(id);
+        if (lead == null) {
+            throw exception(LEAD_NOT_EXISTS);
+        }
+        if (!leadObjectPermissionService.canReadDetail(lead, userId)) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
+        return lead;
+    }
+
+    @Override
+    @ZsjosPermission(bizType = "lead", bizId = "#id", action = "read")
+    public void checkNoteSubject(Long id, Long userId) {
+        requireReadableLead(id, userId);
+    }
 
     @Override
     public PageResult<LeadManagementRespVO> getOperationsLeadPage(LeadManagementPageReqVO reqVO, Long memberId, Long userId) {
@@ -161,13 +179,20 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                         reqVO.getInboxGroup(), reqVO.getInboxSectionOptions());
         LeadVisibilityScope visibility = resolveVisibilityScope(relationScope, userId);
         List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
-        PageResult<LeadDO> page = Boolean.TRUE.equals(reqVO.getPendingTasksFirst())
-                ? leadMapper.selectManagementPageByScope(reqVO,
-                        visibility.sourceUserIds(), visibility.ownerUserIds(), visibility.queryAll(),
-                        inboxQuery, matchedLeadIds, menuTaskSummaryService.getMyLeadReminderIds(userId))
-                : leadMapper.selectManagementPageByScope(reqVO,
-                visibility.sourceUserIds(), visibility.ownerUserIds(), visibility.queryAll(),
-                inboxQuery, matchedLeadIds);
+        List<Long> boundaryIds = salesBoundaryIds(userId);
+        PageResult<LeadDO> page;
+        if (boundaryIds != null) {
+            page = leadMapper.selectManagementPageByBoundary(reqVO, visibility.sourceUserIds(), visibility.ownerUserIds(),
+                    visibility.queryAll(), inboxQuery, matchedLeadIds,
+                    Boolean.TRUE.equals(reqVO.getPendingTasksFirst()) ? menuTaskSummaryService.getMyLeadReminderIds(userId) : List.of(),
+                    boundaryIds, userId, visibility.unownedVisible());
+        } else if (Boolean.TRUE.equals(reqVO.getPendingTasksFirst())) {
+            page = leadMapper.selectManagementPageByScope(reqVO, visibility.sourceUserIds(), visibility.ownerUserIds(),
+                    visibility.queryAll(), inboxQuery, matchedLeadIds, menuTaskSummaryService.getMyLeadReminderIds(userId));
+        } else {
+            page = leadMapper.selectManagementPageByScope(reqVO, visibility.sourceUserIds(), visibility.ownerUserIds(),
+                    visibility.queryAll(), inboxQuery, matchedLeadIds);
+        }
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }
@@ -302,13 +327,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Override
     @ZsjosPermission(bizType = "lead", bizId = "#id", action = "read")
     public LeadManagementRespVO getLead(Long id, Long userId) {
-        LeadDO lead = leadMapper.selectById(id);
-        if (lead == null) {
-            throw exception(LEAD_NOT_EXISTS);
-        }
-        if (!leadObjectPermissionService.canReadDetail(lead, userId)) {
-            throw exception(LEAD_PERMISSION_DENIED);
-        }
+        LeadDO lead = requireReadableLead(id, userId);
         Map<Long, AdminUserRespDTO> users = getUserMap(List.of(lead));
         List<LeadIntendedProductDO> products = intendedProductMapper.selectListByLeadId(id);
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(id);
@@ -334,8 +353,16 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Override
     public Map<String, Long> getStatusCounts(Long userId) {
         LeadVisibilityScope visibility = resolveVisibilityScope("all", userId);
-        return leadMapper.selectManagementStatusCountsByScope(visibility.sourceUserIds(),
-                visibility.ownerUserIds(), visibility.queryAll());
+        List<Long> boundaryIds = salesBoundaryIds(userId);
+        return boundaryIds == null
+                ? leadMapper.selectManagementStatusCountsByScope(visibility.sourceUserIds(), visibility.ownerUserIds(), visibility.queryAll())
+                : leadMapper.selectManagementStatusCountsByBoundary(visibility.sourceUserIds(), visibility.ownerUserIds(),
+                        visibility.queryAll(), boundaryIds, userId, visibility.unownedVisible());
+    }
+
+    private List<Long> salesBoundaryIds(Long userId) {
+        if (leadObjectPermissionService.hasTenantReadAll(userId) || !salesBoundary.isSalesActor(userId)) return null;
+        return sortedUserIds(salesBoundary.accessibleSalesUserIds(userId));
     }
 
     @Override
@@ -343,8 +370,14 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<AdminUserRespDTO> users;
         if (leadObjectPermissionService.hasTenantReadAll(userId) || leadObjectPermissionService.hasQueryAll()) {
             users = adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
+            if (!leadObjectPermissionService.hasTenantReadAll(userId) && salesBoundary.isSalesActor(userId)) {
+                Set<Long> allowed = salesBoundary.filterAccessibleUsers(userId, users.stream().map(AdminUserRespDTO::getId).toList());
+                users = users.stream().filter(user -> allowed.contains(user.getId())).toList();
+            }
         } else {
-            users = adminUserApi.getUserList(leadObjectPermissionService.getRelatedAndManagedUserIds(userId)).stream()
+            Set<Long> visibleIds = leadObjectPermissionService.getRelatedAndManagedUserIds(userId);
+            if (salesBoundary.isSalesActor(userId)) visibleIds = salesBoundary.filterAccessibleUsers(userId, visibleIds);
+            users = adminUserApi.getUserList(visibleIds).stream()
                     .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
                     .toList();
         }
@@ -592,7 +625,13 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private LeadVisibilityScope resolveVisibilityScope(String relationScope, Long userId) {
         if ("all".equals(relationScope) && (leadObjectPermissionService.hasTenantReadAll(userId)
                 || leadObjectPermissionService.hasQueryAll())) {
-            return new LeadVisibilityScope(List.of(), List.of(), true);
+            return new LeadVisibilityScope(List.of(), List.of(), true, true);
+        }
+        // Lead query-all within a sales boundary: owned leads follow the owner's department, while unassigned leads
+        // belong to no department yet and stay visible (recycle-pending ones keep their source owner's department).
+        if ("all".equals(relationScope) && salesBoundary.isSalesActor(userId)
+                && securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)) {
+            return new LeadVisibilityScope(List.of(), sortedUserIds(salesBoundary.accessibleSalesUserIds(userId)), false, true);
         }
         List<Long> relatedUserIds = sortedUserIds(leadObjectPermissionService.getRelatedAndManagedUserIds(userId));
         boolean submitted = ("all".equals(relationScope) || "submitted".equals(relationScope))
@@ -603,7 +642,13 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 owned ? relatedUserIds : List.of(), false);
     }
 
-    public record LeadVisibilityScope(List<Long> sourceUserIds, List<Long> ownerUserIds, boolean queryAll) {}
+    /** {@code unownedVisible}: unassigned, non-recycle-pending leads are visible regardless of department. */
+    public record LeadVisibilityScope(List<Long> sourceUserIds, List<Long> ownerUserIds, boolean queryAll,
+                                      boolean unownedVisible) {
+        public LeadVisibilityScope(List<Long> sourceUserIds, List<Long> ownerUserIds, boolean queryAll) {
+            this(sourceUserIds, ownerUserIds, queryAll, false);
+        }
+    }
 
     @Override
     public LeadManagementRespVO getPartnerLead(Long id, Long partnerId) {
@@ -684,7 +729,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             case SOURCE_PARTNER -> "兼职提交";
             case SOURCE_INTERNAL_NEW_MEDIA -> "新媒体提交";
             case SOURCE_SALES_SELF -> "销售自拓录";
-            case cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_EDUCATION_SELF -> "教务自拓录";
             default -> "来源未配置";
         };
     }
@@ -723,7 +767,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             if (SupervisorLeadActionPolicy.isAllowed(TRANSFER, lead)) {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
             }
-            if (salesPoolAllowed(lead) && (!recyclePending || STATUS_SUBMITTED.equals(lead.getStatus()))) {
+            if (salesSupervisorLead(lead) && (!recyclePending || STATUS_SUBMITTED.equals(lead.getStatus()))) {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
             }
         }
@@ -813,11 +857,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         return actions;
     }
 
-    private boolean salesPoolAllowed(LeadDO lead) {
-        try { return !teamTransferPolicy.isEducation(lead); }
-        catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) { return false; }
-    }
-
     private boolean salesSupervisorLead(LeadDO lead) {
         try { return OWNER_SALES.equals(teamTransferPolicy.resolveIdentity(lead)); }
         catch (cn.iocoder.yudao.framework.common.exception.ServiceException ex) { return false; }
@@ -843,12 +882,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RECYCLE)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RECYCLE, true));
         }
-        if (salesPoolAllowed(lead) && SupervisorLeadActionPolicy.isAllowed(RELEASE_CLAIM_POOL, lead)
+        if (salesLead && SupervisorLeadActionPolicy.isAllowed(RELEASE_CLAIM_POOL, lead)
                 && (!ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus()) || STATUS_SUBMITTED.equals(lead.getStatus()))
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_CLAIM_POOL)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_CLAIM_POOL, true));
         }
-        if (salesPoolAllowed(lead) && SupervisorLeadActionPolicy.isAllowed(RELEASE_PUBLIC_SEA, lead)
+        if (salesLead && SupervisorLeadActionPolicy.isAllowed(RELEASE_PUBLIC_SEA, lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_PUBLIC_SEA)
                 && publicSeaPoolService.canEnterManually(lead.getId())) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA, true));

@@ -11,8 +11,11 @@ final class StudentInfoMaterialSelection {
     static final Set<String> KEYS = Set.of("portrait", "identity_images", "diploma_images",
             "education_report", "application_images", "work_proof", "social_security",
             "labor_contract", "prior_certificate", "certificate_lookup", "commitment", "gift_shipping_address", "certificate_shipping_address");
+    static boolean optional(String key) {
+        return KEYS.contains(key) || StudentInfoProductRules.CONDITIONAL.contains(key);
+    }
     static List<String> selectable(List<Field> fields) {
-        return fields.stream().filter(f -> Boolean.TRUE.equals(f.getEnabled()) && KEYS.contains(f.getKey()))
+        return fields.stream().filter(f -> Boolean.TRUE.equals(f.getEnabled()) && optional(f.getKey()))
                 .map(Field::getKey).toList();
     }
     static List<Field> select(List<Field> fields, List<String> requested) {
@@ -20,6 +23,7 @@ final class StudentInfoMaterialSelection {
         if (new HashSet<>(selected).size() != selected.size() || !selectable(fields).containsAll(selected))
             throw exception(FIELD_INVALID, "所选材料不在本次可收集范围内，请刷新配置");
         // Omit from the snapshot entirely so prefill and attachment copying cannot retain hidden materials.
-        return fields.stream().filter(f -> !KEYS.contains(f.getKey()) || selected.contains(f.getKey())).toList();
+        return fields.stream().filter(f -> !optional(f.getKey()) || selected.contains(f.getKey())
+                || requested == null && StudentInfoProductRules.CONDITIONAL.contains(f.getKey())).toList();
     }
 }

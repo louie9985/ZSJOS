@@ -41,12 +41,25 @@ public final class MediaLeadVO {
     public record ScopeNode(String key, String parentKey, String title, String scopeType, Long scopeId) {}
 
     public record Target(Long id, String scopeType, Long scopeId, String name, LocalDate periodStart,
-                         Integer targetCount, Integer actualCount, boolean manual, Integer version) {}
+                         Integer targetCount, Integer actualCount, boolean manual, Integer version, java.math.BigDecimal targetAmount, boolean amountManual) {}
 
     public record TargetEdit(@NotNull @Pattern(regexp = "USER|DEPT|CENTER") String scopeType,
                              @NotNull Long scopeId, @NotNull LocalDate periodStart,
                              @Min(0) Integer targetCount, Integer version,
-                             @NotBlank @Size(max = 500) String reason, boolean restoreAutomatic) {}
+                             @NotBlank @Size(max = 500) String reason, boolean restoreAutomatic,
+                             @DecimalMin("0") @Digits(integer = 12, fraction = 2) java.math.BigDecimal targetAmount,
+                             boolean amountOnly, boolean countChanged, boolean amountChanged, boolean restoreAmountAutomatic, Long sourceId) {
+        public boolean editsCount() { return countChanged || !amountChanged && !amountOnly; }
+        public boolean editsAmount() { return amountChanged || !countChanged && amountOnly; }
+        public boolean restoresAmount() { return amountChanged ? restoreAmountAutomatic : restoreAutomatic; }
+        public TargetEdit(String scopeType, Long scopeId, LocalDate periodStart, Integer targetCount, Integer version, String reason, boolean restoreAutomatic, java.math.BigDecimal targetAmount, boolean amountOnly) {
+            this(scopeType, scopeId, periodStart, targetCount, version, reason, restoreAutomatic, targetAmount, amountOnly, false, false, false, null);
+        }
+        public TargetEdit(String scopeType, Long scopeId, LocalDate periodStart, Integer targetCount,
+                          Integer version, String reason, boolean restoreAutomatic) {
+            this(scopeType, scopeId, periodStart, targetCount, version, reason, restoreAutomatic, null, false);
+        }
+    }
     public record TargetRevision(Long id, Long targetId, String beforeJson, String afterJson,
                                  String reason, Long operatorId, java.time.LocalDateTime createTime) {}
     public record Detail(String leadNo, java.time.LocalDateTime submittedAt, String contributorName,

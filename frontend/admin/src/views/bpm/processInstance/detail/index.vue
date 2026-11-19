@@ -45,14 +45,23 @@
             <div class="form-scroll-area">
               <el-scrollbar>
                 <el-row :gutter="40">
-                  <el-col :span="17" class="!flex !flex-col formCol">
+                  <el-col :span="financeOrderTask ? 24 : 17" class="!flex !flex-col formCol">
                     <!-- 表单信息 -->
                     <div
                       v-loading="processInstanceLoading"
                       class="form-box flex flex-col mb-30px flex-1"
                     >
+                      <FinanceOrderApprovalDetail
+                        v-if="financeOrderTask && taskId"
+                        :key="taskId"
+                        :task-id="taskId"
+                        :process-instance-id="id"
+                        entry="bpm"
+                        :done="taskView === 'done'"
+                        @changed="refresh"
+                      />
                       <!-- 情况一：流程表单 -->
-                      <div v-if="processDefinition?.formType === BpmModelFormType.NORMAL">
+                      <div v-else-if="processDefinition?.formType === BpmModelFormType.NORMAL">
                         <form-create
                           v-model="detailForm.value"
                           v-model:api="fApi"
@@ -61,13 +70,13 @@
                         />
                       </div>
                       <!-- 情况二：业务表单 -->
-                      <div v-if="processDefinition?.formType === BpmModelFormType.CUSTOM">
+                      <div v-else-if="processDefinition?.formType === BpmModelFormType.CUSTOM">
                         <el-button v-if="withdrawalId" type="primary" @click="withdrawalRouter.push({ path: '/zsjos/withdrawal', query: { withdrawalId } })">打开提现详情</el-button>
                         <BusinessFormComponent v-else :id="processInstance.businessKey" />
                       </div>
                     </div>
                   </el-col>
-                  <el-col :span="7">
+                  <el-col v-if="!financeOrderTask" :span="7">
                     <!-- 审批记录时间线 -->
                     <ProcessInstanceTimeline :activity-nodes="activityNodes" />
                   </el-col>
@@ -106,7 +115,7 @@
           </el-tab-pane>
 
           <!-- 流程评论 -->
-          <el-tab-pane label="流程评论" name="comment">
+          <el-tab-pane v-if="!financeOrderTask" label="流程评论" name="comment">
             <div class="form-scroll-area">
               <el-scrollbar>
                 <ProcessInstanceCommentList
@@ -122,7 +131,7 @@
         <div class="b-t-solid border-t-1px border-[var(--el-border-color)]">
           <!-- 操作栏按钮 -->
           <ProcessInstanceOperationButton
-            v-if="!withdrawalId"
+            v-if="!withdrawalId && !financeOrderTask"
             ref="operationButtonRef"
             :process-instance="processInstance"
             :process-definition="processDefinition"
@@ -162,11 +171,14 @@ import approveSvg from '@/assets/svgs/bpm/approve.svg'
 import rejectSvg from '@/assets/svgs/bpm/reject.svg'
 import cancelSvg from '@/assets/svgs/bpm/cancel.svg'
 import PrintDialog from './PrintDialog.vue'
+import FinanceOrderApprovalDetail from '@/views/zsjos/salesOrderApproval/FinanceOrderApprovalDetail.vue'
+import { FINANCE_ORDER_PROCESS_KEY } from '@/api/zsjos/salesOrderApproval'
 
 defineOptions({ name: 'BpmProcessInstanceDetail' })
 const props = defineProps<{
   id: string // 流程实例的编号
   taskId?: string // 任务编号
+  taskView?: 'todo' | 'done'
   activityId?: string //流程活动编号，用于抄送查看
 }>()
 const message = useMessage() // 消息弹窗
@@ -174,6 +186,7 @@ const processInstanceLoading = ref(false) // 流程实例的加载中
 const processInstance = ref<any>({}) // 流程实例
 const withdrawalRouter = useRouter()
 const processDefinition = ref<any>({}) // 流程定义
+const financeOrderTask = computed(() => !!props.taskId && processDefinition.value.key === FINANCE_ORDER_PROCESS_KEY)
 const withdrawalId = computed(() => processDefinition.value.key === 'zsjos_partner_withdrawal'
   && /^withdrawal:[1-9]\d*$/.test(processInstance.value.businessKey || '')
   ? processInstance.value.businessKey.slice('withdrawal:'.length) : undefined)
@@ -230,7 +243,7 @@ const getApprovalDetail = async () => {
     processDefinition.value = data.processDefinition
 
     // 设置表单信息
-    if (processDefinition.value.formType === BpmModelFormType.NORMAL) {
+    if (!financeOrderTask.value && processDefinition.value.formType === BpmModelFormType.NORMAL) {
       // 获取表单字段权限
       const formFieldsPermission = data.formFieldsPermission
       // 清空可编辑字段为空
@@ -258,7 +271,7 @@ const getApprovalDetail = async () => {
           })
         }
       })
-    } else {
+    } else if (!financeOrderTask.value) {
       // 注意：data.processDefinition.formCustomViewPath 是组件的全路径，例如说：/crm/contract/detail/index.vue
       BusinessFormComponent.value = registerComponent(data.processDefinition.formCustomViewPath)
     }
@@ -322,9 +335,11 @@ const activeTab = ref('form')
 /** 初始化 */
 const userOptions = ref<UserApi.UserVO[]>([]) // 用户列表
 onMounted(async () => {
-  getDetail()
-  // 获得用户列表
-  userOptions.value = await UserApi.getSimpleUserList()
+  void getProcessModelView()
+  await getApprovalDetail()
+  if (!financeOrderTask.value) {
+    userOptions.value = await UserApi.getSimpleUserList()
+  }
 })
 </script>
 

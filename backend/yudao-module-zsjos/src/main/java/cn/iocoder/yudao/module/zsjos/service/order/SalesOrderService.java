@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 
 public interface SalesOrderService {
@@ -20,6 +21,13 @@ public interface SalesOrderService {
     Long reviseAndResubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);
     SalesOrderRespVO get(Long orderId, Long userId);
     SalesOrderRespVO get(Long orderId, Long userId, String taskId);
+    SalesOrderRespVO getNativeFinanceApproval(String taskId, boolean done, Long userId, boolean businessEntry);
+
+    void commentOnNativeFinanceApproval(Long userId, SalesOrderNativeCommentReqVO reqVO, boolean businessEntry);
+
+    void actOnNativeFinanceApproval(Long userId, SalesOrderNativeActionReqVO reqVO);
+
+    List<SalesOrderSignCandidateRespVO> getNativeFinanceSignCandidates(String taskId, Long userId, boolean businessEntry);
     SalesOrderRespVO getOwn(Long orderId, Long userId);
     SalesOrderRespVO getManagement(Long orderId, Long userId);
     PageResult<SalesOrderListItemRespVO> getManagementPage(SalesOrderMyPageReqVO reqVO, Long userId);
@@ -37,6 +45,7 @@ public interface SalesOrderService {
     SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId);
     void approve(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
     void reject(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
+    void migrateLegacyApproval(Long orderId, Long userId, SalesOrderLegacyApprovalMigrationReqVO reqVO);
     void terminate(Long orderId, Long userId, SalesOrderTerminateReqVO reqVO);
     java.util.List<SalesOrderListItemRespVO> getCustomerOrders(Long leadId, Long userId);
     SalesOrderRespVO getCustomerOrder(Long leadId, Long orderId, Long userId);

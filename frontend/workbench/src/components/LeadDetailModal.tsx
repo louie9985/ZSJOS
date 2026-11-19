@@ -4,10 +4,8 @@ import { api, type DictData, type ManagedLead } from '../services/api'
 import LeadDetailOverview from './LeadDetailOverview'
 import LeadFollowUpPanel from './LeadFollowUpPanel'
 import LeadAppealPanel from './LeadAppealPanel'
-import { APP_ROUTES, DICT_TYPE } from '../constants'
-import { Link } from 'react-router-dom'
+import { DICT_TYPE } from '../constants'
 import LeadNextFollowUpCancelButton from './LeadNextFollowUpCancelButton'
-import { hasPermission } from '../services/managementAccess'
 
 type TabKey = 'overview' | 'follow-ups' | 'appeals'
 
@@ -105,7 +103,6 @@ export default function LeadDetailModal({
               label: '概览',
               children: (
                 <div className="lead-detail-tab-content" style={{ padding: 24 }}>
-                  {lead.personId && hasPermission(permissions,'zsjos:student-info-task:query') && hasPermission(permissions,'zsjos:registration:query-pool') && <Link to={`${APP_ROUTES.STUDENT_INFO_TASKS}?personId=${lead.personId}`} onClick={onClose}>查看该客户的收集任务</Link>}
                   <LeadDetailOverview
                     lead={lead}
                     categoryLabel={categoryLabel}

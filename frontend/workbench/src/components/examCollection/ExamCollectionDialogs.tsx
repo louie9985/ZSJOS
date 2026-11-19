@@ -139,7 +139,7 @@ export function ExamCreateDialog({onClose,onCreated}:{onClose:()=>void;onCreated
         <Typography.Text strong className="exam-create-group">本次收集材料</Typography.Text>
         {loading?<Spin/>:!ready?null:presetGroups.materials.length?presetGroups.materials.map(presetRow):<Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="尚无可用的已发布材料字段"/>}
       </section>
-      <Typography.Text type="secondary">生成后可复制统一链接，再选择服务中的班级通知学习规划师。</Typography.Text>
+      <Typography.Text type="secondary">生成后可复制统一链接，再选择服务中的班级通知班主任。</Typography.Text>
     </Space>
   </Modal>
   {preview&&<ExamCollectionBodyPreview title={title||''} description={description||''} content={content||''} fields={ordered} onClose={()=>setPreview(false)}/>}
@@ -160,7 +160,7 @@ export function ExamNotifyDialog({task,adjusting=false,onClose,onSaved}:{task:Ex
   const leave=useExamLeaveGuard(changed||Boolean(reason.trim()),busy);
   useEffect(()=>{let active=true;setLoading(true);setOptionsReady(false);setError('');const request=adjusting?examCollectionApi.classOptions(task.id):examCollectionApi.classes();void request.then(v=>{if(adjusting&&task.classIds.some(id=>!v.some(c=>c.id===id)))throw new Error('已有班级信息未完整加载，请重试');if(active){setClasses(v);setOptionsReady(true)}}).catch(e=>{if(active)setError(studentInfoError(e))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[reload,adjusting,task.id]);
   const notify=async()=>{if(busy||loading||!optionsReady||!selected.length||adjusting&&(!changed||!reason.trim()))return;setBusy(true);setError('');try{if(adjusting)await examCollectionApi.adjustClasses(task.id,task.revision,selected,reason.trim());else await examCollectionApi.notify(task.id,task.revision,selected);onSaved()}catch(e){setError(studentInfoError(e))}finally{setBusy(false)}};
-  return <>{leave.guard}<Modal open title={adjusting?'调整收集班级':'选择班级并通知学习规划师'} width={640} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles} maskClosable={false}
+  return <>{leave.guard}<Modal open title={adjusting?'调整收集班级':'选择班级并通知班主任'} width={640} style={{maxWidth:'calc(100vw - 32px)',top:16}} styles={modalStyles} maskClosable={false}
     onCancel={()=>void leave.check().then(allowed=>{if(allowed)onClose()})} onOk={()=>void notify()} okText={adjusting?'确认调整班级':`通知 ${selected.length} 个班级`} confirmLoading={busy} okButtonProps={{disabled:loading||!optionsReady||!selected.length||adjusting&&(!changed||!reason.trim())}}>
     <Space orientation="vertical" className="exam-collection-stack">
       <Typography.Text strong>{task.title}</Typography.Text>
@@ -170,7 +170,7 @@ export function ExamNotifyDialog({task,adjusting=false,onClose,onSaved}:{task:Ex
         treeNodeFilterProp="searchText" showCheckedStrategy={TreeSelect.SHOW_CHILD} loading={loading} disabled={busy||!optionsReady}
         treeData={examClassTree(classes,retained)} value={selected.map(id=>`class:${id}`)}
         onChange={values=>setSelected(selectedExamClassIds(values,classes,retained))}/>
-      <Alert type="info" showIcon title={adjusting?`新增 ${added.length} 个班级，移除 ${removed.length} 个班级`:'本次通知将固定应收名单'} description={adjusting?'新增班级按当前服务中学员纳入名单；移除班级的应收成员停止催收，历史资料保留。继续保留的班级沿用原冻结名单，不重新拉取成员。':'以后转班不会自动改变人数。规划师收齐其负责学员的资料后，待办自动移除；考务也可以结束整个任务。'}/>
+      <Alert type="info" showIcon title={adjusting?`新增 ${added.length} 个班级，移除 ${removed.length} 个班级`:'本次通知将固定应收名单'} description={adjusting?'新增班级按当前服务中学员纳入名单；移除班级的应收成员停止催收，历史资料保留。继续保留的班级沿用原冻结名单，不重新拉取成员。':'以后转班不会自动改变人数。班主任收齐其负责学员的资料后，待办自动移除；考务也可以结束整个任务。'}/>
       {adjusting&&<><p>将移除：{classes.filter(c=>removed.includes(c.id)).map(c=>`${c.groupName?`${c.groupName} / `:''}${c.name}`).join('、')||'无'}</p><Input.TextArea aria-label="调整班级原因" placeholder="请填写新增或移除班级的原因" value={reason} onChange={e=>setReason(e.target.value)} maxLength={500} showCount disabled={busy}/></>}
       {selected.length>0&&<ul className="exam-collection-selection">{classes.filter(c=>selected.includes(c.id)).map(c=><li key={c.id}>{c.groupId != null ? `${c.groupName || '班级组名称未提供'} / ` : ''}{c.name}<span>{c.plannerName}</span></li>)}</ul>}
     </Space>

@@ -15,7 +15,8 @@ public class RegistrationChecklistDraftSaveReqVO {
     @NotNull private Integer templateVersion;
     @NotBlankIdempotency private String idempotencyKey;
     @NotEmpty @Size(max = 50) private List<@Valid ItemReqVO> items;
-    @NotEmpty @Size(max = 20) private List<@Valid RouteOptionReqVO> routeOptions;
+    /** Optional content-director routes; study-planner routing is retired. */
+    @Size(max = 20) private List<@Valid RouteOptionReqVO> routeOptions;
 
     @Data
     public static class ItemReqVO {

@@ -1178,6 +1178,11 @@ public class BpmTaskServiceImpl implements BpmTaskService {
     }
 
     private void validateTaskAction(Long userId, String action, Task task, ProcessInstance instance, String reason) {
+        validateTaskAction(userId, action, task, instance, reason, null);
+    }
+
+    private void validateTaskAction(Long userId, String action, Task task, ProcessInstance instance,
+                                    String reason, BpmTaskSignCreateReqVO signRequest) {
         ProcessDefinition definition = bpmProcessDefinitionService.getProcessDefinition(task.getProcessDefinitionId());
         BpmTaskActionContext context = new BpmTaskActionContext()
                 .setUserId(userId)
@@ -1185,6 +1190,11 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                 .setReason(reason)
                 .setParentTaskId(task.getParentTaskId())
                 .setTaskId(task.getId())
+                .setAssignee(task.getAssignee())
+                .setTaskStatus((Integer) taskService.getVariableLocal(task.getId(), BpmnVariableConstants.TASK_VARIABLE_STATUS))
+                .setTaskScopeType(task.getScopeType())
+                .setSignType(signRequest == null ? null : signRequest.getType())
+                .setSignUserIds(signRequest == null ? null : signRequest.getUserIds())
                 .setTaskDefinitionKey(task.getTaskDefinitionKey())
                 .setProcessInstanceId(task.getProcessInstanceId())
                 .setProcessDefinitionId(task.getProcessDefinitionId())
@@ -1442,6 +1452,35 @@ public class BpmTaskServiceImpl implements BpmTaskService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void skipObsoleteNode(Long operatorUserId, String processInstanceId, String processDefinitionKey,
+                                 String businessKey, String taskDefinitionKey, String reason) {
+        ProcessInstance instance = processInstanceService.getProcessInstance(processInstanceId);
+        Long tenantId = cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId();
+        if (instance == null || instance.isSuspended() || instance.isEnded()
+                || !java.util.Objects.equals(instance.getTenantId(), String.valueOf(tenantId))
+                || !java.util.Objects.equals(instance.getProcessDefinitionKey(), processDefinitionKey)
+                || !java.util.Objects.equals(instance.getBusinessKey(), businessKey)) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        List<Task> activeTasks = taskService.createTaskQuery().processInstanceId(processInstanceId)
+                .taskDefinitionKey(taskDefinitionKey).active().list();
+        // Sign children have the same node key. Let their real assignees resolve them before migration.
+        if (activeTasks.stream().anyMatch(task -> StrUtil.isNotBlank(task.getParentTaskId())
+                || StrUtil.isNotBlank(task.getScopeType()))) {
+            throw exception(TASK_OBSOLETE_NODE_ACTIVE_SIGN);
+        }
+        for (Task task : activeTasks) {
+            // An OR-sign multi-instance completion can remove the remaining sibling tasks.
+            if (getTask(task.getId()) == null) continue;
+            updateTaskStatusAndReason(task.getId(), BpmTaskStatusEnum.SKIP.getStatus(), reason);
+            commentService.createComment(task.getId(), processInstanceId, BpmCommentTypeEnum.MIGRATION_SKIP,
+                    operatorUserId, reason);
+            taskService.complete(task.getId());
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     @DataPermission(enable = false) // 关闭数据权限，避免查询不到用户数据。相关案例：https://gitee.com/zhijiantianya/yudao-cloud/issues/ID1UYA
     public void moveTaskToEnd(String processInstanceId, String reason) {
         List<Task> taskList = getRunningTaskListByProcessInstanceId(processInstanceId, null, null);
@@ -1489,7 +1528,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (instance == null) {
             throw exception(PROCESS_INSTANCE_NOT_EXISTS);
         }
-        validateTaskAction(userId, BpmTaskActionValidator.ACTION_ADD_SIGN, taskEntity, instance);
+        validateTaskAction(userId, BpmTaskActionValidator.ACTION_ADD_SIGN, taskEntity, instance, reqVO.getReason(), reqVO);
         List<AdminUserRespDTO> userList = adminUserApi.getUserList(reqVO.getUserIds());
         if (CollUtil.isEmpty(userList)) {
             throw exception(TASK_SIGN_CREATE_USER_NOT_EXIST);

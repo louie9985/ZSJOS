@@ -1161,7 +1161,7 @@ function OwnedMediaStudentsPage({ permissions = [] }: { permissions?: string[] }
       <div className="student-overview-subheading"><Typography.Text strong>服务团队</Typography.Text></div>
       <div className="lead-profile-meta">
         {[
-          ['学习规划师', directorContext?.ownerUserName || selectedService?.ownerUserName || '未指派'],
+          ['班主任', directorContext?.ownerUserName || selectedService?.ownerUserName || '未指派'],
           ['责任编导', directorContext?.contentDirectorUserName || selectedService?.contentDirectorUserName || '未指派'],
           ['职业规划师', directorContext?.careerPlannerUserName || selectedService?.careerPlannerUserName || '未指派'],
           ['运营负责人', directorContext?.operatorUserName || selectedService?.operatorUserName || '未指派'],

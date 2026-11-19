@@ -6,9 +6,10 @@ import { mediaLeadApi, type Target, type TargetRevision } from '../../services/m
 function targetValue(snapshot: string | null): string {
   if (snapshot == null) return '未设置'
   try {
-    const value = JSON.parse(snapshot) as { manual?: boolean; targetCount?: number }
-    if (value.manual === false) return '自动汇总'
-    return typeof value.targetCount === 'number' ? `${value.targetCount} 人` : '未设置'
+    const value = JSON.parse(snapshot) as { manual?: boolean; targetCount?: number; targetAmount?: number; amountManual?: boolean }
+    const count = value.manual === false ? '自动汇总' : typeof value.targetCount === 'number' ? `${value.targetCount} 人` : '未设置'
+    const amount = value.amountManual === false ? '自动汇总' : value.targetAmount == null ? '未设置' : `${value.targetAmount.toFixed(2)} 元`
+    return `人数：${count}；业绩：${amount}`
   } catch {
     return '历史快照不可解析'
   }

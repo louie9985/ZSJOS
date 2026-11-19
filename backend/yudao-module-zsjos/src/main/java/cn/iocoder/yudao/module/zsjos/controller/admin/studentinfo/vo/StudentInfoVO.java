@@ -63,6 +63,8 @@ public final class StudentInfoVO {
         private List<Integer> path;
     }
     @Data public static class Submit {
+        private String agreementHash;
+        private Boolean agreementAccepted;
         private IdentityAreaInput identityArea;
         @NotNull @jakarta.validation.constraints.Min(0) private Long revision;
         @NotNull @Size(max=33) private Map<String, Object> values;
@@ -88,6 +90,7 @@ public final class StudentInfoVO {
         public Option(String value, String label) { this.value = value; this.label = label; }
     }
     @Data public static class Runtime {
+        private String agreementBody, agreementHash, agreementConsent, agreementConfirmedDate;
         private Draft draft;
         private String status;
         private Long tenantId;
@@ -98,6 +101,8 @@ public final class StudentInfoVO {
         private Map<String,List<Option>> options = Map.of();
     }
     @Data public static class Detail {
+        private String agreementBody;
+        private Long agreementVersion;
         private Long id;
         private String status;
         private LocalDateTime createdAt;

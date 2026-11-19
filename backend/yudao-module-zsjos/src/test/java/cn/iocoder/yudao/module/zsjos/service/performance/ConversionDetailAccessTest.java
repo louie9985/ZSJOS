@@ -46,7 +46,7 @@ class ConversionDetailAccessTest {
         when(access.has("zsjos:sales-performance:detail")).thenReturn(true);
         when(access.historicalScope(any())).thenReturn(new PerformanceAccess.HistoricalScope(false,false,Set.of(12L)));
         var receipt=new PerformanceFact();receipt.setLeadId(5L);receipt.setReceivedAt(LocalDateTime.now(PerformancePeriods.ZONE).minusMinutes(1));
-        receipt.setStatus("valid");receipt.setSourceType("education_self_sourced");receipt.setSourceProviderRecorded(false);
+        receipt.setStatus("valid");receipt.setSourceType("sales_self_sourced");receipt.setSourceProviderRecorded(false);
         when(details.conversionOrders(any())).thenReturn(List.of());when(details.conversionReceipts(any())).thenReturn(List.of(receipt));
         var q=new Query();q.setScopeType("DEPT");q.setScopeId(12L);q.setPeriodKey("last7");q.setKeyword("unmatched");q.setProductKey("unmatched");
         var response=service.conversionDetails(q);

@@ -7,6 +7,13 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface RegistrationCommandMapper extends BaseMapperX<RegistrationCommandDO> {
+    default boolean hasTransferByOperator(Long caseId, Long userId) {
+        return exists(new LambdaQueryWrapperX<RegistrationCommandDO>()
+                .eq(RegistrationCommandDO::getRegistrationCaseId, caseId)
+                .eq(RegistrationCommandDO::getOperatorUserId, userId)
+                .eq(RegistrationCommandDO::getCommandType, "transfer"));
+    }
+
     default RegistrationCommandDO selectByIdempotencyKey(String idempotencyKey) {
         return selectOne(new LambdaQueryWrapperX<RegistrationCommandDO>()
                 .eq(RegistrationCommandDO::getIdempotencyKey, idempotencyKey));

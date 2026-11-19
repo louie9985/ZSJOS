@@ -1,5 +1,5 @@
 import { Button, Tag } from 'antd'
-import { orderPartnerOwnerText, orderSourcePersonText } from '../services/salesOrder'
+import { FINANCE_ORDER_PROCESS_KEY, orderPartnerOwnerText, orderSourcePersonText } from '../services/salesOrder'
 import type { ProColumns } from '@ant-design/pro-components'
 import type { SalesOrder, SalesOrderListItem } from '../services/api'
 import DateTimeText from './DateTimeText'
@@ -34,7 +34,7 @@ export function buildSalesOrderTableColumns(onDetail: (item: SalesOrderListItem)
       render: (_, row) => <Tag color={SALES_ORDER_STATUS_COLORS[row.status as SalesOrder['status']]}>{SALES_ORDER_STATUS_LABELS[row.status as SalesOrder['status']] || (row.status == null ? '—' : '未知状态')}</Tag>
     },
     { title: '审批轮次', dataIndex: 'approvalRoundNo', width: 100, render: (_, row) => row.approvalRoundNo ? `第 ${row.approvalRoundNo} 轮` : '-' },
-    { title: '当前审批节点', dataIndex: 'taskDefinitionKey', width: 150, render: (_, row) => SALES_ORDER_TASK_LABELS[String(row.taskDefinitionKey)] || '-' },
+    { title: '当前审批节点', dataIndex: 'taskDefinitionKey', width: 150, render: (_, row) => row.taskName || (row.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ? undefined : SALES_ORDER_TASK_LABELS[String(row.taskDefinitionKey)]) || '-' },
     { title: '审批结果', dataIndex: 'taskStatus', width: 110, render: (_, row) => row.taskStatus == null ? '-' : TASK_STATUS_LABELS[Number(row.taskStatus)] || '未知状态' },
     { title: '主管确认状态', dataIndex: 'supervisorConfirmationStatus', width: 130, render: (_, row) => row.supervisorConfirmationStatus ? SUPERVISOR_STATUS_LABELS[String(row.supervisorConfirmationStatus)] || '未知状态' : '—' },
     textColumn('主管确认申请人', 'supervisorRequesterName', 150),
@@ -44,7 +44,8 @@ export function buildSalesOrderTableColumns(onDetail: (item: SalesOrderListItem)
     textColumn('手机号', 'studentMobile', 140),
     textColumn('微信号', 'studentWechatId', 150),
     { title: '订单地区', key: 'orderRegion', width: 180, ellipsis: true, render: (_, item) => [item.provinceName, item.cityName].filter(Boolean).join(' / ') || '-' },
-    textColumn('约定考试时间', 'agreedExamTime', 150),
+    textColumn('商定考试月份', 'agreedExamMonth', 130),
+    textColumn('原商定考试时间（文本）', 'agreedExamTime', 170),
     textColumn('班型', 'classType', 130),
     textColumn('服务周期', 'servicePeriodLabelSnapshot', 140),
     textColumn('学员来源', 'studentSourceLabelSnapshot', 140),

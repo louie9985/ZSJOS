@@ -16,6 +16,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_
 public class SalesOrderCommandService {
     @Resource private SalesOrderCommandMapper commandMapper;
 
+    public boolean hasCommand(Long approvalRoundId, String commandType) {
+        return commandMapper.hasCommand(approvalRoundId, commandType);
+    }
+
     public boolean replay(String key, Command command) {
         SalesOrderCommandDO existing = commandMapper.selectByIdempotencyKey(key);
         if (existing == null) return false;

@@ -82,7 +82,7 @@
         </template>
       </el-table-column>
       <el-table-column v-if="!isPartnerScene" label="所属部门" prop="deptName" min-width="140" />
-      <el-table-column v-else label="承接身份" width="110"><template #default="{ row }">{{ row.ownerIdentity === 'education' ? '教务' : row.ownerIdentity === 'sales' ? '销售' : '未配置' }}</template></el-table-column>
+      <el-table-column v-else label="承接身份" width="110"><template #default="{ row }">{{ row.ownerIdentity === 'sales' ? '销售' : '未配置' }}</template></el-table-column>
       <el-table-column :label="`已绑定${targetLabel}`" min-width="300">
         <template #default="{ row }">
           <div v-if="row.salesUsers.length" class="sales-tags">
@@ -149,7 +149,6 @@
     <el-form-item v-if="isPartnerScene && saveMode !== 'remove'" label="承接身份" required>
       <el-radio-group v-model="ownerIdentity">
         <el-radio-button value="sales">销售承接</el-radio-button>
-        <el-radio-button value="education">教务承接</el-radio-button>
       </el-radio-group>
     </el-form-item>
     <el-radio-group v-if="isBatch" v-model="saveMode" class="mode-switch">
@@ -288,7 +287,7 @@ const isAdminMode = computed(() => route.name === 'ZsjosUserRelationData')
 const sceneCode = computed(() => String(route.params.sceneCode || 'lead_specified_assignment'))
 const scene = ref<UserRelationApi.UserRelationSceneVO>()
 const isPartnerScene = computed(() => scene.value?.sourceType === 'partner')
-const ownerIdentity = ref<'sales' | 'education'>()
+const ownerIdentity = ref<'sales'>()
 const sceneName = computed(() => scene.value?.name || '派单关系')
 const sourceLabel = computed(() => scene.value?.sourceLabel || '派单员工')
 const targetLabel = computed(() => scene.value?.targetLabel || '销售专员')
@@ -485,7 +484,7 @@ const submitRelations = async () => {
 
 const prepareSubmit = () => {
   if (isPartnerScene.value && selectedSalesIds.value.length > 0 && saveMode.value !== 'remove' && !ownerIdentity.value) {
-    message.warning('请选择销售或教务承接身份')
+    message.warning('请选择销售承接身份')
     return
   }
   if (selectedSalesIds.value.length === 0 && saveMode.value !== 'replace') {

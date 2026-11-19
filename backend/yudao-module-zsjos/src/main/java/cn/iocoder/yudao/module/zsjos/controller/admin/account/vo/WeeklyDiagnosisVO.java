@@ -37,6 +37,8 @@ public final class WeeklyDiagnosisVO {
         @NotBlank @Size(max=200) private String directionSummary;
         @NotBlank private String trafficNormal;
         @PositiveOrZero private Long highestLikes;
+        @PositiveOrZero private Long published7;
+        @PositiveOrZero private Long published28;
         @NotBlank private String metricToken;
     }
     public record Preview(Node node, String metricToken) {}

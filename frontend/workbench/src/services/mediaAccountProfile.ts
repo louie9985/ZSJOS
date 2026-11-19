@@ -116,7 +116,7 @@ export type DiagnosisOverview = {
   }>;
 };
 export type WeeklyDiagnosisPreview = {node: WeeklyDiagnosisNode; metricToken: string};
-export type WeeklyDiagnosisSubmit = {nodeKey: string; common: DiagnosisRequest; highestLikes?: number;
+export type WeeklyDiagnosisSubmit = {nodeKey: string; common: DiagnosisRequest; published7?: number; published28?: number; highestLikes?: number;
   changeDirection: string; trafficNormal: string; directionSummary: string; metricToken: string};
 export type DiagnosisBatchCandidate = {
   accountId: number; accountNo?: string; accountName?: string; platformLabel?: string;

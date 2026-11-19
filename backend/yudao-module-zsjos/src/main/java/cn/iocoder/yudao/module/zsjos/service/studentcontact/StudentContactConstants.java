@@ -49,8 +49,6 @@ public interface StudentContactConstants {
     String COLLABORATOR_DIRECTOR = "content_director";
     String COLLABORATOR_CAREER = "career_planner";
     String COLLABORATOR_OPERATOR = "operator";
-    String RELATION_REGISTRATION_MANAGER_PLANNER = "registration_manager_study_planner";
-    String RELATION_REGISTRATION_SPECIALIST_PLANNER = "registration_specialist_study_planner";
     String RELATION_PLANNER_DIRECTOR = "study_planner_content_director";
     String RELATION_PLANNER_CAREER = "study_planner_career_planner";
     String RELATION_DIRECTOR_OPERATOR = "content_director_operator";
@@ -78,7 +76,7 @@ public interface StudentContactConstants {
     String NOTIFY_CONTACT = "zsjos.student.contact_reminder";
     String NOTIFY_EXAM_NOTICE = "zsjos.student.exam_notice";
     String NOTIFY_OPERATOR_ASSIGNED = "zsjos.student.operator_assigned";
-    String NOTIFY_ROLE_PLANNER = "study_planner";
-    String NOTIFY_ROLE_SUPERVISOR = "delivery_supervisor";
+    String NOTIFY_ROLE_HEAD_TEACHER = "head_teacher";
+    String NOTIFY_ROLE_SUPERVISOR = "sales_supervisor";
     String NOTIFY_ROLE_OPERATOR = "operator";
 }

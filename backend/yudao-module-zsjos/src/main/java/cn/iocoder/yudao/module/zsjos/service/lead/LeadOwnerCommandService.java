@@ -24,9 +24,26 @@ public class LeadOwnerCommandService {
     @Resource private LeadDispatchService dispatchService;
     @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private LeadAssignmentService assignmentService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
-    public List<LeadAssignmentUserRespVO> getTransferCandidates() {
-        return assignmentService.getEligibleSalesUsers();
+    /** Candidate owners without a specific lead, limited to the requester's sales boundary like the per-lead list. */
+    public List<LeadAssignmentUserRespVO> getTransferCandidates(Long ownerUserId) {
+        var candidates = assignmentService.getEligibleSalesUsers();
+        var allowed = salesBoundary.filterTransferTargets(ownerUserId, candidates.stream().map(LeadAssignmentUserRespVO::getId).toList());
+        return candidates.stream().filter(user -> allowed.contains(user.getId())).toList();
+    }
+
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "owner-transfer")
+    public List<LeadAssignmentUserRespVO> getTransferCandidates(Long leadId, Long ownerUserId) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        if (!ownerUserId.equals(lead.getOwnerUserId())) throw exception(LEAD_PERMISSION_DENIED);
+        if (STATUS_WON.equals(lead.getStatus()) || STATUS_CLOSED.equals(lead.getStatus())) throw exception(LEAD_PERMISSION_DENIED);
+        if (salesOrderMapper.selectActiveByLeadId(leadId, ACTIVE_ORDER_STATUSES) != null) throw exception(LEAD_OWNER_TRANSFER_DEAL_ACTIVE);
+        String source = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+        var candidates = isSelfSourced(source) ? assignmentService.getEligibleSalesUsers() : assignmentService.getEligibleReceivers();
+        var allowed = salesBoundary.filterTransferTargets(ownerUserId, candidates.stream().map(LeadAssignmentUserRespVO::getId).toList());
+        return candidates.stream().filter(user -> !ownerUserId.equals(user.getId()) && allowed.contains(user.getId())).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)

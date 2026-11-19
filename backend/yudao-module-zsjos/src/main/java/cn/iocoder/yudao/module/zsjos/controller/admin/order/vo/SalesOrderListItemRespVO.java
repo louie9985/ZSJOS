@@ -24,6 +24,7 @@ public class SalesOrderListItemRespVO {
     private String provinceName;
     private String cityName;
     private String agreedExamTime;
+    private String agreedExamMonth;
     private String classType;
     private String servicePeriodLabelSnapshot;
     private String studentSourceLabelSnapshot;
@@ -58,8 +59,10 @@ public class SalesOrderListItemRespVO {
     private Integer approvalRoundNo;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
+    private String processDefinitionKey;
     private String taskId;
     private Boolean approvalReasonRequired;
+    private String taskName;
     private String taskDefinitionKey;
     private Integer taskStatus;
     private String taskReason;

@@ -56,11 +56,15 @@ class LeadDispatchServiceImplTest {
         TenantContextHolder.setTenantId(1L);
         org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null);
         org.mockito.Mockito.lenient().when(newcomerPoolService.today()).thenReturn(java.time.LocalDate.of(2026, 10, 9));
+        org.mockito.Mockito.lenient().when(assignmentService.isEligibleReceiver(any())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(salesBoundary.canAccessUser(any(), any())).thenReturn(true);
+        org.mockito.Mockito.lenient().when(salesBoundary.canTransferTo(any(), any())).thenReturn(true);
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowRecorder flowRecorder;
     @Mock private PartnerLeadAssignmentService partnerAssignmentService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks
     private LeadDispatchServiceImpl service;
     @Mock
@@ -106,7 +110,7 @@ class LeadDispatchServiceImplTest {
         when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("unassigned"), org.mockito.ArgumentMatchers.isNull(), any())).thenReturn(1);
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of(10L));
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(11L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(salesUser(11L)));
         when(dispatchRedisRepository.poolSize()).thenReturn(1L);
         when(dispatchRedisRepository.rotateNext()).thenReturn(11L);
         when(dispatchRedisRepository.isOnline(11L)).thenReturn(true);
@@ -119,6 +123,15 @@ class LeadDispatchServiceImplTest {
         verify(notifyEventPublisher).publish(eq("zsjos.lead.reassigned"), eq(1L), eq("lead-dispatch:92"), any(), any(),
                 org.mockito.ArgumentMatchers.argThat(context -> Long.valueOf(11L).equals(context.get("pendingSalesUserId"))
                         && Integer.valueOf(2).equals(context.get("assignment.attempt"))));
+    }
+
+    @Test
+    void revokedReceiverCannotAcceptPendingLead() {
+        LeadDO lead = lead(); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(assignmentService.isEligibleReceiver(10L)).thenReturn(false);
+        assertThrows(ServiceException.class, () -> service.accept(1L, 10L));
+        verify(leadMapper, never()).updatePendingResult(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -159,7 +172,7 @@ class LeadDispatchServiceImplTest {
 
     @Test
     void specifiedDispatchPublishesRoundAndNullDeadline() {
-        LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("education");
+        LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("sales");
         doAnswer(call -> { ((LeadAssignmentHistoryDO) call.getArgument(0)).setId(91L); return 1; }).when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
         service.start(lead, 10L, 20L);
         verify(notifyEventPublisher).publish(eq("zsjos.lead.assigned"), eq(1L), eq("lead-dispatch:91"), eq(20L), any(),
@@ -168,17 +181,17 @@ class LeadDispatchServiceImplTest {
     }
 
     @Test
-    void specifiedEducationAcceptanceFreezesEducationHistory() {
-        LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("education");
+    void specifiedPartnerAcceptanceFreezesSalesHistory() {
+        LeadDO lead = lead(); lead.setDispatchMode("specified"); lead.setAssignmentStatus("pending_acceptance"); lead.setPendingAssigneeUserId(10L); lead.setSourceType("partner"); lead.setPendingOwnerIdentity("sales");
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(1);
         service.accept(1L, 10L);
-        assertEquals("education", lead.getOwnerIdentity());
+        assertEquals("sales", lead.getOwnerIdentity());
         verify(newcomerPoolService, never()).recordAcceptance(any());
         var capture = org.mockito.ArgumentCaptor.forClass(LeadAssignmentHistoryDO.class);
         verify(historyMapper).insert(capture.capture());
-        assertEquals("education", capture.getValue().getOwnerIdentitySnapshot());
-        verify(partnerAssignmentService).validateTarget(10L,"education");
+        assertEquals("sales", capture.getValue().getOwnerIdentitySnapshot());
+        verify(partnerAssignmentService).validateTarget(10L,"sales");
         verify(assignmentService, never()).getEligibleSalesUsers();
     }
 
@@ -263,7 +276,6 @@ class LeadDispatchServiceImplTest {
 
     @Test
     void claimRejectsWhenBeijingDailyLimitReached() {
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(leadMapper.selectById(1L)).thenReturn(lead());
         when(leadMapper.updatePublicPoolToOwned(eq(1L), eq(10L), any())).thenReturn(1);
@@ -279,7 +291,6 @@ class LeadDispatchServiceImplTest {
     void claimCreatesFollowUpTaskWithoutBusinessNotification() {
         LeadDO lead = lead();
         lead.setAssignmentStatus("public_pool");
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(leadMapper.updatePublicPoolToOwned(eq(1L), eq(10L), any())).thenReturn(1);
@@ -305,7 +316,7 @@ class LeadDispatchServiceImplTest {
         when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of());
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(salesUser(10L)));
         when(dispatchRedisRepository.poolSize()).thenReturn(1L);
         when(dispatchRedisRepository.rotateNext()).thenReturn(10L);
         when(dispatchRedisRepository.isOnline(10L)).thenReturn(true);
@@ -373,7 +384,7 @@ class LeadDispatchServiceImplTest {
         when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of());
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L), salesUser(11L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(salesUser(10L), salesUser(11L)));
         when(newcomerPoolService.availableUsers(eq(Set.of(10L, 11L)), any())).thenReturn(Set.of(11L));
         when(newcomerPoolService.lockAvailable(11L)).thenReturn(true);
         when(dispatchRedisRepository.poolSize()).thenReturn(2L);
@@ -398,7 +409,7 @@ class LeadDispatchServiceImplTest {
         when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of());
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L), salesUser(11L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(salesUser(10L), salesUser(11L)));
         when(newcomerPoolService.availableUsers(eq(Set.of(10L, 11L)), any())).thenReturn(Set.of(11L));
         when(dispatchRedisRepository.poolSize()).thenReturn(2L);
         when(dispatchRedisRepository.rotateNext()).thenReturn(10L, 11L, 10L);
@@ -423,7 +434,7 @@ class LeadDispatchServiceImplTest {
         var second = retryableLead(); second.setId(2L);
         when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(first, second));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L), salesUser(11L), salesUser(12L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(salesUser(10L), salesUser(11L), salesUser(12L)));
         when(newcomerPoolService.availableUsers(any(), any())).thenReturn(Set.of(11L, 12L));
         when(newcomerPoolService.lockAvailable(11L)).thenReturn(true);
         when(newcomerPoolService.lockAvailable(12L)).thenReturn(true);
@@ -448,7 +459,7 @@ class LeadDispatchServiceImplTest {
         when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(historyMapper.selectTriedSalesUserIds(1L)).thenReturn(List.of());
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
+        when(assignmentService.getEligibleReceivers()).thenReturn(List.of(salesUser(10L)));
         when(dispatchRedisRepository.poolSize()).thenReturn(1L);
         when(dispatchRedisRepository.rotateNext()).thenReturn(10L);
         when(dispatchRedisRepository.isOnline(10L)).thenReturn(true);
@@ -468,7 +479,6 @@ class LeadDispatchServiceImplTest {
         lead.setStatus("suspended");
         lead.setAssignmentStatus("owned");
         lead.setOwnerUserId(10L);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
         when(leadMapper.selectById(1L)).thenReturn(lead);
 
         ServiceException error = assertThrows(ServiceException.class,
@@ -484,7 +494,6 @@ class LeadDispatchServiceImplTest {
         lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(10L);
         OpportunityDO opportunity = new OpportunityDO();
         opportunity.setId(30L); opportunity.setLeadId(1L); opportunity.setOwnerUserId(10L);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
         doAnswer(invocation -> {
@@ -502,13 +511,44 @@ class LeadDispatchServiceImplTest {
     }
 
     @Test
+    void ownerTransferTargetUsesDepartmentBoundaryNotReaderDataScope() {
+        LeadDO lead = lead();
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        // A "仅本人" data scope cannot read colleague 20's records, but may still hand its own lead to 20.
+        org.mockito.Mockito.lenient().when(salesBoundary.canAccessUser(10L, 20L)).thenReturn(false);
+        doAnswer(invocation -> {
+            invocation.getArgument(0, LeadAssignmentHistoryDO.class).setId(88L);
+            return 1;
+        }).when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
+
+        service.transferOwned(1L, 10L, 20L, 10L, "转派", "transfer-scope");
+
+        assertEquals(20L, lead.getOwnerUserId());
+        verify(salesBoundary).canTransferTo(10L, 20L);
+    }
+
+    @Test
+    void ownerTransferRejectsTargetOutsideDepartmentBoundary() {
+        LeadDO lead = lead();
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(salesBoundary.canTransferTo(10L, 20L)).thenReturn(false);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.transferOwned(1L, 10L, 20L, 10L, "转派", "transfer-cross"));
+
+        assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+        verify(leadMapper, never()).updateById(any(LeadDO.class));
+    }
+
+    @Test
     void ownerTransferClosesPreviousQualificationBeforeStartingNewRound() {
         LeadDO lead = lead();
         lead.setStatus("submitted");
         lead.setAssignmentStatus("owned");
         lead.setOwnerUserId(10L);
         lead.setQualificationRoundNo(3);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         doAnswer(invocation -> {
             invocation.getArgument(0, LeadAssignmentHistoryDO.class).setId(88L);
@@ -534,7 +574,6 @@ class LeadDispatchServiceImplTest {
     void approvedTransferInvalidatesWhenOriginalOwnerChanged() {
         LeadDO lead = lead();
         lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(11L);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
 
         LeadDispatchService.TransferAttemptResult result = service.tryAdminTransfer(1L, 10L, 20L, 20L, "审批通过");
@@ -548,7 +587,6 @@ class LeadDispatchServiceImplTest {
     void approvedTransferSucceedsWhenOriginalOwnerStillMatches() {
         LeadDO lead = lead();
         lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(10L);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         doAnswer(invocation -> {
             var history = invocation.getArgument(0,
@@ -636,24 +674,24 @@ class LeadDispatchServiceImplTest {
         return user;
     }
     @Test
-    void educationSelfSourcedIsOwnedImmediatelyAndCreatesLifecycleTasksWithoutDispatch() {
+    void salesSelfSourcedIsOwnedImmediatelyAndCreatesLifecycleTasksWithoutDispatch() {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setStatus("submitted");
-        lead.setSourceType("education_self_sourced"); lead.setDispatchMode("self");
+        lead.setSourceType("sales_self_sourced"); lead.setDispatchMode("self");
         doAnswer(call -> { ((LeadAssignmentHistoryDO) call.getArgument(0)).setId(90L); return 1; })
                 .when(historyMapper).insert(any(LeadAssignmentHistoryDO.class));
         service.start(lead, 999L, 42L);
         assertEquals(42L, lead.getOwnerUserId());
-        assertEquals("education", lead.getOwnerIdentity());
+        assertEquals("sales", lead.getOwnerIdentity());
         assertEquals("owned", lead.getAssignmentStatus());
         verify(assignmentService, never()).getEligibleSalesUsers();
         verify(lifecycleTaskService).createFirstFollowUpTask(eq(1L), eq(42L), eq(90L), any(), any(), any());
         verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(42L), any());
         verify(historyMapper).insert(org.mockito.ArgumentMatchers.argThat((LeadAssignmentHistoryDO history) ->
-                "education".equals(history.getOwnerIdentitySnapshot()) && history.getReason().contains("教务")));
+                "sales".equals(history.getOwnerIdentitySnapshot()) && history.getReason().contains("销售自拓直接归属")));
     }
 
     @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.CsvSource({"sales_self_sourced,sales", "education_self_sourced,education"})
+    @org.junit.jupiter.params.provider.CsvSource({"sales_self_sourced,sales"})
     void assistedMediaKeepsEntryOwnerAndNormalTasks(String entry,String owner) {
         var lead=new LeadDO().setId(1L).setSourceType("internal_new_media").setSubmissionSourceType(entry)
                 .setSourceUserId(20L).setDispatchMode("self").setStatus("submitted");

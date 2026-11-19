@@ -19,7 +19,8 @@ Object.assign(api,{
  leadCatalog:async()=>({categoryTree:[],spus:[],skus:[]}),
  dictDataByType:async(type:string)=>[{value:type==='zsjos_lead_category'?'a':'channel',label:type==='zsjos_lead_category'?'测试分类':'测试渠道'}],
  newMediaProviders:async()=>[{id:2,nickname:'测试提供方'}],
- createSelfSourcedLead:create,createEducationSelfSourcedLead:create,createLead:create,
+ querySelfSourcedArchive:async(education:boolean)=>{fixture.requests.push({archiveEducation:education});return []},
+ createSelfSourcedLead:create,createEducationSelfSourcedLead:async()=>{throw new Error('旧教务入口不应被调用')},createLead:create,
  leadFollowUpPage:async()=>({list:records,total:records.length}),checkSelfSourcedLeadContact:async()=>false
 })
-createRoot(document.getElementById('root')!).render(<ThemeProvider><App><BrowserRouter><main style={{padding:16,maxWidth:1100,margin:'auto'}}>{query.has('history')?<><FollowUpTimeline records={records}/><LeadFollowUpCharts leadId={1}/></>:<LeadSubmissionPage selfSourced educationSelfSourced={query.has('education')} permissions={[query.has('education')?'zsjos:lead:education-self-sourced:create':'zsjos:lead:self-sourced:create']}/>}</main></BrowserRouter></App></ThemeProvider>)
+createRoot(document.getElementById('root')!).render(<ThemeProvider><App><BrowserRouter><main style={{padding:16,maxWidth:1100,margin:'auto'}}>{query.has('history')?<><FollowUpTimeline records={records}/><LeadFollowUpCharts leadId={1}/></>:<LeadSubmissionPage selfSourced permissions={['zsjos:lead:self-sourced:create']}/>}</main></BrowserRouter></App></ThemeProvider>)

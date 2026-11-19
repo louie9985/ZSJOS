@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="visible"
-    :title="educationSelfSourced ? '教务录入客资' : selfSourced ? '销售录入客资' : '提交客资'"
+    :title="selfSourced ? '销售录入客资' : '提交客资'"
     width="min(760px, 96vw)"
     destroy-on-close
   >
@@ -137,7 +137,7 @@ import * as MenuApi from '@/api/zsjos/workbenchMenus'
 import * as AreaApi from '@/api/system/area'
 import { getSimpleDictDataList, type DictDataVO } from '@/api/system/dict/dict.data'
 import { useUserStoreWithOut } from '@/store/modules/user'
-const props = defineProps<{ selfSourced?: boolean; educationSelfSourced?: boolean }>()
+const props = defineProps<{ selfSourced?: boolean }>()
 const emit = defineEmits<{ success: [] }>()
 const message = useMessage()
 const userStore = useUserStoreWithOut()
@@ -192,7 +192,7 @@ const queryArchive = async () => {
   const sequence = ++archiveSequence
   archiveLoading.value = true; archiveError.value = ''; archiveCandidates.value = undefined; selectedArchive.value = undefined
   try {
-    const candidates = await MenuApi.querySelfSourcedArchive(!!props.educationSelfSourced, {
+    const candidates = await MenuApi.querySelfSourcedArchive({
       mobile: archiveMobile.value.trim() || undefined, wechatId: archiveWechat.value.trim() || undefined, idempotencyKey: crypto.randomUUID()
     })
     if (sequence !== archiveSequence) return
@@ -305,7 +305,7 @@ const submit = async () => {
         selfSourcedNextFollowUpAt: automatic.value && form.selfSourcedNextFollowUpAt ? Number(form.selfSourcedNextFollowUpAt) : undefined,
         idempotencyKey: idempotencyKey.value ?? (idempotencyKey.value = crypto.randomUUID())
       },
-      !!props.selfSourced, !!props.educationSelfSourced
+      !!props.selfSourced
     )
     if (result?.outcome === 'activated') message.success('客资已存在，已激活提醒')
     else if (result?.outcome === 'review_pending') message.warning('疑似重复，待复核；尚未新建或判有效')

@@ -68,10 +68,11 @@ public class PartnerLeadAssignmentService {
     private boolean eligible(Long userId) {
         var user = userId == null ? null : userApi.getUser(userId);
         return user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())
-                && permissionApi.hasAnyPermissions(userId, PERMISSION_ACCEPT);
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_RECEIVE)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_SALES_ELIGIBLE);
     }
 
-    private boolean validIdentity(String identity) { return OWNER_SALES.equals(identity) || OWNER_EDUCATION.equals(identity); }
+    private boolean validIdentity(String identity) { return OWNER_SALES.equals(identity); }
 
     private List<LeadAssignmentRelationDO> active(Long partnerId) {
         return relationMapper.selectListBySourceUserIds(PARTNER_SCENE, Set.of(partnerId)).stream()
@@ -79,8 +80,9 @@ public class PartnerLeadAssignmentService {
     }
 
     public List<LeadAssignmentUserRespVO> targets() {
-        return userApi.getUserList(permissionApi.getEnabledUserIdsByPermission(PERMISSION_ACCEPT)).stream()
-                .filter(u -> Integer.valueOf(0).equals(u.getStatus())).map(u -> {
+        return userApi.getUserList(permissionApi.getEnabledUserIdsByPermission(PERMISSION_RECEIVE)).stream()
+                .filter(u -> Integer.valueOf(0).equals(u.getStatus())
+                        && permissionApi.hasAnyPermissions(u.getId(), PERMISSION_SALES_ELIGIBLE)).map(u -> {
                     var vo = new LeadAssignmentUserRespVO(); vo.setId(u.getId()); vo.setNickname(u.getNickname());
                     vo.setStatus(u.getStatus()); vo.setDeptId(u.getDeptId());
                     vo.setMaskedMobile(DesensitizedUtil.mobilePhone(u.getMobile())); return vo;

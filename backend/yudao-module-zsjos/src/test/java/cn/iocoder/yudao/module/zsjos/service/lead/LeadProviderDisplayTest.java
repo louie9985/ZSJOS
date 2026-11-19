@@ -33,7 +33,8 @@ class LeadProviderDisplayTest {
         lead.setSourceProviderRecorded(true);
         assertEquals("销售本人（未关联新媒体）", LeadProviderDisplay.identityLabel(lead));
         lead.setSourceType("education_self_sourced");
-        assertEquals("教务本人（未关联新媒体）", LeadProviderDisplay.identityLabel(lead));
+        assertEquals("提供方待核实", LeadProviderDisplay.identityLabel(lead));
+        lead.setSourceType("sales_self_sourced");
         lead.setProviderOwnerId(1L);
         assertEquals("提供方待核实", LeadProviderDisplay.identityLabel(lead));
     }

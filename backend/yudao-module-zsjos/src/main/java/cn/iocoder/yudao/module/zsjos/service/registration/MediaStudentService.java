@@ -65,6 +65,11 @@ public class MediaStudentService {
         var accounts = personIds.isEmpty() ? List.<MediaAccountDO>of()
                 : accountPermissionProvider.filterReadable(accountMapper.selectByStudents(personIds), userId).stream()
                         .filter(MediaStudentService::isDisplayedAccount).toList();
+        if (salesScoped(userId)) {
+            Set<Long> visibleServices = page.getList().stream().flatMap(student -> student.getServices().stream())
+                    .map(MyStudentRespVO.ServiceVO::getServiceRelationId).collect(java.util.stream.Collectors.toSet());
+            accounts = accounts.stream().filter(account -> visibleServices.contains(account.getCreateServiceRelationId())).toList();
+        }
         var grouped = accounts.stream().collect(java.util.stream.Collectors.groupingBy(MediaAccountDO::getStudentPersonId));
         var rows = page.getList().stream().map(student -> {
             var row = BeanUtils.toBean(student, MediaStudentListRespVO.class);
@@ -108,6 +113,7 @@ public class MediaStudentService {
     @Resource private StudentServiceObjectPermissionProvider servicePermissions;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper relationMapper;
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     public MediaStudentDetailRespVO getDetail(Long userId, Long personId) {
         boolean readAll = permissionApi.hasTenantReadAllAccess(userId);
@@ -118,6 +124,11 @@ public class MediaStudentService {
         List<MediaAccountDO> accounts = accountMapper.selectByStudent(personId).stream()
                 .filter(MediaStudentService::isDisplayedAccount)
                 .filter(account -> accountPermissionProvider.hasPermission(account.getId(), "read", userId)).toList();
+        if (salesScoped(userId)) {
+            Set<Long> visibleServices = result.getStudent().getServices().stream().map(MyStudentRespVO.ServiceVO::getServiceRelationId)
+                    .collect(java.util.stream.Collectors.toSet());
+            accounts = accounts.stream().filter(account -> visibleServices.contains(account.getCreateServiceRelationId())).toList();
+        }
         List<Long> accountIds = accounts.stream().map(MediaAccountDO::getId).toList();
         Map<Long, MediaAccountDO> accountById = accounts.stream()
                 .collect(java.util.stream.Collectors.toMap(MediaAccountDO::getId, row -> row));
@@ -153,9 +164,12 @@ public class MediaStudentService {
         }).toList());
         // Drafts can precede accounts; all-card readers may inspect these assets without owning them.
         boolean readAllDrafts = readAll || permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:query-all");
+        Set<Long> visibleServiceIds = salesScoped(userId) ? result.getStudent().getServices().stream()
+                .map(MyStudentRespVO.ServiceVO::getServiceRelationId).collect(java.util.stream.Collectors.toSet()) : null;
         var unboundDrafts = (readAllDrafts ? positioningMapper.selectUnboundForStudent(personId)
                 : positioningMapper.selectByDirectorAndStudent(userId, personId)).stream()
-                .filter(row -> row.getAccountId() == null && personId.equals(row.getStudentPersonId()));
+                .filter(row -> row.getAccountId() == null && personId.equals(row.getStudentPersonId()))
+                .filter(row -> visibleServiceIds == null || visibleServiceIds.contains(row.getServiceRelationId()));
         result.setPositioningDrafts(java.util.stream.Stream.concat(positioningCards.stream(), unboundDrafts)
                 .filter(row -> "co_creating".equals(row.getStatus()) && (readAllDrafts || userId.equals(row.getDirectorUserId())))
                 .map(row -> {
@@ -229,7 +243,7 @@ public class MediaStudentService {
             value.setLastActivityAt(row.getUpdateTime());
             return value;
         }).toList());
-        var talks = talkRecordMapper.selectRecentByStudent(personId);
+        var talks = visibleTalks(userId, result.getStudent(), talkRecordMapper.selectRecentByStudent(personId), accounts);
         result.setOperationTimeline(buildOperationTimeline(
                 accounts,
                 positioningSubmissions,
@@ -437,8 +451,10 @@ public class MediaStudentService {
     }
 
     public List<MediaStudentTalkRespVO> getTalkRecords(Long userId, Long personId) {
-        myStudentService.getMediaStudent(userId, personId);
-        List<MediaStudentTalkRecordDO> records = talkRecordMapper.selectByStudent(personId);
+        var visibleStudent = myStudentService.getMediaStudent(userId, personId);
+        var readableAccounts = salesScoped(userId) ? accountMapper.selectByStudent(personId).stream()
+                .filter(account -> accountPermissionProvider.hasPermission(account.getId(), "read", userId)).toList() : List.<MediaAccountDO>of();
+        List<MediaStudentTalkRecordDO> records = visibleTalks(userId, visibleStudent, talkRecordMapper.selectByStudent(personId), readableAccounts);
         var users = adminUserApi.getUserMap(records.stream().map(MediaStudentTalkRecordDO::getOperatorUserId).collect(java.util.stream.Collectors.toSet()));
         return records.stream().map(record -> {
             MediaStudentTalkRespVO response = new MediaStudentTalkRespVO();
@@ -453,9 +469,48 @@ public class MediaStudentService {
         }).toList();
     }
 
+    private List<MediaStudentTalkRecordDO> visibleTalks(Long userId, MyStudentRespVO student,
+            List<MediaStudentTalkRecordDO> records, List<MediaAccountDO> readableAccounts) {
+        if (!salesScoped(userId)) return records;
+        Set<Long> services = student.getServices().stream().map(MyStudentRespVO.ServiceVO::getServiceRelationId)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, MediaAccountDO> allAccounts = accountMapper.selectByStudent(student.getPersonId()).stream()
+                .collect(java.util.stream.Collectors.toMap(MediaAccountDO::getId, account -> account));
+        Set<Long> readable = readableAccounts.stream().map(MediaAccountDO::getId).collect(java.util.stream.Collectors.toSet());
+        boolean scoped = salesScoped(userId);
+        boolean reviewUnknown = permissionApi.hasAnyPermissions(userId, "zsjos:media-student:history-review");
+        return records.stream().filter(record -> {
+            if (record.getServiceRelationId() != null)
+                return !scoped || services.contains(record.getServiceRelationId())
+                        && (record.getAccountId() == null || readable.contains(record.getAccountId()));
+            var account = record.getAccountId() == null ? null : allAccounts.get(record.getAccountId());
+            if (account != null && account.getCreateServiceRelationId() != null)
+                return !scoped || services.contains(account.getCreateServiceRelationId()) && readable.contains(account.getId());
+            return reviewUnknown;
+        }).toList();
+    }
+
+    private boolean salesScoped(Long userId) {
+        return !permissionApi.hasTenantReadAllAccess(userId) && salesBoundary.isSalesActor(userId);
+    }
+
     public Long createTalkRecord(Long userId, Long personId, MediaStudentTalkSaveReqVO request) {
+        if (salesScoped(userId)) {
+            if (request.getServiceRelationId() == null)
+                throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED);
+            var student = myStudentService.getMediaStudent(userId, personId);
+            Set<Long> ids = student.getServices().stream().map(MyStudentRespVO.ServiceVO::getServiceRelationId).collect(java.util.stream.Collectors.toSet());
+            if (!ids.contains(request.getServiceRelationId()))
+                throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED);
+            if (request.getAccountId() != null && accountMapper.selectByStudent(personId).stream()
+                    .noneMatch(account -> Objects.equals(account.getId(), request.getAccountId())
+                            && Objects.equals(account.getCreateServiceRelationId(), request.getServiceRelationId())))
+                throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
+        }
         // Full read access is not participation and must not grant this legacy write command.
-        if (relationMapper.selectAssignedByUserAndPersonIds(userId, List.of(personId), null).isEmpty()) {
+        var assigned = relationMapper.selectAssignedByUserAndPersonIds(userId, List.of(personId), null);
+        if (assigned.isEmpty() || salesScoped(userId) && assigned.stream()
+                .noneMatch(relation -> Objects.equals(relation.getId(), request.getServiceRelationId()))) {
             throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED);
         }
         if (request.getAccountId() != null && accountMapper.selectByParticipantAndStudent(userId, personId).stream()
@@ -463,7 +518,7 @@ public class MediaStudentService {
             throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
         }
         MediaStudentTalkRecordDO record = new MediaStudentTalkRecordDO();
-        record.setStudentPersonId(personId); record.setAccountId(request.getAccountId());
+        record.setStudentPersonId(personId); record.setServiceRelationId(salesScoped(userId) ? request.getServiceRelationId() : null); record.setAccountId(request.getAccountId());
         record.setOperatorUserId(userId); record.setContent(request.getContent().trim());
         record.setAttachmentFileIdsJson(JsonUtils.toJsonString(request.getAttachmentFileIds() == null
                 ? List.of() : request.getAttachmentFileIds()));

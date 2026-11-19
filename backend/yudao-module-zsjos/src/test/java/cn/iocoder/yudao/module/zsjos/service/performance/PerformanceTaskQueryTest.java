@@ -77,7 +77,9 @@ class PerformanceTaskQueryTest {
             var query = new cn.iocoder.yudao.module.zsjos.dal.mysql.performance.PerformanceDetailQuery()
                     .setBusinessDomain("sales").setTenant(9L).setType(scope).setId(id).setAllDepartments(true).setMissingDepartment(personal)
                     .setDepartments(java.util.Set.of()).setMetric("qualification").setNow(now).setSize(1);
-            var expected = rows.stream().filter(x -> x.getDeptId()!=null && Boolean.TRUE.equals(x.getCurrentQualification()))
+            // Personal queries keep facts without a task attribution: their NULL business domain is the legacy sales
+            // compatibility case (PerformanceDetailSql, 2026-10-20), and missingDepartment admits the missing organization.
+            var expected = rows.stream().filter(x -> (personal || x.getDeptId()!=null) && Boolean.TRUE.equals(x.getCurrentQualification()))
                     .sorted(java.util.Comparator.comparing(PerformanceFact::getId)).map(PerformanceFact::getId).toList();
             assertEquals(expected.size(), pages.count(query));
             var paged = new java.util.ArrayList<Long>();

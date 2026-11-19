@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 public class MediaStudentTalkRecordDO extends TenantBaseDO {
     @TableId private Long id;
     private Long studentPersonId;
+    private Long serviceRelationId;
     private Long accountId;
     private Long operatorUserId;
     private String content;

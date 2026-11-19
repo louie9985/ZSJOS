@@ -29,7 +29,9 @@ public final class PerformanceVO {
   @Min(1) @Max(100) private Integer pageSize=20;
  }
  public record UnclassifiedDetail(Detail fact,String attributionReason,Long historicalDepartmentId) {}
- public record Organization(Long deptId,Long centerId,String kind) {}
+ public record Organization(Long deptId,Long centerId,String kind,Boolean salesBoundaryRoot) {
+  public Organization(Long deptId,Long centerId,String kind){this(deptId,centerId,kind,false);}
+ }
  public record Revision(Long id,String reason,String before,String after,String operatorName,LocalDateTime at) {}
  public record Node(String key,String parentKey,String title,String scopeType,Long scopeId,boolean selectable) {}
     @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
@@ -47,7 +49,14 @@ public final class PerformanceVO {
  public record Group(String key,String label,BigDecimal amount,long count,BigDecimal share) {}
  public record Target(Long id,String scopeType,Long scopeId,String name,String periodType,LocalDate periodStart,
    BigDecimal automaticFloor,BigDecimal automaticSprint,BigDecimal floorAmount,BigDecimal sprintAmount,
-   boolean manual,boolean complete,int missing,Integer version) {}
+   boolean manual,boolean complete,int missing,Integer version,String sourceToken,boolean sourceConflict) {
+  public Target(Long id,String scopeType,Long scopeId,String name,String periodType,LocalDate periodStart,BigDecimal automaticFloor,BigDecimal automaticSprint,BigDecimal floorAmount,BigDecimal sprintAmount,boolean manual,boolean complete,int missing,Integer version) {
+   this(id,scopeType,scopeId,name,periodType,periodStart,automaticFloor,automaticSprint,floorAmount,sprintAmount,manual,complete,missing,version,null,false);
+  }
+  public Target(Long id,String scopeType,Long scopeId,String name,String periodType,LocalDate periodStart,BigDecimal automaticFloor,BigDecimal automaticSprint,BigDecimal floorAmount,BigDecimal sprintAmount,boolean manual,boolean complete,int missing,Integer version,String sourceToken) {
+   this(id,scopeType,scopeId,name,periodType,periodStart,automaticFloor,automaticSprint,floorAmount,sprintAmount,manual,complete,missing,version,sourceToken,false);
+  }
+ }
  public record TargetProgress(String key,String label,Metric actual,Target target) {}
  public record Overview(LocalDateTime asOf,LocalDateTime attributionAvailableSince,List<TargetProgress> targets,List<Metric> performance,List<Metric> conversion,
    Map<String,Long> pending,long missingAttributionOrders,BigDecimal missingAttributionAmount,boolean canDetail) {}
@@ -81,10 +90,12 @@ public final class PerformanceVO {
   private boolean restoreAutomatic;
   @NotBlank @Size(max=500) private String reason;
   private Integer version;
+  private String sourceToken;
  }
  @Data public static class TargetBatch { @NotEmpty @Size(max=200) private List<@Valid TargetEdit> items; }
  @Data public static class OrgEdit {
   @NotNull private Long deptId; @NotNull private Long centerId;
   @NotNull @Pattern(regexp="DEPT|CENTER") private String kind;
+  private Boolean salesBoundaryRoot;
  }
 }

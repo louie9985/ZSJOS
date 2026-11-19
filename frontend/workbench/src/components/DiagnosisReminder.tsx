@@ -5,12 +5,19 @@ import { useNavigate } from 'react-router-dom';
 import { formatTimestamp } from '../services/time';
 import { useOverlayCoordinator } from './OverlayCoordinator';
 
+// Maximum taskIds accepted by the diagnosis acknowledgement endpoint.
+const ACK_BATCH_SIZE = 500;
+
 export default function DiagnosisReminder({ enabled }: { enabled: boolean }) {
   const navigate = useNavigate();
   const { businessOverlayCount } = useOverlayCoordinator();
   const [items, setItems] = useState<DiagnosisTodo[]>([]), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const itemsRef = useRef(items); itemsRef.current = items;
-  const acknowledged = useRef('');
+  const acknowledgement = useRef<{
+    items: DiagnosisTodo[];
+    offset: number;
+    pending?: Promise<void>;
+  } | null>(null);
   const [retry, setRetry] = useState(0);
   const groups=Object.values(items.reduce<Record<string,DiagnosisTodo[]>>((result,item)=>{
     const key=`${item.accountId}:${item.dueAt}`;(result[key] ??= []).push(item);return result;
@@ -21,9 +28,21 @@ export default function DiagnosisReminder({ enabled }: { enabled: boolean }) {
   }, [enabled,retry]);
   const visible = items.length > 0 && businessOverlayCount === 0;
   const markSeen = useCallback(async () => {
-    const ids = items.map(x => x.taskId), key = ids.join(',');
-    if (!ids.length || acknowledged.current === key) return;
-    await diagnosisApi.acknowledge(ids); acknowledged.current=key; setError('');
+    if (!items.length) return;
+    if (acknowledgement.current?.items !== items) {
+      acknowledgement.current = { items, offset: 0 };
+    }
+    const progress = acknowledgement.current;
+    if (progress.pending) return progress.pending;
+    progress.pending = (async () => {
+      while (progress.offset < items.length) {
+        const batch = items.slice(progress.offset, progress.offset + ACK_BATCH_SIZE);
+        await diagnosisApi.acknowledge(batch.map(item => item.taskId));
+        progress.offset += batch.length;
+      }
+      setError('');
+    })().finally(() => { progress.pending = undefined; });
+    return progress.pending;
   }, [items]);
   // A displayed summary is recorded server-side; dismissing never completes a diagnosis.
   useEffect(() => { if (visible) void markSeen().catch(e => setError(e instanceof Error ? e.message : '提醒状态保存失败，请重试')); }, [visible,markSeen]);

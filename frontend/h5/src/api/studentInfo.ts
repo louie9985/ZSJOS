@@ -6,6 +6,7 @@ export interface CollectionField {
   required: boolean; enabled: boolean; note?: string; options?: string[]; sensitive: boolean
 }
 export interface CollectionRuntime {
+  agreementBody?: string; agreementHash?: string; agreementConsent?: string; agreementConfirmedDate?: string
   draft?: CollectionDraft
   productName?: string; images: CollectionImage[]
   status: string; tenantId?: number; configVersion?: number; fields: CollectionField[]
@@ -40,6 +41,7 @@ export const collectionApi = {
     return URL.createObjectURL(new Blob([response.data], { type: image.contentType }))
   },
   detail: async (token: string) => unwrap<CollectionRuntime>(await client.get('/zsjos/student-info-form/detail', { headers: headers(token) })),
-  submit: async (token: string, values: Record<string, string | number[]>, revision: number, identityArea?: IdentityAreaInput) => unwrap<boolean>(await client.post('/zsjos/student-info-form/submit', { values, revision, identityArea }, { headers: headers(token) })),
+  markRead: async (token: string, digest: string) => unwrap<boolean>(await client.post('/zsjos/student-info-form/agreement-read', null, { params: { digest }, headers: headers(token) })),
+  submit: async (token: string, values: Record<string, string | number[]>, revision: number, identityArea?: IdentityAreaInput, agreementHash?: string, agreementAccepted?: boolean) => unwrap<boolean>(await client.post('/zsjos/student-info-form/submit', { values, revision, identityArea, agreementHash, agreementAccepted }, { headers: headers(token) })),
   areas: async (tenantId: number) => unwrap<CollectionArea[]>(await axios.get('/app-api/system/area/tree', { headers: { 'tenant-id': tenantId, Authorization: undefined }, timeout: 15000 })),
 }

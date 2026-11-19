@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import type { ProColumns } from '@ant-design/pro-components';
 import type { DictData } from '../services/api';
 import type { DiagnosisBatchCandidate, WeeklyDiagnosisPreview } from '../services/mediaAccountProfile';
+import { PublicationInput } from './AccountDiagnosisForm';
 import BusinessTable from './BusinessTable';
 import { WeeklyDiagnosisMetrics } from './WeeklyDiagnosisMetrics';
 
@@ -54,9 +55,7 @@ export default function AccountDiagnosisAccounts({rows, candidates, candidatesLo
     <Typography.Text type="secondary">{row.candidate.platformLabel || '平台待填写'}</Typography.Text>
     {row.loading && <Spin size="small" />}
     {row.error && <Alert type="error" showIcon title={row.error} action={<Button size="small" disabled={disabled} onClick={() => onRetry(row.candidate.accountId)}>重试</Button>} />}
-    {row.preview?.node.parts.find(part => part.days === 7)?.metric && <Typography.Text type="secondary">
-      本周发布 {row.preview.node.parts.find(part => part.days === 7)?.metric.publishedCount ?? '无法统计'} 条
-    </Typography.Text>}
+    {row.preview?.node.parts.map(part => <PublicationInput key={part.days} days={part.days} accountId={row.candidate.accountId} />)}
   </Space>;
   const columns: ProColumns<DiagnosisAccountRow>[] = [
     {title: '账号', key: 'account', width: 190, ellipsis: false, render: (_, row) => summary(row)},

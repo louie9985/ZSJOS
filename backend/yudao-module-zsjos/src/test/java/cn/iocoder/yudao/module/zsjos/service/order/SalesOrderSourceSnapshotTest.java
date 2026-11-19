@@ -32,7 +32,8 @@ class SalesOrderSourceSnapshotTest {
 
     @Test void capturesOnlyExplicitNoProviderEvidence() {
         assertEquals(true, capture("sales_self_sourced", true, null).getSelfSourcedWithoutProvider());
-        assertEquals(true, capture("education_self_sourced", true, null).getSelfSourcedWithoutProvider());
+        // Retired education source is backfilled to sales and no longer treated as self-sourced.
+        assertEquals(false, capture("education_self_sourced", true, null).getSelfSourcedWithoutProvider());
         assertEquals(false, capture("sales_self_sourced", true, 2L).getSelfSourcedWithoutProvider());
         assertEquals(false, capture("internal_new_media", true, null).getSelfSourcedWithoutProvider());
         assertNull(capture("sales_self_sourced", null, null).getSelfSourcedWithoutProvider());

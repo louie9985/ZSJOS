@@ -712,6 +712,44 @@
       ]
     },
     {
+      "processKey": "zsjos_sales_order_finance_approval",
+      "assetVersion": "3.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": [
+        "financeReview"
+      ],
+      "businessVariables": [
+        "orderId",
+        "leadId",
+        "leadNo",
+        "formalOwnerIdentity",
+        "formalOwnerIdentityLabel",
+        "personId",
+        "roundNo"
+      ],
+      "assigneeVariables": [
+        "financeUsers"
+      ],
+      "runtimeOnlyVariables": [
+        "orderId",
+        "leadId",
+        "leadNo",
+        "formalOwnerIdentity",
+        "formalOwnerIdentityLabel",
+        "personId",
+        "roundNo",
+        "financeUsers"
+      ],
+      "businessKeyFormat": "sales-order:{orderId}",
+      "minimumMigration": "V023",
+      "path": "zsjos_sales_order_finance_approval/3.0.0/process-model.json",
+      "sha256": "78aec3e61581a14af3134e90aed29d06990725178eb958676f7824105069e1ca",
+      "startUserSelectTaskKeys": [
+        "financeReview"
+      ]
+    },
+    {
       "processKey": "zsjos_lead_appeal_review",
       "assetVersion": "2.0.0",
       "recommended": true,

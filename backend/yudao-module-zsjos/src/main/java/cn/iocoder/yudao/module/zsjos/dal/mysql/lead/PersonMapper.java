@@ -165,6 +165,24 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }
 
+    default PageResult<PersonDO> selectSalesScopedMediaPage(MyStudentPageReqVO req, Long subject,
+            java.util.Collection<Long> owners, java.util.Collection<Long> matchedIds) {
+        if (owners == null || owners.isEmpty()) return PageResult.empty();
+        QueryWrapperX<PersonDO> query = studentQuery(req, matchedIds);
+        String ownerList = owners.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+        String subjectSql = subject == null ? "" : " AND (sr.owner_user_id=" + subject
+                + " OR sr.content_director_user_id=" + subject + " OR sr.career_planner_user_id=" + subject
+                + " OR sr.operator_user_id=" + subject + ")";
+        String operatorSql = req.getOperatorUserId() == null ? "" : " AND sr.operator_user_id=" + req.getOperatorUserId();
+        query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
+                + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
+                + "AND sr.owner_user_id IN (" + ownerList + ") AND sr.status IN ('active','paused','completed') "
+                + "AND (sr.media_ready=1 OR (sr.media_ready IS NULL AND sr.acceptance_status='accepted')) "
+                + "AND ({0} IS NULL OR sr.class_id={0}) AND ({1} IS NULL OR sr.status={1})"
+                + subjectSql + operatorSql + ")", req.getClassId(), req.getServiceStatus());
+        return selectPage(req, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
+    }
+
     /** Match the same services projected by MyStudentServiceImpl, before pagination and counting. */
     static void applyMediaOperatorFilter(QueryWrapperX<PersonDO> query, MyStudentPageReqVO req,
                                          Long subjectId, boolean explicitRead) {

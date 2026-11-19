@@ -98,7 +98,7 @@ class PerformanceReportTest {
   assertEquals(1L,reference.details(query).getTotal());
  }
  @org.junit.jupiter.params.ParameterizedTest
- @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto"})
  void automaticTasksAreExcludedFromSummaryAndDetailsInEveryScope(String generationSource){
   var day=LocalDate.now(PerformancePeriods.ZONE).minusDays(1);query.setStart(day);query.setEnd(day.plusDays(1));query.setMetric("tasks");
   var first=task(1,"completed",day.atTime(12,0));first.setGroupKey("lead_first_follow_up");first.setGenerationSource(generationSource);

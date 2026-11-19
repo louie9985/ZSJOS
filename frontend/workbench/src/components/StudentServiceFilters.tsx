@@ -19,7 +19,7 @@ export default function StudentServiceFilters({ value, onChange, canReadAnnotati
   useEffect(() => { void load() }, [canReadAnnotation])
   if (error) return <Alert type="error" showIcon title="学员筛选选项加载失败" action={<Button size="small" onClick={() => void load()}>重试</Button>} />
   return <>{([
-    ['ownerUserId', 'service.ownerUserId', '全部学习规划师'],
+    ['ownerUserId', 'service.ownerUserId', '全部班主任'],
     ['acceptanceStatus', 'service.acceptanceStatus', '全部接收状态'],
     ['deliveryStage', 'service.deliveryStage', '全部交付阶段'],
     ['taskState', 'service.taskState', '全部任务状态'],

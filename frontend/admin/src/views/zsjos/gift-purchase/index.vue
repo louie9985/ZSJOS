@@ -16,6 +16,7 @@
       <el-form-item>
         <el-button type="primary" native-type="submit">查询</el-button>
         <el-button @click="reset">重置</el-button>
+        <el-button v-if="canReadTextbooks" @click="showTextbooks = true">教材邮寄地址</el-button>
         <el-button v-hasPermi="['zsjos:gift-purchase:create']" type="success" @click="open()"
           >新增采购</el-button
         >
@@ -237,9 +238,13 @@
         >
       </template>
     </el-dialog>
+    <el-dialog v-if="canReadTextbooks" v-model="showTextbooks" title="教材邮寄地址" width="90%" destroy-on-close>
+      <TextbookAddresses v-if="showTextbooks" />
+    </el-dialog>
   </ContentWrap>
 </template>
 <script setup lang="ts">
+import TextbookAddresses from './TextbookAddresses.vue'
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import download from '@/utils/download'
@@ -278,6 +283,10 @@ const query = reactive({
   giftKeyword: '',
   purchased: false as boolean | 'all'
 })
+const showTextbooks = ref(false)
+const canReadTextbooks = computed(() => [
+  'zsjos:gift-purchase:query', 'zsjos:sales-order:query-management', 'zsjos:student-info-form:sensitive-read'
+].every(permission => checkPermi([permission])))
 const canBatch = computed(() => checkPermi(['zsjos:gift-purchase:batch-purchase']))
 const selected = ref<GiftPurchaseVO[]>([])
 const purchaseTable = ref<{ clearSelection: () => void }>()

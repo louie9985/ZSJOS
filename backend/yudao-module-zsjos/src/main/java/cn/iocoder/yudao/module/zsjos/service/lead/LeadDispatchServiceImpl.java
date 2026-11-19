@@ -53,7 +53,6 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadAssignmentRuleMapper ruleMapper;
     @Resource private LeadAssignmentService assignmentService;
-    @Resource private LeadTeamTransferPolicy teamTransferPolicy;
     @Resource private PartnerLeadAssignmentService partnerAssignmentService;
     @Resource private LeadDispatchRedisRepository dispatchRedisRepository;
     @Resource private DictDataApi dictDataApi;
@@ -64,6 +63,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private LeadPublicSeaPoolService publicSeaPoolService;
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private NewcomerPoolService newcomerPoolService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -71,8 +71,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         LocalDateTime now = LocalDateTime.now();
         if (DISPATCH_SELF.equals(lead.getDispatchMode())) {
             lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(submitterUserId);
-            String entrySource = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
-            lead.setOwnerIdentity(SOURCE_EDUCATION_SELF.equals(entrySource) ? OWNER_EDUCATION : OWNER_SALES);
+            lead.setOwnerIdentity(OWNER_SALES);
             lead.setOwnershipStartedAt(now); LeadMapper.advanceActivity(lead, now); leadMapper.updateById(lead);
             LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, submitterUserId,
                     submitterUserId, null, 1, null, ownerIdentityLabel(lead.getOwnerIdentity()) + (SOURCE_INTERNAL_NEW_MEDIA.equals(lead.getSourceType())
@@ -89,7 +88,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             if (SOURCE_PARTNER.equals(lead.getSourceType())) {
                 partnerAssignmentService.validateTarget(specifiedSalesUserId, lead.getPendingOwnerIdentity());
             } else {
-                boolean allowed = assignmentService.getEligibleSalesUsers().stream()
+                boolean allowed = assignmentService.getEligibleReceivers().stream()
                         .anyMatch(user -> Objects.equals(user.getId(), specifiedSalesUserId));
                 if (!allowed) throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
             }
@@ -115,7 +114,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         dispatchNext(lead, rule, config, submitterUserId, null, now);
     }
 
-    @Override public List<LeadAssignmentUserRespVO> getEligibleSalesUsers() { return assignmentService.getEligibleSalesUsers(); }
+    @Override public List<LeadAssignmentUserRespVO> getEligibleSalesUsers() { return assignmentService.getEligibleReceivers(); }
     @Override public List<LeadAssignmentUserRespVO> getAssignableSalesUsers(Long sourceUserId) { return assignmentService.getAssignableSalesUsers(sourceUserId); }
 
     @Override
@@ -132,7 +131,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             moveToPool(lead, operatorUserId, "无可继续尝试的启用销售", activityAt);
             return;
         }
-        Set<Long> eligible = assignmentService.getEligibleSalesUsers().stream()
+        Set<Long> eligible = assignmentService.getEligibleReceivers().stream()
                 .map(LeadAssignmentUserRespVO::getId).collect(Collectors.toSet());
         Set<Long> priorityUsers = newcomerPoolService.availableUsers(eligible, newcomerPoolService.today());
         try {
@@ -237,6 +236,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 throw exception(LEAD_ASSIGNMENT_ALREADY_HANDLED);
             }
         }
+        if (!assignmentService.isEligibleReceiver(userId)) throw exception(LEAD_PERMISSION_DENIED);
         String acceptedIdentity = SOURCE_PARTNER.equals(lead.getSourceType()) && DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
                 ? lead.getPendingOwnerIdentity() : OWNER_SALES;
         if (SOURCE_PARTNER.equals(lead.getSourceType()) && DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) {
@@ -303,10 +303,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "claim")
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="抢单", target="lead", id=0, actor=1, actorType="ADMIN")
     public void claim(Long leadId, Long userId) {
-        requireSalesUser(userId);
         RuleConfig config = readConfig(requireRule().getConfigJson());
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         LeadDO lead = requireLead(leadId);
+        requireTransferTarget(lead, userId);
         LocalDateTime claimedAt = LocalDateTime.now();
         if (leadMapper.updatePublicPoolToOwned(leadId, userId, claimedAt) == 0) throw exception(LEAD_CLAIM_ALREADY_TAKEN);
         if (claimDailyCounterMapper.reserve(TenantContextHolder.getRequiredTenantId(), userId, today,
@@ -375,8 +375,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="管理员转派", target="lead", id=0, actor=2, actorType="ADMIN")
     public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason,
                               String idempotencyKey) {
-        requireSalesUser(salesUserId);
         LeadDO lead = requireLead(leadId);
+        requireTransferTarget(lead, salesUserId);
+        requireTransferScope(lead, operatorUserId, salesUserId);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
@@ -390,9 +391,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="本人转派", target="lead", id=0, actor=3, actorType="ADMIN")
     public void transferOwned(Long leadId, Long expectedOwnerUserId, Long salesUserId,
                               Long operatorUserId, String reason, String idempotencyKey) {
-        requireSalesUser(salesUserId);
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        requireTransferTarget(lead, salesUserId);
+        requireTransferScope(lead, operatorUserId, salesUserId);
         if (!Objects.equals(expectedOwnerUserId, lead.getOwnerUserId())
                 || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 || STATUS_SUSPENDED.equals(lead.getStatus())
@@ -408,12 +410,15 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @cn.iocoder.yudao.module.zsjos.service.lead.flow.LeadFlowOperation(value="审核转派", target="lead", id=0, actor=3, actorType="ADMIN")
     public TransferAttemptResult tryAdminTransfer(Long leadId, Long expectedOwnerUserId, Long salesUserId,
                                                   Long operatorUserId, String reason) {
-        if (assignmentService.getEligibleSalesUsers().stream().noneMatch(user -> salesUserId.equals(user.getId()))) {
-            return TransferAttemptResult.invalidated("目标销售已不再有效");
-        }
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) {
             return TransferAttemptResult.invalidated("客资已不存在");
+        }
+        if (!isTransferTargetEligible(lead, salesUserId)) {
+            return TransferAttemptResult.invalidated("目标销售已不再有效");
+        }
+        if (!isTransferScopeAllowed(lead, operatorUserId, salesUserId)) {
+            return TransferAttemptResult.invalidated("目标销售不在可管理范围内");
         }
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
@@ -424,33 +429,15 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         return TransferAttemptResult.success();
     }
 
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
-    public void transferEducation(Long leadId, Long targetUserId, Long operatorUserId, String reason, String idempotencyKey) {
-        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
-        if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead);
-        teamTransferPolicy.requireTarget(lead, targetUserId, operatorUserId);
-        if (STATUS_SUSPENDED.equals(lead.getStatus()) || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
-            throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
-        }
-        doAdminTransfer(lead, targetUserId, operatorUserId, reason, idempotencyKey, OWNER_EDUCATION);
-    }
-
-    private void doAdminTransfer(LeadDO lead, Long salesUserId, Long operatorUserId, String reason, String idempotencyKey) {
-        doAdminTransfer(lead, salesUserId, operatorUserId, reason, idempotencyKey, OWNER_SALES);
-    }
-
     private void doAdminTransfer(LeadDO lead, Long salesUserId, Long operatorUserId, String reason,
-                                 String idempotencyKey, String ownerIdentity) {
+                                 String idempotencyKey) {
         Long leadId = lead.getId();
         LocalDateTime transferredAt = LocalDateTime.now();
         publicSeaPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
         Long from = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getPendingAssigneeUserId();
         Long pendingAssigneeUserId = lead.getPendingAssigneeUserId();
         String fromAssignmentStatus = lead.getAssignmentStatus();
-        lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId); lead.setOwnerIdentity(ownerIdentity);
+        lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId); lead.setOwnerIdentity(OWNER_SALES);
         lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
         lead.setOwnershipStartedAt(transferredAt);
         lifecycleTaskService.cancelAssignmentTask(leadId, pendingAssigneeUserId,
@@ -461,7 +448,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), transferredAt, reason);
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
         history.setLeadId(leadId); history.setActionType(ACTION_TRANSFER); history.setFromOwnerUserId(from);
-        history.setToOwnerUserId(salesUserId); history.setOwnerIdentitySnapshot(ownerIdentity); history.setOperatorUserId(operatorUserId);
+        history.setToOwnerUserId(salesUserId); history.setOwnerIdentitySnapshot(OWNER_SALES); history.setOperatorUserId(operatorUserId);
         history.setReason(reason);
         history.setOccurredAt(transferredAt); historyMapper.insert(history);
         lead.setCurrentAssignmentHistoryId(history.getId());
@@ -618,6 +605,27 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         if (assignmentService.getEligibleSalesUsers().stream().noneMatch(user -> userId.equals(user.getId()))) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
+    }
+
+    private boolean isTransferTargetEligible(LeadDO lead, Long userId) {
+        String source = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+        return isSelfSourced(source) ? assignmentService.isEligibleSalesUser(userId)
+                : assignmentService.isEligibleReceiver(userId);
+    }
+
+    private void requireTransferTarget(LeadDO lead, Long userId) {
+        if (!isTransferTargetEligible(lead, userId)) throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
+    }
+
+    private boolean isTransferScopeAllowed(LeadDO lead, Long actorId, Long targetId) {
+        Long owner = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getRecycleSourceOwnerUserId();
+        // Target is a new owner (boundary only); the current owner check is data access to the existing record.
+        return salesBoundary.canTransferTo(actorId, targetId)
+                && (owner == null || salesBoundary.canAccessUser(actorId, owner));
+    }
+
+    private void requireTransferScope(LeadDO lead, Long actorId, Long targetId) {
+        if (!isTransferScopeAllowed(lead, actorId, targetId)) throw exception(LEAD_PERMISSION_DENIED);
     }
 
     private LeadDO requireLead(Long id) {

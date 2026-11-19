@@ -21,7 +21,7 @@ class DefaultClassReviewFixTest {
  @BeforeEach void setup(){TenantContextHolder.setTenantId(1L);com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(),"fixture"),DeliveryClassDO.class);}
  @AfterEach void clear(){TenantContextHolder.clear();}
  @Test void clearingDepartmentWritesNullForBothOwnedContainers() throws Exception {
-  for(var type:List.of(UnscheduledDeliveryClassService.class,ExceptionDeliveryClassService.class)){
+  for(var type:List.of(ExceptionDeliveryClassService.class)){
    var service=type.getConstructor().newInstance();var mapper=mock(DeliveryClassMapper.class);var qualification=mock(DeliveryClassService.class);
    ReflectionTestUtils.setField(service,"classes",mapper);ReflectionTestUtils.setField(service,"classService",qualification);ReflectionTestUtils.setField(service,"depts",mock(DeptApi.class));
    when(qualification.validateHomeroom(20L)).thenReturn(new AdminUserRespDTO().setId(20L).setNickname("name"));
@@ -40,19 +40,17 @@ class DefaultClassReviewFixTest {
   assertSame(winner,service.ensure(20L));verify(mapper,times(1)).selectOne(any(Wrapper.class));
  }
  @Test void onePlannerFailureDoesNotAbortReconciliation(){
-  var service=spy(new ExceptionDeliveryClassService());var users=mock(AdminUserApi.class);var roles=mock(RoleApi.class);var permissions=mock(PermissionApi.class);
-  ReflectionTestUtils.setField(service,"users",users);ReflectionTestUtils.setField(service,"roles",roles);ReflectionTestUtils.setField(service,"permissions",permissions);
-  when(roles.getRoleByCode("study_planner")).thenReturn(new RoleRespDTO().setId(1L).setStatus(0));
-  when(permissions.getUserRoleIdListByRoleIds(Set.of(1L))).thenReturn(new LinkedHashSet<>(List.of(20L,21L)));
+  var service=spy(new ExceptionDeliveryClassService());var users=mock(AdminUserApi.class);var permissions=mock(PermissionApi.class);
+  ReflectionTestUtils.setField(service,"users",users);ReflectionTestUtils.setField(service,"permissions",permissions);
+  when(permissions.getEnabledUserIdsByPermission("zsjos:sales:eligible")).thenReturn(new LinkedHashSet<>(List.of(20L,21L)));
   when(users.getUser(anyLong())).thenAnswer(c->new AdminUserRespDTO().setId(c.getArgument(0)).setStatus(0));
   doThrow(new IllegalStateException("synthetic failure")).when(service).ensure(20L);doReturn(new DeliveryClassDO()).when(service).ensure(21L);
   assertDoesNotThrow(service::reconcile);verify(service).ensure(21L);
  }
  @Test void assignablePageFiltersRetiredPlannerBeforePaging(){
-  var service=new DeliveryClassServiceImpl();var mapper=mock(DeliveryClassMapper.class,CALLS_REAL_METHODS);var permissions=mock(PermissionApi.class);var roles=mock(RoleApi.class);var users=mock(AdminUserApi.class);
-  ReflectionTestUtils.setField(service,"mapper",mapper);ReflectionTestUtils.setField(service,"permissionApi",permissions);ReflectionTestUtils.setField(service,"roleApi",roles);ReflectionTestUtils.setField(service,"adminUserApi",users);
-  when(permissions.hasTenantReadAllAccess(1L)).thenReturn(true);when(roles.getRoleByCode("study_planner")).thenReturn(new RoleRespDTO().setId(1L).setStatus(0));
-  when(permissions.getUserRoleIdListByRoleIds(Set.of(1L))).thenReturn(Set.of(20L,21L));when(users.getUserList(anyCollection())).thenReturn(List.of(new AdminUserRespDTO().setId(20L).setStatus(0),new AdminUserRespDTO().setId(21L).setStatus(1)));
+  var service=new DeliveryClassServiceImpl();org.springframework.test.util.ReflectionTestUtils.setField(service,"scopeService",mock(DeliveryClassScopeService.class));var mapper=mock(DeliveryClassMapper.class,CALLS_REAL_METHODS);var permissions=mock(PermissionApi.class);var roles=mock(RoleApi.class);var users=mock(AdminUserApi.class);
+  ReflectionTestUtils.setField(service,"mapper",mapper);ReflectionTestUtils.setField(service,"permissionApi",permissions);ReflectionTestUtils.setField(service,"adminUserApi",users);
+  when(permissions.hasTenantReadAllAccess(1L)).thenReturn(true);when(permissions.getEnabledUserIdsByPermission("zsjos:sales:eligible")).thenReturn(Set.of(20L));
   var request=new DeliveryClassPageReqVO();request.setAssignableOnly(true);var query=service.scopedQuery(1L,request,true);
   String sql=query.getSqlSegment();assertTrue(sql.contains("homeroom_user_id IN"));assertTrue(query.getParamNameValuePairs().containsValue(20L));assertFalse(query.getParamNameValuePairs().containsValue(21L));
  }

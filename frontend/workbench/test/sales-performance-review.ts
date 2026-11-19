@@ -5,7 +5,7 @@ export function installPerformanceReview() {
   const mode = params.get('state') ?? 'success'
   const start = '2026-09-01T00:00:00', end = '2026-09-28T12:00:00'
   const metric = (key: string, label = key, i = 0) => ({ key, label, start, end, amount: 120000 + i * 3000, orders: 42, averageAmount: 120000 + i * 3000, averageOrders: 40, average: 3000 + i * 75, converted: 24, denominator: 60, rate: .4 })
-  const target = { scopeType: 'USER', scopeId: 1, name: '演示销售甲', periodType: 'month', periodStart: '2026-09-01', floorAmount: 150000, sprintAmount: 200000, automaticFloor: 150000, automaticSprint: 200000, manual: false, complete: false, missing: 1 }
+  const target = { id: 1, version: 0, sourceToken: '1:0|2:0', scopeType: 'USER', scopeId: 1, name: '演示销售甲', periodType: 'month', periodStart: '2026-09-01', floorAmount: 150000, sprintAmount: 200000, automaticFloor: 150000, automaticSprint: 200000, manual: false, complete: false, missing: 1 }
   const groups = [{ key: 'inbound|线上引流', label: '线上引流', amount: 80000, count: 40, share: 2 / 3 }, { key: 'self|非引流', label: '非引流', amount: 40000, count: 20, share: 1 / 3 }]
   const categories = groups.map((x, i) => ({ ...x, key: `category-${i}`, label: ['课程咨询', '考试咨询'][i] }))
   const nodes = [{ key: 'ORG:10', title: '演示销售中心', scopeType: 'CENTER', scopeId: 10, selectable: true }, { key: 'USER:1', parentKey: 'ORG:10', title: '演示销售甲', scopeType: 'USER', scopeId: 1, selectable: true }]
@@ -14,6 +14,12 @@ export function installPerformanceReview() {
     const path = config.url ?? '', q = config.params ?? {}
     let data: unknown = []
     if (path.endsWith('/tree')) data = mode === 'unauthorized' ? [] : nodes
+    else if (path.endsWith('/organization-candidates')) data = nodes
+    else if (path.endsWith('/organizations')) {
+      if (params.has('orgError') && !failedPaths.has(path)) { failedPaths.add(path); throw new Error('组织映射加载失败') }
+      if (params.has('orgDelay')) await new Promise(resolve=>setTimeout(resolve,1500))
+      data = [{deptId:10,centerId:10,kind:'CENTER',salesBoundaryRoot:true}]
+    }
     else if (mode === 'loading') return new Promise(()=>{})
     else if(mode === 'retry'&&!failedPaths.has(path)){failedPaths.add(path);throw new Error('演示请求失败，请重试')}
     else if (mode === 'error') throw new Error('演示请求失败，请重试')
@@ -24,6 +30,14 @@ export function installPerformanceReview() {
     else if (path.endsWith('/missing-targets')) data = [{ scopeType: 'USER', scopeId: 1, name: '演示销售甲', department: '演示销售中心', periodStart: '2026-09-01', reason: '保底、冲刺目标未设置' }]
     else if (path.endsWith('/details')) data = { list: [{ id: 100, leadId: 200, number: 'KZ-DEMO-001', kind: ['accept', 'qualification', 'todayFollowUp', 'overdueFollowUp', 'tasks'].includes(q.metric) ? 'task' : 'lead', label: '后续跟进', occurredAt: start, receivedAt: start, dueAt: '2026-09-28T09:00:00', ownerName: '演示归属人', assigneeName: '演示执行人', category: '课程咨询', stage: '方案确认', overdueMinutes: 180, state: '待处理' }], total: 1 }
     else if (path.endsWith('/list')) data = [target]
+    else if (path.endsWith('/batch')) {
+      const body = typeof config.data === 'string' ? JSON.parse(config.data) : config.data
+      const edit = body.items[0]
+      if (params.has('conflict') || edit.sourceToken !== target.sourceToken) throw new Error('目标已被修改，请刷新后重试')
+      target.floorAmount = edit.floorAmount; target.sprintAmount = edit.sprintAmount
+      target.version += 1; target.sourceToken = `1:${target.version}|2:0`
+      data = true
+    }
     return { data: { code: 0, data }, status: 200, statusText: 'OK', headers: {}, config }
   }
 }

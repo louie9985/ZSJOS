@@ -24,6 +24,7 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceReadAccess;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.flowable.engine.history.HistoricProcessInstance;
@@ -54,6 +55,8 @@ public class BpmProcessInstanceController {
 
     @Resource
     private BpmProcessInstanceService processInstanceService;
+    @Resource
+    private BpmProcessInstanceReadAccess processInstanceReadAccess;
     @Resource
     private BpmProcessInstanceRelationService processInstanceRelationService;
     @Resource
@@ -197,10 +200,7 @@ public class BpmProcessInstanceController {
     @Parameter(name = "id", description = "流程实例的编号", required = true)
     @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
     public CommonResult<BpmProcessInstanceRespVO> getProcessInstance(@RequestParam("id") String id) {
-        HistoricProcessInstance processInstance = processInstanceService.getHistoricProcessInstance(id);
-        if (processInstance == null) {
-            return success(null);
-        }
+        HistoricProcessInstance processInstance = processInstanceReadAccess.requireReadable(getLoginUserId(), id);
 
         // 拼接返回
         ProcessDefinition processDefinition = processDefinitionService.getProcessDefinition(
@@ -241,6 +241,15 @@ public class BpmProcessInstanceController {
     @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
     @SuppressWarnings("unchecked")
     public CommonResult<BpmApprovalDetailRespVO> getApprovalDetail(@Valid BpmApprovalDetailReqVO reqVO) {
+        if (reqVO.getProcessInstanceId() != null) {
+            processInstanceReadAccess.requireReadable(getLoginUserId(), reqVO.getProcessInstanceId());
+        }
+        if (StrUtil.isNotBlank(reqVO.getTaskId())) {
+            HistoricTaskInstance task = taskService.getHistoricTask(reqVO.getTaskId());
+            if (task == null || !task.getProcessInstanceId().equals(reqVO.getProcessInstanceId())) {
+                throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+            }
+        }
         if (StrUtil.isNotEmpty(reqVO.getProcessVariablesStr())) {
             reqVO.setProcessVariables(JsonUtils.parseObject(reqVO.getProcessVariablesStr(), Map.class));
         }
@@ -264,6 +273,7 @@ public class BpmProcessInstanceController {
     @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
     public CommonResult<BpmProcessInstanceBpmnModelViewRespVO> getProcessInstanceBpmnModelView(
             @RequestParam(value = "id") String id) {
+        processInstanceReadAccess.requireReadable(getLoginUserId(), id);
         return success(processInstanceService.getProcessInstanceBpmnModelView(id));
     }
 
@@ -273,6 +283,7 @@ public class BpmProcessInstanceController {
     @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
     public CommonResult<BpmProcessPrintDataRespVO> getProcessInstancePrintData(
             @RequestParam("processInstanceId") String processInstanceId) {
+        processInstanceReadAccess.requireReadable(getLoginUserId(), processInstanceId);
         return success(buildPrintData(processInstanceId));
     }
 

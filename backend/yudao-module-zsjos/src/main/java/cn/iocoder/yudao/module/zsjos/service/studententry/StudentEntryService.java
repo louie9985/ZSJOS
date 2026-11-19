@@ -46,6 +46,7 @@ public class StudentEntryService {
     public static final ErrorCode COMMAND_CONFLICT = new ErrorCode(1_900_010_104, "重复提交的内容不一致，请重新打开录入表单");
     public static final ErrorCode FORM_INVALID = new ErrorCode(1_900_010_105, "学员录入参数不完整或不匹配");
     @Resource private PermissionApi permissionApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Resource private PostApi postApi;
     @Resource private AdminUserApi userApi;
     @Resource private PersonMapper personMapper;
@@ -76,7 +77,7 @@ public class StudentEntryService {
         var courses = catalog.skus().stream().map(sku -> new Course(sku.skuRef(),
                 catalog.spus().stream().filter(spu -> Objects.equals(spu.spuRef(), sku.spuRef()))
                     .map(spu -> spu.spuName() + " / " + sku.skuName()).findFirst().orElse(sku.skuName()))).toList();
-        var eligibleClasses = classes.options(null, true).stream().filter(c -> {
+        var eligibleClasses = classes.options(null, true, actor).stream().filter(c -> {
             if (DeliveryClassKind.PENDING.equals(c.getClassKind()) || Boolean.TRUE.equals(c.getSystemClass()) && c.getHomeroomUserId() == null) return true;
             if (c.getHomeroomUserId() == null) return false;
             try { classes.validateHomeroom(c.getHomeroomUserId()); return true; }
@@ -134,6 +135,11 @@ public class StudentEntryService {
             var selected = classMapper.selectByIdForUpdate(classId, tenant);
             if (selected == null || !"SERVING".equals(selected.getStatus())
                     || (!DeliveryClassKind.pending(selected) && !DeliveryClassKind.assignable(selected))) throw exception(TARGET_INVALID);
+            // Sales classes follow the head teacher; the selected class must be handed to someone inside the boundary.
+            // The tenant pending pool is invisible to sales actors, so they cannot park students there.
+            if (salesBoundary.isSalesActor(actor) && (DeliveryClassKind.pending(selected)
+                    || !salesBoundary.canTransferTo(actor, selected.getHomeroomUserId())))
+                throw exception(TARGET_INVALID);
             if (!DeliveryClassKind.pending(selected)) ownerId = classes.validateHomeroom(selected.getHomeroomUserId()).getId();
         }
         String courseSnapshot = null;

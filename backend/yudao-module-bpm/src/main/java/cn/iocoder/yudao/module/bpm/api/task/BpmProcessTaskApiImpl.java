@@ -69,6 +69,26 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     private AdminUserApi adminUserApi;
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true,
+            propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW,
+            isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+    public List<BpmLiveTaskState> getCommittedNodeTasks(String processInstanceId, String taskDefinitionKey) {
+        String tenantId = String.valueOf(cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        return bpmTaskService.getRunningTaskListByProcessInstanceId(processInstanceId, null, taskDefinitionKey).stream()
+                .filter(task -> tenantId.equals(task.getTenantId()))
+                .map(task -> new BpmLiveTaskState(task.getId(), task.getParentTaskId(), task.getAssignee(), task.getScopeType(),
+                        (Integer) task.getTaskLocalVariables().get(BpmnVariableConstants.TASK_VARIABLE_STATUS)))
+                .toList();
+    }
+
+    @Override
+    public void skipObsoleteNode(Long operatorUserId, String processInstanceId, String processDefinitionKey,
+                                 String businessKey, String taskDefinitionKey, String reason) {
+        bpmTaskService.skipObsoleteNode(operatorUserId, processInstanceId, processDefinitionKey, businessKey,
+                taskDefinitionKey, reason);
+    }
+
+    @Override
     public List<BpmProcessNodeStatusRespDTO> getProcessNodeStatuses(String processInstanceId, Set<String> taskDefinitionKeys) {
         if (processInstanceId == null) return List.of();
         return getProcessNodeStatuses(Set.of(processInstanceId), taskDefinitionKeys)
@@ -99,6 +119,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
                 case 2, 7 -> "approved";
                 case 3, 5 -> "rejected";
                 case 4 -> "cancelled";
+                case -2 -> "skipped";
                 default -> "pending";
             };
             Map<String, BpmProcessNodeStatusRespDTO> result = grouped.get(task.getProcessInstanceId());
@@ -109,7 +130,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
                     && (current.getEndTime() == null || current.getEndTime().isBefore(taskEndTime))) {
                 BpmProcessNodeStatusRespDTO value = new BpmProcessNodeStatusRespDTO();
                 value.setTaskDefinitionKey(task.getTaskDefinitionKey()); value.setStatus(status);
-                value.setReviewerUserId(NumberUtil.parseLong(task.getAssignee(), null));
+                if (!"skipped".equals(status)) value.setReviewerUserId(NumberUtil.parseLong(task.getAssignee(), null));
                 value.setActionUserId(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.userId(task.getTaskLocalVariables()));
                 value.setActionUserNameSnapshot(cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmTaskActorSnapshot.name(task.getTaskLocalVariables()));
                 value.setConsecutiveApprovalDeduplicated(isConsecutiveApprovalDeduplicated(task, definitions));
@@ -151,8 +172,9 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
 
     private int statusRank(String status) {
         return switch (status) {
-            case "rejected" -> 4;
-            case "approved" -> 3;
+            case "rejected" -> 5;
+            case "approved" -> 4;
+            case "skipped" -> 3;
             case "pending" -> 2;
             case "cancelled" -> 1;
             default -> 0;
@@ -252,7 +274,26 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
 
     @Override
     public BpmTaskRespDTO getTodoTask(Long userId, String taskId) {
-        Task task = bpmTaskService.validateTask(userId, taskId);
+        return toTodoTask(bpmTaskService.validateTask(userId, taskId));
+    }
+
+    @Override
+    public BpmTaskRespDTO getParticipantTodoTask(Long userId, String taskId) {
+        Task task = bpmTaskService.getTask(taskId);
+        String tenant = String.valueOf(cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        if (userId == null || task == null || task.isSuspended() || !tenant.equals(task.getTenantId())) return null;
+        String actor = String.valueOf(userId);
+        if (!actor.equals(task.getAssignee()) && !(task.getAssignee() == null && actor.equals(task.getOwner()))) return null;
+        return toTodoTask(task);
+    }
+
+    @Override
+    public List<String> createSignTasks(Long userId, String taskId, String type, Set<Long> userIds, String reason) {
+        return bpmTaskService.createSignTask(userId, new BpmTaskSignCreateReqVO()
+                .setId(taskId).setType(type).setUserIds(userIds).setReason(reason));
+    }
+
+    private BpmTaskRespDTO toTodoTask(Task task) {
         ProcessInstance process = processInstanceService.getProcessInstance(task.getProcessInstanceId());
         BpmTaskRespDTO result = new BpmTaskRespDTO();
         result.setId(task.getId()); result.setName(task.getName()); result.setProcessInstanceId(task.getProcessInstanceId());
@@ -260,6 +301,8 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
         result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
+        result.setStatus(task.getTaskLocalVariables() == null ? null
+                : (Integer) task.getTaskLocalVariables().get(BpmnVariableConstants.TASK_VARIABLE_STATUS));
         result.setReasonRequire(readReasonRequire(task, new HashMap<>()));
         return result;
     }

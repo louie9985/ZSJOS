@@ -29,6 +29,7 @@ class StudentReadScopeRegressionTest {
     private final AdminUserApi users = mock(AdminUserApi.class);
     private final ServiceRelationMapper relations = mock(ServiceRelationMapper.class);
     private final DeliveryClassMapper classes = mock(DeliveryClassMapper.class);
+    private final cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary = mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class);
     private final DeliveryClassScopeService scope = new DeliveryClassScopeService();
     private final StudentServiceReadService reads = new StudentServiceReadService();
     private final StudentServiceObjectPermissionProvider objects = new StudentServiceObjectPermissionProvider();
@@ -38,6 +39,9 @@ class StudentReadScopeRegressionTest {
         var self = new DeptDataPermissionRespDTO(); self.setSelf(true);
         when(permissions.getDeptDataPermission(7L)).thenReturn(self);
         when(permissions.hasAnyPermissions(7L, "zsjos:delivery-class:query", DeliveryClassService.PERMISSION_QUERY_MANAGED)).thenReturn(true);
+        ReflectionTestUtils.setField(scope, "salesBoundary", salesBoundary);
+        ReflectionTestUtils.setField(reads, "salesBoundary", salesBoundary);
+        ReflectionTestUtils.setField(objects, "salesBoundary", salesBoundary);
         ReflectionTestUtils.setField(scope, "permissionApi", permissions);
         ReflectionTestUtils.setField(scope, "adminUserApi", users);
         ReflectionTestUtils.setField(scope, "classMapper", classes);
@@ -166,7 +170,7 @@ class StudentReadScopeRegressionTest {
                 + "UNION ALL SELECT 16,2,0,70,91,7,NULL,NULL,'accepted','active' "
                 + "UNION ALL SELECT 17,1,1,70,91,7,NULL,NULL,'accepted','active' "
                 + "UNION ALL SELECT 18,1,0,70,91,7,NULL,NULL,'accepted','terminated'),"
-                + "zsjos_service_relation AS (SELECT scope_rows.*,NULL order_id,NULL order_item_id,NOW() update_time FROM scope_rows),"
+                + "zsjos_service_relation AS (SELECT scope_rows.*,NULL order_id,NULL order_item_id,NOW() update_time,1 teaching_delivery,0 teaching_closed FROM scope_rows),"
                 + "zsjos_person AS (SELECT 70 id,1 tenant_id,0 deleted UNION ALL SELECT 70,2,0),"
                 + "zsjos_order AS (SELECT 0 id,1 tenant_id,0 deleted,0 lead_id),"
                 + "zsjos_order_item AS (SELECT 0 id,0 order_id,1 tenant_id,0 deleted),"

@@ -40,6 +40,11 @@ class ExistingPageMetricSourcesTest {
         assertEquals(MetricFormula.Status.FORBIDDEN,sources.aggregate(operand(),null,7L).status());
         verifyNoInteractions(media);
     }
+    @Test void retiredEducationTeamSourceIsNotSupported() {
+        assertFalse(sources.supports("education_team"));
+        assertFalse(sources.canRead("education_team",7L));
+        verifyNoInteractions(permissions);
+    }
     @Test void periodAddsHalfOpenBoundaryWithoutChangingOriginalOrFilter() {
         var catalog=new AdvancedFilterService().catalog("lead_appeal");
         String field=catalog.fields().stream().filter(f -> "date".equals(f.valueType())).findFirst().orElseThrow().fieldKey();

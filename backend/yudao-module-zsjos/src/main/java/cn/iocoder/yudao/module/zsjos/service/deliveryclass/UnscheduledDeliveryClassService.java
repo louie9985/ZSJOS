@@ -2,20 +2,16 @@ package cn.iocoder.yudao.module.zsjos.service.deliveryclass;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
-import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import cn.iocoder.yudao.module.system.api.permission.RoleApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.Objects;
-import java.util.Set;
 
 @Service
 @Slf4j
@@ -24,7 +20,6 @@ public class UnscheduledDeliveryClassService {
     @Resource private DeliveryClassService classService;
     @Resource private AdminUserApi users;
     @Resource private DeptApi depts;
-    @Resource private RoleApi roles;
     @Resource private PermissionApi permissions;
 
     public DeliveryClassDO ensure(Long owner) {
@@ -53,24 +48,12 @@ public class UnscheduledDeliveryClassService {
             }
             return existing;
         }
-        var row = new DeliveryClassDO().setClassNo("US" + owner).setClassName("未确定考期")
-                .setClassKind(DeliveryClassKind.UNSCHEDULED).setSystemClass(true)
-                .setHomeroomUserId(owner).setHomeroomUserNameSnapshot(user.getNickname())
-                .setDeptId(user.getDeptId()).setDeptNameSnapshot(deptName).setStatus("SERVING").setVersion(0);
-        try { classes.insert(row); return row; }
-        catch (DuplicateKeyException conflict) {
-            // Current read also sees the winner inside a repeatable-read enrollment transaction.
-            existing = classes.selectPlannerDefaultForUpdate(DeliveryClassKind.UNSCHEDULED, owner,
-                    TenantContextHolder.getRequiredTenantId());
-            if (existing == null) throw conflict;
-            return existing;
-        }
+        // Historical enrollment can reuse an existing container, but must not recreate a retired empty class.
+        return null;
     }
 
     public void reconcile() {
-        var role = roles.getRoleByCode("study_planner");
-        if (role == null || !Objects.equals(role.getStatus(), CommonStatusEnum.ENABLE.getStatus())) return;
-        for (Long id : permissions.getUserRoleIdListByRoleIds(Set.of(role.getId()))) {
+        for (Long id : permissions.getEnabledUserIdsByPermission("zsjos:sales:eligible")) {
             var user = users.getUser(id);
             if (user == null || !Objects.equals(user.getStatus(), CommonStatusEnum.ENABLE.getStatus())) continue;
             try { ensure(id); }

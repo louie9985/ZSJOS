@@ -37,7 +37,6 @@ public class LeadSelfSourcedAutomationService {
     public void validate(LeadCreateReqVO request, Long userId, String sourceType) {
         String createPermission = switch (sourceType) {
             case SOURCE_SALES_SELF -> "zsjos:lead:self-sourced:create";
-            case SOURCE_EDUCATION_SELF -> "zsjos:lead:education-self-sourced:create";
             default -> throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         };
         for (String permission : new String[]{createPermission, "zsjos:lead-follow-up:create", "zsjos:lead:qualify"}) {

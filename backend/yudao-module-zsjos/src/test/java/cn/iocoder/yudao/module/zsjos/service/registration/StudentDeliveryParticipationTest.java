@@ -27,6 +27,7 @@ class StudentDeliveryParticipationTest {
     }
     @Test void mediaOnlyRelationRetainsDirectorOperatorActionsAndRejectsTeachingCommands() {
         var provider = new StudentServiceObjectPermissionProvider();
+        ReflectionTestUtils.setField(provider,"salesBoundary",mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class));
         ReflectionTestUtils.setField(provider,"relationMapper",relations);
         ReflectionTestUtils.setField(provider,"permissionApi",permissions);
         var r=relation(11,false);r.setOwnerUserId(7L);
@@ -68,6 +69,7 @@ class StudentDeliveryParticipationTest {
     }
     @Test void deliveryCountAndPageShareExplicitPredicateIncludingFullReaders() {
         var service=new StudentServiceReadService();
+        ReflectionTestUtils.setField(service,"salesBoundary",mock(cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService.class));
         ReflectionTestUtils.setField(service,"permissionApi",permissions);
         ReflectionTestUtils.setField(service,"filters",mock(cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService.class));
         var readScope=mock(cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService.class);

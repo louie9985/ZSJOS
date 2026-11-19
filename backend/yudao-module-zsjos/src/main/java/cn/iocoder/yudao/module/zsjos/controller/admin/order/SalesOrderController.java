@@ -60,7 +60,7 @@ public class SalesOrderController {
     }
 
     @PostMapping("/repurchase")
-    @Operation(summary = "销售与教务按客户身份提交复购订单")
+    @Operation(summary = "销售按客户身份提交复购订单")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
     public CommonResult<Long> createRepurchase(@Valid @RequestBody SalesOrderRepurchaseReqVO req) {
         return success(repurchaseSubmission.submit(WebFrameworkUtils.getLoginUserId(), req));
@@ -97,7 +97,7 @@ public class SalesOrderController {
     }
 
     @PostMapping("/student/{personId}/repurchase")
-    @Operation(summary = "学习规划师为本人负责的学员提交复购订单")
+    @Operation(summary = "班主任为本人负责的学员提交复购订单")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:student-repurchase')")
     public CommonResult<Long> createStudentRepurchase(@PathVariable Long personId,
                                                        @Valid @RequestBody SalesOrderRepurchaseReqVO reqVO) {
@@ -294,6 +294,60 @@ public class SalesOrderController {
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<Boolean> reject(@PathVariable Long id, @Valid @RequestBody SalesOrderDecisionReqVO reqVO) {
         orderService.reject(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
+    }
+
+    @PutMapping("/{id}/approval/migrate-legacy")
+    @Operation(summary = "在原审批实例中跳过旧报名履约审批节点")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:migrate-approval')")
+    public CommonResult<Boolean> migrateLegacyApproval(@PathVariable Long id, @Valid @RequestBody SalesOrderLegacyApprovalMigrationReqVO reqVO) {
+        orderService.migrateLegacyApproval(id, WebFrameworkUtils.getLoginUserId(), reqVO);
+        return success(true);
+    }
+
+    @GetMapping("/approval/native-detail")
+    @Operation(summary = "查询本人财务审批或加签任务的订单详情")
+    @PreAuthorize("@ss.hasPermission('bpm:task:query')")
+    public CommonResult<SalesOrderRespVO> getNativeFinanceApproval(@RequestParam String taskId,
+                                                                  @RequestParam(defaultValue = "todo") String view,
+                                                                  @RequestParam(defaultValue = "false") boolean done) {
+        return success(orderService.getNativeFinanceApproval(taskId, done || "done".equals(view), WebFrameworkUtils.getLoginUserId(), false));
+    }
+
+    @GetMapping("/approval/business-detail")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
+    public CommonResult<SalesOrderRespVO> getBusinessFinanceApproval(@RequestParam String taskId,
+                                                                    @RequestParam(defaultValue = "false") boolean done) {
+        return success(orderService.getNativeFinanceApproval(taskId, done, WebFrameworkUtils.getLoginUserId(), true));
+    }
+
+    @PutMapping("/approval/native-action")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
+    public CommonResult<Boolean> actOnNativeFinanceApproval(@Valid @RequestBody SalesOrderNativeActionReqVO reqVO) {
+        orderService.actOnNativeFinanceApproval(WebFrameworkUtils.getLoginUserId(), reqVO);
+        return success(true);
+    }
+
+    @PostMapping("/approval/comment")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:review','bpm:task:update')")
+    public CommonResult<Boolean> commentOnNativeFinanceApproval(@Valid @RequestBody SalesOrderNativeCommentReqVO reqVO,
+                                                               @RequestParam(defaultValue = "business") String entry) {
+        orderService.commentOnNativeFinanceApproval(WebFrameworkUtils.getLoginUserId(), reqVO, isBusinessEntry(entry));
+        return success(true);
+    }
+
+    @GetMapping("/approval/sign-candidates")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:review','bpm:task:query')")
+    public CommonResult<java.util.List<SalesOrderSignCandidateRespVO>> getNativeFinanceSignCandidates(
+            @RequestParam String taskId, @RequestParam(defaultValue = "business") String entry) {
+        return success(orderService.getNativeFinanceSignCandidates(taskId, WebFrameworkUtils.getLoginUserId(), isBusinessEntry(entry)));
+    }
+
+    private boolean isBusinessEntry(String entry) {
+        if (!"business".equals(entry) && !"bpm".equals(entry)) {
+            throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
+                    cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_PERMISSION_DENIED);
+        }
+        return "business".equals(entry);
     }
 
     @PutMapping("/{id}/supervisor-confirmation/request")

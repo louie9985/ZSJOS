@@ -13,7 +13,7 @@ export function examClassTree(classes: ExamClass[], retainedClassIds: number[] =
   const nodes: ExamClassNode[] = []
   for (const item of classes) {
     const groupName = item.groupId == null ? '' : item.groupName || '班级组名称未提供'
-    const planner = item.plannerId ? item.plannerName || '学习规划师名称未提供' : '未分配学习规划师'
+    const planner = item.plannerId ? item.plannerName || '班主任名称未提供' : '未分配班主任'
     const available = item.selectable !== false && Boolean(item.plannerId)
     const historical = !available && retainedClassIds.includes(item.id)
     const leaf = { value: `class:${item.id}`, title: `${item.name} · ${historical ? '已选历史班级，可保留或移除' : planner}`, searchText: `${groupName} ${item.name} ${planner}`, disabled: !available && !historical }

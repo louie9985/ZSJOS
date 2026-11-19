@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceReadAccess;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.flowable.bpmn.model.UserTask;
@@ -55,6 +56,8 @@ public class BpmTaskController {
     @Resource
     private BpmProcessInstanceService processInstanceService;
     @Resource
+    private BpmProcessInstanceReadAccess processInstanceReadAccess;
+    @Resource
     private BpmFormService formService;
     @Resource
     private BpmProcessDefinitionService processDefinitionService;
@@ -81,6 +84,10 @@ public class BpmTaskController {
                 || !cn.iocoder.yudao.module.bpm.enums.task.BpmTaskStatusEnum.RUNNING.getStatus().equals(result.getStatus())) {
             throw cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(
                     cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.TASK_NOT_EXISTS);
+        }
+        ProcessInstance instance = processInstanceService.getProcessInstance(task.getProcessInstanceId());
+        if (instance != null) {
+            result.setProcessDefinitionKey(instance.getProcessDefinitionKey());
         }
         return success(result);
     }
@@ -162,6 +169,7 @@ public class BpmTaskController {
     @PreAuthorize("@ss.hasPermission('bpm:task:query')")
     public CommonResult<List<BpmTaskRespVO>> getTaskListByProcessInstanceId(
             @RequestParam("processInstanceId") String processInstanceId) {
+        processInstanceReadAccess.requireReadable(getLoginUserId(), processInstanceId);
         List<HistoricTaskInstance> taskList = taskService.getTaskListByProcessInstanceId(processInstanceId, true);
         if (CollUtil.isEmpty(taskList)) {
             return success(Collections.emptyList());

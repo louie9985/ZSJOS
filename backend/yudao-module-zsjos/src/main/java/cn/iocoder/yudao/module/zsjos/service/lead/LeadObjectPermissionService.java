@@ -55,6 +55,7 @@ public class LeadObjectPermissionService {
     @Resource private MediaAccountMapper mediaAccountMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadReadBatchMapper readBatchMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     public void check(Long leadId, String action) {
         LeadDO lead = leadMapper.selectById(leadId);
@@ -62,6 +63,8 @@ public class LeadObjectPermissionService {
             throw exception(LEAD_NOT_EXISTS);
         }
         Long userId = getLoginUserId();
+        if (!Set.of("read", "follow-up-read", "flow-read", "pending-read", "accept", "reject", "claim").contains(action)
+                && !withinOwnerBoundary(lead, userId)) throw exception(LEAD_PERMISSION_DENIED);
         boolean allowed = switch (action) {
             case "read", "follow-up-read", "flow-read" -> canReadDetail(lead, userId);
             case "pending-read" -> hasTenantReadAll(userId) || ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
@@ -97,7 +100,7 @@ public class LeadObjectPermissionService {
     }
 
     public boolean canRead(LeadDO lead, Long userId) {
-        return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)
+        return (withinOwnerBoundary(lead, userId) || isOwnSubmission(lead, userId)) && (hasQueryAll() || hasScopedQueryAll(userId)
                 || securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)
                     && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                     && (Objects.equals(userId, lead.getProviderOwnerId())
@@ -106,11 +109,17 @@ public class LeadObjectPermissionService {
                     && (Objects.equals(userId, lead.getOwnerUserId())
                     || managesUserDepartment(userId, lead.getOwnerUserId()))
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
-                    && managesUserDepartment(userId, lead.getRecycleSourceOwnerUserId());
+                    && managesUserDepartment(userId, lead.getRecycleSourceOwnerUserId()));
     }
 
     public boolean hasQueryAll() {
-        return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
+        Long userId = getLoginUserId();
+        if (hasTenantReadAll(userId)) return true;
+        if (!isSalesActor(userId)) return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
+        var scope = permissionApi.getDeptDataPermission(userId);
+        return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)
+                && permissionApi.hasAnyPermissions(userId, "zsjos:sales:cross-department")
+                && scope != null && Boolean.TRUE.equals(scope.getAll());
     }
 
     /**
@@ -118,11 +127,54 @@ public class LeadObjectPermissionService {
      */
     public boolean canReadDetail(LeadDO lead, Long userId) {
         // Submitted-list department visibility grants reads only, not submitter-assistance commands.
-        return myOperationsService.canReadLead(lead, userId) || hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId)
+        return (withinOwnerBoundary(lead, userId) || isOwnSubmission(lead, userId))
+                && (myOperationsService.canReadLead(lead, userId) || hasTenantReadAll(userId) || canReadDetailByRelationship(lead, userId)
                 || canReadRecycledSourceOwner(lead, userId)
                 || userId != null && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                     && securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)
-                    && managesUserDepartment(userId, lead.getProviderOwnerId());
+                    && managesUserDepartment(userId, lead.getProviderOwnerId()));
+    }
+
+    private boolean isOwnSubmission(LeadDO lead, Long userId) {
+        return userId != null && !isSalesActor(userId) && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(userId, lead.getProviderOwnerId());
+    }
+
+    private boolean withinOwnerBoundary(LeadDO lead, Long userId) {
+        if (hasTenantReadAll(userId) || !isSalesActor(userId)) return true;
+        return withinOwnerBoundary(lead, userId, owner -> salesBoundary.canAccessUser(userId, owner),
+                securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION));
+    }
+
+    /** Batch form of {@link #withinOwnerBoundary(LeadDO, Long)}: the accessible owner set is resolved once. */
+    private java.util.function.Predicate<LeadDO> ownerBoundary(Long userId) {
+        if (hasTenantReadAll(userId) || !isSalesActor(userId)) return lead -> true;
+        Set<Long> owners = salesBoundary.accessibleSalesUserIds(userId);
+        boolean unownedVisible = securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
+        return lead -> withinOwnerBoundary(lead, userId, owners::contains, unownedVisible);
+    }
+
+    /**
+     * Mirrors the LeadMapper sales-boundary predicate so list, count and detail agree. Owned leads follow the
+     * owner's current department; recycle-pending leads keep their source owner's department; other unassigned
+     * leads (dispatching, claim pool, pending another receiver) belong to no department yet and are visible to
+     * lead query-all holders. The pending assignee always sees its own offer.
+     */
+    private static boolean withinOwnerBoundary(LeadDO lead, Long userId,
+                                               java.util.function.Predicate<Long> ownerAccessible, boolean unownedVisible) {
+        if (lead.getOwnerUserId() != null) return ownerAccessible.test(lead.getOwnerUserId());
+        if (Objects.equals(userId, lead.getPendingAssigneeUserId())) return true;
+        if (ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus()))
+            return lead.getRecycleSourceOwnerUserId() != null && ownerAccessible.test(lead.getRecycleSourceOwnerUserId());
+        return unownedVisible;
+    }
+
+    private boolean isSalesActor(Long userId) {
+        return userId != null && salesBoundary.isSalesActor(userId);
+    }
+
+    private boolean hasScopedQueryAll(Long userId) {
+        return isSalesActor(userId) && securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
     }
 
     /**
@@ -142,7 +194,7 @@ public class LeadObjectPermissionService {
 
     private boolean canReadDetailByRelationship(LeadDO lead, Long userId) {
         if (userId == null) return false;
-        if (hasQueryAll() || PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+        if (hasQueryAll() || hasScopedQueryAll(userId) || PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(userId, lead.getProviderOwnerId())
                 || Objects.equals(userId, lead.getOwnerUserId())
                 || managesUserDepartment(userId, lead.getOwnerUserId())
@@ -164,6 +216,7 @@ public class LeadObjectPermissionService {
      * request it; read-only visibility for other sales must not grant the action.
      */
     public boolean canRequestSubmitterAssist(LeadDO lead, Long userId) {
+        if (!withinOwnerBoundary(lead, userId)) return false;
         LeadPublicSeaPoolCycleDO cycle = publicSeaPoolCycleMapper.selectActiveByLeadId(lead.getId());
         if (cycle != null) {
             return Objects.equals(userId, cycle.getOriginalOwnerUserId())
@@ -173,24 +226,26 @@ public class LeadObjectPermissionService {
     }
 
     public boolean canReadSubordinatePartnerLead(LeadDO lead, Long userId) {
-        return lead.getPartnerId() != null && partnerOwnershipService.canRead(userId, lead.getPartnerId());
+        return withinOwnerBoundary(lead, userId) && lead.getPartnerId() != null && partnerOwnershipService.canRead(userId, lead.getPartnerId());
     }
 
     public boolean canReadStudentSalesHistory(LeadDO lead, Long userId) {
+        if (!withinOwnerBoundary(lead, userId)) return false;
         long tenantId = TenantContextHolder.getRequiredTenantId();
         return serviceRelationMapper.countActiveByOwnerAndLead(userId, lead.getId(), tenantId) > 0
                 || serviceRelationMapper.countActiveByParticipantAndLead(userId, lead.getId(), tenantId) > 0;
     }
 
     public boolean canReadMediaStudentLead(LeadDO lead, Long userId) {
+        if (!withinOwnerBoundary(lead, userId)) return false;
         long tenantId = TenantContextHolder.getRequiredTenantId();
         return mediaAccountMapper.countParticipantByLead(userId, lead.getId(), tenantId) > 0;
     }
 
     public boolean canReadAsOwnerOrManager(LeadDO lead, Long userId) {
-        return Objects.equals(userId, lead.getOwnerUserId())
+        return withinOwnerBoundary(lead, userId) && (Objects.equals(userId, lead.getOwnerUserId())
                 || hasQueryAll()
-                || managesUserDepartment(userId, lead.getOwnerUserId());
+                || managesUserDepartment(userId, lead.getOwnerUserId()));
     }
 
     /**
@@ -251,6 +306,7 @@ public class LeadObjectPermissionService {
     }
 
     public boolean canManageQualificationException(LeadDO lead, Long userId) {
+        if (!withinOwnerBoundary(lead, userId)) return false;
         if (securityFrameworkService.hasPermission(QUALIFICATION_MANAGE_ALL_PERMISSION)) return true;
         Long scopedOwnerId = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
                 ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
@@ -290,6 +346,10 @@ public class LeadObjectPermissionService {
     public Set<Long> filterReadableDetails(java.util.Collection<LeadDO> leads, Long userId) {
         if (leads.isEmpty() || userId == null) return Set.of();
         if (hasTenantReadAll(userId) || hasQueryAll()) return leads.stream().map(LeadDO::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        var boundary = ownerBoundary(userId);
+        leads = leads.stream().filter(lead -> boundary.test(lead) || isOwnSubmission(lead, userId)).toList();
+        if (hasScopedQueryAll(userId)) return leads.stream().map(LeadDO::getId)
                 .collect(java.util.stream.Collectors.toSet());
         Set<Long> managed = new HashSet<>(getManagedUserIds(userId));
         boolean submitted = securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED);

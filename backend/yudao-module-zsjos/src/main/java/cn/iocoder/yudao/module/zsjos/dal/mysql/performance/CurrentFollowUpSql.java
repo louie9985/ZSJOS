@@ -12,7 +12,7 @@ public final class CurrentFollowUpSql {
         return "SELECT t.* FROM zsjos_business_task t WHERE t.tenant_id=#{tenant} AND t.deleted=0 "
                 + "AND t.status='pending' AND t.task_type IN ('lead_first_follow_up','lead_follow_up_reminder') "
                 + "AND NOT (t.task_type='lead_first_follow_up' AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(t.payload,'$.generationSource')),'') "
-                + "IN ('sales_self_sourced_auto','education_self_sourced_auto')) "
+                + "IN ('sales_self_sourced_auto')) "
                 + "AND <choose><when test='assigneeIds != null and !assigneeIds.isEmpty()'>t.assignee_id IN "
                 + "<foreach collection='assigneeIds' item='assignee' open='(' separator=',' close=')'>#{assignee}</foreach>"
                 + "</when><otherwise>1=0</otherwise></choose>";

@@ -21,6 +21,8 @@ public interface StudentInfoConstants {
     ErrorCode LINK_INVALID = new ErrorCode(1_900_090_005, "信息收集链接不存在");
     ErrorCode LINK_EXPIRED = new ErrorCode(1_900_090_006, "信息收集链接已过期或已撤销");
     ErrorCode ALREADY_SUBMITTED = new ErrorCode(1_900_090_007, "信息已提交，不可再次填写或生成");
+    ErrorCode AGREEMENT_CHANGED = new ErrorCode(1_900_090_030, "协议内容已变化，请重新阅读并确认");
+    ErrorCode AGREEMENT_REQUIRED = new ErrorCode(1_900_090_031, "请先阅读完整协议并明确同意");
     ErrorCode FIELD_INVALID = new ErrorCode(1_900_090_008, "字段不符合要求：{}");
     ErrorCode REFERENCE_INVALID = new ErrorCode(1_900_090_009, "字典或地区配置已变化，请重新选择：{}");
     ErrorCode URL_INVALID = new ErrorCode(1_900_090_010, "尚未配置有效的信息收集 H5 地址");

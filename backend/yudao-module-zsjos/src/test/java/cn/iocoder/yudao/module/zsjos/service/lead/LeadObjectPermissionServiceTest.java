@@ -43,6 +43,7 @@ import java.util.List;
 class LeadObjectPermissionServiceTest {
     @Mock private cn.iocoder.yudao.module.zsjos.service.personnel.MyOperationsService myOperationsService;
     @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     @InjectMocks
     private LeadObjectPermissionService service;
@@ -59,6 +60,34 @@ class LeadObjectPermissionServiceTest {
     @Mock private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
     @Mock private LeadPublicSeaPoolService leadPublicSeaPoolService;
     @Mock private MediaAccountMapper mediaAccountMapper;
+
+    @Test
+    void crossDepartmentQualificationRestoreIsDenied() {
+        LeadDO row = lead(10L, 20L);
+        when(leadMapper.selectById(1L)).thenReturn(row);
+        when(salesBoundary.isSalesActor(30L)).thenReturn(true);
+        when(salesBoundary.canAccessUser(30L, 20L)).thenReturn(false);
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
+            assertThrows(ServiceException.class, () -> service.check(1L, "qualification-manage"));
+        }
+    }
+
+    @Test
+    void administratorReadsWithoutResolvingSalesDepartmentRoot() {
+        LeadDO row = lead(10L, 20L);
+        when(permissionApi.hasTenantReadAllAccess(30L)).thenReturn(true);
+        assertTrue(service.canReadDetail(row, 30L));
+        org.mockito.Mockito.verify(salesBoundary, org.mockito.Mockito.never()).isSalesActor(30L);
+    }
+
+    @Test
+    void salesDepartmentMemberCannotReadCrossDepartmentAsOriginalSubmitter() {
+        LeadDO row = lead(10L, 20L);
+        when(salesBoundary.isSalesActor(10L)).thenReturn(true);
+        when(salesBoundary.canAccessUser(10L, 20L)).thenReturn(false);
+        assertFalse(service.canReadDetail(row, 10L));
+    }
 
     @Test
     void operationsRelationAllowsReadButDoesNotCreateSalesOrAssistanceRights() {
@@ -89,20 +118,20 @@ class LeadObjectPermissionServiceTest {
     }
 
     @Test
-    void educationQualificationScopeUsesOwnerDepartmentNotQueryAll() {
-        LeadDO education = lead(20L, 20L);
-        education.setOwnerIdentity("education"); education.setSourceType("education_self_sourced");
+    void salesQualificationScopeUsesOwnerDepartmentNotQueryAll() {
+        LeadDO sales = lead(20L, 20L);
+        sales.setOwnerIdentity("sales"); sales.setSourceType("sales_self_sourced");
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, 101L));
         when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(100L)));
         when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(101L)));
-        org.junit.jupiter.api.Assertions.assertTrue(service.canManageQualificationException(education, 30L));
-        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(education, 40L));
-        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(education, 20L));
+        org.junit.jupiter.api.Assertions.assertTrue(service.canManageQualificationException(sales, 30L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(sales, 40L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(sales, 20L));
         when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
-        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(education, 40L));
-        org.junit.jupiter.api.Assertions.assertTrue(service.canRead(education, 40L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canManageQualificationException(sales, 40L));
+        org.junit.jupiter.api.Assertions.assertTrue(service.canRead(sales, 40L));
         when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
-        org.junit.jupiter.api.Assertions.assertFalse(service.canRead(education, 40L));
+        org.junit.jupiter.api.Assertions.assertFalse(service.canRead(sales, 40L));
     }
 
     @Test
@@ -558,6 +587,63 @@ class LeadObjectPermissionServiceTest {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);
             assertDoesNotThrow(() -> service.check(1L, action));
         }
+    }
+
+    @Test
+    void unassignedLeadPassesSalesBoundaryOnlyForLeadQueryAllHolders() {
+        LeadDO pool = lead(null, null);
+        pool.setAssignmentStatus("public_pool"); pool.setRecycleSourceOwnerUserId(20L);
+        when(salesBoundary.isSalesActor(30L)).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead:qualification:manage-all")).thenReturn(true);
+        // A stale recycle source on a claim-pool lead no longer decides its department (same rule as the list SQL).
+        assertFalse(service.canManageQualificationException(pool, 30L));
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        assertTrue(service.canManageQualificationException(pool, 30L));
+        org.mockito.Mockito.verify(salesBoundary, org.mockito.Mockito.never()).canAccessUser(30L, 20L);
+    }
+
+    @Test
+    void recyclePendingLeadKeepsSourceOwnerBoundaryEvenForQueryAllHolders() {
+        LeadDO recycled = lead(null, null);
+        recycled.setAssignmentStatus("recycle_pending"); recycled.setRecycleSourceOwnerUserId(20L);
+        when(salesBoundary.isSalesActor(30L)).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead:qualification:manage-all")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        when(salesBoundary.canAccessUser(30L, 20L)).thenReturn(false);
+        assertFalse(service.canManageQualificationException(recycled, 30L));
+        when(salesBoundary.canAccessUser(30L, 20L)).thenReturn(true);
+        assertTrue(service.canManageQualificationException(recycled, 30L));
+    }
+
+    @Test
+    void batchDetailFilterResolvesBoundaryOnceAndMatchesSingleRule() {
+        LeadDO pool = lead(null, null); pool.setId(1L); pool.setAssignmentStatus("public_pool"); pool.setRecycleSourceOwnerUserId(20L);
+        LeadDO foreignRecycle = lead(null, null); foreignRecycle.setId(2L);
+        foreignRecycle.setAssignmentStatus("recycle_pending"); foreignRecycle.setRecycleSourceOwnerUserId(20L);
+        LeadDO foreignOwned = lead(null, 20L); foreignOwned.setId(3L); foreignOwned.setAssignmentStatus("owned");
+        LeadDO localOwned = lead(null, 40L); localOwned.setId(4L); localOwned.setAssignmentStatus("owned");
+        LeadDO localRecycle = lead(null, null); localRecycle.setId(5L);
+        localRecycle.setAssignmentStatus("recycle_pending"); localRecycle.setRecycleSourceOwnerUserId(40L);
+        when(salesBoundary.isSalesActor(30L)).thenReturn(true);
+        when(salesBoundary.accessibleSalesUserIds(30L)).thenReturn(java.util.Set.of(30L, 40L));
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
+            assertEquals(java.util.Set.of(1L, 4L, 5L), service.filterReadableDetails(
+                    List.of(pool, foreignRecycle, foreignOwned, localOwned, localRecycle), 30L));
+        }
+        org.mockito.Mockito.verify(salesBoundary, org.mockito.Mockito.never())
+                .canAccessUser(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void nonSalesActorKeepsOriginalUnassignedLeadVisibility() {
+        LeadDO pool = lead(null, null);
+        pool.setAssignmentStatus("public_pool"); pool.setRecycleSourceOwnerUserId(20L);
+        when(securityFrameworkService.hasPermission("zsjos:lead:qualification:manage-all")).thenReturn(true);
+        assertTrue(service.canManageQualificationException(pool, 30L));
+        org.mockito.Mockito.verify(salesBoundary, org.mockito.Mockito.never())
+                .canAccessUser(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
     }
 
     private static LeadDO lead(Long sourceUserId, Long ownerUserId) {

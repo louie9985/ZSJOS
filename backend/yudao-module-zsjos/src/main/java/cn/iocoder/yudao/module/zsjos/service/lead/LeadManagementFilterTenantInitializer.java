@@ -50,10 +50,10 @@ public class LeadManagementFilterTenantInitializer {
                         condition(INBOX_FILTER_FIELD_STATUS, STATUS_INVALID), INVALID_STAGE),
                 group("closed", "已关闭客资", 40,
                         condition(INBOX_FILTER_FIELD_STATUS, STATUS_CLOSED), CLOSED_STAGE),
-                // 手动录入＝销售/教务自拓录，与 dispatch_mode=self 等价，不新增表字段。
+                // 手动录入＝销售自拓录，与 dispatch_mode=self 等价，不新增表字段。
                 group("manual", "手动录入客资", 50,
                         condition(INBOX_FILTER_FIELD_SOURCE_TYPE,
-                                SOURCE_SALES_SELF, SOURCE_EDUCATION_SELF), FULL_STAGE)));
+                                SOURCE_SALES_SELF), FULL_STAGE)));
 
         String json = JsonUtils.toJsonString(config);
         LocalDateTime now = LocalDateTime.now();

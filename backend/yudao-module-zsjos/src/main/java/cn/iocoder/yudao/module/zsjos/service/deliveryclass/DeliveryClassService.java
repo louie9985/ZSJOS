@@ -17,7 +17,7 @@ public interface DeliveryClassService {
     PageResult<DeliveryClassRespVO> getMyPage(Long userId, DeliveryClassPageReqVO req);
     DeliveryClassRespVO get(Long id, Long userId);
     PageResult<DeliveryClassStudentRespVO> students(Long id, Long userId, PageParam pageParam);
-    List<DeliveryClassOptionRespVO> options(Long categoryId, boolean includePending);
+    List<DeliveryClassOptionRespVO> options(Long categoryId, boolean includePending, Long actorId);
     List<HomeroomCandidateRespVO> homeroomCandidates(Long userId);
     List<DeliveryClassCategoryOptionRespVO> categoryOptions();
     List<ExamProductScopeRespVO> productOptions();

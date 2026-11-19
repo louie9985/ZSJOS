@@ -1,8 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import pageSource from './LeadSubmissionPage.tsx?raw'
+import routeSource from '../layouts/RouteHost.tsx?raw'
 import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
 describe('lead submission stepped form', () => {
+  it('routes only the sales URL to the self-sourced form', () => {
+    expect(routeSource).not.toContain('LEAD_EDUCATION_SELF_SOURCED')
+    expect(routeSource).toContain('menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage permissions={permissions} selfSourced/>')
+    expect(pageSource).not.toContain('educationSelfSourced')
+    expect(pageSource).toContain('api.createSelfSourcedLead')
+  })
+  it('no longer routes the retired education team menu', () => {
+    expect(routeSource).not.toContain('EDUCATION_TEAM')
+    expect(routeSource).not.toContain("import EducationTeamPage")
+  })
   it('splits the form into steps that stay mounted so values survive going back', () => {
     expect(pageSource).toContain('<Steps')
     expect(pageSource).toContain('STEP_FIELDS')

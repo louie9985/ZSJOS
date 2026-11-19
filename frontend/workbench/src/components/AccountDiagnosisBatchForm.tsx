@@ -7,7 +7,7 @@ import { diagnosisBatchApi, weeklyDiagnosisApi, type AccountProfile, type Diagno
 import AccountDiagnosisForm from './AccountDiagnosisForm';
 import AccountDiagnosisAccounts, { type DiagnosisAccountRow } from './AccountDiagnosisAccounts';
 
-type AccountValues = {currentStage?: string; accountStatus?: string; highestLikes?: number};
+type AccountValues = {currentStage?: string; accountStatus?: string; highestLikes?: number; published7?: number; published28?: number};
 const errorText = (error: unknown) => error instanceof Error ? error.message : '请求失败，请重试';
 
 export default function AccountDiagnosisBatchForm({profile, type, seed, preview, dicts, disabled, onSavingChange,
@@ -107,6 +107,7 @@ export default function AccountDiagnosisBatchForm({profile, type, seed, preview,
         cycle: initial ? 0 : row.preview!.node.parts[0].cycle} as DiagnosisRequest;
       return {accountId: row.candidate.accountId, ...(initial ? {initial: common} : {weekly: {
         nodeKey: row.preview!.node.key, common, highestLikes: individual.highestLikes,
+        published7: individual.published7, published28: individual.published28,
         changeDirection: String(values.changeDirection), trafficNormal: String(values.trafficNormal),
         directionSummary: String(values.directionSummary), metricToken: row.preview!.metricToken,
       }})};

@@ -21,6 +21,7 @@ class StudentObjectPermissionProviderTest {
                 org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(String[].class))).thenReturn(false);
     }
 
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks StudentObjectPermissionProvider provider;
     @Mock ServiceRelationMapper relationMapper;
     @Mock PermissionApi permissionApi;

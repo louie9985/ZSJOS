@@ -22,6 +22,8 @@ public class MediaLeadTargetDO extends TenantBaseDO {
     private LocalDate periodStart;
     private Integer targetCount;
     private Boolean manual;
+    private java.math.BigDecimal targetAmount;
+    private Boolean amountManual;
     private String reason;
     private Integer version;
 }

@@ -293,7 +293,6 @@
   .registration-page .registration-information { border-right: 0; overflow: visible; }
   .registration-page .registration-operation-column { display: contents; }
   .registration-page .registration-operation-scroll { overflow: visible; }
-  .registration-page .registration-detail-actions { position: sticky; bottom: 0; z-index: 2; }
 }
 @media (max-width: 768px) {
   .registration-page.is-detail-open .lead-inbox-list-pane { display: none; }

@@ -8,8 +8,24 @@ export default function StudentInfoQrCard({url,onError,compact=false,title='学�
   const qr=card.current?.querySelector('canvas');if(!qr)throw Error('二维码未就绪')
   const logo=new Image();logo.src='/collection/logo.png';await logo.decode()
   const canvas=document.createElement('canvas');canvas.width=800;canvas.height=1080;const ctx=canvas.getContext('2d');if(!ctx)throw Error('无法创建图片')
-  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,800,1080);ctx.drawImage(logo,110,72,580,580*logo.naturalHeight/logo.naturalWidth)
-  ctx.textAlign='center';ctx.fillStyle='#18324d';ctx.font='600 38px "Microsoft YaHei",sans-serif';ctx.fillText(title,400,302)
+  const titleFont='600 38px "Microsoft YaHei",sans-serif'
+  ctx.font=titleFont
+  const lines:string[]=[]
+  let line=''
+  for(const character of title){
+   if(line && ctx.measureText(line+character).width>704){
+    lines.push(line)
+    line=''
+   }
+   line+=character
+  }
+  lines.push(line)
+  const extraHeight=(lines.length-1)*48
+  canvas.height=1080+extraHeight
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,800,canvas.height);ctx.drawImage(logo,110,72,580,580*logo.naturalHeight/logo.naturalWidth)
+  ctx.textAlign='center';ctx.fillStyle='#18324d';ctx.font=titleFont
+  lines.forEach((text,index)=>ctx.fillText(text,400,302+index*48))
+  ctx.translate(0,extraHeight)
   ctx.font='23px "Microsoft YaHei",sans-serif';ctx.fillStyle='#607389';ctx.fillText(subtitle,400,354)
   ctx.fillStyle='#f4f8fc';ctx.fillRect(139,382,522,522);ctx.fillStyle='#ffffff';ctx.fillRect(157,400,486,486);ctx.imageSmoothingEnabled=false;ctx.drawImage(qr,169,412,462,462)
   ctx.font='22px "Microsoft YaHei",sans-serif';ctx.fillStyle='#607389';ctx.fillText('微信扫一扫 · 手机与电脑均可填写',400,958);ctx.font='20px "Microsoft YaHei",sans-serif';ctx.fillText(notice,400,1004)

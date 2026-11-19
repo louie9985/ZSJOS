@@ -13,7 +13,7 @@ const scopes = [
   { key: 'DEPT:10', parentKey: 'CENTER:20', title: '新媒体一部', scopeType: 'DEPT', scopeId: 10 },
   { key: 'USER:1', parentKey: 'DEPT:10', title: '测试运营', scopeType: 'USER', scopeId: 1 }
 ]
-const target = { id: 3, scopeType: 'DEPT', scopeId: 10, name: '新媒体一部', periodStart: '2026-09-01', targetCount: 20, actualCount: 13, manual: true, version: 0 }
+const target = { id: 3, scopeType: 'DEPT', scopeId: 10, name: '新媒体一部', periodStart: '2026-09-01', targetCount: 20, targetAmount: 2000000, amountManual: true, actualCount: 13, manual: true, version: 0 }
 const overview = {
   asOf: '2026-09-28', target,
   periods: [

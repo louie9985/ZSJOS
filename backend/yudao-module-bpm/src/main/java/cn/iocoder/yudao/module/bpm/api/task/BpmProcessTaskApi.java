@@ -44,7 +44,22 @@ public interface BpmProcessTaskApi {
 
     BpmTaskRespDTO getTodoTask(Long userId, String taskId);
 
+    /** Tenant-scoped task held by the current actor, including an owner waiting for a required sign. */
+    BpmTaskRespDTO getParticipantTodoTask(Long userId, String taskId);
+
+    java.util.List<String> createSignTasks(Long userId, String taskId, String type,
+                                         java.util.Set<Long> userIds, String reason);
+
     BpmTaskRespDTO getDoneTask(Long userId, String taskId);
+
+    /** Reads committed node state after the business caller has serialized its task actions. */
+    java.util.List<BpmLiveTaskState> getCommittedNodeTasks(String processInstanceId, String taskDefinitionKey);
+
+    record BpmLiveTaskState(String id, String parentTaskId, String assignee, String scopeType, Integer status) {}
+
+    /** Skips the named obsolete node without writing an approval or touching other branches. Caller authorizes the business operation. */
+    void skipObsoleteNode(Long operatorUserId, String processInstanceId, String processDefinitionKey,
+                          String businessKey, String taskDefinitionKey, String reason);
 
     void approveTask(Long userId, BpmTaskDecisionReqDTO reqDTO);
 

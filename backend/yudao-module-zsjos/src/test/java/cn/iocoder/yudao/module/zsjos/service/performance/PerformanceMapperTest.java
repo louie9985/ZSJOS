@@ -7,7 +7,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 class PerformanceMapperTest {
  @org.junit.jupiter.params.ParameterizedTest
- @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto"})
  void automaticProvenanceIsAppliedByActualQueriesInEveryScope(String generationSource) throws Exception {
   var dataSource=new org.apache.ibatis.datasource.unpooled.UnpooledDataSource("org.h2.Driver","jdbc:h2:mem:performance"+UUID.randomUUID()+";MODE=MySQL","sa","");
   var config=new Configuration();config.setMapUnderscoreToCamelCase(true);

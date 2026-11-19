@@ -109,7 +109,7 @@ public class SalesDispatchStatusServiceImpl implements SalesDispatchStatusServic
     }
 
     private boolean isEligible(Long userId) {
-        return assignmentService.isEligibleSalesUser(userId);
+        return assignmentService.isEligibleReceiver(userId);
     }
 
     private void requireEligible(Long userId) {

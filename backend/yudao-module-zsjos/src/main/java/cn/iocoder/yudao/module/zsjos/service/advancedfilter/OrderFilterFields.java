@@ -11,7 +11,7 @@ final class OrderFilterFields {
     private OrderFilterFields() {}
 
     static void register(Map<String, Field> result) {
-        add(result, select(Sensitivity.STANDARD, "order.formalOwnerIdentity", EXTRA, "成交归属身份", options(LeadConstants.OWNER_SALES, "销售", LeadConstants.OWNER_EDUCATION, "教务"), orderBind("formal_owner_identity", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
+        add(result, select(Sensitivity.STANDARD, "order.formalOwnerIdentity", EXTRA, "成交归属身份", options(LeadConstants.OWNER_SALES, "销售"), orderBind("formal_owner_identity", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, text(Sensitivity.STANDARD, "order.orderNo", IDENTITY, "订单号", orderBind("order_no", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, select(Sensitivity.STANDARD, "order.status", STATUS, "订单状态", options(SalesOrderConstants.STATUS_PENDING_APPROVAL, "审批中", SalesOrderConstants.STATUS_REVISION_REQUIRED, "待修改", SalesOrderConstants.STATUS_EFFECTIVE, "已生效", SalesOrderConstants.STATUS_SUPERSEDED, "已被接续", SalesOrderConstants.STATUS_TERMINATED, "已终止"), orderBind("status", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));
         add(result, select(Sensitivity.STANDARD, "order.type", STATUS, "订单类型", options(SalesOrderConstants.ORDER_TYPE_FIRST_PURCHASE, "首购", SalesOrderConstants.ORDER_TYPE_REPURCHASE, "复购"), orderBind("order_type", orderFromLead, orderFromAppeal, orderFromRegistration, serviceFromStudent)));

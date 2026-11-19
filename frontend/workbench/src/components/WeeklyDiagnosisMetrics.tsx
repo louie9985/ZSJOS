@@ -16,7 +16,6 @@ export function WeeklyDiagnosisMetrics({ node, submitted = false, extra }: {node
         {m.reason && <Alert type="warning" showIcon message={m.reason} />}
         <Typography.Paragraph type="secondary">数据查询时间：{formatTimestamp(m.asOf)}{m.settledAt ? `；周期已结算：${formatTimestamp(m.settledAt)}` : ''}</Typography.Paragraph>
         <Descriptions size="small" column={{xs:1,sm:2}} items={[
-          ...(part.days===7 || part.days===28 ? [{key:'published',label:`${part.days}天发布条数`,children:m.publishedCount ?? '无法统计'}] : []),
           ...(part.days>7 ? [
             {key:'valid',label:`${part.days}天有效客资条数`,children:m.validLeads ?? '无法统计'},
             {key:'deals',label:submitted?'当前成交客资条数':'成交客资条数',children:m.deals ?? '无法统计'},
@@ -24,7 +23,6 @@ export function WeeklyDiagnosisMetrics({ node, submitted = false, extra }: {node
           ] : []),
           ...(part.days===28 ? [{key:'likes',label:'最高点赞量',children:`${m.highestLikes ?? '未记录'}（已取得 ${m.likesCoverage ?? 0}/4 次7天记录，包含本次填写）`}] : []),
         ]} />
-        {(part.days===7 || part.days===28) && <Typography.Paragraph type="secondary">{m.publicationExplanation}{m.missingPublishTimeCount ? ` 另有 ${m.missingPublishTimeCount} 条缺少预计发布时间，未纳入。` : ''}</Typography.Paragraph>}
         {part.days>7 && <Typography.Paragraph type="secondary">{m.conversionExplanation}</Typography.Paragraph>}
         {extra?.(part)}
       </section>;

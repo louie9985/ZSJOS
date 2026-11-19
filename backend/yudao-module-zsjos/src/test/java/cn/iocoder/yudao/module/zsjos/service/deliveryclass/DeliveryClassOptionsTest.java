@@ -32,22 +32,25 @@ class DeliveryClassOptionsTest {
 
     @Test void unscheduledIsSelectableWithoutPendingButInactiveOwnerIsExcluded() {
         var mapper = mock(DeliveryClassMapper.class);
-        var service = spy(new DeliveryClassServiceImpl());
+        var service = spy(new DeliveryClassServiceImpl()); org.springframework.test.util.ReflectionTestUtils.setField(service, "scopeService", org.mockito.Mockito.mock(DeliveryClassScopeService.class));
         ReflectionTestUtils.setField(service,"mapper",mapper);
+        ReflectionTestUtils.setField(service,"adminUserApi",mock(cn.iocoder.yudao.module.system.api.user.AdminUserApi.class));
+        ReflectionTestUtils.setField(service,"permissionApi",mock(cn.iocoder.yudao.module.system.api.permission.PermissionApi.class));
         var pending = new DeliveryClassDO().setId(1L).setSystemClass(true).setClassKind("PENDING");
         var active = new DeliveryClassDO().setId(2L).setSystemClass(true).setClassKind("UNSCHEDULED").setHomeroomUserId(20L);
         var inactive = new DeliveryClassDO().setId(3L).setSystemClass(true).setClassKind("UNSCHEDULED").setHomeroomUserId(30L);
         when(mapper.selectList(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(List.of(pending,active,inactive));
         doReturn(new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO().setId(20L)).when(service).validateHomeroom(20L);
         doThrow(cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.DELIVERY_CLASS_USER_INVALID)).when(service).validateHomeroom(30L);
-        assertEquals(List.of(2L),service.options(null,false).stream().map(row -> row.getId()).toList());
+        assertEquals(List.of(2L),service.options(null, false, 7L).stream().map(row -> row.getId()).toList());
     }
 
     private List<Long> optionIds(Long categoryId, boolean includePending) throws Exception {
         TableInfoHelper.initTableInfo(new MapperBuilderAssistant(new MybatisConfiguration(), ""), DeliveryClassDO.class);
         DeliveryClassMapper mapper = mock(DeliveryClassMapper.class);
-        DeliveryClassServiceImpl service = new DeliveryClassServiceImpl();
+        DeliveryClassServiceImpl service = new DeliveryClassServiceImpl(); org.springframework.test.util.ReflectionTestUtils.setField(service, "scopeService", org.mockito.Mockito.mock(DeliveryClassScopeService.class));
         ReflectionTestUtils.setField(service, "mapper", mapper);
+        ReflectionTestUtils.setField(service, "permissionApi", mock(cn.iocoder.yudao.module.system.api.permission.PermissionApi.class));
         try (var connection = DriverManager.getConnection("jdbc:h2:mem:class_options;MODE=MySQL")) {
             connection.createStatement().execute("CREATE TABLE classes(id BIGINT, category_id BIGINT, system_class BOOLEAN, status VARCHAR, class_name VARCHAR, class_kind VARCHAR DEFAULT 'NORMAL')");
             connection.createStatement().execute("INSERT INTO classes(id,category_id,system_class,status,class_name) VALUES (1,NULL,TRUE,'SERVING','Pending'),(2,70,FALSE,'SERVING','A'),(3,80,FALSE,'SERVING','B'),(4,80,FALSE,'COMPLETED','C'),(5,NULL,TRUE,'COMPLETED','Old')");
@@ -69,7 +72,7 @@ class DeliveryClassOptionsTest {
                     return rows;
                 }
             });
-            return service.options(categoryId, includePending).stream().map(row -> row.getId()).toList();
+            return service.options(categoryId, includePending, 7L).stream().map(row -> row.getId()).toList();
         }
     }
 }

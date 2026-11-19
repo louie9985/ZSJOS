@@ -6,7 +6,6 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
 import org.junit.jupiter.api.*;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -16,6 +15,8 @@ class UnscheduledDeliveryClassServiceTest {
     private final DeliveryClassService qualification = mock(DeliveryClassService.class);
     private final UnscheduledDeliveryClassService service = new UnscheduledDeliveryClassService();
     @BeforeEach void setup() {
+        com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(
+                new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(), "fixture"), DeliveryClassDO.class);
         TenantContextHolder.setTenantId(1L);
         ReflectionTestUtils.setField(service,"classes",mapper);
         ReflectionTestUtils.setField(service,"classService",qualification);
@@ -24,21 +25,18 @@ class UnscheduledDeliveryClassServiceTest {
     }
     @AfterEach void clear() { TenantContextHolder.clear(); }
 
-    @Test void createsOwnedUndatedClassAndReusesIt() {
-        var row = service.ensure(20L);
-        assertEquals("未确定考期",row.getClassName()); assertEquals(20L,row.getHomeroomUserId());
-        assertEquals("UNSCHEDULED",row.getClassKind()); assertNull(row.getExamScheduleSnapshot());
-        assertTrue(DeliveryClassKind.assignable(row)); assertFalse(DeliveryClassKind.pending(row));
+    @Test void reusesExistingHistoricalClassWithoutCreating() {
+        var row = new DeliveryClassDO().setId(88L).setClassKind("UNSCHEDULED")
+                .setHomeroomUserId(20L).setHomeroomUserNameSnapshot("规划师");
         when(mapper.selectOne(any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenReturn(row);
         assertSame(row,service.ensure(20L));
-        verify(mapper,times(1)).insert(any(DeliveryClassDO.class));
+        verify(mapper,never()).insert(any(DeliveryClassDO.class));
         verify(mapper,never()).updateById(any(DeliveryClassDO.class));
     }
-    @Test void concurrentWinnerIsReadWithCurrentLockingRead() {
-        var winner = new DeliveryClassDO().setId(88L).setClassKind("UNSCHEDULED").setHomeroomUserId(20L);
-        when(mapper.insert(any(DeliveryClassDO.class))).thenThrow(new DuplicateKeyException("race"));
-        when(mapper.selectPlannerDefaultForUpdate("UNSCHEDULED",20L,1L)).thenReturn(winner);
-        assertSame(winner,service.ensure(20L));
+    @Test void missingClassIsNotRecreatedOnRepeatedCalls() {
+        assertNull(service.ensure(20L));
+        assertNull(service.ensure(20L));
+        verify(mapper,never()).insert(any(DeliveryClassDO.class));
     }
     @Test void ownedDefaultNeverGetsGlobalPendingReadException() {
         var provider = new DeliveryClassObjectPermissionProvider();
@@ -48,6 +46,7 @@ class UnscheduledDeliveryClassServiceTest {
         ReflectionTestUtils.setField(provider,"permissionApi",permissions);
         ReflectionTestUtils.setField(provider,"scopeService",scope);
         when(permissions.hasAnyPermissions(anyLong(),any(String[].class))).thenReturn(true);
+        when(permissions.hasAnyPermissions(anyLong(),eq(DeliveryClassService.PERMISSION_QUERY_ALL))).thenReturn(false);
         var row = new DeliveryClassDO().setId(2L).setClassKind("UNSCHEDULED").setSystemClass(true)
                 .setHomeroomUserId(20L).setDeptId(80L);
         when(mapper.selectById(2L)).thenReturn(row);

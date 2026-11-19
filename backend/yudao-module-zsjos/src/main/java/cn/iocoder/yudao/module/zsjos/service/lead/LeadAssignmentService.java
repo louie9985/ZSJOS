@@ -18,6 +18,10 @@ public interface LeadAssignmentService {
 
     boolean isEligibleSalesUser(Long userId);
 
+    List<LeadAssignmentUserRespVO> getEligibleReceivers();
+
+    boolean isEligibleReceiver(Long userId);
+
     List<LeadAssignmentUserRespVO> getAssignableSalesUsers(Long sourceUserId);
 
     void saveRelations(LeadAssignmentSaveReqVO reqVO, Long operatorUserId);

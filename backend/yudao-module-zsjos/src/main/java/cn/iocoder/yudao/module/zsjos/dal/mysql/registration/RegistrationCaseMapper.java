@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.zsjos.dal.mysql.registration;
 
-import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
@@ -26,11 +25,23 @@ public interface RegistrationCaseMapper extends BaseMapperX<RegistrationCaseDO> 
     @Select("SELECT * FROM zsjos_registration_case WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     RegistrationCaseDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
-    default PageResult<RegistrationCaseDO> selectPoolPage(RegistrationPoolPageReqVO pageParam,
-                                                           java.util.List<Long> orderIds,
-                                                           java.util.List<Long> caseIds) {
+    default PageResult<RegistrationCaseDO> selectOwnedPage(RegistrationPoolPageReqVO pageParam,
+            java.util.List<Long> orderIds, java.util.List<Long> caseIds, Long ownerUserId,
+            java.util.Set<Long> enabledUserIdsForRecovery) {
         LambdaQueryWrapperX<RegistrationCaseDO> query = new LambdaQueryWrapperX<RegistrationCaseDO>()
                 .eqIfPresent(RegistrationCaseDO::getStatus, pageParam.getStatus());
+        if (enabledUserIdsForRecovery == null) {
+            query.eq(RegistrationCaseDO::getOwnerUserId, ownerUserId);
+        } else {
+            query.and(visibility -> visibility.eq(RegistrationCaseDO::getOwnerUserId, ownerUserId)
+                    .or(orphan -> {
+                        orphan.in(RegistrationCaseDO::getStatus, STATUS_PENDING, STATUS_PROCESSING);
+                        if (!enabledUserIdsForRecovery.isEmpty()) {
+                            orphan.and(owner -> owner.isNull(RegistrationCaseDO::getOwnerUserId)
+                                    .or().notIn(RegistrationCaseDO::getOwnerUserId, enabledUserIdsForRecovery));
+                        }
+                    }));
+        }
         if ("pending".equals(pageParam.getStatusGroup())) {
             query.in(RegistrationCaseDO::getStatus, STATUS_PENDING, STATUS_PROCESSING);
         } else if ("processed".equals(pageParam.getStatusGroup())) {

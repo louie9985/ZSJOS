@@ -34,6 +34,7 @@ class LeadOwnerCommandServiceTest {
     @Mock private LeadDispatchService dispatchService;
     @Mock private LeadPublicSeaPoolService publicSeaPoolService;
     @Mock private LeadAssignmentService assignmentService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     @BeforeEach
     void setUp() {
@@ -43,6 +44,35 @@ class LeadOwnerCommandServiceTest {
     @AfterEach
     void tearDown() {
         TenantContextHolder.clear();
+    }
+
+    @Test
+    void candidatesUseLeadSourceAndDepartmentScope() {
+        LeadDO lead = ownedLead(); lead.setSubmissionSourceType("internal_new_media");
+        var allowed = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO(); allowed.setId(30L);
+        var other = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO(); other.setId(40L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(assignmentService.getEligibleReceivers()).thenReturn(java.util.List.of(allowed, other));
+        when(salesBoundary.filterTransferTargets(20L, java.util.List.of(30L, 40L))).thenReturn(java.util.Set.of(30L));
+        assertEquals(java.util.List.of(30L), service.getTransferCandidates(1L, 20L).stream().map(v -> v.getId()).toList());
+        verify(assignmentService, never()).getEligibleSalesUsers();
+        verify(salesBoundary, never()).filterAccessibleUsers(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void candidatesWithoutLeadAreLimitedToRequesterDepartment() {
+        var same = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO(); same.setId(30L);
+        var other = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO(); other.setId(40L);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(java.util.List.of(same, other));
+        when(salesBoundary.filterTransferTargets(20L, java.util.List.of(30L, 40L))).thenReturn(java.util.Set.of(30L));
+        assertEquals(java.util.List.of(30L), service.getTransferCandidates(20L).stream().map(v -> v.getId()).toList());
+    }
+
+    @Test
+    void candidateContextCannotReadAnotherOwnersLead() {
+        when(leadMapper.selectById(1L)).thenReturn(ownedLead());
+        assertThrows(ServiceException.class, () -> service.getTransferCandidates(1L, 99L));
+        verify(assignmentService, never()).getEligibleReceivers();
     }
 
     @Test

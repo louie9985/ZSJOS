@@ -39,7 +39,7 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
     public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> roles) {
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
-        if (roles.contains(NOTIFY_ROLE_PLANNER)) add(recipients, payload.get("plannerUserId"));
+        if (roles.contains(NOTIFY_ROLE_HEAD_TEACHER)) add(recipients, payload.get("plannerUserId"));
         if (roles.contains(NOTIFY_ROLE_SUPERVISOR)) add(recipients, payload.get("supervisorUserId"));
         if (roles.contains(NOTIFY_ROLE_OPERATOR)) add(recipients, payload.get("operatorUserId"));
         return recipients;
@@ -66,8 +66,8 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneVariableRespDTO("contact.stage", "提醒阶段", false),
                 new NotifySceneVariableRespDTO("contact.dueAt", "任务截止时间", false),
                 new NotifySceneVariableRespDTO("exam.date", "考试日期", false)),
-                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_PLANNER, "学习规划师"),
-                        new NotifySceneRoleRespDTO(NOTIFY_ROLE_SUPERVISOR, "教务主管"),
+                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_HEAD_TEACHER, "班主任"),
+                        new NotifySceneRoleRespDTO(NOTIFY_ROLE_SUPERVISOR, "销售主管"),
                         new NotifySceneRoleRespDTO(NOTIFY_ROLE_OPERATOR, "运营负责人")),
                 List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), true);
     }

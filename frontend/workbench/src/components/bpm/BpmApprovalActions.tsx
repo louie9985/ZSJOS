@@ -18,6 +18,7 @@ import {
   BPM_OPERATION_BUTTON,
   type BpmOperationButtonType,
   type BpmTask,
+  type FinanceApprovalCommand,
   type SimpleUser
 } from '../../services/api'
 import BpmSignaturePad from './BpmSignaturePad'
@@ -101,6 +102,8 @@ export default function BpmApprovalActions({
   users,
   allowDecision = true,
   decisionOnly = false,
+  rejectReasonRequired = false,
+  submitFinanceAction,
   decisionHint,
   extraActions,
   extraHint,
@@ -123,6 +126,8 @@ export default function BpmApprovalActions({
   allowDecision?: boolean
   /** 业务只支持通过/驳回时，隐藏其余任务操作；不改变服务端权限校验。 */
   decisionOnly?: boolean
+  rejectReasonRequired?: boolean
+  submitFinanceAction?: (data: FinanceApprovalCommand) => Promise<unknown>
   /** allowDecision=false 时展示的引导文案。 */
   decisionHint?: string
   /** 业务侧推进流程的动作，排在流程类动作之前。 */
@@ -210,7 +215,7 @@ export default function BpmApprovalActions({
     if (!task || !command || busy.current || !actionable) return
     let values: ActionFormValues
     if (decision) {
-      if (reasonRequired && !inlineReason.trim()) { message.warning('请输入审批意见'); return }
+      if ((reasonRequired || (rejectReasonRequired && decision === 'reject')) && !inlineReason.trim()) { message.warning('请输入审批意见'); return }
       values = { reason: inlineReason }
     } else try {
       values = await form.validateFields()
@@ -231,10 +236,12 @@ export default function BpmApprovalActions({
       const reason = values.reason?.trim() ?? ''
       switch (command) {
         case 'approve':
-          await api.approveBpmTask({ id: task.id, reason, signPicUrl })
+          if (submitFinanceAction) await submitFinanceAction({ taskId: task.id, action: command, reason, signPicUrl })
+          else await api.approveBpmTask({ id: task.id, reason, signPicUrl })
           break
         case 'reject':
-          await api.rejectBpmTask({ id: task.id, reason })
+          if (submitFinanceAction) await submitFinanceAction({ taskId: task.id, action: command, reason })
+          else await api.rejectBpmTask({ id: task.id, reason })
           break
         case 'transfer':
           await api.transferBpmTask({ id: task.id, assigneeUserId: values.assigneeUserId!, reason })
@@ -243,12 +250,13 @@ export default function BpmApprovalActions({
           await api.delegateBpmTask({ id: task.id, delegateUserId: values.delegateUserId!, reason })
           break
         case 'addSign':
-          await api.createBpmTaskSign({
-            id: task.id,
-            userIds: values.userIds!,
-            type: values.signType ?? 'after',
-            reason
-          })
+          if (submitFinanceAction) {
+            await submitFinanceAction({ taskId: task.id, action: 'sign', userIds: values.userIds!,
+              type: values.signType ?? 'after', reason })
+          } else {
+            await api.createBpmTaskSign({ id: task.id, userIds: values.userIds!,
+              type: values.signType ?? 'after', reason })
+          }
           break
         case 'deleteSign':
           // 减签的 id 是被移除的子任务编号，不是当前任务。

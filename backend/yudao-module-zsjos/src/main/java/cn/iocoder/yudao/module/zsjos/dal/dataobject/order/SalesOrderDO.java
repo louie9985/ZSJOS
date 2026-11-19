@@ -44,7 +44,10 @@ public class SalesOrderDO extends TenantBaseDO {
     private String provinceName;
     private String cityCode;
     private String cityName;
+    /** Legacy free text; kept read-only for history and no longer accepted from submissions. */
     private String agreedExamTime;
+    /** Required YYYY-MM for new submissions; null only on orders submitted before the month field existed. */
+    private String agreedExamMonth;
     private String classType;
     private String servicePeriod;
     private String studentSource;

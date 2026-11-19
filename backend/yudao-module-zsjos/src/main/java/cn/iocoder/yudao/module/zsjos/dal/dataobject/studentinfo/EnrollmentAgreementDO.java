@@ -7,7 +7,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("zsjos_enrollment_category_agreement")
+@TableName("zsjos_enrollment_product_agreement")
 public class EnrollmentAgreementDO extends TenantBaseDO {
     private Long id;
     private Long revision;

@@ -109,6 +109,7 @@ public class SalesOrderSnapshot {
         private String cityCode;
         private String cityName;
         private String agreedExamTime;
+        private String agreedExamMonth;
         private String classType;
         private String servicePeriod;
         private String studentSource;
@@ -156,6 +157,7 @@ public class SalesOrderSnapshot {
             result.setCityCode(order.getCityCode());
             result.setCityName(order.getCityName());
             result.setAgreedExamTime(order.getAgreedExamTime());
+            result.setAgreedExamMonth(order.getAgreedExamMonth());
             result.setClassType(order.getClassType());
             result.setServicePeriod(order.getServicePeriod());
             result.setStudentSource(order.getStudentSource());

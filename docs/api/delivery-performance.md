@@ -1,5 +1,7 @@
 # 交付业绩统计与设置
 
+> 历史契约：交付业绩独立页面和接口已由统一销售业绩取代，以下为原实现记录。统一后的事实、目标、修订和权限口径见 [销售业绩](sales-performance.md)。历史目标、修订及事实不因页面退役而删除。组织调整后，原交付域的归属快照和个人目标与销售域一并由 [快照回填脚本](sales-performance.md#组织调整后的快照回填) 对齐到员工当前部门，执行须单独授权。
+
 独立 Workbench 页面 `/zsjos/delivery-performance`、`/zsjos/delivery-performance-target`；使用 `/admin-api/zsjos/delivery-performance/**` 与 `/admin-api/zsjos/delivery-performance-target/**`。
 
 交付业绩统计与设置完整复刻既有能力并独立维护，不再复用销售业绩的页面、API 工厂、业务服务或查询实现。此次拆分保留既有功能与口径：周期、金额、订单、成交率、跟进、明细、目标和修订交互不变；来源、1280 元门槛、接收窗口及复购规则保持一致，无新媒体引流的教务自拓仍不进入成交率。

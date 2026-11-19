@@ -1,5 +1,14 @@
 # ZSJOS 成交订单 API
 
+## 财务审批与报名履约
+
+新提交、复购和补正重提统一启动 SIMPLE 流程 `zsjos_sales_order_finance_approval`。业务键为 `sales-order:{orderId}`，各入口在启动前按订单商品创建报名待办。审批仅包含配置财务部门的 `financeReview` 节点。BPM 最终通过事件使订单生效，随后根据订单考期自动建班或入班。明确驳回终止未完报名待办并创建补正任务，历史报名记录和材料继续保留。新轮次的 `supervisorConfirmationEnabled` 为 false。
+
+财务审批人使用 BPM 待办和通用任务操作。加签通过 `PUT /bpm/task/create-sign`，参数为 `id`、`type`（`before` 或 `after`）、`userIds`、`reason`。加签人员需启用并拥有 BPM 任务查询及办理权限。财务普通通过意见选填，加签通过和所有驳回需填写意见。财务或签人驳回走同一最终结果事件。订单列表和详情提供 `processDefinitionKey`，通用 BPM 页面可通过 `GET /zsjos/sales-order/approval/native-detail?taskId=&view=todo|done` 查询本人待办或已办关联的只读订单详情。
+
+旧流程保留历史和已有加签。V375 定义 `zsjos:sales-order:migrate-approval` 按钮权限。由管理员授权后，通过 `PUT /zsjos/sales-order/{id}/approval/migrate-legacy` 逐单迁移，提交当前 `approvalRoundId`、`orderVersion`、`roundVersion`、`reason` 和 `idempotencyKey`。命令受订单管理可见范围约束。它在原实例记录报名节点跳过及操作人，保留原财务审批结果、待办、记录与快照。若报名节点有待处理加签，先由原办理人员完成加签，再用原参数重试。财务已通过且剩余报名节点跳过时，原流程发出最终通过事件。迁移命令不重启实例或补录历史审批。部署新后端前应发布仓库中的 3.0.0 SIMPLE 资产并配置 BPM 审批入口权限。
+
+
 ## 权限与对象范围
 
 - `zsjos:sales-order:create`：当前正式归属销售录入成交订单；公海协同销售必须先完成正式转派，不能仅凭协同身份录入。
@@ -29,7 +38,7 @@
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders`：要求 `zsjos:lead-detail:order-read`，并以统一 Lead 详情对象关系按客户聚合首购与复购订单。
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders/{orderId}`：同样累计标签 feature 权限、Lead 对象关系和订单与客资 `personId` 一致性校验。
 - `PUT /zsjos/sales-order/{id}/resubmit`：对允许重提的 `revision_required` 订单创建全新订单并返回新订单 ID。旧订单进入 `superseded` 终态，使用 `supersedes_order_id` / `superseded_by_order_id` 双向关联；旧审批轮次、明细、凭证和驳回原因保持不变，新订单从第 1 个审批轮次独立启动。若同一客资已存在另一张活动首购订单，或同一客户已存在另一张活动复购订单，则拒绝重提；复购创建与重提通过客户主档行锁串行化。
-- `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情。新建或重提审批轮次会在既有 `order_snapshot` 中保存录单时订单字典显示值（性质、服务期限、学员来源、收费方式、支付方式）以及关联客资的档案字段和来源/分类/渠道显示值；详情优先使用该轮次快照，因此字典或客资后续变更、停用不会让已录订单显示为“标签未配置”。历史轮次没有这些快照字段时，返回历史缺失信息，不回退当前字典、客资或用户资料。首购订单有历史客资快照时，`leadProfile` 返回客资业务编号 `leadNo`、客户联系方式、来源、提交人、所属销售、分类、渠道、派单方式和地区，用于审批详情展示；无关联客资的复购订单不返回该字段；新录复购选择或自动匹配的客资档案通过独立 associatedLeadId 与 leadProfile 保存于轮次快照，不写交易 leadId，且内部 `leadId` 不作为客资编号回退。`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/动作时姓名快照及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
+- `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情。新建或重提审批轮次会在既有 `order_snapshot` 中保存录单时订单字典显示值（性质、服务期限、学员来源、收费方式、支付方式）以及关联客资的档案字段和来源/分类/渠道显示值；详情优先使用该轮次快照，因此字典或客资后续变更、停用不会让已录订单显示为“标签未配置”。历史轮次没有这些快照字段时，返回历史缺失信息，不回退当前字典、客资或用户资料。首购订单有历史客资快照时，`leadProfile` 返回客资业务编号 `leadNo`、客户联系方式、来源、提交人、所属销售、分类、渠道、派单方式和地区，用于审批详情展示；无关联客资的复购订单不返回该字段；新录复购选择或自动匹配的客资档案通过独立 associatedLeadId 与 leadProfile 保存于轮次快照，不写交易 leadId，且内部 `leadId` 不作为客资编号回退。`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled/skipped` 汇总状态、实际审核人用户 ID/动作时姓名快照及节点时间。旧轮次按迁移命令跳过报名节点时，状态为 `skipped`，工作台显示“已跳过”并保留该节点完成时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
 - `GET /zsjos/sales-order/management/{id}`：订单管理详情。仅接受 `zsjos:sales-order:query-management`，并按当前 System 数据权限（或独立 `query-all`）校验订单提交人范围；不会继承旧 `query-team` 的团队读取范围。
 - `GET /zsjos/sales-order/my-page`：本人提交订单分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。列表响应直接投影订单详情中可用于表格展示的业务字段，包括购买方、学员联系方式与地区、历史字典标签快照、课程摘要、付款与服务信息、备注、关联客资业务编号及来源摘要；课程明细按当前页批量读取，不要求前端逐行请求详情。内部关联 ID 仍只用于路由和命令，不作为用户可见列。
 - `GET /zsjos/sales-order/management-page`、`POST /zsjos/sales-order/management-search-page`：订单管理分页及高级筛选，`keyword` 去除首尾空白后按订单号、学员姓名、手机号或订单保存的学员微信号（`studentWechatId`）模糊匹配；与状态、高级条件同时生效。服务端按 System 数据权限（或独立 `query-all`）计算订单提交人范围。
@@ -57,6 +66,18 @@
 - `PUT /zsjos/sales-order/{id}/supervisor-confirmation/confirm`、`/reject`：主管提交通过或驳回决定，必须携带 `confirmationId`、主管 BPM `taskId`、轮次、订单/轮次/确认记录版本、必填且不超过 1000 字的 `reason` 和幂等键。主管通过后，已先通过的中心任务完成汇合，尚未处理的中心任务继续等待普通审批；主管驳回使用 BPM 驳回整轮并退回销售补正。
 - `PUT /zsjos/sales-order/{id}/terminate`：待审核或待重提订单的原创建人或正式负责人可填写原因终止订单；仅待审核订单终止当前 BPM 流程，包括已进入财务节点的订单。订单域先校验权限、状态、版本和幂等键，再通过 BPM 业务授权终止接口记录真实操作人、授权类型与原因。
 
+## 财务审批双入口
+
+新成交订单使用 SIMPLE 模型 `zsjos_sales_order_finance_approval`，将财务中心当前启用人员交给 BPM 分派 `financeReview`。先发布 [3.0.0 模型](../../script/bpm/zsjos_sales_order_finance_approval/3.0.0/process-model.json) 再启用新提交代码。提交要求 `agreedExamMonth` 为 `YYYY-MM`，历史自由文本继续可读。运行依赖已批准的 V371 自动分班结构与 V374 履约归属结构，并要求已有发布的报名履约配置。订单提交起始创建报名履约与资料收集，履约按订单明细和成交负责人建档。订单最终通过时按已有规则自动分班，履约提交仍校验订单已生效。审批完成后由原有订单结果事务更新状态、机会和通知。最终驳回取消本单履约任务。
+
+- `GET /zsjos/sales-order/approval/business-detail?taskId=&done=false` 供成交审批页使用，需要 `zsjos:sales-order:review`。财务父任务要求财务中心成员资格和本人任务关系，加签子任务要求本人的加签任务关系。等待前加签期间可通过本人任务 ID 读取详情。
+- `GET /zsjos/sales-order/approval/native-detail?taskId=&done=false` 供 BPM 使用，需要 `bpm:task:query` 与本人任务关系，支持父任务和原生加签子任务。历史 `view=done` 参数继续有效。
+- 两个接口都验证租户、流程模型、业务键、订单与审批轮次的对应关系。待办必须属于当前轮次，已办按任务的历史轮次读取。响应包含订单详情、`approvalTask`（任务标识、状态、父任务、意见约束与 `canAct`、`canSign`）、`approvalProgress`（节点及其历史任务）和 `approvalComments`。普通审批列表和任务定位响应包含 `processDefinitionKey`。
+- 业务入口通过 `PUT /zsjos/sales-order/approval/native-action` 提交 `{taskId,action,reason,type?,userIds?}`。支持 `approve`、`reject` 和 `sign`，加签类型为 `before` 或 `after`。BPM 入口调用 BPM 原生任务接口，另行校验 `bpm:task:update`。所有入口共用 BPM 写入、订单轮次锁与财务任务校验。待加签时其他并行财务处理人不能越过该加签。
+- `GET /zsjos/sales-order/approval/sign-candidates?taskId=&entry=business|bpm` 由可加签父任务的办理人查询，返回具有成交审批权限，或同时具有 BPM 查询和更新权限的启用人员 `{id,nickname}`。普通员工可以承办本人加签子任务。普通财务通过意见选填，加签子任务通过意见、驳回原因和加签原因必填。
+- `POST /zsjos/sales-order/approval/comment?entry=business|bpm` 接收 `{taskId,message}`，再次校验当前办理人，在相同 BPM 实例追加评论。
+- 历史 `zsjos_sales_order_dual_approval` 与原主管确认接口继续按既有流程处理。独立的 `PUT /zsjos/sales-order/{id}/approval/migrate-legacy` 需要管理员在系统角色管理中配置迁移权限，并通过订单管理数据范围和版本校验。该操作跳过原实例内的旧报名节点并保留财务任务及历史；旧报名节点有活动加签时返回业务错误。历史导入轮次继续按已有订单快照读取。
+
 ## 快照边界
 
 2026-10-12 经确认的人员修复可保存订单级 `repaired_actor_snapshot`。服务端校验修复来源、租户、订单及当前人员引用后，优先使用其人员展示；原轮次业务事实、导入旧员工证据和 BPM 历史仍保留。补录姓名记录本次采集时间，不表示原交易时姓名。Admin、Workbench 继续消费原人员响应字段；详见 [V312 操作与兼容说明](../operations/order-actor-snapshot-repair.md)。
@@ -73,7 +94,7 @@
 外部复购和所有客户联系方式写入口共用 Person 身份写服务。手机号与微信号使用同一租户级占用空间，手机号命中微信号同样冲突；值仅去除首尾空格，微信号大小写敏感且最多 64 个字符。同一 Person 的手机号与微信号可填写相同值并只占用一次。并发创建相同联系方式时只允许创建一份客户主档，其他请求按已存在客户继续执行复购入口校验。
 
 审批详情仅在当前中心节点仍为 `pending` 且当前待办仍提供 `taskId` 时显示通过、驳回操作。任一审核人处理该中心节点后，同中心其他用户不再显示操作按钮；服务端仍以 BPM 待办状态校验并拒绝过期或重复处理。
-上线后创建的审批轮次返回 `supervisorConfirmationEnabled=true`。申请时服务端从订单 `formalSalesUserId` 对应销售的当前直属部门读取 `leaderUserId`；正式销售或部门负责人未配置、负责人停用、负责人就是正式销售或负责人缺少主管确认权限分别返回稳定错误。确认记录为 `pending/confirmed/rejected/cancelled`；申请中心通过不会取消主管记录，申请中心或另一中心驳回、销售终止或流程取消会把未完成记录置为 `cancelled`。历史确认记录继续使用申请时固化的 `supervisorUserId`；上线前已存在轮次保持 `false`，继续旧流程且禁止发起主管确认。
+仍使用旧双中心流程且启用了主管确认的历史轮次返回 `supervisorConfirmationEnabled=true`。申请时服务端从订单 `formalSalesUserId` 对应销售的当前直属部门读取 `leaderUserId`；正式销售或部门负责人未配置、负责人停用、负责人就是正式销售或负责人缺少主管确认权限分别返回稳定错误。确认记录为 `pending/confirmed/rejected/cancelled`；申请中心通过不会取消主管记录，申请中心或另一中心驳回、销售终止或流程取消会把未完成记录置为 `cancelled`。历史确认记录继续使用申请时固化的 `supervisorUserId`；上线前已存在轮次保持 `false`，继续旧流程且禁止发起主管确认。
 - `POST /zsjos/sales-order/voucher/upload`：上传 JPG、PNG、WebP 或 PDF，最多 100 MB；服务端按文件内容识别真实类型。所有订单最终提交必须引用 1–6 个当前销售上传的凭证，包括零元订单和系统外复购。工作台延迟上传，管理端系统外复购选择后上传；两端都保留上传中、失败、重试、删除和预览状态。
 
 提交命令必须携带 `idempotencyKey`。同一次录单或补正意图的快速重复点击、凭证上传失败和请求重试必须复用该键，只有服务端确认成功后才轮换；首次录单在锁定客资行后会再次检查该键，使并发相同请求返回已创建订单，而不是重复创建或误报已有活动订单。订单总金额不由客户端提交，服务端以各课程 `actualAmount` 重新汇总。手机号和微信号均为必填项，空白字符串视为未填；所有订单必须引用 1–6 份缴费凭证。省市名称由服务端根据省市级联编码生成快照；对于可直接选择且以 `cityCode=OTHER` 表示的省级区域，客户端 `cityName` 可以为空，最终快照以区域 API 解析结果为准。五类订单字典值由系统字典 API 校验。
@@ -91,8 +112,8 @@
 ## 状态
 
 - `pending_approval`：当前 BPM 轮次处理中，同一客资禁止新建活动订单。
-- `revision_required`：任一中心驳回或流程取消，原订单可补正重提，同一客资仍禁止新建活动订单。
-- `effective`：两个中心均通过；关联 Opportunity 和 Lead 在同一事务进入 `won`。客户主档保留，订单继续以必填 `personId` 关联客户。
+- `revision_required`：审批驳回或流程取消，原订单可补正重提，同一客资仍禁止新建活动订单。
+- `effective`：财务单流程完成通过，或历史双中心流程满足原会签规则；关联 Opportunity 和 Lead 在同一事务进入 `won`。客户主档保留，订单继续以必填 `personId` 关联客户。
 - `terminated`：创建人或正式负责人主动终止待审核或待重提订单，禁止重提。待审核订单同时终止当前 BPM；待重提订单仅更新订单终止原因、时间和版本，保留已结束轮次的驳回事实，不重复撤销履约、返现及商机。沿用 `zsjos:sales-order:create` 权限、对象归属校验、版本及幂等保护。
 - `superseded`：旧订单已被独立 successor 订单接续，不可再次重提；详情提供新订单入口。新订单详情提供返回旧订单入口。
 
@@ -107,11 +128,11 @@ Sales-order notifications use the order business number (`orderNo`) and do not r
 Applied V085 environments use forward migration V087 to repair safely resolvable residual `order.studentName` snapshots, including logically deleted history, without changing V085 or the occupied V086 permission migration. Missing tenant-scoped order relations block the repair; an internal order or Lead ID is never substituted as the visible identifier.
 - `POST /zsjos/sales-order/student/{personId}/repurchase`：需要独立权限 `zsjos:sales-order:student-repurchase`。学习规划师只能为本人已接收且状态为服务中、已暂停或已结业的学员录入复购；该权限不开放通用订单创建或外部历史客户复购。订单提交人和正式销售归属均为当前学习规划师；订单仅关联 `personId`，不继承原客资或兼职返现。幂等重放还必须匹配客户、提交人、提交中心、复购原因和完整订单请求指纹，跨中心或不同请求复用 key 返回冲突。
 
-### 双中心通过意见选填（所有审批轮次）
+### 历史双中心通过意见选填
 
 财务与报名履约普通节点不区分流程版本，通过意见统一选填，驳回原因必填。审批列表（分页/游标）、任务详情（`GET /{id}?taskId=...`，省略 taskId 保留原业务详情语义）及普通任务定位响应新增 `approvalReasonRequired`，由 BPM 的有效业务意见策略提供：成交订单双中心普通任务为 false，主管子任务为 true，其他业务仍使用原定义配置；缺失或读取失败时前端阻止提交并提供重试，不能按最新定义猜测。主管确认及其申请原因要求不变。
 
-部署本次后端后，已有待审订单立即适用选填规则；双端继续消费服务端策略。无需发布新模型或迁移已有实例，2.1.0 资产仍作为后续部署的推荐定义。空意见不补写“同意”，详情与历史保持空值展示；幂等指纹与 BPM 提交使用同一规范化意见。
+已有待审双中心订单按其所属定义继续处理，双端消费服务端意见策略。空意见不补写“同意”，详情与历史保持空值展示；幂等指纹与 BPM 提交使用同一规范化意见。
 
 
 ## 订单历史展示契约（2026-09-22）
@@ -311,3 +332,15 @@ React 工作台和 Vue 管理端现有客户录单均已适配候选弹窗。完
 候选客资按卡牌展示，整卡可选。工作台采用细分隔线样式：全部字段直接呈现，字段间浅色横线，选中时使用主题主色细边框、浅色外环和“已选中”文本，同时保留原有放大上浮效果；具体样式见工作台 UI 规范。管理端保留原有选中放大上浮及主题光边。两端均支持单选及键盘操作，窄屏纵向排列。卡牌保留全部客户档案字段。
 
 历史客户复购页面采用横排身份输入，核验成功后显示客户摘要，可修改后重新核验。卡牌默认直接展示全部客户档案字段及当前状态，不增加展开/收起操作。候选区使用可用宽度，继续录单操作位于底部粘性操作栏。
+
+### 销售部门范围与历史凭证
+
+销售业务部门人员访问订单时，服务端同时检查功能权限、原有数据范围和订单正式成交负责人 `formalSalesUserId` 的业务部门范围；跨部需要单独配置的跨部管理权限并满足 System 数据范围。正式负责人缺失的历史订单不会从实际录单人推断归属。销售人员本人提交（`submitterUserId` 为本人）的订单始终在其业务部门边界内，即使正式负责人为空或属于其他部门（2026-11-14）；他人提交且正式负责人缺失的订单按不可访问处理。管理、本人和团队列表及游标、状态统计、财务导出和审批待办均在分页或计数前按同一规则（正式负责人在边界内，或本人提交）限定范围，对象校验与批量读取过滤使用相同规则；非销售审批主体保留原审批权限规则，管理员保留既有例外。
+
+授权订单详情中的受控凭证以文件 ID 生成 600 秒预签名地址。历史快照若仅保存 URL，仍按既有兼容规则返回（相对 `/media` 路径补旧 CRM 域名，绝对 URL 原样保留），不改变历史记录。该兼容行为由 `SalesOrderVoucherCompatibilityTest` 覆盖；旧 CRM 或外部存储的实际访问控制不由本接口保证，需在目标环境单独验证。
+
+## 商定考试月份（2026-11-14）
+
+- 提交、重提及复购订单请求新增必填 `agreedExamMonth`，格式 `YYYY-MM`，缺失或格式错误返回参数校验错误；订单详情、列表、快照返回该字段。两端表单使用月份选择器。
+- 原自由文本 `agreedExamTime` 不再由提交写入，历史值保留并以“原商定考试时间（文本）”只读展示；历史订单不自动回填月份。
+- 审批通过后的自动分班规则见 [报名履约](registration-fulfillment-api.md) 的“审批通过后自动分班”。

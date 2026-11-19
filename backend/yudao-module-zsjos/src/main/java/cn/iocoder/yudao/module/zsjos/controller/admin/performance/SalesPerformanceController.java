@@ -9,7 +9,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import java.util.*;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
-@PerformanceDomainBoundary("sales")
 @RestController @Validated @RequestMapping("/zsjos/sales-performance")
 @PreAuthorize("@ss.hasPermission('zsjos:sales-performance:query')")
 public class SalesPerformanceController {

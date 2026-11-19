@@ -28,7 +28,7 @@ with sync_playwright() as p:
         errors = []
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(base + '/test/filter-select-display.html')
-        owner = page.get_by_role('combobox', name='全部学习规划师', exact=True)
+        owner = page.get_by_role('combobox', name='全部班主任', exact=True)
         owner.click()
         popup = check_popup(page, width)
         popup.locator('.ant-select-item-option').first.click()

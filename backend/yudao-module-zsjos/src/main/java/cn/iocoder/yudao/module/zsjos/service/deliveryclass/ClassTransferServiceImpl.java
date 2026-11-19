@@ -45,6 +45,7 @@ public class ClassTransferServiceImpl implements ClassTransferService {
     @Resource private PermissionApi permissionApi;
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private DeliveryClassServiceImpl deliveryClassService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     @Override
     @ZsjosAudit(action = "class-transfer.create", targetType = "service-relation")
@@ -62,6 +63,8 @@ public class ClassTransferServiceImpl implements ClassTransferService {
                 || !DeliveryClassKind.assignable(target) || !"SERVING".equals(target.getStatus())
                 || Objects.equals(source.getId(), target.getId())) throw exception(CLASS_TRANSFER_INVALID);
         deliveryClassService.validateHomeroom(target.getHomeroomUserId());
+        // Options are filtered client-side; the server must still keep transfers inside the sales boundary.
+        if (!salesBoundary.canTransferTo(userId, target.getHomeroomUserId())) throw exception(CLASS_TRANSFER_INVALID);
         if (mapper.selectPendingByRelation(relationId) != null) throw exception(CLASS_TRANSFER_ACTIVE);
         AdminUserRespDTO applicant = adminUserApi.getUser(userId);
         DeptRespDTO dept = applicant == null || applicant.getDeptId() == null ? null : deptApi.getDept(applicant.getDeptId());
@@ -129,8 +132,9 @@ public class ClassTransferServiceImpl implements ClassTransferService {
                     : adminUserApi.getUser(target.getHomeroomUserId());
             boolean targetOwnerEligible = targetOwner != null
                     && Objects.equals(targetOwner.getStatus(), CommonStatusEnum.ENABLE.getStatus())
-                    && permissionApi.hasAnyPermissions(targetOwner.getId(), DeliveryClassService.PERMISSION_QUERY_MY)
-                    && permissionApi.hasAnyPermissions(targetOwner.getId(), "zsjos:student:query-my");
+                    // Same qualification as DeliveryClassService.validateHomeroom, so approval invalidates instead of failing.
+                    && permissionApi.hasAnyPermissions(targetOwner.getId(), "zsjos:sales:eligible")
+                    && salesBoundary.canTransferTo(request.getApplicantUserId(), targetOwner.getId());
             boolean stale = relation == null || cn.iocoder.yudao.module.zsjos.service.registration.TeachingServiceLifecycle.closed(relation) || !List.of("active", "paused", "completed").contains(relation.getStatus())
                     || !Objects.equals(relation.getClassId(), request.getFromClassId())
                     || !Objects.equals(relation.getOwnerUserId(), request.getFromHomeroomUserId())

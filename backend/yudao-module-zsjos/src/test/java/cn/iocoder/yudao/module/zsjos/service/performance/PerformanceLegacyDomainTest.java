@@ -1,8 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.performance;
 
 import cn.iocoder.yudao.module.zsjos.dal.mysql.performance.*;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryperformance.DeliveryPerformanceDetailMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryperformance.DeliveryPerformanceDetailQuery;
 import org.apache.ibatis.datasource.unpooled.UnpooledDataSource;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.*;
@@ -34,20 +32,21 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Exercise old facts through the real report, drilldown and conversion mapper paths. */
 class PerformanceLegacyDomainTest {
     private SqlSession fixture() throws Exception {
+        return fixture(new UnpooledDataSource("org.h2.Driver", "jdbc:h2:mem:legacy" + UUID.randomUUID() + ";MODE=MySQL", "sa", ""));
+    }
+    private SqlSession fixture(javax.sql.DataSource dataSource) throws Exception {
         var config = new Configuration();
         config.setMapUnderscoreToCamelCase(true);
-        config.setEnvironment(new Environment("legacy-domain", new JdbcTransactionFactory(),
-                new UnpooledDataSource("org.h2.Driver", "jdbc:h2:mem:legacy" + UUID.randomUUID() + ";MODE=MySQL", "sa", "")));
+        config.setEnvironment(new Environment("legacy-domain", new JdbcTransactionFactory(), dataSource));
         config.addMapper(PerformanceDetailMapper.class);
         config.addMapper(PerformanceReportMapper.class);
-        config.addMapper(DeliveryPerformanceDetailMapper.class);
         var session = new SqlSessionFactoryBuilder().build(config).openSession();
         try (var sql = session.getConnection().createStatement()) {
-            sql.execute("CREATE TABLE zsjos_lead(id BIGINT,tenant_id BIGINT,deleted INT,lead_no VARCHAR,source_type VARCHAR,source_provider_user_id BIGINT,submission_source_type VARCHAR,source_provider_recorded BOOLEAN,provider_owner_type VARCHAR,provider_owner_id BIGINT,status VARCHAR,lead_category_label_snapshot VARCHAR,sales_stage_label_snapshot VARCHAR,owner_user_id BIGINT,current_assignment_history_id BIGINT)");
-            sql.execute("CREATE TABLE zsjos_order(id BIGINT,tenant_id BIGINT,deleted INT,order_no VARCHAR,lead_id BIGINT,formal_sales_user_id BIGINT,submitted_at TIMESTAMP,total_amount DECIMAL(12,2),order_type VARCHAR,status VARCHAR)");
-            sql.execute("CREATE TABLE zsjos_lead_assignment_history(id BIGINT,tenant_id BIGINT,deleted INT,lead_id BIGINT,to_owner_user_id BIGINT,occurred_at TIMESTAMP,action_type VARCHAR)");
-            sql.execute("CREATE TABLE zsjos_performance_attribution(fact_type VARCHAR,fact_id BIGINT,tenant_id BIGINT,deleted INT,user_id BIGINT,user_name VARCHAR,received_at TIMESTAMP,assignment_id BIGINT,source_group VARCHAR,channel_label VARCHAR,channel_code VARCHAR,dept_id BIGINT,center_id BIGINT,business_domain VARCHAR,org_source VARCHAR)");
-            sql.execute("CREATE TABLE zsjos_performance_org(tenant_id BIGINT,deleted INT,dept_id BIGINT,business_domain VARCHAR,create_time TIMESTAMP,update_time TIMESTAMP)");
+            sql.execute("CREATE TABLE zsjos_lead(id BIGINT,tenant_id BIGINT,deleted INT,lead_no VARCHAR(255),source_type VARCHAR(255),source_provider_user_id BIGINT,submission_source_type VARCHAR(255),source_provider_recorded BOOLEAN,provider_owner_type VARCHAR(255),provider_owner_id BIGINT,status VARCHAR(255),lead_category_label_snapshot VARCHAR(255),sales_stage_label_snapshot VARCHAR(255),owner_user_id BIGINT,current_assignment_history_id BIGINT)");
+            sql.execute("CREATE TABLE zsjos_order(id BIGINT,tenant_id BIGINT,deleted INT,order_no VARCHAR(255),lead_id BIGINT,formal_sales_user_id BIGINT,submitted_at TIMESTAMP,total_amount DECIMAL(12,2),order_type VARCHAR(255),status VARCHAR(255))");
+            sql.execute("CREATE TABLE zsjos_lead_assignment_history(id BIGINT,tenant_id BIGINT,deleted INT,lead_id BIGINT,to_owner_user_id BIGINT,occurred_at TIMESTAMP,action_type VARCHAR(255))");
+            sql.execute("CREATE TABLE zsjos_performance_attribution(fact_type VARCHAR(255),fact_id BIGINT,tenant_id BIGINT,deleted INT,user_id BIGINT,user_name VARCHAR(255),received_at TIMESTAMP,assignment_id BIGINT,source_group VARCHAR(255),channel_label VARCHAR(255),channel_code VARCHAR(255),dept_id BIGINT,center_id BIGINT,business_domain VARCHAR(255),org_source VARCHAR(255))");
+            sql.execute("CREATE TABLE zsjos_performance_org(tenant_id BIGINT,deleted INT,dept_id BIGINT,business_domain VARCHAR(255),create_time TIMESTAMP,update_time TIMESTAMP)");
             // The sales mapping was introduced after these facts. It cannot prove their old domain.
             sql.execute("INSERT INTO zsjos_performance_org VALUES(1,0,10,'sales','2026-02-01','2026-02-01'),(1,0,20,'delivery','2020-01-01','2020-01-01')");
             for (int id = 1; id <= 14; id++) {
@@ -74,11 +73,11 @@ class PerformanceLegacyDomainTest {
                 .setStart(LocalDateTime.of(2026, 1, 1, 0, 0)).setEnd(LocalDateTime.of(2026, 2, 1, 0, 0)).setSize(100);
     }
 
-    @Test void legacyPersonalReportsAndPagesRestoreFactsWithoutAdmittingDelivery() throws Exception {
+    @Test void unifiedPersonalReportsAndPagesIncludeDeliveryOnce() throws Exception {
         try (var session = fixture()) {
             var mapper = session.getMapper(PerformanceDetailMapper.class);
             var q = query("USER", 1);
-            var expected = Set.of(1L, 2L, 3L, 4L, 7L, 8L, 9L, 13L);
+            var expected = Set.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 13L);
             assertEquals(expected, ids(mapper.page(q)));
             assertEquals(expected.size(), mapper.count(q));
             q.setSize(3);
@@ -93,7 +92,7 @@ class PerformanceLegacyDomainTest {
             try (var amount = amountRows(session, report)) {
                 assertTrue(amount.next());
                 assertEquals(expected.size(), amount.getLong("count"));
-                assertEquals(0, new BigDecimal("10240").compareTo(amount.getBigDecimal("amount")));
+                assertEquals(0, new BigDecimal("12800").compareTo(amount.getBigDecimal("amount")));
             }
             report.setGrouping("source");
             long grouped = 0;
@@ -113,7 +112,7 @@ class PerformanceLegacyDomainTest {
         try (var session = fixture()) {
             var mapper = session.getMapper(PerformanceDetailMapper.class);
             var q = query("DEPT", 10);
-            var expected = Set.of(2L, 3L, 4L, 8L, 13L);
+            var expected = Set.of(2L, 3L, 4L, 5L, 8L, 13L);
             assertEquals(expected, ids(mapper.page(q)));
             q.setAllDepartments(false).setDepartments(Set.of(10L));
             assertEquals(expected, ids(mapper.page(q)));
@@ -123,7 +122,7 @@ class PerformanceLegacyDomainTest {
             q.setDepartments(Set.of());
             assertTrue(mapper.page(q).isEmpty());
             q.setAllDepartments(true).setType("CENTER").setId(30L);
-            assertEquals(Set.of(2L, 3L, 4L, 7L, 8L, 13L), ids(mapper.page(q)));
+            assertEquals(Set.of(2L, 3L, 4L, 5L, 6L, 7L, 8L, 13L), ids(mapper.page(q)));
         }
     }
 
@@ -137,8 +136,8 @@ class PerformanceLegacyDomainTest {
             var window = new PerformancePeriods.Window("month", "", q.getStart(), q.getEnd());
             var result = new PerformanceConversion.Population(orders, receipts).assessment(window);
             assertTrue(result.ready());
-            assertEquals(Set.of(1L, 2L, 3L, 4L, 7L, 9L), result.eligible().keySet());
-            assertEquals(6, result.eligible().values().stream().filter(x -> x.order() != null).count());
+            assertEquals(Set.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 9L), result.eligible().keySet());
+            assertEquals(8, result.eligible().values().stream().filter(x -> x.order() != null).count());
             q.setConversionLeadIds(java.util.stream.LongStream.rangeClosed(1, 600).boxed().collect(java.util.stream.Collectors.toSet()));
             assertEquals(ids(receipts), ids(mapper.conversionReceipts(q)));
             try (var sql = session.getConnection().createStatement()) {
@@ -146,22 +145,8 @@ class PerformanceLegacyDomainTest {
             }
             session.clearCache();
             result = new PerformanceConversion.Population(mapper.conversionOrders(q), mapper.conversionReceipts(q)).assessment(window);
-            assertEquals(6, result.eligible().size());
+            assertEquals(8, result.eligible().size());
             assertNull(result.eligible().get(1L).order(), "Low-value current receipts still belong to the denominator");
-        }
-    }
-
-    @Test void legacyCompatibilityDoesNotExpandDeliveryOrRewriteUnknownHistory() throws Exception {
-        try (var session = fixture()) {
-            var q = new DeliveryPerformanceDetailQuery().setTenant(1L).setBusinessDomain("delivery").setType("USER").setId(1L)
-                    .setAllDepartments(true).setMissingDepartment(true).setMetric("orders")
-                    .setStart(LocalDateTime.of(2026, 1, 1, 0, 0)).setEnd(LocalDateTime.of(2026, 2, 1, 0, 0)).setSize(100);
-            var delivery = session.getMapper(DeliveryPerformanceDetailMapper.class);
-            assertEquals(Set.of(5L, 6L), delivery.page(q).stream().map(x -> x.getId()).collect(java.util.stream.Collectors.toSet()));
-            q.setUnclassified(true);
-            assertEquals(Set.of(1L, 2L, 3L, 7L, 8L, 13L, 14L), delivery.page(q).stream().map(x -> x.getId()).collect(java.util.stream.Collectors.toSet()));
-            assertEquals(ids(session.getMapper(PerformanceDetailMapper.class).page(query("USER", 1).setUnclassified(true))),
-                    delivery.page(q).stream().map(x -> x.getId()).collect(java.util.stream.Collectors.toSet()));
         }
     }
 
@@ -218,56 +203,26 @@ class PerformanceLegacyDomainTest {
 
     @Test
     @EnabledIfEnvironmentVariable(named="PERFORMANCE_LEGACY_MYSQL_URL", matches=".+")
-    void liveReadOnlySnapshotReportsActualBeforeAndAfterConversion() throws Exception {
-        try (var connection = java.sql.DriverManager.getConnection(System.getenv("PERFORMANCE_LEGACY_MYSQL_URL"),
-                System.getenv("PERFORMANCE_LEGACY_MYSQL_USER"), System.getenv("PERFORMANCE_LEGACY_MYSQL_PASSWORD"))) {
-            connection.setTransactionIsolation(java.sql.Connection.TRANSACTION_REPEATABLE_READ);
-            connection.setReadOnly(true);
-            connection.setAutoCommit(false);
-            long user;
-            try (var statement = connection.createStatement(); var rows = statement.executeQuery("SELECT to_owner_user_id FROM zsjos_lead_assignment_history WHERE tenant_id=1 AND deleted=0 AND action_type IN ('accept','claim','transfer') AND to_owner_user_id IS NOT NULL GROUP BY to_owner_user_id ORDER BY COUNT(*) DESC LIMIT 1")) {
-                assertTrue(rows.next());
-                user = rows.getLong(1);
-            }
-            var config = new Configuration();
-            config.setMapUnderscoreToCamelCase(true);
-            config.setEnvironment(new Environment("legacy-read-only", new JdbcTransactionFactory(), new SingleConnectionDataSource(connection, true)));
-            config.addMapper(PerformanceDetailMapper.class);
-            config.addMapper(StrictMapper.class);
-            try (var session = new SqlSessionFactoryBuilder().build(config).openSession(connection)) {
-                var fixed = session.getMapper(PerformanceDetailMapper.class);
-                var strict = session.getMapper(StrictMapper.class);
-                for (String type : List.of("USER", "DEPT", "CENTER")) {
-                    var q = query(type, type.equals("USER") ? user : type.equals("DEPT") ? 1021 : 1020);
-                    q.setStart(LocalDateTime.of(2026, 9, 1, 0, 0)).setEnd(LocalDateTime.of(2026, 10, 1, 0, 0));
-                    var window = new PerformancePeriods.Window("lastMonth", "", q.getStart(), q.getEnd());
-                    for (boolean before : List.of(true, false)) {
-                        var orders = before ? strict.orders(q) : fixed.conversionOrders(q);
-                        q.setConversionLeadIds(orders.stream().map(PerformanceFact::getLeadId).filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
-                        var receipts = before ? strict.receipts(q) : fixed.conversionReceipts(q);
-                        var metric = PerformanceStatisticsService.metric(window, orders, receipts);
-                        var assessment = new PerformanceConversion.Population(orders, receipts).assessment(window);
-                        System.out.println("Legacy MySQL " + type + " " + (before ? "before" : "after")
-                                + ": eligible=" + assessment.eligible().size() + ", denominator=" + metric.denominator()
-                                + ", converted=" + metric.converted() + ", source=" + metric.sourceStatus() + ", review=" + metric.sourceReviewCount());
-                    }
-                }
-                connection.rollback();
-            }
-        }
-    }
-
-    interface StrictMapper {
-        @SelectProvider(type=StrictSql.class, method="orders") List<PerformanceFact> orders(PerformanceDetailQuery q);
-        @SelectProvider(type=StrictSql.class, method="receipts") List<PerformanceFact> receipts(PerformanceDetailQuery q);
-    }
-
-    public static class StrictSql {
-        public static String orders(PerformanceDetailQuery q) { return before(PerformanceDetailSql.conversionOrders(q)); }
-        public static String receipts(PerformanceDetailQuery q) { return before(PerformanceDetailSql.conversionReceipts(q)); }
-        private static String before(String sql) {
-            return sql.replace("(f.resolved_domain='sales' OR (f.business_domain IS NULL AND f.resolved_domain IS NULL))", "f.resolved_domain='sales'")
-                    .replace("(f.org_source='frozen'<if test=\"businessDomain == 'sales' and !unclassified\"> OR (f.business_domain IS NULL AND f.resolved_domain IS NULL)</if>)", "f.org_source='frozen'");
+    void mysqlSyntheticFactsIncludeBothDomainsAndRespectDepartmentScope() throws Exception {
+        String url=System.getenv("PERFORMANCE_LEGACY_MYSQL_URL");
+        if(!url.matches("jdbc:mysql://127\\.0\\.0\\.1:[0-9]+/perf_merge_[a-z0-9]+(?:\\?.*)?"))
+            throw new IllegalArgumentException("MySQL fixture requires an isolated local perf_merge_ schema");
+        var ds=new UnpooledDataSource("com.mysql.cj.jdbc.Driver",url,System.getenv("PERFORMANCE_LEGACY_MYSQL_USER"),System.getenv("PERFORMANCE_LEGACY_MYSQL_PASSWORD"));
+        try(var session=fixture(ds)) {
+            var mapper=session.getMapper(PerformanceDetailMapper.class);
+            var q=query("USER",1);
+            var expected=Set.of(1L,2L,3L,4L,5L,6L,7L,8L,9L,13L);
+            assertEquals(expected,ids(mapper.page(q)));assertEquals(expected.size(),mapper.count(q));
+            q.setSize(3);var pages=new ArrayList<PerformanceFact>();
+            for(int offset=0;offset<expected.size();offset+=3){q.setOffset(offset);pages.addAll(mapper.page(q));}
+            assertEquals(expected.size(),pages.size());assertEquals(expected,ids(pages));
+            var report=report(q);var amounts=session.getMapper(PerformanceReportMapper.class).amounts(report);
+            assertEquals(expected.size(),amounts.getFirst().getCount());
+            assertEquals(0,new BigDecimal("12800").compareTo(amounts.getFirst().getAmount()));
+            q=query("DEPT",10).setAllDepartments(false).setDepartments(Set.of(10L));
+            assertEquals(Set.of(2L,3L,4L,5L,8L,13L),ids(mapper.page(q)));
+            q.setDepartments(Set.of());assertTrue(mapper.page(q).isEmpty());
+            session.rollback();
         }
     }
 

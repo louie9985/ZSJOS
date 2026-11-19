@@ -12,6 +12,11 @@ public class BpmTaskActionContext {
     private String action;
     private String reason;
     private String taskId;
+    private String assignee;
+    private Integer taskStatus;
+    private String taskScopeType;
+    private String signType;
+    private java.util.Set<Long> signUserIds;
     private String parentTaskId;
     private String taskDefinitionKey;
     private String processInstanceId;

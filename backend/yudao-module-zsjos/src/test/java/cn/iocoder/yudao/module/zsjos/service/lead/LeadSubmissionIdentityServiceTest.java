@@ -38,29 +38,20 @@ class LeadSubmissionIdentityServiceTest {
     @Mock private DeptApi deptApi;
     @Mock private PartnerMapper partnerMapper;
     @Mock private PersonnelStateService personnelStateService;
+    @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
 
     private void allowEnabledPersonnel(Long userId) {
         lenient().when(personnelStateService.isEnabled(userId)).thenReturn(true);
     }
 
     @Test
-    void educationOwnerEligibilityChecksAccountDepartmentAndPersonnel() {
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(null));
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
-        AdminUserRespDTO owner = user(20L, 10L, Set.of());
-        owner.setStatus(CommonStatusEnum.DISABLE.getStatus());
-        when(adminUserApi.getUser(20L)).thenReturn(owner);
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
-        owner.setStatus(CommonStatusEnum.ENABLE.getStatus());
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
-        DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(CommonStatusEnum.DISABLE.getStatus());
+    void retainedOwnerDoesNotNeedNewSalesOrReceiveQualification() {
+        when(adminUserApi.getUser(1L)).thenReturn(user(1L, 10L, Set.of()));
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(0);
         when(deptApi.getDept(10L)).thenReturn(dept);
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
-        dept.setStatus(CommonStatusEnum.ENABLE.getStatus());
-        org.junit.jupiter.api.Assertions.assertFalse(service.isEligibleEducationOwner(20L));
-        when(personnelStateService.isEnabled(20L)).thenReturn(true);
-        org.junit.jupiter.api.Assertions.assertTrue(service.isEligibleEducationOwner(20L));
-        assertDoesNotThrow(() -> service.requireEducationSubmitter(20L));
+        when(personnelStateService.isEnabled(1L)).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertTrue(service.isEligibleRetainedOwner(1L));
+        org.mockito.Mockito.verifyNoInteractions(permissionApi);
     }
 
     @Test
@@ -151,23 +142,37 @@ class LeadSubmissionIdentityServiceTest {
         user.setPostIds(postIds); user.setStatus(CommonStatusEnum.ENABLE.getStatus()); return user;
     }
     @Test
-    void educationSubmitterUsesEnabledEmployeeWithoutSalesPost() {
+    void salesSubmitterUsesEnabledEmployeeWithoutSalesPost() {
         allowEnabledPersonnel(1L);
         when(adminUserApi.getUser(1L)).thenReturn(user(1L, 10L, Set.of()));
         DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(0);
         when(deptApi.getDept(10L)).thenReturn(dept);
-        assertDoesNotThrow(() -> service.requireEducationSubmitter(1L));
-        assertEquals(LeadSubmissionIdentityService.Identity.EDUCATION,
-                service.resolveHistoricalSubmission(1L, SOURCE_EDUCATION_SELF, null).identity());
+        when(permissionApi.hasAnyPermissions(1L, "zsjos:sales:eligible")).thenReturn(true);
+        assertDoesNotThrow(() -> service.requireSales(1L));
+        assertEquals(LeadSubmissionIdentityService.Identity.SALES,
+                service.resolveHistoricalSubmission(1L, SOURCE_SALES_SELF, null).identity());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(longs = {10L, 20L})
+    void salesFromEitherDepartmentCanSelfSourceWithoutReceivePermission(Long deptId) {
+        when(adminUserApi.getUser(1L)).thenReturn(user(1L, deptId, Set.of()));
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(deptId); dept.setStatus(0);
+        when(deptApi.getDept(deptId)).thenReturn(dept);
+        when(personnelStateService.isEnabled(1L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(1L, "zsjos:sales:eligible")).thenReturn(true, false);
+        assertDoesNotThrow(() -> service.requireSales(1L));
+        assertThrows(ServiceException.class, () -> service.requireSales(1L));
+        org.mockito.Mockito.verify(permissionApi, org.mockito.Mockito.never()).hasAnyPermissions(1L, "zsjos:lead:receive");
     }
 
     @Test
-    void educationSubmitterRejectsDisabledPersonnel() {
+    void salesSubmitterRejectsDisabledPersonnel() {
         when(adminUserApi.getUser(1L)).thenReturn(user(1L, 10L, Set.of()));
         DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(0);
         when(deptApi.getDept(10L)).thenReturn(dept);
         when(personnelStateService.isEnabled(1L)).thenReturn(false);
-        assertThrows(ServiceException.class, () -> service.requireEducationSubmitter(1L));
+        assertThrows(ServiceException.class, () -> service.requireSales(1L));
     }
 
 }

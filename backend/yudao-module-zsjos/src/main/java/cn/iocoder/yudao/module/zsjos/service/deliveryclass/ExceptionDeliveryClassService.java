@@ -5,13 +5,11 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import cn.iocoder.yudao.module.system.api.permission.RoleApi;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.deliveryclass.DeliveryClassDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.deliveryclass.DeliveryClassMapper;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
-import java.util.Set;
 import java.util.Objects;
 
 @Service
@@ -21,7 +19,6 @@ public class ExceptionDeliveryClassService {
     @Resource private DeliveryClassService classService;
     @Resource private AdminUserApi users;
     @Resource private DeptApi depts;
-    @Resource private RoleApi roles;
     @Resource private PermissionApi permissions;
 
     public DeliveryClassDO ensure(Long owner) {
@@ -63,9 +60,7 @@ public class ExceptionDeliveryClassService {
 
     public void reconcile() {
         // Same authoritative qualification as DeliveryClassService.validateHomeroom.
-        var role = roles.getRoleByCode("study_planner");
-        if (role == null || !Objects.equals(role.getStatus(),CommonStatusEnum.ENABLE.getStatus())) return;
-        for (Long id : permissions.getUserRoleIdListByRoleIds(Set.of(role.getId()))) {
+        for (Long id : permissions.getEnabledUserIdsByPermission("zsjos:sales:eligible")) {
             try {
                 var user = users.getUser(id);
                 if (user != null && Objects.equals(user.getStatus(),CommonStatusEnum.ENABLE.getStatus())) ensure(id);

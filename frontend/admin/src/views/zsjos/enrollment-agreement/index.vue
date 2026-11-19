@@ -4,11 +4,13 @@
       <el-button link @click="load">重新加载</el-button>
     </el-alert>
     <h2>报名协议维护</h2>
-    <el-cascader v-model="categoryId" :options="categories" :props="{ label: 'name', value: 'id', emitPath: false }"
-      filterable :disabled="busy" placeholder="选择产品末级分类" aria-label="产品末级分类" @change="load" />
-    <el-empty v-if="!busy && !error && !version" :description="categories.length ? '请选择要维护协议的末级分类' : '暂无产品分类'" />
+    <el-select v-model="productRef" filterable :disabled="busy" placeholder="选择启用的产品（SPU）" aria-label="产品（SPU）" @change="load">
+      <el-option v-for="product in products" :key="product.productRef" :value="product.productRef"
+        :label="[...product.categoryPath.map(node => node.name), product.name].join(' / ')" />
+    </el-select>
+    <el-empty v-if="!busy && !error && !version" :description="products.length ? '请选择要维护协议的产品' : '暂无启用的产品'" />
     <template v-if="version">
-      <p>{{ version.publishedVersion ? '当前发布版本 V' + version.publishedVersion : '该分类尚未发布协议' }} · 仅适用于本分类新生成的报名表</p>
+      <p>{{ version.publishedVersion ? '当前发布版本 V' + version.publishedVersion : '该产品尚未发布协议' }} · 仅适用于本产品新生成的报名表</p>
       <el-space v-if="editable" wrap class="mb-12px">
         <span>插入订单字段</span>
         <el-button v-for="field in fields" :key="field" size="small" @click="insertField(field)">{{ field }}</el-button>
@@ -32,9 +34,9 @@ import request from '@/config/axios'
 import { checkPermi } from '@/utils/permission'
 interface Template { revision: number; publishedVersion: number; draftBody: string }
 const endpoint = '/zsjos/enrollment-agreement'
-interface Category { id: number; name: string; children?: Category[] }
-const categories = ref<Category[]>([])
-const categoryId = ref<number>()
+interface Product { productRef: string; name: string; categoryPath: { name: string }[] }
+const products = ref<Product[]>([])
+const productRef = ref<string>()
 const version = ref<Template>()
 const body = ref('')
 const fields = ['学员姓名', '联系电话', '课程名称', '实际费用']
@@ -49,10 +51,10 @@ const busy = ref(false)
 const error = ref('')
 const message = useMessage()
 const editable = computed(() => checkPermi(['zsjos:agreement:update']))
-const sample = computed(() => body.value.replaceAll('{{学员姓名}}', '示例学员').replaceAll('{{课程名称}}', '示例末级分类')
+const sample = computed(() => body.value.replaceAll('{{学员姓名}}', '示例学员').replaceAll('{{课程名称}}', '示例产品')
   .replaceAll('{{联系电话}}', '138****0000').replaceAll('{{实际费用}}', '1680.00'))
 async function refresh() {
-  const data = await request.get<Template>({ url: endpoint, params: { categoryId: categoryId.value } })
+  const data = await request.get<Template>({ url: endpoint, params: { productRef: productRef.value } })
   version.value = data
   body.value = data.draftBody
 }
@@ -62,8 +64,8 @@ async function load() {
   version.value = undefined
   preview.value = false
   try {
-    if (!categories.value.length) categories.value = await request.get<Category[]>({ url: endpoint + '/categories' })
-    if (categoryId.value) await refresh()
+    if (!products.value.length) products.value = await request.get<Product[]>({ url: endpoint + '/products' })
+    if (productRef.value) await refresh()
   }
   catch (cause) { error.value = String(cause) }
   finally { busy.value = false }
@@ -73,7 +75,7 @@ async function save(publish: boolean) {
   busy.value = true
   error.value = ''
   try {
-    const data = { categoryId: categoryId.value, revision: version.value.revision, body: body.value }
+    const data = { productRef: productRef.value, revision: version.value.revision, body: body.value }
     if (publish) {
       try { await message.confirm('将发布最近一次保存的草稿，随后生成的收集表会使用此版本。') }
       catch { return }

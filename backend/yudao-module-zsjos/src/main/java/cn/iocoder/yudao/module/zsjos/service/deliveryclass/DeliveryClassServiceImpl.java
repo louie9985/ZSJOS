@@ -10,8 +10,6 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import cn.iocoder.yudao.module.system.api.permission.RoleApi;
-import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.deliveryclass.vo.*;
@@ -58,7 +56,6 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
     @Resource private PermissionApi permissionApi;
-    @Resource private RoleApi roleApi;
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private DeliveryClassScopeService scopeService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.common.BusinessReadScopeService readScopeService;
@@ -76,19 +73,13 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Override
     public PageResult<DeliveryClassRespVO> getManagedPage(Long userId, DeliveryClassPageReqVO req) {
         if (Boolean.TRUE.equals(req.getCommandTargetsOnly())) req.setAssignableOnly(true);
-        ReadScope scope = resolveReadScope(userId, req, true);
-        PageResult<DeliveryClassDO> page = Boolean.TRUE.equals(req.getAssignableOnly())
-                ? mapper.selectPage(req, scopedQuery(userId, req, true))
-                : mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
+        PageResult<DeliveryClassDO> page = mapper.selectPage(req, scopedQuery(userId, req, true));
         return toPageResult(page, userId);
     }
 
     @Override
     public PageResult<DeliveryClassRespVO> getMyPage(Long userId, DeliveryClassPageReqVO req) {
-        ReadScope scope = resolveReadScope(userId, req, false);
-        PageResult<DeliveryClassDO> page = Boolean.TRUE.equals(req.getAssignableOnly())
-                ? mapper.selectPage(req, scopedQuery(userId, req, false))
-                : mapper.selectDeliveryClassPage(req, scope.departments(), scope.subject(), scope.all(), scope.system());
+        PageResult<DeliveryClassDO> page = mapper.selectPage(req, scopedQuery(userId, req, false));
         return toPageResult(page, userId);
     }
 
@@ -97,15 +88,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     LambdaQueryWrapperX<DeliveryClassDO> scopedQuery(Long userId, DeliveryClassPageReqVO req, boolean managed) {
         ReadScope scope = resolveReadScope(userId, req, managed);
         var query = mapper.classQuery(req, scope.departments(), scope.subject(), scope.all(), scope.system());
+        applySalesBoundary(query, userId);
         if (Boolean.TRUE.equals(req.getAssignableOnly())) {
-            var role = roleApi.getRoleByCode("study_planner");
-            List<Long> eligible = List.of();
-            if (role != null && Objects.equals(role.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
-                var ids = permissionApi.getUserRoleIdListByRoleIds(Set.of(role.getId()));
-                if (!ids.isEmpty()) eligible = adminUserApi.getUserList(ids).stream()
-                        .filter(u -> Objects.equals(u.getStatus(), CommonStatusEnum.ENABLE.getStatus()))
-                        .map(AdminUserRespDTO::getId).toList();
-            }
+            List<Long> eligible = List.copyOf(permissionApi.getEnabledUserIdsByPermission("zsjos:sales:eligible"));
             if (eligible.isEmpty()) query.ne(DeliveryClassDO::getClassKind, DeliveryClassKind.UNSCHEDULED);
             else {
                 List<Long> owners = eligible;
@@ -116,12 +101,25 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         return query;
     }
 
+    private void applySalesBoundary(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<DeliveryClassDO> query, Long userId) {
+        Set<Long> homerooms = scopeService.salesHomerooms(userId).orElse(null);
+        if (homerooms == null) return;
+        if (homerooms.isEmpty()) query.apply("1=0");
+        else query.in(DeliveryClassDO::getHomeroomUserId, homerooms);
+    }
+
     private ReadScope resolveReadScope(Long userId, DeliveryClassPageReqVO req, boolean managed) {
         if (Boolean.TRUE.equals(req.getCommandTargetsOnly())) {
             if (!managed || !permissionApi.hasAnyPermissions(userId, "zsjos:delivery-class:direct-transfer"))
                 throw exception(DELIVERY_CLASS_PERMISSION_DENIED);
+            if (scopeService.salesHomerooms(userId).isPresent()) return new ReadScope(Set.of(), null, true, false);
             var commandScope = scopeService.resolve(userId);
             return new ReadScope(commandScope.deptIds(), null, commandScope.allDepartments(), false);
+        }
+        if (managed && req.getReadScope() == null && req.getTargetUserId() == null
+                && scopeService.salesHomerooms(userId).isPresent()) {
+            // Sales managed reads follow head teachers (applySalesBoundary), not stored class departments.
+            return new ReadScope(Set.of(), null, true, false);
         }
         if (!managed || req.getReadScope() != null || req.getTargetUserId() != null) {
             Long subject = req.getReadScope() != null || req.getTargetUserId() != null
@@ -141,6 +139,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     public DeliveryClassFilterContextRespVO filterContext(Long userId, DeliveryClassPageReqVO req, boolean managed) {
         ReadScope scope = resolveReadScope(userId, req, managed);
         var query = mapper.classQuery(new DeliveryClassPageReqVO(), scope.departments(), scope.subject(), scope.all(), scope.system());
+        applySalesBoundary(query, userId);
         query.in(DeliveryClassDO::getStatus, List.of("SERVING", "COMPLETED"));
         List<DeliveryClassDO> rows = mapper.selectList(query);
         Map<Long, AdminUserRespDTO> homeroomUsers = homeroomUsers(rows);
@@ -203,9 +202,9 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private record ClassActionScope(boolean update, boolean complete, Long department,
-                                    DeliveryClassScopeService.Scope scope) {
+                                    DeliveryClassScopeService.Scope scope, Set<Long> salesHomerooms) {
         static final ClassActionScope NONE = new ClassActionScope(false, false, null,
-                new DeliveryClassScopeService.Scope(false, Set.of()));
+                new DeliveryClassScopeService.Scope(false, Set.of()), null);
     }
 
     private ClassActionScope actionScope(Long userId) {
@@ -215,7 +214,8 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         var user = adminUserApi.getUser(userId);
         var scope = objectPermissions.commandScope(userId, user);
         return new ClassActionScope(update, complete, user == null ? null : user.getDeptId(),
-                scope == null ? ClassActionScope.NONE.scope() : scope);
+                scope == null ? ClassActionScope.NONE.scope() : scope,
+                permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_MANAGED) ? scopeService.salesHomerooms(userId).orElse(null) : null);
     }
 
     List<String> availableActions(DeliveryClassDO row, Long userId) {
@@ -223,8 +223,10 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     private List<String> availableActions(DeliveryClassDO row, ClassActionScope actor) {
-        if (Boolean.TRUE.equals(row.getSystemClass()) || row.getDeptId() == null
-                || !(actor.scope().allDepartments() || actor.scope().deptIds().contains(row.getDeptId()))) return List.of();
+        if (Boolean.TRUE.equals(row.getSystemClass()) || row.getDeptId() == null) return List.of();
+        boolean inScope = actor.salesHomerooms() != null ? actor.salesHomerooms().contains(row.getHomeroomUserId())
+                : actor.scope().allDepartments() || actor.scope().deptIds().contains(row.getDeptId());
+        if (!inScope) return List.of();
         List<String> actions = new ArrayList<>();
         if (actor.update() && Objects.equals(actor.department(), row.getDeptId())) {
             if (!"COMPLETED".equals(row.getStatus())) actions.add("UPDATE");
@@ -258,14 +260,22 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     }
 
     @Override
-    public List<DeliveryClassOptionRespVO> options(Long categoryId, boolean includePending) {
-        List<DeliveryClassDO> rows = mapper.selectList(new LambdaQueryWrapperX<DeliveryClassDO>()
+    public List<DeliveryClassOptionRespVO> options(Long categoryId, boolean includePending, Long actorId) {
+        if (actorId == null) throw exception(DELIVERY_CLASS_PERMISSION_DENIED);
+        var query = new LambdaQueryWrapperX<DeliveryClassDO>()
                 .eq(DeliveryClassDO::getStatus, "SERVING")
                 .ne(DeliveryClassDO::getClassKind, DeliveryClassKind.EXCEPTION)
                 .and(categoryId != null, q -> q.eq(DeliveryClassDO::getSystemClass, true)
                         .or().eq(DeliveryClassDO::getCategoryId, categoryId))
                 .orderByDesc(DeliveryClassDO::getSystemClass).orderByAsc(DeliveryClassDO::getClassName)
-                .orderByAsc(DeliveryClassDO::getId));
+                .orderByAsc(DeliveryClassDO::getId);
+        // Options are target pickers: a sales actor may hand students to any head teacher inside the boundary.
+        Set<Long> homerooms = scopeService.salesTransferHomerooms(actorId).orElse(null);
+        if (homerooms != null) {
+            if (homerooms.isEmpty()) query.apply("1=0");
+            else query.in(DeliveryClassDO::getHomeroomUserId, homerooms);
+        }
+        List<DeliveryClassDO> rows = mapper.selectList(query);
         Map<Long, AdminUserRespDTO> homeroomUsers = homeroomUsers(rows);
         return rows.stream().filter(row -> includePending || !DeliveryClassKind.pending(row))
                 .filter(row -> !DeliveryClassKind.UNSCHEDULED.equals(row.getClassKind()) || validAssignmentOwner(row))
@@ -281,9 +291,7 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     public List<HomeroomCandidateRespVO> homeroomCandidates(Long userId) {
         AdminUserRespDTO manager = adminUserApi.getUser(userId);
         if (manager == null || manager.getDeptId() == null) return List.of();
-        RoleRespDTO plannerRole = roleApi.getRoleByCode("study_planner");
-        if (plannerRole == null || !Objects.equals(plannerRole.getStatus(), CommonStatusEnum.ENABLE.getStatus())) return List.of();
-        Set<Long> plannerUserIds = permissionApi.getUserRoleIdListByRoleIds(Set.of(plannerRole.getId()));
+        Set<Long> plannerUserIds = permissionApi.getEnabledUserIdsByPermission("zsjos:sales:eligible");
         Collection<AdminUserRespDTO> users = adminUserApi.getUserListByDeptIds(Set.of(manager.getDeptId()));
         Map<Long, DeptRespDTO> depts = deptApi.getDeptMap(users.stream().map(AdminUserRespDTO::getDeptId)
                 .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
@@ -433,8 +441,12 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
         DeliveryClassDO target = mapper.selectByIdForUpdate(req.getTargetClassId(), relation.getTenantId());
         validateTransferTarget(relation, target);
         DeliveryClassDO source = require(relation.getClassId());
-        if ((!DeliveryClassKind.pending(source) && !scopeService.contains(userId, source.getDeptId()))
-                || !scopeService.contains(userId, target.getDeptId())) throw exception(DELIVERY_CLASS_PERMISSION_DENIED);
+        Set<Long> homerooms = scopeService.salesHomerooms(userId).orElse(null);
+        boolean sourceAllowed = DeliveryClassKind.pending(source) || (homerooms == null
+                ? scopeService.contains(userId, source.getDeptId()) : homerooms.contains(source.getHomeroomUserId()));
+        boolean targetAllowed = homerooms == null
+                ? scopeService.contains(userId, target.getDeptId()) : homerooms.contains(target.getHomeroomUserId());
+        if (!sourceAllowed || !targetAllowed) throw exception(DELIVERY_CLASS_PERMISSION_DENIED);
         transferLocked(relation, target, target.getHomeroomUserId(), req.getReason().trim(),
                 "direct-transfer:" + relationId + ":v" + relation.getVersion());
     }
@@ -490,11 +502,11 @@ public class DeliveryClassServiceImpl implements DeliveryClassService {
     @Override
     public AdminUserRespDTO validateHomeroom(Long userId) {
         AdminUserRespDTO user = adminUserApi.getUser(userId);
-        RoleRespDTO plannerRole = roleApi.getRoleByCode("study_planner");
-        if (user == null || !Objects.equals(user.getStatus(), CommonStatusEnum.ENABLE.getStatus())
-                || plannerRole == null || !Objects.equals(plannerRole.getStatus(), CommonStatusEnum.ENABLE.getStatus())
-                || !permissionApi.getEnabledRoleIdsByUserId(userId).contains(plannerRole.getId())) {
+        if (user == null || !Objects.equals(user.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
             throw exception(DELIVERY_CLASS_USER_INVALID);
+        }
+        if (!permissionApi.hasAnyPermissions(userId, "zsjos:sales:eligible")) {
+            throw exception(DELIVERY_CLASS_SALES_QUALIFICATION_REQUIRED);
         }
         return user;
     }

@@ -103,8 +103,6 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const invalidCaseLink=rawCaseId!==null&&(!/^[1-9][0-9]*$/.test(rawCaseId)||!Number.isSafeInteger(Number(rawCaseId)));
   const linkedCaseId=rawCaseId!==null?(invalidCaseLink?undefined:Number(rawCaseId)):routeState?.registrationCaseId;
   const [statusGroup, setStatusGroup] = useState<'pending' | 'processed' | 'all'>(metricScope ? 'all' : 'pending');
-  const [classAssigned, setClassAssigned] = useState<boolean>();
-  const handledLocation = useRef<string | undefined>(undefined);
   const [rows, setRows] = useState<RegistrationCase[]>([]);
   const [total, setTotal] = useState(0);
   const [pageNo, setPageNo] = useState(1);
@@ -118,22 +116,19 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const [completing, setCompleting] = useState(false);
   const [closing, setClosing] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferSaving, setTransferSaving] = useState(false);
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferError, setTransferError] = useState("");
+  const [transferCandidates, setTransferCandidates] = useState<Array<{ id: number; nickname: string }>>([]);
+  const [transferForm] = Form.useForm<{ targetUserId: number; reason: string }>();
   const [closeForm] = Form.useForm<{ reason: string }>();
   const [routeSaving, setRouteSaving] = useState(false);
-  const [classSaving, setClassSaving] = useState(false);
   const [informationBusy, setInformationBusy] = useState(false);
-  const [classDraft, setClassDraft] = useState<Record<number, number>>({});
-  const [classOptions, setClassOptions] = useState<DeliveryClassOption[]>([]);
-  const [classOptionsLoading, setClassOptionsLoading] = useState(false);
-  const [classOptionsError, setClassOptionsError] = useState("");
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [itemErrors, setItemErrors] = useState<Record<number, string>>({});
   const [operationError, setOperationError] = useState("");
-  const classOptionsRequest = useRef(false);
-  const canAssignClass = hasPermission(permissions, "zsjos:registration:update");
-  const classesDirty = selected?.assignmentMode === "class_per_item" && selected.classAssignments?.some(
-    row => (classDraft[row.orderItemId] ?? null) !== (row.classId ?? null),
-  );
+  const canUpdateTask = hasPermission(permissions, "zsjos:registration:update");
   const [attachmentSavingIds, setAttachmentSavingIds] = useState<Set<number>>(new Set());
   const [savingItemIds, setSavingItemIds] = useState<Set<number>>(new Set());
   const [routeCandidates, setRouteCandidates] = useState<Record<number, Array<{ id: number; nickname: string }>>>({});
@@ -141,18 +136,8 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const detailGeneration = useRef(0);
   const inflightLists = useRef(new Set<string>());
   const activeCaseId = useRef<number | undefined>(undefined);
-  const draftDirty = useRef(false);
-  draftDirty.current = !detailLoading && Boolean(classesDirty);
-  const mutationBusy = informationBusy || classSaving || routeSaving || completing || closing || savingItemIds.size > 0 || attachmentSavingIds.size > 0;
+  const mutationBusy = transferOpen || transferSaving || informationBusy || routeSaving || completing || closing || savingItemIds.size > 0 || attachmentSavingIds.size > 0;
   const terminal = Boolean(selected && ["completed", "cancelled", "ended"].includes(selected.status));
-  const confirmLeave = (action: () => void) => {
-    if (!draftDirty.current) { action(); return; }
-    Modal.confirm({ title: "分班选择尚未保存", content: "放弃修改后将保留上次保存的分班结果。", okText: "放弃修改", cancelText: "继续编辑", onOk: () => {
-      draftDirty.current = false;
-      setClassDraft(Object.fromEntries((selected?.classAssignments || []).filter(row => row.classId).map(row => [row.orderItemId, row.classId!])));
-      action();
-    } });
-  };
   const clearSelection = () => {
     ++listGeneration.current;
     ++detailGeneration.current;
@@ -175,13 +160,11 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       const generation = ++detailGeneration.current;
       activeCaseId.current = id;
       setSelected(current => current?.id === id ? current : undefined);
-      setClassDraft({});
       setSavingItemIds(new Set());
       setAttachmentSavingIds(new Set());
       setItemErrors({});
       setOperationError("");
       setRouteCandidates({});
-      setClassSaving(false);
       setRouteSaving(false);
       setCompleting(false);
       setClosing(false);
@@ -192,7 +175,6 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         const next = await api.registrationCase(id);
         if (generation === detailGeneration.current) {
           applyCase(next);
-          setClassDraft(Object.fromEntries((next.classAssignments || []).filter(row => row.classId).map(row => [row.orderItemId, row.classId!])));
         }
       } catch (requestError) {
         if (generation === detailGeneration.current) setDetailError(errorMessage(requestError));
@@ -203,11 +185,24 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     [applyCase],
   );
   const failedListPage=useRef(1);
-  const mergeRows=useInboxPageMerge<RegistrationCase>(JSON.stringify([statusGroup,classAssigned,keyword,advancedFilter]),true,row=>row.id);
+  const mergeRows=useInboxPageMerge<RegistrationCase>(JSON.stringify([statusGroup,keyword,advancedFilter]),true,row=>row.id);
+  useEffect(() => {
+    if (invalidCaseLink) {
+      ++detailGeneration.current;
+      activeCaseId.current = undefined;
+      setSelected(undefined);
+      setDetailLoading(false);
+      setMobileDetailOpen(true);
+    } else if (linkedCaseId) {
+      setMobileDetailOpen(true);
+      void loadCase(linkedCaseId);
+    }
+  }, [invalidCaseLink, linkedCaseId, loadCase, location.key]);
+
   const load = useCallback(
     async (targetPage = pageNo, preferredId?: number) => {
       failedListPage.current=targetPage;
-      const requestKey = `${statusGroup}:${classAssigned}:${targetPage}:${preferredId || "current"}:${keyword}:${JSON.stringify(advancedFilter)}`;
+      const requestKey = `${statusGroup}:${targetPage}:${preferredId || "current"}:${keyword}:${JSON.stringify(advancedFilter)}`;
       if (inflightLists.current.has(requestKey)) return;
       inflightLists.current.add(requestKey);
       const generation = ++listGeneration.current;
@@ -217,7 +212,6 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       try {
         const page = await metricRegistrations.registrationPoolPage({
             statusGroup,
-            classAssigned: statusGroup === "pending" ? classAssigned : undefined,
             pageNo: targetPage,
             pageSize: PAGE_SIZE,
             keyword: keyword || undefined,
@@ -227,10 +221,10 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         setRows(current=>mergeRows(targetPage,page.list,current));
         setTotal(page.total);
         setPageNo(targetPage);
-        if(invalidCaseLink||(targetPage>1&&!preferredId)||detailAtRequest!==detailGeneration.current)return;
+        if (invalidCaseLink || linkedCaseId || (targetPage > 1 && !preferredId) || detailAtRequest !== detailGeneration.current) return;
         const targetId = preferredId ?? page.list.find(row => row.id === activeCaseId.current)?.id ?? page.list[0]?.id;
-        if (targetId && !draftDirty.current) await loadCase(targetId);
-        else if (!targetId) { activeCaseId.current = undefined; ++detailGeneration.current; setSelected(undefined); setDetailLoading(false); }
+        if (targetId) await loadCase(targetId);
+        else { activeCaseId.current = undefined; ++detailGeneration.current; setSelected(undefined); setDetailLoading(false); }
       } catch (requestError) {
         if (generation === listGeneration.current) setError(errorMessage(requestError));
       } finally {
@@ -238,15 +232,12 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, classAssigned, keyword, loadCase, pageNo, selected?.id, statusGroup,mergeRows,invalidCaseLink],
+    [advancedFilter,  keyword, loadCase, pageNo, selected?.id, statusGroup,mergeRows, invalidCaseLink, linkedCaseId],
   );
 
   useEffect(() => {
-    const preferredId = handledLocation.current !== location.key ? linkedCaseId : undefined;
-    handledLocation.current = location.key;
-    if(invalidCaseLink){activeCaseId.current=undefined;detailGeneration.current++;setSelected(undefined);setDetailLoading(false)}
-    void load(1, preferredId);
-  }, [advancedFilter, classAssigned, keyword, location.key, linkedCaseId, statusGroup,invalidCaseLink]);
+    void load(1);
+  }, [advancedFilter,  keyword, location.key, linkedCaseId, statusGroup,invalidCaseLink]);
   useEffect(() => {
     const refresh = (event: Event) => {
       const caseId = Number(
@@ -254,16 +245,14 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           ?.registrationCaseId,
       );
       message.info("有新的报名履约任务");
-      if (!draftDirty.current) void load(1, Number.isFinite(caseId) ? caseId : undefined);
+      void load(1, Number.isFinite(caseId) ? caseId : undefined);
     };
     window.addEventListener("zsjos-registration-task-created", refresh);
     return () =>
       window.removeEventListener("zsjos-registration-task-created", refresh);
   }, [load]);
   useEffect(() => {
-    const beforeUnload = (event: BeforeUnloadEvent) => { if (draftDirty.current) { event.preventDefault(); event.returnValue = ""; } };
-    window.addEventListener("beforeunload", beforeUnload);
-    return () => { window.removeEventListener("beforeunload", beforeUnload); ++detailGeneration.current; };
+    return () => { ++detailGeneration.current; };
   }, []);
 
   // Generation checks also protect A -> B -> A switches while a request is pending.
@@ -273,7 +262,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     return () => activeCaseId.current === id && detailGeneration.current === generation;
   };
   const updateItem = async (item: NonNullable<RegistrationCase["items"]>[number], checked: boolean) => {
-    if (!selected || mutationBusy || !canAssignClass || terminal) return;
+    if (!selected || mutationBusy || !canUpdateTask || terminal) return;
     const current = beginMutation();
     setSavingItemIds(new Set([item.id]));
     setItemErrors(errors => ({ ...errors, [item.id]: "" }));
@@ -292,7 +281,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     } catch (error) { if (current()) setOperationError(errorMessage(error)); }
   };
   const saveRoutes = async (routes: RegistrationRoute[], previous: RegistrationCase) => {
-    if (mutationBusy || !canAssignClass || terminal) return;
+    if (mutationBusy || !canUpdateTask || terminal) return;
     const current = beginMutation();
     setRouteSaving(true); setOperationError("");
     try {
@@ -320,39 +309,8 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     await saveRoutes(selected.routes.map(item => item.id === route.id
       ? { ...item, selected: true, assigneeUserId, assigneeUserName: candidate?.nickname } : item), selected);
   };
-  const loadClassOptions = async () => {
-    if (classOptionsRequest.current) return;
-    classOptionsRequest.current = true;
-    setClassOptionsLoading(true);
-    setClassOptionsError("");
-    try {
-      setClassOptions(await api.deliveryClasses.options());
-    } catch (requestError) {
-      setClassOptions([]);
-      setClassOptionsError(errorMessage(requestError));
-    } finally {
-      classOptionsRequest.current = false;
-      setClassOptionsLoading(false);
-    }
-  };
-  const saveClasses = async () => {
-    if (!selected?.classAssignments || mutationBusy || !canAssignClass || selected.assignable !== true || terminal) return;
-    const assignments = selected.classAssignments.map(row => ({ orderItemId: row.orderItemId, classId: classDraft[row.orderItemId] }));
-    if (assignments.some(row => !row.classId)) { setOperationError("请为当前任务的产品选择班级"); return; }
-    const current = beginMutation();
-    setClassSaving(true); setOperationError("");
-    try {
-      const next = await api.updateRegistrationClassAssignments(selected.id, { version: selected.version, idempotencyKey: key(), assignments });
-      if (current()) {
-        applyCase(next);
-        setClassDraft(Object.fromEntries((next.classAssignments || []).filter(row => row.classId).map(row => [row.orderItemId, row.classId!])));
-        message.success("分班已保存，交付服务已建立");
-      }
-    } catch (error) { if (current()) setOperationError(errorMessage(error)); }
-    finally { if (current()) setClassSaving(false); }
-  };
   const uploadAttachment = async (item: NonNullable<RegistrationCase["items"]>[number], file: File) => {
-    if (!selected || mutationBusy || !canAssignClass || terminal || (item.attachments?.length || 0) >= 9) return;
+    if (!selected || mutationBusy || !canUpdateTask || terminal || (item.attachments?.length || 0) >= 9) return;
     if (!/\.(jpe?g|png|webp|pdf|docx?|xlsx?)$/i.test(file.name)) {
       setItemErrors(errors => ({ ...errors, [item.id]: "仅支持 JPG、PNG、WebP、PDF、Word、Excel" })); return;
     }
@@ -366,7 +324,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     finally { if (current()) setAttachmentSavingIds(new Set()); }
   };
   const deleteAttachment = async (itemId: number, attachmentId: number) => {
-    if (!selected || mutationBusy || !canAssignClass || terminal) return;
+    if (!selected || mutationBusy || !canUpdateTask || terminal) return;
     const current = beginMutation();
     setAttachmentSavingIds(new Set([itemId])); setItemErrors(errors => ({ ...errors, [itemId]: "" }));
     try {
@@ -375,8 +333,28 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     } catch (error) { if (current()) setItemErrors(errors => ({ ...errors, [itemId]: errorMessage(error) })); }
     finally { if (current()) setAttachmentSavingIds(new Set()); }
   };
+  const loadTransferCandidates = async (caseId: number) => {
+    setTransferLoading(true);
+    setTransferError("");
+    try { setTransferCandidates(await api.registrationTransferCandidates(caseId)); }
+    catch (error) { setTransferError(errorMessage(error)); }
+    finally { setTransferLoading(false); }
+  };
+  const transfer = async ({ targetUserId, reason }: { targetUserId: number; reason: string }) => {
+    if (!selected || transferSaving || !reason.trim()) return;
+    setTransferSaving(true);
+    setTransferError("");
+    try {
+      await api.transferRegistration(selected.id, { version: selected.version, idempotencyKey: key(), targetUserId, reason: reason.trim() });
+      setTransferOpen(false);
+      clearSelection();
+      await load(1);
+      message.success("履约任务已转交");
+    } catch (error) { setTransferError(errorMessage(error)); }
+    finally { setTransferSaving(false); }
+  };
   const complete = async () => {
-    if (!selected?.completable || mutationBusy || classesDirty || !hasPermission(permissions, "zsjos:registration:complete")) return;
+    if (!selected?.completable || mutationBusy || !hasPermission(permissions, "zsjos:registration:complete")) return;
     const current = beginMutation();
     setCompleting(true); setOperationError("");
     try {
@@ -393,7 +371,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
       await api.closeRegistration(selected.id, { version: selected.version, idempotencyKey: key(), reason: values.reason.trim() });
       if (current()) {
         message.success(selected.orderItemId ? "本产品已结束，无需后续交付" : "报名履约已关闭");
-        draftDirty.current = false; setCloseOpen(false); closeForm.resetFields(); await load(1);
+        setCloseOpen(false); closeForm.resetFields(); await load(1);
       }
     } catch (error) { if (current()) { setOperationError(errorMessage(error)); message.error(errorMessage(error)); } }
     finally { if (current()) setClosing(false); }
@@ -401,7 +379,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const checkboxItems = selected?.items?.filter(item => item.itemType === "checkbox") || [];
   const requiredAttachments = selected?.items?.filter(item => item.itemType === "attachment" && item.attachmentRequired) || [];
   const completionReason = terminal ? (selected?.statusLabel || "任务已结束")
-    : mutationBusy ? "正在保存或提交，请稍候" : classesDirty ? "请先保存分班选择"
+    : mutationBusy ? "正在保存或提交，请稍候"
     : !hasPermission(permissions, "zsjos:registration:complete") ? "暂无完成报名履约权限"
     : !selected?.completable ? selected?.completionBlockReason || "当前任务暂时不能完成" : "已满足完成条件，可完成报名履约";
 
@@ -414,7 +392,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     />
   ) : selected ? (
     <RegistrationDetailLayout hero={<>
-        <Button className="registration-mobile-back" onClick={() => confirmLeave(() => { setMobileDetailOpen(false); void loadCase(selected.id); })}>返回列表</Button>
+        <Button className="registration-mobile-back" onClick={() => { setMobileDetailOpen(false); void loadCase(selected.id); }}>返回列表</Button>
         <div>
           <Typography.Title level={4}>
             {selected.studentName || "未填写学员姓名"}
@@ -441,6 +419,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               <div><dt>订单号</dt><dd>{selected.orderNo || "暂无订单号"}</dd></div>
               <div><dt>客资编号</dt><dd>{selected.leadNo || "暂无客资编号"}</dd></div>
               <div><dt>学员手机号</dt><dd>{selected.studentMobile || "未填写"}</dd></div>
+              <div><dt>履约负责人</dt><dd>{selected.ownerName || "未记录"}</dd></div>
               <div><dt>订单状态</dt><dd>{selected.orderStatusLabel || "未知状态"}</dd></div>
             </dl>
           </section>
@@ -451,7 +430,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               {(selected.deliveries?.length || 0) > 1 && <Typography.Text strong>交付服务 {index + 1}</Typography.Text>}
               <dl className="registration-facts">
                 <div><dt>当前交付班级</dt><dd>{delivery.className || "待分班"}</dd></div>
-                <div><dt>学习规划师</dt><dd>{delivery.ownerUserName || "尚未分配"}</dd></div>
+                <div><dt>班主任</dt><dd>{delivery.ownerUserName || "尚未分配"}</dd></div>
                 <div><dt>交付状态</dt><dd>{delivery.status === "cancelled" ? "已停止交付" : delivery.acceptanceStatus === "accepted" ? "已接收" : "待接收"}</dd></div>
               </dl>
             </div>)}
@@ -475,10 +454,17 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         {["pending", "processing"].includes(selected.status) ? <>
           <Button
             type="primary"
-            disabled={!hasPermission(permissions, "zsjos:registration:complete") || !selected.completable || mutationBusy || Boolean(classesDirty)}
+            disabled={!hasPermission(permissions, "zsjos:registration:complete") || !selected.completable || mutationBusy}
             loading={completing}
             onClick={() => void complete()}
           >完成报名履约</Button>
+          {selected.canTransfer && hasPermission(permissions, "zsjos:registration:transfer") &&
+            <Button disabled={mutationBusy} onClick={() => {
+              transferForm.resetFields();
+              setTransferCandidates([]);
+              setTransferOpen(true);
+              void loadTransferCandidates(selected.id);
+            }}>转交履约任务</Button>}
           {hasPermission(permissions, "zsjos:registration:close") && (
             <Button danger type="text" disabled={mutationBusy} onClick={() => { closeForm.setFieldsValue({ reason: selected.cancelReason || "" }); setCloseOpen(true); }}>{selected.orderItemId ? "结束本产品（无需交付）" : "关闭服务"}</Button>
           )}
@@ -486,28 +472,15 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         </Space>
       </>}>
 
+      {!["auto_class", "sales_owner", "class_per_item"].includes(selected.assignmentMode || "") && <>
       <section className="registration-checklist-card registration-step">
-        <div className="registration-step-heading"><span className="registration-step-number">1</span><Typography.Title level={5}>确认分班</Typography.Title><Tag>{classesDirty ? "未保存" : selected.deliveryEstablished ? "已建立交付" : terminal ? "已结束" : "待确认"}</Tag></div>
-        <Typography.Paragraph type="secondary">{selected.assignmentBlockReason || (selected.deliveryEstablished ? "变更班级请通过班级管理办理转班。" : "保存分班后将流转至学生交付中心。已保存但尚未流转的历史分班，请再次保存；选择待分班时暂不分配学习规划师。")}</Typography.Paragraph>
-        {!canAssignClass && !terminal && <Typography.Paragraph type="secondary">暂无修改权限，仅可查看</Typography.Paragraph>}
-        <Space wrap style={{ justifyContent: "space-between", width: "100%" }}><Typography.Title level={5}>{selected.assignmentMode === "class_per_item" ? (selected.orderItemId ? "本产品分班" : "逐商品分班") : "历史学习规划师分配"}</Typography.Title>{selected.assignmentMode === "class_per_item" && canAssignClass && selected.assignable === true && !["completed", "cancelled", "ended"].includes(selected.status) && <Button type="primary" loading={classSaving} disabled={mutationBusy} onClick={() => void saveClasses()}>保存分班</Button>}</Space>
-        {selected.assignmentMode === "class_per_item" && classOptionsError && <Alert type="error" showIcon title="班级加载失败" description={classOptionsError} action={<Button size="small" loading={classOptionsLoading} onClick={() => void loadClassOptions()}>重试</Button>} />}
-        {classesDirty && <Alert type="info" showIcon title="分班选择尚未保存，保存后将流转至学生交付中心" />}
+        <Typography.Title level={5}>历史学习规划师分配</Typography.Title>
         <div className="registration-checklist">
-          {selected.assignmentMode === "class_per_item" ? selected.classAssignments?.map(assignment => {
-            const options = classOptions.map(row => ({ value: row.id, disabled: false, label: row.classKind === "PENDING" || (row.systemClass && !row.classKind) ? "待分班" : `${row.className} · ${row.homeroomUserName || "未配置班主任"}` }));
-            if (assignment.classId && !options.some(row => row.value === assignment.classId)) {
-              options.push({ value: assignment.classId, label: assignment.classKind === "PENDING" || (assignment.systemClass && !assignment.classKind) ? "待分班" : `${assignment.className || "已选班级"} · ${assignment.homeroomUserName || "班主任姓名未记录"}`, disabled: true });
-            }
-            return <div className="registration-checklist-row registration-route-row" key={assignment.orderItemId}>
-              <div className="registration-checklist-copy"><strong>{assignment.productName || '历史产品信息缺失'}</strong><ProductSpecs product={assignment} /><span>{assignment.categoryName || "产品分类"}{assignment.errorReason ? ` · ${assignment.errorReason}` : ""}</span></div>
-              <Select style={{ width: "100%", maxWidth: 420 }} showSearch optionFilterProp="label" value={classDraft[assignment.orderItemId]} placeholder="选择班级（含待分班）" loading={classOptionsLoading} disabled={!canAssignClass || selected.assignable !== true || mutationBusy || ["completed", "cancelled", "ended"].includes(selected.status)} onOpenChange={open => open && void loadClassOptions()} onChange={value => setClassDraft(current => ({ ...current, [assignment.orderItemId]: value }))} options={options} notFoundContent={classOptionsLoading ? <Spin size="small" /> : classOptionsError ? "班级加载失败，请重试" : "暂无未结课班级，请联系班级管理员"} />
-            </div>;
-          }) : selected.routes?.map((route) => (
+          {selected.routes?.map((route) => (
             <div className="registration-checklist-row registration-route-row" key={route.id}>
               <Checkbox
                 checked={route.selected}
-                disabled={!canAssignClass || selected.assignable !== true || mutationBusy || ["completed", "cancelled", "ended"].includes(selected.status)}
+                disabled={!canUpdateTask || selected.assignable !== true || mutationBusy || ["completed", "cancelled", "ended"].includes(selected.status)}
                 onChange={(event) => void toggleRoute(route, event.target.checked)}
               >
                 {route.departmentName}
@@ -517,7 +490,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                   value={route.assigneeUserId}
                   placeholder={`选择${route.assigneeTypeLabel}`}
                   loading={routeSaving}
-                  disabled={!canAssignClass || selected.assignable !== true || mutationBusy || ["completed", "cancelled", "ended"].includes(selected.status)}
+                  disabled={!canUpdateTask || selected.assignable !== true || mutationBusy || ["completed", "cancelled", "ended"].includes(selected.status)}
                   options={(routeCandidates[route.id] || (route.assigneeUserId ? [{ id: route.assigneeUserId, nickname: route.assigneeUserName || "已分配负责人" }] : [])).map((candidate) => ({ value: candidate.id, label: candidate.nickname }))}
                   onOpenChange={(open) => open && void loadRouteCandidates(route)}
                   onChange={(value) => void assignRoute(route, value)}
@@ -527,9 +500,11 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           ))}
         </div>
       </section>
+      </>}
       <section className="registration-checklist-card registration-step">
-        <div className="registration-step-heading"><span className="registration-step-number">2</span><Typography.Title level={5}>核对履约事项</Typography.Title></div>
+        <div className="registration-step-heading"><Typography.Title level={5}>核对履约事项</Typography.Title></div>
         <RegistrationStudentInfo key={selected.id} item={selected} permissions={permissions} disabled={mutationBusy && !informationBusy} onBusy={setInformationBusy} onChanged={() => { const id=selected.id; void api.registrationCase(id).then(next=>{if(activeCaseId.current===id)applyCase(next)}).catch(error=>setOperationError(errorMessage(error))) }} />
+        {!terminal && !canUpdateTask && <Typography.Paragraph type="secondary">当前账号缺少“更新报名履约清单”权限，清单和附件仅可查看。</Typography.Paragraph>}
         <Space wrap className="registration-checklist-progress"><Typography.Text type="secondary">人工确认 {checkboxItems.filter(item => item.checked).length} / {checkboxItems.length}</Typography.Text><Typography.Text type="secondary">必传附件 {requiredAttachments.filter(item => item.attachments?.length).length} / {requiredAttachments.length}</Typography.Text></Space>
         {!selected.items?.length && <Typography.Text type="secondary">暂无履约清单项</Typography.Text>}
         <div className="registration-checklist">
@@ -538,9 +513,9 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               <div className="registration-checklist-row" key={item.id}>
                 <div className="registration-checklist-copy">
                   <strong>{item.title}</strong>
-                  <span>{selected.assignmentMode === "class_per_item" ? "新流程由逐商品班级的班主任决定" : "历史报名保留原学习规划师分配"}</span>
+                  <span>{selected.assignmentMode === "auto_class" ? "历史清单项，已自动分班，由所在班级班主任负责" : selected.assignmentMode === "sales_owner" ? "历史清单项，完成履约后归订单成交负责人，分班后由班主任负责" : selected.assignmentMode === "class_per_item" ? "沿用历史班级，未选班的商品归成交负责人" : "历史报名保留原学习规划师分配"}</span>
                 </div>
-                <Tag>{selected.assignmentMode === "class_per_item" ? "按班级归属" : selected.studyPlannerUserName || "历史规划师未分配"}</Tag>
+                <Tag>{selected.assignmentMode === "auto_class" ? "自动分班" : selected.assignmentMode === "sales_owner" ? "自动归属" : selected.assignmentMode === "class_per_item" ? "按班级归属" : selected.studyPlannerUserName || "历史规划师未分配"}</Tag>
               </div>
             ) : item.itemType === "attachment" ? (
               <div className="registration-checklist-row registration-attachment-row" key={item.id}>
@@ -552,7 +527,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                     {item.attachments?.map((attachment) => (
                       <div className="registration-attachment-entry" key={attachment.id}>
                         <RegistrationAttachmentPreview attachment={attachment} />
-                        {canAssignClass && !terminal && (
+                        {canUpdateTask && !terminal && (
                           <Button type="text" danger size="small" icon={<DeleteOutlined />} aria-label={`删除 ${attachment.originalName}`}
                             disabled={mutationBusy} onClick={() => void deleteAttachment(item.id, attachment.id)} />
                         )}
@@ -560,8 +535,8 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                     ))}
                   </div>
                 </div>
-                <ClipboardUploadButtons disabled={!canAssignClass || mutationBusy || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled", "ended"].includes(selected.status)} canPaste={() => canAssignClass && !mutationBusy && (item.attachments?.length || 0) < 9 && !["completed", "cancelled", "ended"].includes(selected.status)} onFiles={files => { const file = files[0]; if (file) void uploadAttachment(item, file) }}><Upload showUploadList={false} accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
-                  disabled={!canAssignClass || mutationBusy || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled", "ended"].includes(selected.status)}
+                <ClipboardUploadButtons disabled={!canUpdateTask || mutationBusy || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled", "ended"].includes(selected.status)} canPaste={() => canUpdateTask && !mutationBusy && (item.attachments?.length || 0) < 9 && !["completed", "cancelled", "ended"].includes(selected.status)} onFiles={files => { const file = files[0]; if (file) void uploadAttachment(item, file) }}><Upload showUploadList={false} accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+                  disabled={!canUpdateTask || mutationBusy || (item.attachments?.length || 0) >= 9 || ["completed", "cancelled", "ended"].includes(selected.status)}
                   beforeUpload={(file) => { void uploadAttachment(item, file); return Upload.LIST_IGNORE; }}>
                   <Button icon={<UploadOutlined />} loading={attachmentSavingIds.has(item.id)}>上传附件</Button>
                 </Upload></ClipboardUploadButtons>
@@ -571,7 +546,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                 <Checkbox
                   checked={item.checked}
                   disabled={
-                    !canAssignClass || mutationBusy ||
+                    !canUpdateTask || mutationBusy ||
                     ["completed", "cancelled", "ended"].includes(selected.status)
                   }
                   onChange={(event) =>
@@ -594,9 +569,8 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
         </div>
       </section>
       <section className="registration-checklist-card registration-step">
-        <div className="registration-step-heading"><span className="registration-step-number">3</span><Typography.Title level={5}>完成履约</Typography.Title><Tag>{terminal ? selected.statusLabel : selected.completable && !classesDirty ? "可办理" : "待满足条件"}</Tag></div>
+        <div className="registration-step-heading"><Typography.Title level={5}>完成履约</Typography.Title><Tag>{terminal ? selected.statusLabel : selected.completable ? "可办理" : "待满足条件"}</Tag></div>
         <Alert showIcon type={terminal || selected.completable ? "info" : "warning"} title={terminal ? selected.statusLabel : selected.completionBlockReason || "已满足完成条件"} />
-        {classesDirty && <Typography.Paragraph type="secondary">分班选择尚未保存，请先保存分班。</Typography.Paragraph>}
       </section>
     </RegistrationDetailLayout>
   ) : (
@@ -606,27 +580,33 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const displayRows=selected&&linkedCaseId===selected.id&&!rows.some(row=>row.id===selected.id)?[selected,...rows]:rows;
   return (
     <section className={"workspace-page registration-page" + (mobileDetailOpen ? " is-detail-open" : "")}>
+      <Modal title="转交履约任务" open={transferOpen} confirmLoading={transferSaving}
+        okText="确认转交" okButtonProps={{ disabled: transferLoading || transferCandidates.length === 0 }}
+        onOk={() => transferForm.submit()} onCancel={() => { if (!transferSaving && !transferLoading) setTransferOpen(false); }}>
+        {transferError && <Alert type="error" title={transferError} action={selected && !transferCandidates.length &&
+          <Button size="small" onClick={() => void loadTransferCandidates(selected.id)}>重试</Button>}/>}
+        <Form form={transferForm} layout="vertical" onFinish={transfer}>
+          <Form.Item name="targetUserId" label="接手人" rules={[{ required: true, message: "请选择接手人" }]}>
+            <Select showSearch optionFilterProp="label" loading={transferLoading} placeholder="选择接手人"
+              notFoundContent="暂无符合条件的接手人" options={transferCandidates.map(user => ({ value: user.id, label: user.nickname }))}/>
+          </Form.Item>
+          <Form.Item name="reason" label="转交原因" rules={[{ required: true, whitespace: true, message: "请输入转交原因" }]}>
+            <Input.TextArea maxLength={100} rows={3}/>
+          </Form.Item>
+        </Form>
+      </Modal>
       {invalidCaseLink&&<Alert type="error" title="报名履约任务跳转参数无效"/>}
       <div className="lead-filter-sections">
         <div className="lead-filter-row" role="group" aria-label="处理状态">
           <span className="lead-filter-row-label">处理状态</span>
           {([{ key: 'pending', label: '待处理中' }, { key: 'processed', label: '已处理' }, { key: 'all', label: '全部' }] as const).map(option => (
             <button type="button" key={option.key} className={statusGroup === option.key ? 'active' : ''}
-              aria-pressed={statusGroup === option.key} onClick={() => confirmLeave(() => {
+              aria-pressed={statusGroup === option.key} onClick={() => {
                 clearSelection(); setRows([]); setTotal(0); setPageNo(1);
-                setClassAssigned(undefined); setStatusGroup(option.key);
-              })}>{option.label}</button>
+                setStatusGroup(option.key);
+              }}>{option.label}</button>
           ))}
         </div>
-        {statusGroup === 'pending' && <div className="lead-filter-row" role="group" aria-label="分班情况">
-          <span className="lead-filter-row-label">分班情况</span>
-          {[{ value: undefined, label: '全部' }, { value: false, label: '待分班' }, { value: true, label: '已分班' }].map(option => (
-            <button type="button" key={option.label} className={classAssigned === option.value ? 'active' : ''}
-              aria-pressed={classAssigned === option.value} onClick={() => confirmLeave(() => {
-                clearSelection(); setRows([]); setTotal(0); setPageNo(1); setClassAssigned(option.value);
-              })}>{option.label}</button>
-          ))}
-        </div>}
       </div>
 
       <div className="lead-inbox-layout">
@@ -638,16 +618,16 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               placeholder="搜索订单号、客资编号、姓名或手机号"
               keyword={keyword}
               value={advancedFilter}
-              onKeyword={(value) => confirmLeave(() => {
+              onKeyword={(value) => {
                 clearSelection();
                 setPageNo(1);
                 setKeyword(value);
-              })}
-              onChange={(value) => confirmLeave(() => {
+              }}
+              onChange={(value) => {
                 clearSelection();
                 setPageNo(1);
                 setAdvancedFilter(value);
-              })}
+              }}
             />
           </div>
           {error && <LoadState error={error} retry={() => void load(pageNo)} />}
@@ -666,7 +646,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
                   type="button"
                   key={row.id}
                   className={`lead-inbox-item${selected?.id === row.id ? " active" : ""}`}
-                  onClick={() => confirmLeave(() => { setMobileDetailOpen(true); void loadCase(row.id); })}
+                  onClick={() => { setMobileDetailOpen(true); void loadCase(row.id); }}
                 >
                   <div className="lead-inbox-item-main">
                     <NameAvatar name={row.studentName || "学员"} seed={row.leadNo} size={36} />
@@ -1063,7 +1043,13 @@ function MyStudentsPageContent({ permissions = [], tenantReadAll = false }: { pe
 
   </div>;
   const studentSearchToolbar = <AdvancedFilterToolbar scene="student_service" pageKey="student_my" placeholder="搜索姓名、代理人、学员编号、手机号、微信号或客资编号" keyword={keyword} value={advancedFilter}
-    onKeyword={value => { if (!resetSelection()) return; setPageNo(1); setKeyword(value); }}
+    onKeyword={value => {
+      // Submitting the same keyword does not rerun the keyword effect; retain rows until the explicit reload completes.
+      if (value === keyword) { void load(1, { force: true }); return; }
+      if (!resetSelection()) return;
+      ++listGeneration.current;
+      setPageNo(1); setKeyword(value);
+    }}
     onChange={value => { if (!resetSelection()) return false; setPageNo(1); setAdvancedFilter(value); }} />;
   if (!canQuery) return <Alert type="warning" showIcon message="暂无学员查询权限" />;
   return (
@@ -1515,7 +1501,11 @@ export function RegistrationChecklistConfigPage() {
       const [nextConfig, nextDepartments] = await Promise.all([
         api.registrationChecklistConfig(), api.simpleDepartments(),
       ]);
-      setConfig(nextConfig);
+      // 学习规划师固定项和规划师流转已随自动分班退役；旧草稿中的残留行不再展示，保存时一并移除。
+      setConfig(nextConfig.draft ? { ...nextConfig, draft: { ...nextConfig.draft,
+        items: nextConfig.draft.items.filter((item) => item.itemType !== "study_planner"),
+        routeOptions: nextConfig.draft.routeOptions.filter((route) => route.assigneeType !== "study_planner"),
+      } } : nextConfig);
       setDepartments(nextDepartments);
     } catch (requestError) {
       setError(errorMessage(requestError));
@@ -1548,8 +1538,8 @@ export function RegistrationChecklistConfigPage() {
     if (!department) { message.warning("系统暂无可用部门"); return; }
     updateRoutes((routes) => [...routes, {
       id: -Date.now(), optionKey: `custom_${createIdempotencyKey().replaceAll("-", "")}`,
-      departmentId: department.id, departmentName: department.name, assigneeType: "study_planner",
-      assigneeTypeLabel: "学习规划师", sort: (routes.length + 1) * 10,
+      departmentId: department.id, departmentName: department.name, assigneeType: "content_director",
+      assigneeTypeLabel: "编导", sort: (routes.length + 1) * 10,
       enabled: true, systemRequired: false,
     }]);
   };
@@ -1629,26 +1619,24 @@ export function RegistrationChecklistConfigPage() {
             <div className="registration-config-item" key={item.id}>
               <Input
                 value={item.title}
-                disabled={item.itemType === "study_planner"}
                 onChange={(event) => updateItems((items) => items.map((current) => current.id === item.id ? { ...current, title: event.target.value } : current))}
               />
-              <Select value={item.itemType} disabled={item.systemRequired} options={[
+              <Select value={item.itemType} options={[
                 { value: "checkbox", label: "人工确认" },
                 { value: "attachment", label: "上传附件" },
-                ...(item.systemRequired ? [{ value: "study_planner", label: "系统固定项" }] : []),
               ]} onChange={(itemType) => updateItems((items) => items.map((current) => current.id === item.id
                 ? { ...current, itemType, attachmentRequired: itemType === "attachment" ? current.attachmentRequired : false } : current))} />
               {item.itemType === "attachment" && <Checkbox checked={item.attachmentRequired}
                 onChange={(event) => updateItems((items) => items.map((current) => current.id === item.id
                   ? { ...current, attachmentRequired: event.target.checked } : current))}>必传</Checkbox>}
-              <Switch checked={item.enabled} disabled={item.systemRequired}
+              <Switch checked={item.enabled}
                 onChange={(enabled) => updateItems((items) => items.map((current) => current.id === item.id ? { ...current, enabled } : current))} />
               <Space size={4}>
                 <Button type="text" icon={<UpOutlined />} aria-label="上移" disabled={index === 0}
                   onClick={() => updateItems((items) => move(items, index, -1))} />
                 <Button type="text" icon={<DownOutlined />} aria-label="下移" disabled={index === draft.items.length - 1}
                   onClick={() => updateItems((items) => move(items, index, 1))} />
-                <Button type="text" danger icon={<DeleteOutlined />} aria-label="删除" disabled={item.systemRequired}
+                <Button type="text" danger icon={<DeleteOutlined />} aria-label="删除"
                   onClick={() => updateItems((items) => items.filter((current) => current.id !== item.id))} />
               </Space>
             </div>
@@ -1663,10 +1651,7 @@ export function RegistrationChecklistConfigPage() {
                 options={departments.map((department) => ({ value: department.id, label: department.name }))}
                 onChange={(departmentId) => updateRoutes((routes) => routes.map((current) => current.id === route.id
                   ? { ...current, departmentId, departmentName: departments.find((item) => item.id === departmentId)?.name || current.departmentName } : current))} />
-              <Select value={route.assigneeType} options={[
-                { value: "study_planner", label: "学习规划师" }, { value: "content_director", label: "编导" },
-              ]} onChange={(assigneeType) => updateRoutes((routes) => routes.map((current) => current.id === route.id
-                ? { ...current, assigneeType, assigneeTypeLabel: assigneeType === "study_planner" ? "学习规划师" : "编导" } : current))} />
+              <Select value={route.assigneeType} disabled options={[{ value: "content_director", label: "编导" }]} />
               <Switch checked={route.enabled} onChange={(enabled) => updateRoutes((routes) => routes.map((current) => current.id === route.id ? { ...current, enabled } : current))} />
               <Space size={4}>
                 <Button type="text" icon={<UpOutlined />} aria-label="上移" disabled={index === 0}

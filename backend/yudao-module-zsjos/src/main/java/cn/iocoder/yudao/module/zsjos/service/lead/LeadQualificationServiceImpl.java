@@ -56,12 +56,12 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper appealMapper;
     @Resource private LeadRestoreOwnerPolicy restoreOwnerPolicy;
     @Resource private LeadTeamTransferPolicy teamTransferPolicy;
-    @Resource @org.springframework.context.annotation.Lazy private SubordinateSalesService subordinateSalesService;
     @Resource private LeadAssignmentHistoryMapper historyMapper;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private DictDataApi dictDataApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private LeadAssignmentService assignmentService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private LeadObjectPermissionService permissionService;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
@@ -207,10 +207,14 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
         boolean recycled = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus());
         if (!suspended && !recycled) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
-        if (teamTransferPolicy.isEducation(lead)) return subordinateSalesService.getTransferCandidates(userId, leadId);
         boolean manageAll = permissionService.hasQualificationManageAll();
         Set<Long> managedUserIds = manageAll ? Set.of() : permissionService.getManagedUserIds(userId);
-        return assignmentService.getEligibleSalesUsers().stream()
+        String source = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+        var candidates = isSelfSourced(source) ? assignmentService.getEligibleSalesUsers() : assignmentService.getEligibleReceivers();
+        Set<Long> allowed = salesBoundary.filterTransferTargets(userId, candidates.stream().map(LeadAssignmentUserRespVO::getId).toList());
+        teamTransferPolicy.resolveIdentity(lead);
+        return candidates.stream()
+                .filter(item -> allowed.contains(item.getId()))
                 .filter(item -> manageAll || managedUserIds.contains(item.getId()))
                 .filter(item -> !suspended || !Objects.equals(item.getId(), lead.getOwnerUserId()))
                 .toList();
@@ -258,13 +262,13 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
             throw exception(LEAD_QUALIFICATION_TRANSFER_TARGET_INVALID);
         }
         SupervisorLeadActionPolicy.requireAllowed(SupervisorLeadActionPolicy.Action.TRANSFER, lead);
-        boolean education = teamTransferPolicy.isEducation(lead);
-        if (recycled && !education) {
+        teamTransferPolicy.resolveIdentity(lead);
+        if (recycled) {
             salesSupervisorTransferRecycled(leadId, userId, reqVO);
             return;
         }
-        if (education) teamTransferPolicy.requireTarget(lead, reqVO.getSalesUserId(), userId);
-        else requireEligibleSales(reqVO.getSalesUserId(), userId, true);
+        requireEligibleSales(reqVO.getSalesUserId(), userId, true);
+        requireSalesTransferTarget(lead, reqVO.getSalesUserId(), userId);
         LocalDateTime now = LocalDateTime.now();
         Long fromOwner = suspended ? lead.getOwnerUserId() : lead.getRecycleSourceOwnerUserId();
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管转派");
@@ -272,14 +276,10 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资转派");
         LeadAssignmentHistoryDO history = addHistory(leadId, ACTION_TRANSFER, fromOwner,
                 reqVO.getSalesUserId(), userId, reqVO.getReason(), now);
-        if (education) {
-            history.setOwnerIdentitySnapshot(OWNER_EDUCATION);
-            historyMapper.updateById(history);
-        }
         lead.setStatus(STATUS_SUBMITTED);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setSuspendedAt(null);
-        lead.setOwnerUserId(reqVO.getSalesUserId()); lead.setOwnerIdentity(education ? OWNER_EDUCATION : OWNER_SALES);
+        lead.setOwnerUserId(reqVO.getSalesUserId()); lead.setOwnerIdentity(OWNER_SALES);
         OpportunityDO existingOpportunity = opportunityMapper.selectByLeadId(leadId);
         if (existingOpportunity != null) {
             existingOpportunity.setOwnerUserId(reqVO.getSalesUserId());
@@ -312,30 +312,8 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         if (!STATUS_SUSPENDED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
-        if (!teamTransferPolicy.isEducation(lead)) {
-            salesSupervisorRecycle(leadId, userId, reqVO);
-            return;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        Long fromOwner = lead.getOwnerUserId();
-        lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管回收");
-        lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资回收");
-        LeadAssignmentHistoryDO history = addHistory(leadId, ACTION_RECYCLE, fromOwner, null,
-                userId, reqVO.getReason(), now);
-        history.setOwnerIdentitySnapshot(lead.getOwnerIdentity());
-        historyMapper.updateById(history);
-        lead.setStatus(STATUS_SUBMITTED);
-        lead.setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING);
-        lead.setRecycleSourceOwnerUserId(fromOwner);
-        lead.setOwnerUserId(null); lead.setOwnerIdentity(null);
-        clearCurrentAssignment(lead);
-        LeadMapper.advanceActivity(lead, now);
-        leadMapper.updateAfterOwnershipCleared(lead);
-        addEvent(EVENT_LEAD_RECYCLED, lead, userId, STATUS_SUSPENDED, ASSIGNMENT_RECYCLE_PENDING,
-                reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
-                        "assignmentHistoryId", history.getId()));
-        publishDispositionNotification(QUALIFICATION_RECYCLED, lead, userId, key,
-                fromOwner, null, reqVO.getReason().trim(), now);
+        teamTransferPolicy.resolveIdentity(lead);
+        salesSupervisorRecycle(leadId, userId, reqVO);
     }
 
     @Override
@@ -346,7 +324,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_RELEASED)) return;
-        if (teamTransferPolicy.isEducation(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        teamTransferPolicy.resolveIdentity(lead);
         boolean suspended = STATUS_SUSPENDED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
         boolean recycled = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus());
         if (!suspended && !recycled) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
@@ -435,6 +413,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_TRANSFERRED)) return;
         if (!SupervisorLeadActionPolicy.isSalesRecycledTransferAllowed(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         requireEligibleSales(reqVO.getSalesUserId(), userId, true);
+        requireSalesTransferTarget(lead, reqVO.getSalesUserId(), userId);
         LocalDateTime now = LocalDateTime.now();
         Long fromOwner = lead.getRecycleSourceOwnerUserId();
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管转派");
@@ -504,7 +483,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = dispositionKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_RELEASED)) return;
-        if (teamTransferPolicy.isEducation(lead)) throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        teamTransferPolicy.resolveIdentity(lead);
         if (!STATUS_SUBMITTED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
@@ -599,6 +578,17 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         return lead;
+    }
+
+    /**
+     * Sales supervisor transfer target: inside the actor's sales boundary (transfer semantics, not data scope) and,
+     * unless the lead is self-sourced, a configured receiver. Shared by suspended and recycled transfers.
+     */
+    private void requireSalesTransferTarget(LeadDO lead, Long targetUserId, Long userId) {
+        String source = lead.getSubmissionSourceType() == null ? lead.getSourceType() : lead.getSubmissionSourceType();
+        if (!salesBoundary.canTransferTo(userId, targetUserId)
+                || !isSelfSourced(source) && !assignmentService.isEligibleReceiver(targetUserId))
+            throw exception(LEAD_PERMISSION_DENIED);
     }
 
     private void requireEligibleSales(Long salesUserId, Long operatorUserId, boolean enforceManagerScope) {

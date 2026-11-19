@@ -15,6 +15,7 @@ import static org.mockito.Mockito.*;
 import java.util.List;
 
 class ClassExamProgressServiceTest {
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
     @InjectMocks ClassExamProgressService service;
     @Mock DeliveryClassMapper classes;
     @Mock ServiceRelationMapper relations;

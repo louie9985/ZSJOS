@@ -36,34 +36,27 @@ public class LeadSubmissionController {
                 cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.SALES));
     }
 
-    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(requestEnable = false, responseEnable = false)
-    @PostMapping("/education-self-sourced/archive-query")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
-    public CommonResult<List<LeadArchiveCandidateRespVO>> queryEducationArchive(@Valid @RequestBody LeadContactCheckReqVO req) {
-        return success(archiveService.query(req.getMobile(), req.getWechatId(), getLoginUserId(),
-                cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.EDUCATION));
-    }
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadProductService productService;
     @Resource private ZsjosProductSkuService skuService;
 
     @GetMapping("/product/simple-list")
     @Operation(summary = "获得启用课程列表")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create', 'zsjos:lead:submitter-supplement')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:submitter-supplement')")
     public CommonResult<List<LeadProductSimpleRespVO>> getProductSimpleList() {
         return success(productService.getEnabledProducts());
     }
 
     @GetMapping("/product/catalog")
     @Operation(summary = "获得课程 SPU/SKU 目录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create', 'zsjos:lead:update', 'zsjos:lead:submitter-supplement')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:update', 'zsjos:lead:submitter-supplement')")
     public CommonResult<LeadProductCatalogRespVO> getProductCatalog() {
         return success(skuService.getLeadCatalog());
     }
 
     @PostMapping("/attachment/upload")
     @Operation(summary = "上传客资图片")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create', 'zsjos:lead:submitter-supplement', 'zsjos:lead-complaint:create', 'zsjos:lead-complaint:handle', 'zsjos:lead:request-submitter-assist')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:submitter-supplement', 'zsjos:lead-complaint:create', 'zsjos:lead-complaint:handle', 'zsjos:lead:request-submitter-assist')")
     public CommonResult<LeadAttachmentUploadRespVO> uploadAttachment(@RequestParam("file") MultipartFile file)
             throws IOException {
         return success(attachmentService.upload(file));
@@ -71,7 +64,7 @@ public class LeadSubmissionController {
 
     @PostMapping("/contact-check")
     @Operation(summary = "联系方式查重并激活已有客资")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create')")
     public CommonResult<Boolean> checkContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
         return success(submissionService.checkContact(reqVO, getLoginUserId()));
     }
@@ -82,14 +75,6 @@ public class LeadSubmissionController {
     public CommonResult<Boolean> checkSelfSourcedContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
         return success(submissionService.checkContact(reqVO, getLoginUserId(),
                 cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.SALES));
-    }
-
-    @PostMapping("/education-self-sourced/contact-check")
-    @Operation(summary = "教务自拓联系方式查询（兼容布尔结果）")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
-    public CommonResult<Boolean> checkEducationSelfSourcedContact(@Valid @RequestBody LeadContactCheckReqVO reqVO) {
-        return success(submissionService.checkContact(reqVO, getLoginUserId(),
-                cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService.Identity.EDUCATION));
     }
 
     @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(sanitizeKeys = {"archiveQueryMobile", "archiveQueryWechatId"})
@@ -108,17 +93,9 @@ public class LeadSubmissionController {
         return success(submissionService.createSelfSourced(reqVO, getLoginUserId()));
     }
 
-    @cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog(sanitizeKeys = {"archiveQueryMobile", "archiveQueryWechatId"})
-    @PostMapping("/education-self-sourced/create")
-    @Operation(summary = "教务提交自拓客资并直接归属本人")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:education-self-sourced:create')")
-    public CommonResult<LeadCreateRespVO> createEducationSelfSourced(@Valid @RequestBody LeadCreateReqVO reqVO) {
-        return success(submissionService.createEducationSelfSourced(reqVO, getLoginUserId()));
-    }
-
     @GetMapping("/self-sourced/new-media-providers")
     @Operation(summary = "获得自拓可选的新媒体提供方")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:self-sourced:create', 'zsjos:lead:education-self-sourced:create')")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
     public CommonResult<List<LeadAssignmentUserRespVO>> getNewMediaProviders() {
         return success(submissionService.getNewMediaProviders());
     }

@@ -11,7 +11,12 @@ BEGIN
     NOT EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V378') OR
     NOT EXISTS (SELECT 1 FROM zsjos_enrollment_agreement WHERE tenant_id=1 AND id=1 AND deleted=0) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='V380 requires V378 agreement starter'; END IF;
- CREATE TABLE IF NOT EXISTS zsjos_enrollment_category_agreement LIKE zsjos_enrollment_agreement;
+ CREATE TABLE IF NOT EXISTS zsjos_enrollment_category_agreement (
+ id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, revision BIGINT NOT NULL, published_version BIGINT NOT NULL,
+ draft_body MEDIUMTEXT NOT NULL, published_body MEDIUMTEXT NOT NULL,
+ creator VARCHAR(64) DEFAULT '', updater VARCHAR(64) DEFAULT '', create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+ update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, deleted BIT NOT NULL DEFAULT 0
+ ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
  IF NOT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_student_info_form' AND column_name='agreement_category_name') THEN
  ALTER TABLE zsjos_student_info_form ADD COLUMN agreement_category_name VARCHAR(255) NULL;
  END IF;

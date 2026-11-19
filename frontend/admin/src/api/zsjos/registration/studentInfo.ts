@@ -18,6 +18,8 @@ export interface CollectionImage {
   name: string
 }
 export interface CollectionDetail {
+  agreementVersion?: number
+  agreementBody?: string
   status: string
   fields: Field[]
   values: Record<string, string>
@@ -49,3 +51,35 @@ export const image = async (id: number, item: CollectionImage) => {
 }
 export const download = (id: number): Promise<Blob> =>
   request.download({ url: base(id) + '/export' })
+
+export interface StudentInfoTask {
+  id: number
+  version: number
+  formId?: number
+  status: string
+  canProcess: boolean
+  candidates: Array<{ formId: number; revision: number; missing: string[] }>
+}
+export interface StudentInfoGenerationConfig {
+  configVersionId: number
+  fields: Field[]
+  selectableMaterialKeys: string[]
+  defaultSelectedKeys?: string[]
+}
+const tasks = '/zsjos/student-info-task'
+export const taskByRegistration = (caseId: number) =>
+  request.get<StudentInfoTask>({ url: `${tasks}/by-registration/${caseId}` })
+export const taskLink = (id: number) =>
+  request.get<CollectionLink | null>({ url: `${tasks}/${id}/link` })
+export const taskGenerationConfig = (id: number) =>
+  request.get<StudentInfoGenerationConfig>({ url: `${tasks}/${id}/generation-config` })
+export const taskCommand = (
+  task: StudentInfoTask,
+  operation: 'generate' | 'reuse' | 'sent' | 'regenerate' | 'revoke',
+  options: { configVersionId?: number; materialKeys?: string[]; sourceFormId?: number; sourceRevision?: number } = {}
+) => request.post<StudentInfoTask>({
+  url: `${tasks}/${task.id}/${operation}`,
+  data: { version: task.version, idempotencyKey: crypto.randomUUID(), ...options }
+})
+export const taskArchive = (id: number, formId: number, revision: number, sensitive: boolean) =>
+  request.get<CollectionDetail>({ url: `${tasks}/${id}/archive`, params: { formId, revision, sensitive } })

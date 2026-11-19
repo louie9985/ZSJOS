@@ -87,10 +87,7 @@ export function orderPartnerOwnerText(sourceType: string | undefined, snapshot?:
 }
 
 export function orderSourcePersonText(sourceType?: string, name?: string, selfSourcedWithoutProvider?: boolean | null): string {
-  if (selfSourcedWithoutProvider === true) {
-    if (sourceType === 'sales_self_sourced') return '销售本人自拓（未关联新媒体）'
-    if (sourceType === 'education_self_sourced') return '教务本人自拓（未关联新媒体）'
-  }
+  if (selfSourcedWithoutProvider === true && sourceType === 'sales_self_sourced') return '销售本人自拓（未关联新媒体）'
   return name || '历史未记录'
 }
 
@@ -98,6 +95,7 @@ export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListIte
   return {
     id: order.id,
     orderNo: order.orderNo,
+    taskName: order.taskName,
     leadId: order.leadId,
     personId: order.personId,
     orderType: order.orderType,
@@ -109,6 +107,7 @@ export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListIte
     provinceName: order.provinceName,
     cityName: order.cityName,
     agreedExamTime: order.agreedExamTime,
+    agreedExamMonth: order.agreedExamMonth,
     classType: order.classType,
     studentNatureLabelSnapshot: order.studentNatureLabelSnapshot,
     servicePeriodLabelSnapshot: order.servicePeriodLabelSnapshot,
@@ -146,3 +145,5 @@ export function validateSalesOrderDecisionReason(decision: 'approve' | 'reject',
   if ((decision === 'reject' || required) && !reason.trim())
     return decision === 'reject' ? '请填写驳回原因' : '请填写审批意见'
 }
+
+export const FINANCE_ORDER_PROCESS_KEY = 'zsjos_sales_order_finance_approval'

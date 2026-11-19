@@ -16,8 +16,8 @@ public final class MediaAccountFieldPolicy {
         if (userId == null || !Boolean.TRUE.equals(field.getEnabled())) return false;
         if (POSITIONING_SYNC_FIELDS.contains(field.getKey()) || isRetiredPositioning(field)) return false;
         if (Set.of("student_commitments", "company_commitments").contains(field.getKey()) && !userId.equals(account.getDirectorUserId())) return false;
-        return "DIRECTOR".equals(field.getOwnerType()) && userId.equals(account.getDirectorUserId())
-                || "OPERATOR".equals(field.getOwnerType()) && userId.equals(account.getOwnerOperatorUserId());
+        boolean manualField = "DIRECTOR".equals(field.getOwnerType()) || "OPERATOR".equals(field.getOwnerType());
+        return manualField && (userId.equals(account.getDirectorUserId()) || userId.equals(account.getOwnerOperatorUserId()));
     }
     public static boolean isRetiredPositioning(FieldVO field) {
         return "POSITIONING".equals(field.getGroup()) || field.getKey().startsWith("pc_")

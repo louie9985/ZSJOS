@@ -39,6 +39,7 @@ public class SalesOrderRespVO {
     private String cityCode;
     private String cityName;
     private String agreedExamTime;
+    private String agreedExamMonth;
     private String classType;
     private String servicePeriod;
     private String servicePeriodLabelSnapshot;
@@ -63,8 +64,16 @@ public class SalesOrderRespVO {
     private Integer approvalRoundNo;
     private String approvalRoundStatus;
     private String processInstanceId;
+    private String processDefinitionKey;
+    private ApprovalTask approvalTask;
+    private List<cn.iocoder.yudao.module.bpm.api.task.BpmProcessProgressApi.Comment> approvalComments;
+    private cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessProgressDTO approvalProgress;
+
+    public record ApprovalTask(String id, String name, String processInstanceId, String taskDefinitionKey,
+                               String parentTaskId, Integer status, Boolean reasonRequire, boolean canAct, boolean canSign) {}
     private String taskId;
     private Boolean approvalReasonRequired;
+    private String taskName;
     private String taskDefinitionKey;
     private Integer taskStatus;
     private String taskReason;

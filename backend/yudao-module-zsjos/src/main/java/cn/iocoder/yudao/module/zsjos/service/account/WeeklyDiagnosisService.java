@@ -118,6 +118,12 @@ public class WeeklyDiagnosisService {
         var metricContext = new DiagnosisMetricService.ReadContext();
         var preview=withMetrics(account,node,request.getHighestLikes(),false,metricContext);
         if(node.parts().stream().anyMatch(p->p.days()==7) && request.getHighestLikes()==null)throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+        for (Part part : node.parts()) {
+            if (part.days() != 7 && part.days() != 28) continue;
+            Long count = part.days() == 7 ? request.getPublished7() : request.getPublished28();
+            if (count == null || count < 0) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+            metricContext.manualPublications.put(part.days(), count);
+        }
         if(!token(preview).equals(request.getMetricToken()))throw exception(MEDIA_ACCOUNT_DIAGNOSIS_METRICS_CHANGED);
         String changeLabel=Objects.equals(previousContent.get("changeDirection"),request.getChangeDirection()) && previousContent.get("changeDirectionLabel") instanceof String saved ? saved : label(request.getChangeDirection());
         String trafficLabel=Objects.equals(previousContent.get("trafficNormal"),request.getTrafficNormal()) && previousContent.get("trafficNormalLabel") instanceof String saved ? saved : label(request.getTrafficNormal());
@@ -140,6 +146,8 @@ public class WeeklyDiagnosisService {
         content.put("nodeKey",node.key());content.put("roundKey",node.roundKey());content.put("week",node.week());content.put("weeklyNode",node);
         content.put("weeklyFingerprint",fingerprint);content.put("changeDirection",request.getChangeDirection());content.put("changeDirectionLabel",changeLabel);
         content.put("trafficNormal",request.getTrafficNormal());content.put("trafficNormalLabel",trafficLabel);content.put("directionSummary",request.getDirectionSummary());content.put("highestLikes",request.getHighestLikes());
+        content.put("published7", request.getPublished7());
+        content.put("published28", request.getPublished28());
         primaryEntry.setContent(JsonUtils.toJsonString(content));entries.updateById(primaryEntry);
         for(int i=1;i<node.parts().size();i++){
             var part=node.parts().get(i);

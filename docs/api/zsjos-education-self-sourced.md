@@ -1,4 +1,15 @@
-# 教务自拓与直接成交
+# 自拓统一入口与历史教务来源
+
+## 当前行为（2026-11-16 教务身份退役）
+
+只有销售自拓：`POST /zsjos/lead/self-sourced/{archive-query,contact-check,create}`，权限 `zsjos:lead:self-sourced:create`，提交人须具备 `zsjos:sales:eligible` 且账号、部门和人员状态有效。`/zsjos/lead/education-self-sourced/*` 三个端点、`zsjos:lead:education-self-sourced:create` 在全部 `@PreAuthorize` 中的引用、Workbench `/zsjos/leads/education-self-sourced` 路由、Vue Admin `leadEducationSelfSourced` 页面及两端教务自拓客户端均已删除（菜单元数据已由 V371 退役）。新建自拓一律记录 `sales_self_sourced` 来源和 `sales` 负责人身份，自动首跟/判有效标记为 `sales_self_sourced_auto`。
+
+存量 `education_self_sourced` 来源、`education` 身份、`education_self_sourced_auto` 标记和系统生成的“教务…直接归属”原因由 [`sales_education_identity_backfill.sql`](../../script/sql/mysql/repair/sales_education_identity_backfill.sql) 回填为销售等价值；代码不保留教务兼容分支，未回填的 `education` 身份被视为未知身份，主管恢复/转派/回收/释放失败关闭。
+
+## 以下为原教务自拓历史设计
+
+以下内容记录原有实现、历史迁移和快照规则；其中关于新建身份、岗位资格、独立菜单和权限的描述已由上面的当前行为取代，不代表当前新操作契约。历史迁移和已生成记录不因此回写。
+
 
 ## 业务边界
 

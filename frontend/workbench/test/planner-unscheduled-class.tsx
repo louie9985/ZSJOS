@@ -36,7 +36,6 @@ api.deliveryClasses.options = async () => {
 }
 api.registrationPoolPage = async () => ({ list: [record], total: 1 })
 api.registrationCase = async () => structuredClone(record)
-api.updateRegistrationClassAssignments = async (_id, body) => { state.requests.push(body.assignments); record.classAssignments![0].classId = body.assignments[0].classId; return structuredClone(record) }
 const permissions = query.has('denied') ? ['zsjos:registration:query-pool'] : ['zsjos:registration:query-pool', 'zsjos:registration:update', 'zsjos:delivery-class:query-managed', 'zsjos:delivery-class:update', 'zsjos:delivery-class:complete', 'zsjos:delivery-class:direct-transfer', 'zsjos:student-service:restore']
 const service = { serviceRelationId: 90, classId: query.has('transfer') ? 99 : 3, className: '正式班', ownerUserId: 20, status: 'active', version: 1 }
 const context = { serviceRelationId: 90, version: 1, availableActions: query.has('denied') ? [] : ['DIRECT_TRANSFER'], visibleTabs: [], firstContactChecklist: [], quickNotes: [], deliveryStages: [], formFields: [] } as unknown as StudentContactContext

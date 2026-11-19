@@ -3,7 +3,10 @@ import OrderProductSummary from '../components/OrderProductSummary.vue'
 import OrderHistoryFacts from '../components/OrderHistoryFacts.vue'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
 import * as Api from '@/api/zsjos/workbenchMenus'
+import { FINANCE_ORDER_PROCESS_KEY } from '@/api/zsjos/salesOrderApproval'
+import FinanceOrderApprovalDetail from './FinanceOrderApprovalDetail.vue'
 const message = useMessage()
+const nativeFinance = computed(() => detail.value?.processDefinitionKey === Api.FINANCE_ORDER_PROCESS_KEY)
 const open = ref(false)
 const current = ref<any>()
 const detail = ref<any>()
@@ -14,15 +17,19 @@ const detailLoading = ref(false)
 const approvalReasonRequired = ref<boolean>()
 const loadError = ref('')
 const reasonRequired = computed(() => decision.value === 'reject' || approvalReasonRequired.value !== false)
+const isFinance = computed(() => current.value?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY)
 const load = async () => {
   detail.value = undefined
   approvalReasonRequired.value = undefined
   loadError.value = ''
   detailLoading.value = true
   try {
-    const [order, target] = await Promise.all([
-      Api.getSalesOrder(current.value.id), Api.getSalesOrderApprovalTaskTarget(current.value.taskId)
-    ])
+    const order = await Api.getSalesOrder(current.value.id, current.value.taskId)
+    if (order.processDefinitionKey === Api.FINANCE_ORDER_PROCESS_KEY) {
+      detail.value = order
+      return
+    }
+    const target = await Api.getSalesOrderApprovalTaskTarget(current.value.taskId)
     if (target.orderId !== current.value.id || typeof target.approvalReasonRequired !== 'boolean')
       throw new Error('审批任务或意见配置未加载，请重试')
     detail.value = order
@@ -38,10 +45,14 @@ const show = async (row: any, fn: () => void) => {
   decision.value = 'approve'
   reason.value = ''
   open.value = true
-  await load()
+  if (!isFinance.value) await load()
+}
+const onFinanceChanged = async (completed: boolean) => {
+  if (completed) open.value = false
+  await reloadList()
 }
 const submit = async () => {
-  if (!current.value?.taskId || !detail.value)
+  if (!current.value?.taskId || !detail.value || nativeFinance.value)
     return message.warning('审批并发信息缺失，请刷新详情')
   if (typeof approvalReasonRequired.value !== 'boolean') return message.warning('审批意见配置未加载，请重试')
   if (reasonRequired.value && !reason.value.trim())
@@ -80,8 +91,17 @@ const submit = async () => {
         >审批</el-button
       ></template
     ></WorkbenchListPage
-  ><el-dialog v-model="open" title="成交审批" width="min(560px, calc(100vw - 32px))"
-    ><div v-loading="detailLoading">
+  ><el-dialog v-model="open" title="成交审批" :width="isFinance ? 'min(820px, calc(100vw - 32px))' : 'min(560px, calc(100vw - 32px))'"
+    :close-on-click-modal="false" destroy-on-close
+  >
+    <FinanceOrderApprovalDetail
+      v-if="open && isFinance"
+      :task-id="current.taskId"
+      :process-instance-id="current.processInstanceId"
+      entry="business"
+      @changed="onFinanceChanged"
+    />
+    <div v-else-if="!isFinance" v-loading="detailLoading">
       <el-alert v-if="loadError" :title="loadError" type="error" :closable="false">
         <el-button link type="primary" @click="load">重试</el-button>
       </el-alert>
@@ -90,7 +110,7 @@ const submit = async () => {
       <el-descriptions v-if="detail && !detailLoading" :column="1" border>
         <el-descriptions-item label="成交归属身份">{{ detail.formalOwnerIdentityLabel || '未记录' }}</el-descriptions-item>
       </el-descriptions>
-      <el-form label-width="90px"
+      <el-form v-if="!nativeFinance" label-width="90px"
         ><el-form-item label="订单"
           ><span>{{ detail?.orderNo || `#${current?.id}` }}</span></el-form-item
         ><el-form-item label="结论" required
@@ -106,7 +126,7 @@ const submit = async () => {
             :rows="4"
             maxlength="1000"
             show-word-limit /></el-form-item></el-form></div
-    ><template #footer
+    ><template v-if="!isFinance" #footer
       ><el-button @click="open = false">取消</el-button
       ><el-button
         type="primary"

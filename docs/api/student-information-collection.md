@@ -244,3 +244,7 @@ GET /zsjos/student-info-task/page 的 status 校验允许 CANCELLED，与既有�
 V380 起，租户 1 按产品末级分类独立保存、发布协议。Admin 与 Workbench 嵌入页共用 /admin-api/zsjos/enrollment-agreement：GET /categories 读取分类树，GET 带 categoryId 读取该末级分类；PUT /draft 和 POST /publish 请求体带 categoryId、revision、body。权限分别为 zsjos:agreement:query、update、publish（相同前缀）。未配置的分类仅显示起草范本，必须先保存再发布，不会签署公共范本或其他分类的协议。每张新报名表按已关联产品的末级分类绑定一份已发布模板，冻结版本、正文与分类名称。课程名称仅展示该分类，实际费用仍取关联订单明细，不拼 SKU。已签正文不重算；V378 已生成但未签的表保留原模板，从原订单快照读取分类名，无可靠分类名时提示补全，正文变化需要重新阅读。
 
 H5 详情返回 agreementBody、agreementHash、agreementConsent，已确认的表另含 agreementConfirmedDate。正文末尾可见后，须主动点击阅读完成，通过相同 token 调用 POST `/public-api/zsjos/student-info-form/agreement-read?digest=...`。提交时传 agreementHash、agreementAccepted。服务端锁定表单重新核对订单明细，校验阅读记录和主动确认，随报名提交事务保存确认时间、同意文案和加密正文。内容变化返回 1900090030，缺少阅读或同意返回 1900090031。旧表未绑定版本时沿用原提交接口。持链接确认不提供学员实名验证。
+
+### V381：按启用产品（SPU）维护报名协议
+
+V381 在 V380 后执行。协议维护 GET /products 只返回分类路径和 SPU 均启用的产品；详情、保存、发布使用 productRef。报名表按关联 SPU ID 匹配已发布协议并冻结产品名；同分类不同 SPU 分别发布，同 SPU 的 SKU 共用。没有发布时阻止生成，不继承分类模板、不回填旧表。旧表继续显示原名称快照，已确认正文不变。

@@ -89,7 +89,7 @@ class WeeklyDiagnosisServiceTest {
         var preview=service.preview(10L,WeeklyDiagnosisPeriods.key(10L,"r",anchor.plusDays(28)),0L,20L);
         var common=new DiagnosisRequest();common.setIdempotencyKey("idempotency");
         var request=new Submit();request.setCommon(common);request.setNodeKey(preview.node().key());request.setMetricToken(preview.metricToken());
-        request.setHighestLikes(0L);request.setChangeDirection("true");request.setTrafficNormal("false");request.setDirectionSummary("概况");
+        request.setPublished7(0L);request.setPublished28(12L);request.setHighestLikes(0L);request.setChangeDirection("true");request.setTrafficNormal("false");request.setDirectionSummary("概况");
         var yes=new cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO();yes.setValue("true");yes.setLabel("是");
         var no=new cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO();no.setValue("false");no.setLabel("否");
         when(dicts.getDictDataList("infra_boolean_string")).thenReturn(List.of(yes,no));

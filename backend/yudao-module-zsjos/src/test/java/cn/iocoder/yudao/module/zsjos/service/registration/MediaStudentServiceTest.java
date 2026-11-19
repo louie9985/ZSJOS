@@ -204,6 +204,7 @@ class MediaStudentServiceTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private MediaStudentTalkRecordMapper talkRecordMapper;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.sales.SalesDepartmentBoundaryService salesBoundary;
 
     @Test
     void detailRestoresOwnUnboundDraftWithoutExposingOtherCards() {
@@ -419,5 +420,88 @@ class MediaStudentServiceTest {
         org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,()->service.resolveTarget(1L,"student_delivery_stage",9L));
         verify(accountService).get(7L,1L);
         verifyNoInteractions(myStudentService);
+    }
+    @Test void nonSalesKeepsHistoricalTalkReadWithoutNewPermission() {
+        var student = new MyStudentRespVO(); student.setPersonId(10L); student.setServices(List.of());
+        when(myStudentService.getMediaStudent(7L, 10L)).thenReturn(student);
+        var record = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO();
+        record.setId(1L); record.setStudentPersonId(10L); record.setContent("private"); record.setOperatorUserId(7L);
+        when(talkRecordMapper.selectByStudent(10L)).thenReturn(List.of(record));
+        when(adminUserApi.getUserMap(anySet())).thenReturn(java.util.Map.of());
+        assertEquals(1, service.getTalkRecords(7L,10L).size());
+        verify(permissionApi, never()).hasAnyPermissions(7L, "zsjos:media-student:history-review");
+    }
+
+    @Test void newTalkRequiresExplicitServiceRelation() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO();
+        request.setContent("test");
+        when(salesBoundary.isSalesActor(7L)).thenReturn(true);
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.createTalkRecord(7L,10L,request));
+        verifyNoInteractions(talkRecordMapper);
+    }
+    @Test void salesTalkReadNeverExposesAnotherServiceAndReviewOnlyAddsUnknown() {
+        var visible = new MyStudentRespVO.ServiceVO(); visible.setServiceRelationId(100L);
+        var student = new MyStudentRespVO(); student.setPersonId(10L); student.setServices(List.of(visible));
+        when(myStudentService.getMediaStudent(7L, 10L)).thenReturn(student);
+        when(salesBoundary.isSalesActor(7L)).thenReturn(true);
+        var own = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO();
+        own.setId(1L); own.setServiceRelationId(100L); own.setOperatorUserId(7L); own.setContent("own");
+        var other = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO();
+        other.setId(2L); other.setServiceRelationId(200L); other.setOperatorUserId(7L); other.setContent("other");
+        var unknown = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO();
+        unknown.setId(3L); unknown.setOperatorUserId(7L); unknown.setContent("unknown");
+        when(talkRecordMapper.selectByStudent(10L)).thenReturn(List.of(own, other, unknown));
+        when(accountMapper.selectByStudent(10L)).thenReturn(List.of());
+        when(adminUserApi.getUserMap(anySet())).thenReturn(java.util.Map.of());
+        assertEquals(List.of(1L), service.getTalkRecords(7L,10L).stream().map(row -> row.getId()).toList());
+        when(permissionApi.hasAnyPermissions(7L, "zsjos:media-student:history-review")).thenReturn(true);
+        assertEquals(List.of(1L,3L), service.getTalkRecords(7L,10L).stream().map(row -> row.getId()).toList());
+    }
+    @Test void nonSalesLegacyTalkCreationKeepsOriginalRequestAndParticipation() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO();
+        request.setContent("legacy");
+        var relation = new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO(); relation.setId(100L);
+        when(relationMapper.selectAssignedByUserAndPersonIds(7L, List.of(10L), null)).thenReturn(List.of(relation));
+        service.createTalkRecord(7L, 10L, request);
+        var saved = org.mockito.ArgumentCaptor.forClass(cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO.class);
+        verify(talkRecordMapper).insert(saved.capture());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getValue().getServiceRelationId());
+    }
+    @Test void nonSalesCannotForgeServiceAttributionThroughNewOptionalField() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO();
+        request.setContent("legacy"); request.setServiceRelationId(999L);
+        var relation = new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO(); relation.setId(100L);
+        when(relationMapper.selectAssignedByUserAndPersonIds(7L, List.of(10L), null)).thenReturn(List.of(relation));
+        service.createTalkRecord(7L, 10L, request);
+        var saved = org.mockito.ArgumentCaptor.forClass(cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO.class);
+        verify(talkRecordMapper).insert(saved.capture());
+        org.junit.jupiter.api.Assertions.assertNull(saved.getValue().getServiceRelationId());
+    }
+    @Test void salesCannotSubmitTalkForAnotherServiceOfSamePerson() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO();
+        request.setContent("test"); request.setServiceRelationId(200L);
+        var visible = new MyStudentRespVO.ServiceVO(); visible.setServiceRelationId(100L);
+        var student = new MyStudentRespVO(); student.setPersonId(10L); student.setServices(List.of(visible));
+        when(salesBoundary.isSalesActor(7L)).thenReturn(true);
+        when(myStudentService.getMediaStudent(7L, 10L)).thenReturn(student);
+        org.junit.jupiter.api.Assertions.assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.createTalkRecord(7L, 10L, request));
+        verifyNoInteractions(talkRecordMapper);
+    }
+
+    @Test void salesTalkPersistsOnlyVisibleParticipatingService() {
+        var request = new cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO();
+        request.setContent("test"); request.setServiceRelationId(100L);
+        var visible = new MyStudentRespVO.ServiceVO(); visible.setServiceRelationId(100L);
+        var student = new MyStudentRespVO(); student.setPersonId(10L); student.setServices(List.of(visible));
+        var relation = new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO(); relation.setId(100L);
+        when(salesBoundary.isSalesActor(7L)).thenReturn(true);
+        when(myStudentService.getMediaStudent(7L, 10L)).thenReturn(student);
+        when(relationMapper.selectAssignedByUserAndPersonIds(7L, List.of(10L), null)).thenReturn(List.of(relation));
+        service.createTalkRecord(7L, 10L, request);
+        var saved = org.mockito.ArgumentCaptor.forClass(cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO.class);
+        verify(talkRecordMapper).insert(saved.capture());
+        assertEquals(100L, saved.getValue().getServiceRelationId());
     }
 }

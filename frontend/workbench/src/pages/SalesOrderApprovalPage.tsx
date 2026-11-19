@@ -1,14 +1,15 @@
 import BusinessTable from '../components/BusinessTable'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Badge, Button, Empty, Form, Input, Modal, Result, Segmented, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { Link } from 'react-router-dom'
 import { DownloadOutlined } from '@ant-design/icons'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderApprovalFilterProfile, type SalesOrderListItem } from '../services/api'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS, SALES_ORDER_TASK_LABELS } from '../components/SalesOrderDetailCards'
 import { formatTimestamp } from '../services/time'
-import { validateSalesOrderDecisionReason, mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey } from '../services/salesOrder'
+import { FINANCE_ORDER_PROCESS_KEY, validateSalesOrderDecisionReason, mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import SalesOrderSupervisorInbox from '../components/SalesOrderSupervisorInbox'
@@ -18,13 +19,14 @@ import { useInboxTableLayout } from '../services/inboxLayout'
 
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import { buildSalesOrderTableColumns } from '../components/SalesOrderTableColumns'
+import FinanceOrderApprovalDetail from '../components/FinanceOrderApprovalDetail'
+import { invalidateMenuTasks } from '../services/menuTaskRefresh'
 import LeadDetailModal from '../components/LeadDetailModal'
 
 const PAGE_SIZE = 20
 
 export default function SalesOrderApprovalPage({ permissions }: { permissions: string[] }) {
   const navigate = useNavigate()
-  const location = useLocation()
   const [searchParams] = useSearchParams()
   const { canReview, canConfirmSupervisor, defaultWorkType, showWorkTypeSwitch } = resolveSalesOrderApprovalAccess(permissions)
   const requestedWorkTypeValue = searchParams.get('workType')
@@ -32,6 +34,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     ? requestedWorkTypeValue : undefined
   const requestedOrderId = Number(searchParams.get('orderId')) || undefined
   const requestedTaskId = searchParams.get('taskId') || undefined
+  const requestedDone = searchParams.get('view') === 'done' || searchParams.get('done') === 'true'
   const requestedConfirmationId = Number(searchParams.get('confirmationId')) || undefined
   const [workType, setWorkType] = useState<SalesOrderApprovalWorkType>(requestedWorkType || defaultWorkType || 'approval')
   const [profile, setProfile] = useState<SalesOrderApprovalFilterProfile>({ groups: [], centers: [], orderStates: [] })
@@ -46,6 +49,8 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const [cursor, setCursor] = useState<string>()
   const [hasMore, setHasMore] = useState(true)
   const [selectedKey, setSelectedKey] = useState<string>()
+  const [linkedItem, setLinkedItem] = useState<SalesOrderListItem>()
+  const [finishedTaskId, setFinishedTaskId] = useState<string>()
   const [detail, setDetail] = useState<SalesOrder>()
   const [loading, setLoading] = useState(false)
   const [profileLoading, setProfileLoading] = useState(true)
@@ -89,7 +94,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     return request
   }, [canReview])
 
-  const loadPage = useCallback(async (targetCursor: string | undefined, replace: boolean) => {
+  const loadPage = useCallback(async (targetCursor: string | undefined, replace: boolean, keepSelection = false) => {
     const requestKey = `${targetCursor || 'first'}:${center}:${orderState}:${tablePage}:${tablePageSize}:${useTableLayout}:${keyword.trim()}:${JSON.stringify(advancedFilter)}`
     if (!replace && inflightPages.current.has(requestKey)) return
     inflightPages.current.add(requestKey)
@@ -103,14 +108,14 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       setItems(current => replace || useTableLayout ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey));
       if ('total' in result) setTableTotal(result.total)
       else { setCursor(result.nextCursor); setHasMore(result.hasMore) }
-      if (replace) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
+      if (replace && !requestedOrderId && !requestedTaskId && !keepSelection) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
     } catch (loadError) {
       if (version === requestVersion.current) setError(loadError instanceof Error ? loadError.message : '成交审批加载失败')
     } finally {
       inflightPages.current.delete(requestKey)
       if (version === requestVersion.current) setLoading(false)
     }
-  }, [advancedFilter, center, keyword, orderState, tablePage, tablePageSize, useTableLayout])
+  }, [advancedFilter, center, keyword, orderState, requestedOrderId, requestedTaskId, tablePage, tablePageSize, useTableLayout])
 
   useEffect(() => { void loadProfile() }, [loadProfile])
   useEffect(() => {
@@ -122,28 +127,49 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   }, [canConfirmSupervisor, canReview, workType])
   useEffect(() => { if (!profileLoading && !profileError && orderState && center) void loadPage(undefined, true) }, [center, orderState, keyword, profileLoading, profileError, loadPage])
 
+  const [linkRetry, setLinkRetry] = useState(0)
   useEffect(() => {
-    if (workType !== 'approval' || !requestedOrderId) return
+    if (workType !== 'approval' || (!requestedOrderId && !requestedTaskId)) return
     const version = ++deepLinkVersion.current
-    const targetRequest = requestedTaskId && !requestedConfirmationId
-      ? api.salesOrderApprovalTaskTarget(requestedTaskId) : Promise.resolve(undefined)
-    void Promise.all([api.salesOrder(requestedOrderId), targetRequest]).then(([order, target]) => {
+    ++detailVersion.current
+    setSelectedKey(undefined); setDetail(undefined); setLinkedItem(undefined)
+    setDetailError(''); setDetailLoading(true)
+    const locate = async () => {
+      const target = requestedTaskId && !requestedConfirmationId
+        ? await api.salesOrderApprovalTaskTarget(requestedTaskId, requestedDone ? 'done' : 'todo') : undefined
+      if (target && (target.taskId !== requestedTaskId || (requestedOrderId && target.orderId !== requestedOrderId))) {
+        throw new Error('目标审批任务与订单不匹配')
+      }
+      const id = target?.orderId ?? requestedOrderId
+      if (!id) throw new Error('审批链接缺少订单信息')
+      const nativeOrder = target?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY && requestedTaskId
+        ? await api.financeApprovalOrder(requestedTaskId, requestedDone, 'business', id) : undefined
+      const order = nativeOrder ?? await api.salesOrder(id)
+      if (order.id !== id) throw new Error('目标审批任务与订单不匹配')
       if (version !== deepLinkVersion.current) return
-      const item = { ...salesOrderDetailToListItem(order), taskId: target?.taskId || requestedTaskId,
-        taskDefinitionKey: target?.taskDefinitionKey || order.supervisorApproval?.taskDefinitionKey,
+      const item: SalesOrderListItem = { ...salesOrderDetailToListItem(order), taskId: target?.taskId || requestedTaskId,
+        processDefinitionKey: target?.processDefinitionKey, taskDefinitionKey: target?.taskDefinitionKey || order.supervisorApproval?.taskDefinitionKey,
+        taskEndTime: nativeOrder?.taskEndTime,
         approvalReasonRequired: target?.approvalReasonRequired }
-      setItems(current => mergeSalesOrderListItems([item], current, salesOrderTaskKey))
-      ++detailVersion.current
-      setSelectedKey(salesOrderTaskKey(item)); setDetail(order)
+      setLinkedItem(item)
+      setSelectedKey(salesOrderTaskKey(item))
+      setDetail(nativeOrder ? undefined : order)
       if (target) setCenter(target.center)
-    }).catch(loadError => {
+      if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+    }
+    void locate().catch(loadError => {
       if (version !== deepLinkVersion.current) return
-      ++detailVersion.current; setSelectedKey(undefined); setDetail(undefined)
       setDetailError(loadError instanceof Error ? loadError.message : '审批任务定位失败')
+      if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+    }).finally(() => {
+      if (version === deepLinkVersion.current) setDetailLoading(false)
     })
-  }, [requestedConfirmationId, requestedOrderId, requestedTaskId, workType])
+    return () => { ++deepLinkVersion.current }
+  }, [linkRetry, requestedConfirmationId, requestedDone, requestedOrderId, requestedTaskId, useTableLayout, workType])
 
-  const selectedItem = useMemo(() => items.find(item => salesOrderTaskKey(item) === selectedKey), [items, selectedKey])
+  const selectedItem = useMemo(() => items.find(item => salesOrderTaskKey(item) === selectedKey)
+    ?? (linkedItem && salesOrderTaskKey(linkedItem) === selectedKey ? linkedItem : undefined), [items, linkedItem, selectedKey])
+  const selectedFinanceTask = selectedItem?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ? selectedItem.taskId : undefined
   const loadDetail = useCallback(async (id: number) => {
     const version = ++detailVersion.current
     setDetailLoading(true); setDetailError('')
@@ -152,9 +178,10 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     finally { if (version === detailVersion.current) setDetailLoading(false) }
   }, [])
   useEffect(() => {
+    if (selectedFinanceTask) return
     if (selectedItem && detail?.id !== selectedItem.id) void loadDetail(selectedItem.id)
     else if (!selectedItem) setDetail(undefined)
-  }, [detail?.id, loadDetail, selectedItem])
+  }, [detail?.id, loadDetail, selectedFinanceTask, selectedItem])
 
   const resetList = () => {
     ++requestVersion.current; ++detailVersion.current
@@ -222,13 +249,28 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       complete(); setSupervisorOpen(false); setReason(''); message.success('已申请主管确认'); reload()
     }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '申请失败'))
   }
-  const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
-    : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
+  const detailContent = selectedFinanceTask ? <FinanceOrderApprovalDetail
+    key={selectedFinanceTask} taskId={selectedFinanceTask} orderId={selectedItem?.id}
+    done={Boolean(selectedItem?.taskEndTime) || (selectedFinanceTask === requestedTaskId && requestedDone) || selectedFinanceTask === finishedTaskId}
+    canUpdate={canReview} entry="business" onSuccess={completed => {
+      setLinkedItem(selectedItem)
+      if (completed) {
+        setFinishedTaskId(selectedFinanceTask)
+      }
+      invalidateMenuTasks(true)
+      void loadPage(undefined, true, true)
+    }}/>
+    : detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
+    : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem ? void loadDetail(selectedItem.id) : setLinkRetry(value => value + 1)}>重试</Button>}/>
       : detail ? <><div className="sales-order-detail-actions">{detail.leadId && <Button onClick={() => {
         setLeadDetailModalLeadId(detail.leadId)
         setLeadDetailModalOpen(true)
       }}>客户档案</Button>}</div>
-        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} informationLayout="table" mode={selectedItem?.taskEndTime ? 'approval-done' : 'approval-todo'}
+                {detail.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY && selectedItem?.taskId &&
+          <Link to={`${selectedItem.taskEndTime ? APP_ROUTES.BPM_DONE : APP_ROUTES.BPM_TODO}?taskId=${encodeURIComponent(selectedItem.taskId)}`}>
+            前往通用审批查看财务任务
+          </Link>}
+        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} informationLayout="table" mode={selectedItem?.taskEndTime || detail.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ? 'approval-done' : 'approval-todo'}
           reloadVouchers={async () => (await api.salesOrder(detail.id)).paymentVouchers}
           onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}
           onRequestSupervisor={() => { resetIntent(); setReason(''); setSupervisorOpen(true) }}/></>
@@ -257,14 +299,14 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPage(undefined, true)}>重试</Button>}/>}
       <div className="business-inbox-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false) }}>
         {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={salesOrderTaskKey(item) === selectedKey ? 'business-inbox-item active' : 'business-inbox-item'} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
-          <div className="business-inbox-item-main"><SubjectAvatar seed={item.leadNo} label="" /><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.studentName}</strong><Tag>{SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交审批'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
+          <div className="business-inbox-item-main"><SubjectAvatar seed={item.leadNo} label="" /><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{item.studentName}</strong><Tag>{item.taskName || (item.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ? undefined : SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || '']) || '成交审批'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
           <div className="business-inbox-item-meta"><Badge status="processing"/><span>{formatTimestamp(item.taskCreateTime || item.submittedAt)}</span></div>
         </button>)}
         {loading && <div className="lead-list-loading"><Spin size="small"/> 加载中</div>}
         {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="lead-list-end">已加载全部审批</Typography.Text>}
       </div>
-    </aside><main className="business-inbox-detail-pane">{detailContent}</main></div>}
-    <ResizableDetailDrawer desktopResizable={useTableLayout} className="business-inbox-mobile-drawer sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" placement="right" width="100%">{detailContent}</ResizableDetailDrawer>
+    </aside><main className="business-inbox-detail-pane">{!drawerOpen && detailContent}</main></div>}
+    <ResizableDetailDrawer desktopResizable={useTableLayout} className="business-inbox-mobile-drawer sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" placement="right" width="100%">{drawerOpen ? detailContent : null}</ResizableDetailDrawer>
     <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} onCancel={closeDecision} footer={<><Button onClick={closeDecision}>取消</Button><IrreversiblePopconfirm action={`${decision === 'approve' ? '通过' : '驳回'}成交订单「${selectedItem?.orderNo || ''}」`} danger={decision === 'reject'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submitDecision}><Button type="primary" danger={decision === 'reject'} loading={saving} onClick={prepareDecision}>提交审批</Button></IrreversiblePopconfirm></>}>{typeof selectedItem?.approvalReasonRequired !== 'boolean' && <Alert type="error" showIcon message="审批意见配置未加载，暂不能提交" action={<Button size="small" loading={reasonConfigLoading} onClick={() => void retryReasonConfig()}>重试</Button>} />}<Form.Item label="审批意见" required={reasonRequired}><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder={decision === 'reject' ? '请填写驳回原因' : reasonRequired ? '请填写审批意见' : '审批意见（选填）'}/></Form.Item></Modal>
     <Modal title="申请主管确认" open={supervisorOpen} onCancel={() => { setSupervisorOpen(false); setReason(''); resetIntent() }}
       onOk={() => void submitSupervisorRequest()} confirmLoading={saving} okText="提交申请">

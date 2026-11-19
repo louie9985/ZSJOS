@@ -17,6 +17,19 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class SubordinateSalesDailyQueryTest {
+    @Test void salesTeamExcludesRetiredEducationIdentityAndRejectsUnprovenRecycle() throws Exception {
+        var db = new UnpooledDataSource("org.h2.Driver", "jdbc:h2:mem:team_scope" + UUID.randomUUID() + ";MODE=MySQL", "sa", "");
+        try (var connection = db.getConnection(); var sql = connection.createStatement()) {
+            sql.execute("CREATE TABLE zsjos_lead(id BIGINT, tenant_id BIGINT, deleted BOOLEAN, assignment_status VARCHAR, owner_identity VARCHAR, owner_user_id BIGINT, recycle_source_owner_user_id BIGINT)");
+            sql.execute("CREATE TABLE zsjos_lead_assignment_history(id BIGINT, tenant_id BIGINT, deleted BOOLEAN, lead_id BIGINT, occurred_at TIMESTAMP, action_type VARCHAR, from_owner_user_id BIGINT, to_owner_user_id BIGINT, owner_identity_snapshot VARCHAR)");
+            sql.execute("INSERT INTO zsjos_lead VALUES(1,1,false,'owned','sales',20,NULL),(2,1,false,'owned','education',20,NULL),(3,1,false,'recycle_pending',NULL,NULL,20),(4,1,false,'recycle_pending',NULL,NULL,20)");
+            sql.execute("INSERT INTO zsjos_lead_assignment_history VALUES(1,1,false,3,CURRENT_TIMESTAMP,'recycle',20,NULL,'sales'),(2,1,false,4,CURRENT_TIMESTAMP,'recycle',20,NULL,'education')");
+            try (var rows=sql.executeQuery("SELECT id FROM zsjos_lead WHERE " + SubordinateSalesIdentitySql.CONDITION + " ORDER BY id")) {
+                var ids=new java.util.ArrayList<Long>(); while(rows.next()) ids.add(rows.getLong(1));
+                assertEquals(List.of(1L,3L),ids);
+            }
+        }
+    }
     // H2 lacks MySQL JSON functions; only their scalar projection is adapted.
     public static String jsonExtract(String json, String path) {
         if (json == null) return null;
@@ -25,7 +38,7 @@ public class SubordinateSalesDailyQueryTest {
     }
     public static String jsonUnquote(String value) { return value; }
     @org.junit.jupiter.params.ParameterizedTest
- @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto","education_self_sourced_auto"})
+ @org.junit.jupiter.params.provider.ValueSource(strings={"sales_self_sourced_auto"})
  void actualMapperQueriesEnforceUserTimeTenantDeletionAndEventScope(String generationSource) throws Exception {
         var datasource = new UnpooledDataSource("org.h2.Driver", "jdbc:h2:mem:daily" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         var config = new MybatisConfiguration();

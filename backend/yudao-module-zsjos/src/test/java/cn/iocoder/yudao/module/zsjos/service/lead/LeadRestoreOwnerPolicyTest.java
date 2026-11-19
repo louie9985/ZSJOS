@@ -15,45 +15,32 @@ import static org.mockito.Mockito.*;
 class LeadRestoreOwnerPolicyTest {
     @InjectMocks private LeadRestoreOwnerPolicy policy;
     @org.mockito.Spy private LeadTeamTransferPolicy teamTransferPolicy = new LeadTeamTransferPolicy();
-    @Mock private LeadAssignmentService assignmentService;
     @Mock private LeadSubmissionIdentityService identityService;
 
     @ParameterizedTest
-    @CsvSource({"education_self_sourced,self", "partner,specified"})
-    void supportedEducationOwnershipUsesEmployeeEligibilityOnly(String source, String dispatchMode) {
-        LeadDO lead = lead("education", source);
+    @CsvSource({"sales_self_sourced,self", "partner,specified", "internal_new_media,auto", "partner,auto"})
+    void salesOwnershipUsesEmployeeEligibilityForEverySource(String source, String dispatchMode) {
+        LeadDO lead = lead("sales", source);
         lead.setDispatchMode(dispatchMode);
-        when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
+        when(identityService.isEligibleRetainedOwner(20L)).thenReturn(true);
         assertTrue(policy.isEligible(lead));
-        when(identityService.isEligibleEducationOwner(20L)).thenReturn(false);
+        when(identityService.isEligibleRetainedOwner(20L)).thenReturn(false);
         assertFalse(policy.isEligible(lead));
-        verifyNoInteractions(assignmentService);
     }
 
-    @ParameterizedTest
-    @CsvSource({"internal_new_media,specified", "sales_self_sourced,self", "partner,auto",
-            "partner,self", "partner,", ",specified"})
-    void otherEducationSourcesDoNotGainRestoration(String source, String dispatchMode) {
-        LeadDO lead = lead("education", source);
-        lead.setDispatchMode(dispatchMode);
-        assertFalse(policy.isEligible(lead));
-        verifyNoInteractions(identityService, assignmentService);
-    }
-
-    @Test void salesOwnersRetainEligibilityButUnknownIdentityIsRejected() {
-        when(assignmentService.isEligibleSalesUser(20L)).thenReturn(true);
-        assertTrue(policy.isEligible(lead("sales", "sales_self_sourced")));
-        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> policy.isEligible(lead(null, "internal_new_media")));
-        when(assignmentService.isEligibleSalesUser(20L)).thenReturn(false);
-        assertFalse(policy.isEligible(lead("sales", "sales_self_sourced")));
+    @Test void retiredEducationOrUnknownIdentityIsRejected() {
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> policy.isEligible(lead("education", "partner")));
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> policy.isEligible(lead(null, "internal_new_media")));
         verifyNoInteractions(identityService);
     }
 
     @Test void absentOwnerCannotBeRestored() {
-        LeadDO lead = lead("education", "education_self_sourced");
+        LeadDO lead = lead("sales", "sales_self_sourced");
         lead.setOwnerUserId(null);
         assertFalse(policy.isEligible(lead));
-        verifyNoInteractions(identityService, assignmentService);
+        verifyNoInteractions(identityService);
     }
 
     private LeadDO lead(String identity, String source) {
@@ -61,12 +48,4 @@ class LeadRestoreOwnerPolicyTest {
         lead.setOwnerUserId(20L); lead.setOwnerIdentity(identity); lead.setSourceType(source);
         return lead;
     }
-    @Test void assistedEducationRetainsRestorationAfterSourceCorrection() {
-        LeadDO lead=lead("education","internal_new_media");
-        lead.setSubmissionSourceType("education_self_sourced");lead.setDispatchMode("self");
-        when(identityService.isEligibleEducationOwner(20L)).thenReturn(true);
-        assertTrue(policy.isEligible(lead));verifyNoInteractions(assignmentService);
-        lead.setSubmissionSourceType("sales_self_sourced");assertFalse(policy.isEligible(lead));
-    }
-
 }

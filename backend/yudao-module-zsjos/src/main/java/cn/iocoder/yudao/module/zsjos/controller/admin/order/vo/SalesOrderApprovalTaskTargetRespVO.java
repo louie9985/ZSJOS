@@ -6,6 +6,7 @@ import lombok.Data;
 public class SalesOrderApprovalTaskTargetRespVO {
     private String workType;
     private Long orderId;
+    private String processDefinitionKey;
     private String taskId;
     private Boolean approvalReasonRequired;
     private String taskDefinitionKey;

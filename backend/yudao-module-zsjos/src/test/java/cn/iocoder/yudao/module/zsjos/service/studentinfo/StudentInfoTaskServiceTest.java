@@ -29,8 +29,17 @@ class StudentInfoTaskServiceTest {
     @Mock StudentArchiveRevisionMapper revisions;
     @Mock StudentInfoFormService collection;
     @Mock StudentInfoImageService images;
-    @BeforeEach void setup() { TenantContextHolder.setTenantId(1L); }
-    @AfterEach void clear() { TenantContextHolder.clear(); }
+    @BeforeEach void setup() {
+        TenantContextHolder.setTenantId(1L);
+        cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.setLoginUser(
+                new cn.iocoder.yudao.framework.security.core.LoginUser().setId(20L),
+                new org.springframework.mock.web.MockHttpServletRequest());
+        lenient().when(permission.canAccess(any(), eq("create"), eq(20L))).thenReturn(true);
+    }
+    @AfterEach void clear() {
+        TenantContextHolder.clear();
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
     private SalesOrderDO order(String status) { var order=new SalesOrderDO();order.setId(1L);order.setPersonId(3L);order.setStatus(status);return order; }
     private StudentInfoTaskDO task() { var task=new StudentInfoTaskDO();task.setId(4L);task.setOrderId(1L);task.setOrderItemId(2L);task.setPersonId(3L);task.setVersion(0);return task; }
     private Command command() { var req=new Command();req.setVersion(0);req.setIdempotencyKey("fixture-key");req.setSourceFormId(8L);req.setSourceRevision(0);return req; }
@@ -68,15 +77,17 @@ class StudentInfoTaskServiceTest {
         com.baomidou.mybatisplus.core.metadata.TableInfoHelper.initTableInfo(new org.apache.ibatis.builder.MapperBuilderAssistant(new com.baomidou.mybatisplus.core.MybatisConfiguration(),"filter-test"),StudentInfoTaskDO.class);
         when(permission.canList(any())).thenReturn(true);
         try (var connection=java.sql.DriverManager.getConnection("jdbc:h2:mem:collection_rejection;MODE=MySQL");var statement=connection.createStatement()) {
-            statement.execute("CREATE TABLE zsjos_student_info_task(id BIGINT,order_id BIGINT,tenant_id BIGINT,form_id BIGINT)");
+            statement.execute("CREATE TABLE zsjos_student_info_task(id BIGINT,order_id BIGINT,tenant_id BIGINT,form_id BIGINT,order_item_id BIGINT)");
+            statement.execute("CREATE TABLE zsjos_registration_case(order_id BIGINT,order_item_id BIGINT,tenant_id BIGINT,deleted INT,owner_user_id BIGINT)");
             statement.execute("CREATE TABLE zsjos_order(id BIGINT,tenant_id BIGINT,deleted INT,status VARCHAR(30))");
             statement.execute("CREATE TABLE zsjos_order_approval_round(order_id BIGINT,tenant_id BIGINT,deleted INT,status VARCHAR(30))");
             statement.execute("INSERT INTO zsjos_order VALUES(1,1,0,'revision_required'),(2,1,0,'superseded'),(3,1,0,'terminated'),(4,1,0,'pending_approval'),(5,1,0,'terminated')");
             statement.execute("INSERT INTO zsjos_order_approval_round VALUES(3,1,0,'rejected'),(5,2,0,'rejected'),(5,1,1,'rejected')");
-            statement.execute("INSERT INTO zsjos_student_info_task VALUES(1,1,1,NULL),(2,2,1,20),(3,3,1,30),(4,4,1,NULL),(5,5,1,NULL)");
+            statement.execute("INSERT INTO zsjos_student_info_task VALUES(1,1,1,NULL,11),(2,2,1,20,22),(3,3,1,30,33),(4,4,1,NULL,44),(5,5,1,NULL,55),(6,4,1,NULL,66)");
+            statement.execute("INSERT INTO zsjos_registration_case VALUES(1,11,1,0,20),(2,22,1,0,20),(3,33,1,0,20),(4,44,1,0,20),(5,55,1,0,20),(4,66,1,0,21)");
             when(tasks.selectPage(any(cn.iocoder.yudao.framework.common.pojo.PageParam.class),any(com.baomidou.mybatisplus.core.conditions.Wrapper.class))).thenAnswer(call->{
                 var wrapper=(com.baomidou.mybatisplus.core.conditions.Wrapper<?>)call.getArgument(1);
-                try(var result=statement.executeQuery("SELECT id FROM zsjos_student_info_task WHERE "+wrapper.getSqlSegment())) {
+                try(var result=statement.executeQuery("SELECT id FROM zsjos_student_info_task WHERE "+wrapper.getSqlSegment().replace("#{ew.paramNameValuePairs.MPGENVAL1}", "20"))) {
                     var ids=new java.util.ArrayList<Long>();while(result.next())ids.add(result.getLong(1));
                     var query=(cn.iocoder.yudao.module.zsjos.controller.admin.studentinfo.vo.StudentInfoTaskVO.Query)call.getArgument(0);
                     assertEquals("CANCELLED".equals(query.getStatus())?List.of(5L,3L,2L,1L):List.of(4L),ids);
@@ -89,7 +100,7 @@ class StudentInfoTaskServiceTest {
     }
     @Test void registrationNavigationResolvesExactItemAndReturnsReverseTarget() {
         when(permission.canList(any())).thenReturn(true);
-        var item=new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseDO();item.setId(6L);item.setOrderId(1L);item.setOrderItemId(2L);
+        var item=new cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseDO();item.setId(6L);item.setOrderId(1L);item.setOrderItemId(2L);item.setStatus("pending");
         when(registrationCases.selectById(6L)).thenReturn(item);when(registrationCases.selectByOrderItemId(2L)).thenReturn(item);
         var task=task();when(tasks.byItem(2L)).thenReturn(task);when(orders.selectById(1L)).thenReturn(order("effective"));
         when(collection.prepareTaskForm(task)).thenReturn(new StudentInfoFormDO());
@@ -133,7 +144,7 @@ class StudentInfoTaskServiceTest {
     }
     @Test void materialSelectionDefaultsOffAndCannotAddOrEnableFields() {
         var fields=new StudentInfoFields().presets();
-        assertEquals(13,StudentInfoMaterialSelection.selectable(fields).size());
+        assertEquals(16,StudentInfoMaterialSelection.selectable(fields).size());
         assertTrue(StudentInfoMaterialSelection.select(fields,List.of()).stream().anyMatch(f -> "textbook_shipping_address".equals(f.getKey())));
         var defaults=StudentInfoMaterialSelection.select(fields,null);
         assertTrue(defaults.stream().noneMatch(f->StudentInfoMaterialSelection.KEYS.contains(f.getKey())));
@@ -146,28 +157,43 @@ class StudentInfoTaskServiceTest {
         fields.stream().filter(f->"portrait".equals(f.getKey())).forEach(f->f.setEnabled(false));
         assertThrows(ServiceException.class,()->StudentInfoMaterialSelection.select(fields,List.of("portrait")));
     }
+    @Test void explicitEducationSelectionDeterminesRequiredSnapshotFields() {
+        var fields=new StudentInfoProductRules().resolve(new StudentInfoFields().presets(),true);
+        var chosen=StudentInfoMaterialSelection.select(fields,List.of("target_school"));
+        var education=chosen.stream().filter(f -> StudentInfoProductRules.CONDITIONAL.contains(f.getKey())).toList();
+        assertEquals(1,education.size());
+        assertEquals("target_school",education.getFirst().getKey());
+        assertTrue(education.getFirst().getRequired());
+        assertTrue(StudentInfoMaterialSelection.select(fields,List.of()).stream().noneMatch(f -> StudentInfoProductRules.CONDITIONAL.contains(f.getKey())));
+        assertEquals(3,StudentInfoMaterialSelection.select(fields,null).stream().filter(f -> StudentInfoProductRules.CONDITIONAL.contains(f.getKey())).count());
+    }
     @Test void addressDefaultsFollowOrderGiftAndPublishedTemplate() {
         var task=task();when(tasks.selectById(4L)).thenReturn(task);when(tasks.lock(4L)).thenReturn(task);
         var order=order("pending_approval");
         when(orders.selectByIdForUpdate(1L,1L)).thenReturn(order);
         when(orders.selectById(1L)).thenReturn(order);
-        var form=new StudentInfoFormDO();when(collection.prepareTaskForm(task)).thenReturn(form);
+        var form=new StudentInfoFormDO();when(collection.prepareTask(task,true)).thenReturn(new StudentInfoFormService.TaskPreparation(form,true));
         var fields=new StudentInfoFields().presets();when(collection.definitions(form)).thenReturn(fields);
         for(String gift: new String[]{null,"","  ","[]"," [ ] ","[{\"code\":\"gift\"}]","[\"{\\\"code\\\":\\\"gift\\\"}\"]"}) {
             order.setGiftItems(gift);
             var config=service.generationConfig(4L);
+            assertTrue(config.getDefaultSelectedKeys().containsAll(StudentInfoProductRules.CONDITIONAL));
             assertFalse(config.getDefaultSelectedKeys().contains("certificate_shipping_address"));
             assertEquals(gift!=null && gift.contains("gift"),config.getDefaultSelectedKeys().contains("gift_shipping_address"));
         }
         fields.stream().filter(f -> "gift_shipping_address".equals(f.getKey())).forEach(f -> f.setEnabled(false));
         assertFalse(service.generationConfig(4L).getDefaultSelectedKeys().contains("gift_shipping_address"));
+        when(collection.prepareTask(task,true)).thenReturn(new StudentInfoFormService.TaskPreparation(form,false));
+        var nonEducation=service.generationConfig(4L);
+        assertTrue(nonEducation.getSelectableMaterialKeys().containsAll(StudentInfoProductRules.CONDITIONAL));
+        assertTrue(java.util.Collections.disjoint(nonEducation.getDefaultSelectedKeys(),StudentInfoProductRules.CONDITIONAL));
         order.setGiftItems("invalid");
         assertThrows(ServiceException.class,()->service.generationConfig(4L));
     }
     @Test void generationRejectsStaleConfigurationBeforeIssuingOrCopying() {
         var task=task();when(tasks.selectById(4L)).thenReturn(task);when(tasks.lock(4L)).thenReturn(task);
         when(orders.selectByIdForUpdate(1L,1L)).thenReturn(order("pending_approval"));
-        var target=new StudentInfoFormDO();target.setConfigVersionId(12L);when(collection.prepareTaskForm(task)).thenReturn(target);
+        var target=new StudentInfoFormDO();target.setConfigVersionId(12L);when(collection.prepareTask(task,true)).thenReturn(new StudentInfoFormService.TaskPreparation(target,false));
         var request=command();request.setMaterialKeys(List.of("portrait"));request.setConfigVersionId(11L);
         assertThrows(ServiceException.class,()->service.generate(4L,request));
         verify(collection,never()).issueTaskForm(any());verifyNoInteractions(images);
@@ -212,11 +238,11 @@ class StudentInfoTaskServiceTest {
         when(collection.definitions(any())).thenReturn(List.of(field));
         var answer=new StudentInfoFormValueDO();answer.setId(50L);answer.setFormId(8L);answer.setFieldKey("name");answer.setValueText("合成档案");when(answers.byForm(8L)).thenReturn(List.of(answer));
         var target=new java.util.concurrent.atomic.AtomicReference<StudentInfoFormDO>();
-        doAnswer(call->{var form=(StudentInfoFormDO)call.getArgument(0);form.setId(9L);target.set(form);return null;}).when(collection).issueTaskForm(any());
+        doAnswer(call->{var form=(StudentInfoFormDO)call.getArgument(0);form.setId(9L);form.setStatus("DRAFT");form.setExpiresAt(java.time.LocalDateTime.now().plusDays(1));target.set(form);return null;}).when(collection).issueTaskForm(any());
         when(forms.selectById(9L)).thenAnswer(call->target.get());
-        var row=service.reuse(4L,command());assertEquals("REUSED",row.getStatus());assertEquals(9L,task.getFormId());
+        var row=service.reuse(4L,command());assertEquals("UNSENT",row.getStatus());assertEquals(9L,task.getFormId());
         assertEquals("frozen-contract",target.get().getFieldsSnapshot());assertEquals("retained-draft",old.getDraftSnapshot());assertEquals(8L,answer.getFormId());
-        var copy=ArgumentCaptor.forClass(StudentInfoFormValueDO.class);verify(answers).insert(copy.capture());assertEquals(9L,copy.getValue().getFormId());assertEquals("合成档案",copy.getValue().getValueText());
+        verify(answers,never()).insert(any(StudentInfoFormValueDO.class));assertTrue(target.get().getDraftSnapshot().contains("合成档案"));
         verify(forms).update(isNull(),argThat((com.baomidou.mybatisplus.core.conditions.Wrapper<StudentInfoFormDO> wrapper)->((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StudentInfoFormDO>)wrapper).getParamNameValuePairs().containsValue("REVOKED")));
     }
     @Test void draftPreviewIsReadOnlyAndMasksSensitiveFields() {
