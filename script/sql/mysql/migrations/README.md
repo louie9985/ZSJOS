@@ -1582,7 +1582,7 @@ V320 renames canonical menu 6814 to 下属员工, retaining its route, component
 V321 adds independent delivery performance domain, target uniqueness and menu metadata. Existing sales target values and revisions are preserved. Reviewed tenant-1 organization IDs 1050/1051 are classified as delivery; no role grants or fact backfill. Isolated MySQL partial-DDL recovery, replay, prerequisite failure without ledgers and recovery verified. The source numbering gap was removed on 2026-10-15: exam export V320 -> V319, delivery domain V321 -> V320. Historical isolated verification used the old numbers; full fresh/upgrade acceptance under the new numbering remains unverified. Before migrating an existing database with old version records, review both schema ledgers and checksums; do not blindly replay or reconcile them.
 
 ## V322 — Performance attribution domain review
-After the canonical delivery-domain schema (renumbered V320 or already-applied legacy V321), validate exact menu contracts, domain columns and full target uniqueness; add nullable attribution business_domain without historical backfill. Does not reconcile existing version/checksum drift or role grants. Partial DDL is retained and revalidated. Run tools/test_performance_attribution_review.py in retained synthetic databases. Full fresh-chain acceptance remains blocked by the unresolved legacy V321/renumber ledger mapping; this migration is not authorization to rewrite historical ledgers.
+After the canonical delivery-domain schema (renumbered V320 or already-applied legacy V321), validate exact menu contracts, domain columns and full target uniqueness; add nullable attribution business_domain without historical backfill. Does not reconcile existing version/checksum drift or role grants. Partial DDL is retained and revalidated. (The former tools/test_performance_attribution_review.py was removed on 2026-11-16 together with the retired delivery-performance menus; V371 retires those menus.) Full fresh-chain acceptance remains blocked by the unresolved legacy V321/renumber ledger mapping; this migration is not authorization to rewrite historical ledgers.
 
 2026-10-16 integration: main V318 exam and V319 rest-days retain their identities. Employee menu moved to V320; delivery domain restored to V321; review remains V322. Core source numbering is contiguous. Historical execution evidence above retains its dates; existing database ledger reconciliation remains separately reviewed.
 ## V326 教务团队独立菜单
@@ -1631,3 +1631,50 @@ Apply `V369__version_updates.sql` after V368 and before the version-update runti
 ## V370 客资取消下次跟进独立权限
 
 在 V369 双账本之后、配套前后端之前执行 `V370__lead_next_follow_up_cancel_permission.sql`。仅在客资管理下增加“取消下次跟进”按钮 `zsjos:lead-follow-up:cancel-next-time`，保留通用取消待办菜单。管理员通过角色管理分配新权限。元数据和双账本处于同一事务，失败回滚；可重复执行及恢复已有菜单但缺少账本的情况。应用回退时保留元数据及账本，可通过菜单管理停用按钮。验证命令为 `python script/sql/mysql/tools/test_lead_next_follow_up_cancel_permission.py`。
+
+## V371 销售与交付合并（草稿，未验收）
+
+V370 双账本之后执行 `V371__sales_delivery_merge.sql`：增加销售资格、接收客资、跨销售部门访问、部门边界配置及销售视角未知历史谈话核对五项菜单元数据；新增 `zsjos_performance_org.sales_boundary_root`、`zsjos_performance_target.merged_delivery_target_id`、`zsjos_media_student_talk_record.service_relation_id`、`zsjos_order.agreed_exam_month`、`zsjos_delivery_class.exam_month`、生成列 `auto_class_guard` 及唯一键 `uk_delivery_auto_class`。同一事务内逻辑删除（`deleted=1`、`status=1`、`visible=0`，updater `V371`）已下线功能的菜单元数据：教务团队页面及五个按钮（V326，`zsjos:education-team:*`）、独立交付业绩两个页面及六个按钮（V321，`zsjos:delivery-performance*`）、教务自拓页面（V257，`zsjos:lead:education-self-sourced:create`），共 15 行；V257/V321/V326 保持原文以兼容已部署校验和，新安装先由它们创建再由 V371 退役。沿用 V364/V365 先例，引用这些菜单的 `system_role_menu` 行不撤销、不改派，菜单删除后授权自然失效；退役行出现非预期类型/父节点或退役页面下存在其他有效子菜单时，在任何写入前失败且不登记账本。学生服务与交付中心/一部（1050/1051）、学习规划师（`study_planner`）及交付主管（`delivery_manager`）岗位与角色只从新安装种子 `01-bootstrap-system-seed.sql` 移除（`dept_manager` 自定义数据范围同步去掉 1050/1051），已部署环境的组织与角色由管理员维护，本迁移不删除。不写角色授权、不标记业务部门根、不回填历史订单考试月份或其他业务行；待分班仍为每负责人一个（不按部门拆分）。管理员须依据实际组织明确配置边界根，并按岗位授予销售资格、接收资格和必要的跨部权限；默认无根和无新授权时配套功能不可用。DDL 可能隐式提交，失败后核查上述五列、生成列、唯一键、五项菜单和双账本，再按同脚本恢复。部署前必须在隔离 MySQL 验证首次、重放、部分恢复、前置失败与中文 HEX；目标环境只读账本核查和发布验收未完成前禁止应用。业绩快照回填见 `script/sql/mysql/repair/sales_delivery_org_backfill.sql`，须在组织调整后单独授权执行。
+
+
+## V374 销售报名履约归属
+
+任一账本已有 V374 并不代表回填完成。重放仍按实际缺失的商品履约、收集任务及绑定恢复，只初始化空负责人，不改写已转交的归属。
+
+在 Core V373 双账本后、配套运行时前执行 `V374__sales_owned_registration.sql`。切换期间暂停旧版订单和履约写入。迁移按租户 1 的存量订单正式销售归属初始化履约负责人，取消已驳回、终止或已被接续订单上的待办，补建待财审订单遗漏的商品履约及未完成履约的收集任务。单商品历史任务可原地确定商品；未完成的多商品或无商品历史任务在校验失败时需先确认关联。原任务、表单及链接标识保留。应用新页面元数据后，由管理员在角色管理授予「我的报名履约」及转交按钮权限；迁移无角色分配。
+
+索引与必要列 DDL 可隐式提交；其余数据、菜单及双账本同一事务。失败后检查索引、列、菜单、商品任务绑定和双账本，再重新执行。成功后重放保留后续转交结果。业务数据回退需使用对应版本及变更前备份。执行 `python script/sql/mysql/tools/test_sales_owned_registration.py` 检查初次、重放、前置失败、关联冲突、中间失败恢复和菜单中文 HEX。
+
+V375__sales_order_migrate_approval_permission.sql adds one legacy order approval migration button under the active order-management page. Apply after V374 with both schema ledgers present. The migration preserves existing grants, menus and business rows. Replay repairs partial metadata and retains administrator configuration. Failed prerequisites and ledger writes roll back within the procedure. Disable the button to roll back availability and preserve the migration record.
+
+## V376 报名履约任务创建通知
+
+在 V375 后执行 `V376__registration_task_created_copy.sql`。报名履约可能在财审结束前就建立，内置任务创建模板改为提示新增任务及「我的报名履约」。迁移只更新仍与历史默认文案一致的字段，保留管理员自定义文案、通知规则及已发送消息。重复执行只补齐缺失台账，模板身份或台账写入失败时整个事务回滚。回退时通过通知管理编辑模板。
+
+## V377 Flowable 8 启动元数据
+
+在 V376 后、Flowable 8 首次启动前执行 `V377__flowable_8_schema_metadata.sql`。旧初始化 SQL 已包含 Flowable 8 的表结构，但缺少引擎版本标记，默认自动升级会从 6.1.2 执行重复 DDL。V377 依据 Flowable 8.0.0 原生 MySQL 初始化结果核对表、列、索引和外键形状，兼容 V331 的字符集转换。结构符合时，仅校准流程、共用、事件和身份引擎版本属性。已有 ID 计数器及流程数据保留。若已是 8.0.0，则核对结构和元数据并补齐缺失的账本记录。
+
+升级时先停止全部 Flowable 写入并备份数据库及 `ACT_GE_PROPERTY`、`ACT_ID_PROPERTY`。仅在其余 43 张引擎表均为空时，允许初始化缺失的 ID 计数器。已有数据时须从原库恢复计数器。结构指纹或版本超出已核对范围时，迁移停止，属性和双账本回滚。依据异常核验真实引擎版本和 DDL 后再继续。重复执行可补齐缺失属性或账本。恢复旧属性需在应用停机时按备份恢复。
+
+
+
+### V378 报名协议维护
+
+在 V370 或更新的兼容基线上执行 V378，再部署后端、Admin、Workbench 和 H5。租户 1 的初始已发布模板来自《人社三级营养超值精品班》。迁移仅新增模板、报名表可空协议字段、双端共用菜单及按钮和版本记录。系统管理员分配查看、编辑、发布权限。Workbench 使用 admin_embed 打开同一维护页。旧表不回填。模板发布仅影响随后生成的表；复用资料仍需本人经链接阅读确认。订单学员、电话、课程规格和明细成交金额变化时重新阅读。已确认全文加密存储，员工查看完整正文需要原报名资料敏感查看权限。
+
+迁移可重复，DDL 局部成功后修正冲突并重跑。回退应用时保留模板、确认记录及账本，旧后端不能执行需要确认的新表提交，须暂停相关入口。隔离验证使用 `python script/sql/mysql/tools/test_enrollment_agreement.py`。
+
+### V377 verified UUID generator execution
+
+SQL cannot infer the active Java ID generator from historical ID shapes. Confirm all application executors are stopped and review the deployed Flowable configuration. This repository uses Flowable 8 Spring Boot StrongUuidGenerator by default with no generator override. Only after that verification, set `@zsjos_v377_id_generator='strong-uuid'` in the same connection before executing V377. UUID mode permits a missing next.dbid without inventing one; existing counters remain unchanged and malformed counters still fail. Unset/database mode continues to refuse populated engines missing a counter. Unknown mode values fail. Existing applied artifacts/checksums require separate rollout review; never reconcile them automatically. Preserve full schema fingerprints, metadata/ledger transaction and backup requirements.
+
+### V379 客资与学员沟通记录
+
+在 V378 后执行 V379，再部署对应的后端与员工工作台。迁移新增独立沟通记录表，在客资管理和我的学员下分别定义“追加客资跟进记录”和“追加学员跟进记录”按钮。管理员通过系统角色管理分别授权。回退应用时保留记录表和迁移账本，可以在菜单管理中停用按钮。
+
+### V380 末级分类报名协议
+
+V378 双账本和原模板就绪后执行 V380，再部署后端与维护页。新增按末级分类 ID 唯一的模板表、报名表分类名称快照；不回填、复制或自动发布任何业务分类协议，不改权限和历史签署。上线前为实际使用的分类逐项保存并发布，否则该分类不能生成新表。旧模板只作起草范本，新协议课程字段不展示 SKU。迁移可重复执行；DDL 隐式提交，失败先检查结构与两个账本，保留业务数据，不以删表回滚。
+
+迁移可重复，DDL 局部成功后修正冲突并重跑。回退应用时保留模板、确认记录及账本，旧后端不能执行需要确认的新表提交，须暂停相关入口。隔离验证使用 `python script/sql/mysql/tools/test_enrollment_agreement.py`。
