@@ -66,6 +66,7 @@ services:
       ZSJOS_DB_MODULES: ${ZSJOS_DB_MODULES:-core,hrm,fms,eam,pms}
       ZSJOS_DB_SKIP_CHECKSUM: ${ZSJOS_DB_SKIP_CHECKSUM:-true}
       ZSJOS_DB_BACKUP_DIR: /backups
+      ZSJOS_DB_FLOWABLE_ID_GENERATOR: ${ZSJOS_DB_FLOWABLE_ID_GENERATOR:-}
     volumes:
       - mysql-backups:/backups
     secrets:

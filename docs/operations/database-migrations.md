@@ -1389,6 +1389,39 @@ Core desired schema and fresh baseline include the empty enrollment agreement ta
 
 SQL cannot infer the active Java ID generator from historical ID shapes. Confirm all application executors are stopped and review the deployed Flowable configuration. This repository uses Flowable 8 Spring Boot StrongUuidGenerator by default with no generator override. Only after that verification, set `@zsjos_v377_id_generator='strong-uuid'` in the same connection before executing V377. UUID mode permits a missing next.dbid without inventing one; existing counters remain unchanged and malformed counters still fail. Unset/database mode continues to refuse populated engines missing a counter. Unknown mode values fail. Existing applied artifacts/checksums require separate rollout review; never reconcile them automatically. Preserve full schema fingerprints, metadata/ledger transaction and backup requirements.
 
+The official runner accepts `ZSJOS_DB_FLOWABLE_ID_GENERATOR=strong-uuid` only as an
+operator declaration after those checks. It prepends the session setting to V377
+in its own MySQL connection; other SQL files and deployed migration bytes/checksums
+remain unchanged. Compose forwards the setting to the one-shot migrator. Leave it
+unset for ordinary runs; `database` retains the original-counter requirement, and
+unknown values fail before database execution. Preflight blocks a populated engine
+without a counter or verified UUID mode before backup and preceding migrations.
+
+For a stopped, verified UUID installation, rebuild the migrator from the corrected
+source, then use the existing environment/override files for the selected target:
+
+```bash
+bash deploy/production/zsjos-db build-migrator
+ZSJOS_DB_FLOWABLE_ID_GENERATOR=strong-uuid bash deploy/production/zsjos-db plan production
+ZSJOS_DB_FLOWABLE_ID_GENERATOR=strong-uuid bash deploy/production/zsjos-db migrate production
+bash deploy/production/zsjos-db verify production
+```
+
+Here `production` is the existing runner configuration name; select the actual
+target's configuration and secrets explicitly. After an interrupted upgrade,
+inspect actual Flowable metadata and both ledgers; retain successful earlier
+migrations and resume pending versions under the migration lock and verified
+backup. Do not restore a whole database, replay bootstrap, invent a counter or
+rewrite checksum records to clear this error. V377 failure rolls back its metadata
+and ledger transaction; preceding migration commits remain. Application rollback
+retains the installed schema; restoring V377 metadata requires the pre-execution
+snapshot with all executors stopped.
+
+Focused checks: `python3 -B script/sql/mysql/tools/test_flowable_migration_runner.py`.
+Set `ZSJOS_V377_TEST_CONTAINER` and `ZSJOS_V377_TEST_DATABASE` to an approved local
+MySQL container/source schema to additionally retain isolated MySQL fixtures. The
+fixture path reads source schema/checksums only and verifies source data unchanged.
+
 ## V380 category agreement schema
 
 Core desired schema and fresh baseline include the empty category agreement table and nullable form agreement_category_name snapshot. Existing databases run V380 after the V378 tenant-1 starter. The upgrade preserves all existing agreement/form rows and grants. CREATE/column guards permit repeat and partial recovery; both ledgers follow postconditions. Back up first; DDL is not transactional rollback, and application rollback retains new snapshots. This additive upgrade does not require stopping writers, but ordinary MySQL metadata locks can briefly delay requests.

@@ -1655,7 +1655,7 @@ V375__sales_order_migrate_approval_permission.sql adds one legacy order approval
 
 在 V376 后、Flowable 8 首次启动前执行 `V377__flowable_8_schema_metadata.sql`。旧初始化 SQL 已包含 Flowable 8 的表结构，但缺少引擎版本标记，默认自动升级会从 6.1.2 执行重复 DDL。V377 依据 Flowable 8.0.0 原生 MySQL 初始化结果核对表、列、索引和外键形状，兼容 V331 的字符集转换。结构符合时，仅校准流程、共用、事件和身份引擎版本属性。已有 ID 计数器及流程数据保留。若已是 8.0.0，则核对结构和元数据并补齐缺失的账本记录。
 
-升级时先停止全部 Flowable 写入并备份数据库及 `ACT_GE_PROPERTY`、`ACT_ID_PROPERTY`。仅在其余 43 张引擎表均为空时，允许初始化缺失的 ID 计数器。已有数据时须从原库恢复计数器。结构指纹或版本超出已核对范围时，迁移停止，属性和双账本回滚。依据异常核验真实引擎版本和 DDL 后再继续。重复执行可补齐缺失属性或账本。恢复旧属性需在应用停机时按备份恢复。
+升级时先停止全部 Flowable 写入并备份数据库及 `ACT_GE_PROPERTY`、`ACT_ID_PROPERTY`。仅在其余 43 张引擎表均为空时，允许初始化缺失的 ID 计数器。已有数据且使用数据库计数器时须从原库恢复；经核实使用 UUID 时按下述显式模式执行，保留计数器缺失状态。结构指纹或版本超出已核对范围时，迁移停止，属性和双账本回滚。依据异常核验真实引擎版本和 DDL 后再继续。重复执行可补齐缺失属性或账本。恢复旧属性需在应用停机时按备份恢复。
 
 
 
@@ -1668,6 +1668,8 @@ V375__sales_order_migrate_approval_permission.sql adds one legacy order approval
 ### V377 verified UUID generator execution
 
 SQL cannot infer the active Java ID generator from historical ID shapes. Confirm all application executors are stopped and review the deployed Flowable configuration. This repository uses Flowable 8 Spring Boot StrongUuidGenerator by default with no generator override. Only after that verification, set `@zsjos_v377_id_generator='strong-uuid'` in the same connection before executing V377. UUID mode permits a missing next.dbid without inventing one; existing counters remain unchanged and malformed counters still fail. Unset/database mode continues to refuse populated engines missing a counter. Unknown mode values fail. Existing applied artifacts/checksums require separate rollout review; never reconcile them automatically. Preserve full schema fingerprints, metadata/ledger transaction and backup requirements.
+
+官方迁移工具支持一次性 `ZSJOS_DB_FLOWABLE_ID_GENERATOR=strong-uuid`，Compose 会传入迁移容器，工具仅在执行 V377 的同一 MySQL 连接中声明模式，不修改 SQL 文件或 checksum。默认不声明，`database` 保留原计数器要求，非法值在数据库执行前拒绝。已有引擎数据而缺少计数器且未声明 UUID 时，预检会在备份和前序迁移前阻断。先重建 migrator 镜像，再按[数据库操作文档](../../../../docs/operations/database-migrations.md#v377-verified-uuid-generator-execution)核对目标、备份、双账本并继续 pending 升级；不得伪造计数器、重放 bootstrap 或篡改历史账本。
 
 ### V379 客资与学员沟通记录
 

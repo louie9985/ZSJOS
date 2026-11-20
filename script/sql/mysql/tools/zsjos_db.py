@@ -58,6 +58,7 @@ class DbConfig:
     password: str
     release: str
     backup_dir: Path
+    flowable_id_generator: str = ""
 
 
 def info(message: str) -> None:
@@ -432,11 +433,15 @@ def db_config(environment: str) -> DbConfig:
         password=password,
         release=value("ZSJOS_DB_RELEASE_VERSION", "development"),
         backup_dir=backup_dir,
+        flowable_id_generator=values.get("ZSJOS_DB_FLOWABLE_ID_GENERATOR", ""),
     )
 
 
 class MysqlClient:
     def __init__(self, config: DbConfig):
+        if config.flowable_id_generator not in ("", "database", "strong-uuid"):
+            fail("ZSJOS_DB_FLOWABLE_ID_GENERATOR must be empty, database or strong-uuid; "
+                 "select strong-uuid only after verifying the deployed generator and stopping all writers")
         self.config = config
         self.mysql = shutil.which("mysql")
         self.mysqldump = shutil.which("mysqldump")
@@ -485,7 +490,14 @@ class MysqlClient:
                 fail("ZSJOS_BOOTSTRAP_REQUIRES_EMPTY_DATABASE: "
                      "select an empty database without tables/views/routines/events; "
                      "no bootstrap SQL was sent")
-        result = run(self.base(self.mysql) + [self.config.database], env=self.env(), input_text=path.read_text(encoding="utf-8"), capture=True)
+        sql = path.read_text(encoding="utf-8")
+        if (path.resolve() == (SQL_ROOT / "migrations/V377__flowable_8_schema_metadata.sql").resolve()
+                and self.config.flowable_id_generator):
+            # Each file uses a new connection; the verified mode must accompany
+            # V377 itself, without changing its deployed bytes or checksum.
+            sql = ("SET @zsjos_v377_id_generator="
+                   + sql_literal(self.config.flowable_id_generator) + ";\n" + sql)
+        result = run(self.base(self.mysql) + [self.config.database], env=self.env(), input_text=sql, capture=True)
         return result.stdout or ""
 
     def table_count(self) -> int:
@@ -763,6 +775,23 @@ def migration_preflight(
     except CommandError as error:
         blockers.append(str(error))
         pending = _migrations_not_installed(manifests, installed)
+    if (any(item.module == "core" and item.version == "V377" for item in pending)
+            and client.config.flowable_id_generator != "strong-uuid"
+            and client.table_exists("ACT_GE_PROPERTY")
+            and client.query("SELECT EXISTS(SELECT 1 FROM ACT_GE_PROPERTY WHERE NAME_='next.dbid')").strip() == "0"):
+        tables = client.query(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE() "
+            "AND UPPER(table_name) REGEXP '^(ACT|FLW)_' "
+            "AND UPPER(table_name) NOT IN ('ACT_GE_PROPERTY','ACT_ID_PROPERTY')"
+        ).splitlines()
+        probes = ["EXISTS(SELECT 1 FROM `" + table.replace("`", "``") + "`)" for table in tables]
+        if probes and client.query("SELECT " + " OR ".join(probes)).strip() == "1":
+            blockers.append(
+                "V377: populated Flowable engine has no next.dbid. Verify the deployed ID generator "
+                "and stop all application executors; for verified UUID generation set "
+                "ZSJOS_DB_FLOWABLE_ID_GENERATOR=strong-uuid in the migration environment. "
+                "Database generation requires the original counter; never invent one."
+            )
     if any(item.module == "core" and item.version == "V305" for item in pending):
         # V305's SQL owns the final guard. Check its evidence requirement before
         # earlier migrations can commit; empty installations still use normal SQL.
