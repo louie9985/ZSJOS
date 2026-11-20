@@ -52,14 +52,23 @@ class RegistrationEarlyDeliveryTest {
         relation.setOrderId(10L); relation.setOrderItemId(101L); relation.setPersonId(1000L);
         relation.setStatus("active"); relation.setVersion(8); relation.setOwnerUserId(20L);
         relation.setAcceptanceStatus("accepted"); relation.setClassId(900L);
+        var sent = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
+        sent.setSentAt(java.time.LocalDateTime.now());
+        lenient().when(studentInfoTaskService.formForRegistration(task)).thenReturn(sent);
         lenient().when(caseMapper.selectById(1L)).thenReturn(task);
         lenient().when(caseMapper.selectByIdForUpdate(1L,1L)).thenReturn(task);
         lenient().when(orderMapper.selectByIdForUpdate(10L,1L)).thenReturn(order);
     }
     @AfterEach void clear() { TenantContextHolder.clear(); }
-    @Test void fulfillmentCanCompleteWithoutRequestingStudentInformation() {
-        completionPreservesAcceptedOrTransferredService("active");
-        verifyNoInteractions(studentInfoTaskService);
+    @Test void completionRequiresSentOrReusedInformation() {
+        when(studentInfoTaskService.formForRegistration(task)).thenReturn(null);
+        var check = new RegistrationCaseChecklistItemDO(); check.setItemType("checkbox"); check.setChecked(true);
+        when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(check));
+        check.setId(2L);
+        var req = new RegistrationVersionReqVO(); req.setVersion(3); req.setIdempotencyKey("complete-unsent");
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class, () -> service.complete(1L,7L,req));
+        verify(studentInfoTaskService).formForRegistration(task);
+        verifyNoInteractions(serviceRelationMapper);
     }
 
     @ParameterizedTest @ValueSource(strings={"active","paused","completed"})

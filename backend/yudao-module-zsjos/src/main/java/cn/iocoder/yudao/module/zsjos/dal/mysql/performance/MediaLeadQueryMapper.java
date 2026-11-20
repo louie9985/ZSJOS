@@ -57,6 +57,8 @@ public interface MediaLeadQueryMapper {
           </if>
           ORDER BY o.effective_at,o.id LIMIT 1)
         """;
+    String DRILL_FROM = " FROM zsjos_lead l LEFT JOIN zsjos_order o ON o.id=" + DRILL_ORDER
+            + " AND o.tenant_id=l.tenant_id AND o.deleted=0";
     String DRILL_FILTER = """
         <if test="q.memberUserId != null">AND l.contribution_user_id_snapshot=#{q.memberUserId}</if>
         <choose>
@@ -64,6 +66,10 @@ public interface MediaLeadQueryMapper {
             AND """ + FIRST_ORDER + """
               &gt;= #{start} AND """ + FIRST_ORDER + """
               &lt; #{end}
+          </when>
+          <when test="q.metric == 'contribution'">
+            AND o.id IS NOT NULL
+            <if test="!q.cumulative">AND o.effective_at &gt;= #{start} AND o.effective_at &lt; #{end}</if>
           </when>
           <otherwise>
             <if test="!q.cumulative"> AND l.submitted_at &gt;= #{start} AND l.submitted_at &lt; #{end} </if>
@@ -75,13 +81,12 @@ public interface MediaLeadQueryMapper {
         <if test="q.metric == 'invalid'">AND l.status='invalid'</if>
         <if test="q.metric == 'converted'">AND """ + FIRST_ORDER + """
           IS NOT NULL</if>
-        <if test="q.metric == 'contribution'">AND """ + DRILL_ORDER + """
-          IS NOT NULL</if>
         <if test="q.dimension == 'channel'">AND COALESCE(l.source_channel_label_snapshot,'历史未记录')=#{q.groupLabel}</if>
         <if test="q.dimension == 'category'">AND COALESCE(l.lead_category_label_snapshot,'历史未记录')=#{q.groupLabel}</if>
         """;
 
-    @Select("<script>SELECT COUNT(*) " + SCOPE + DRILL_FILTER + "</script>")
+    @Select("<script>SELECT COUNT(*) <choose><when test=\"q.metric == 'contribution'\">" + DRILL_FROM
+            + " WHERE " + SCOPE_WHERE + "</when><otherwise>" + SCOPE + "</otherwise></choose>" + DRILL_FILTER + "</script>")
     long countDrill(@Param("tenant") Long tenant, @Param("type") String type, @Param("id") Long id,
                     @Param("departments") List<Long> departments, @Param("start") LocalDateTime start,
                     @Param("end") LocalDateTime end, @Param("now") LocalDateTime now,
@@ -92,8 +97,7 @@ public interface MediaLeadQueryMapper {
             + "l.source_channel_label_snapshot channelLabel,l.lead_category_label_snapshot categoryLabel,"
             + "l.submitted_name submittedName,l.provider_owner_name_snapshot providerName,"
             + "o.id orderId,o.order_no orderNo,o.total_amount orderAmount,o.effective_at orderEffectiveAt "
-            + " FROM zsjos_lead l LEFT JOIN zsjos_order o ON o.id=" + DRILL_ORDER
-            + " AND o.tenant_id=l.tenant_id AND o.deleted=0"
+            + DRILL_FROM
             + " WHERE " + SCOPE_WHERE + DRILL_FILTER
             + " ORDER BY l.submitted_at DESC,l.id DESC LIMIT #{size} OFFSET #{offset}</script>")
     List<MediaLeadDetailRow> pageDrill(@Param("tenant") Long tenant, @Param("type") String type, @Param("id") Long id,

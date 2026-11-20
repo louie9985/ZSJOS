@@ -9,7 +9,7 @@ import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderApproval
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS, SALES_ORDER_TASK_LABELS } from '../components/SalesOrderDetailCards'
 import { formatTimestamp } from '../services/time'
-import { FINANCE_ORDER_PROCESS_KEY, validateSalesOrderDecisionReason, mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey } from '../services/salesOrder'
+import { isFinanceApprovalTask, FINANCE_ORDER_PROCESS_KEY, validateSalesOrderDecisionReason, mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import SalesOrderSupervisorInbox from '../components/SalesOrderSupervisorInbox'
@@ -142,7 +142,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       }
       const id = target?.orderId ?? requestedOrderId
       if (!id) throw new Error('审批链接缺少订单信息')
-      const nativeOrder = target?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY && requestedTaskId
+      const nativeOrder = isFinanceApprovalTask(target) && requestedTaskId
         ? await api.financeApprovalOrder(requestedTaskId, requestedDone, 'business', id) : undefined
       const order = nativeOrder ?? await api.salesOrder(id)
       if (order.id !== id) throw new Error('目标审批任务与订单不匹配')
@@ -169,7 +169,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
 
   const selectedItem = useMemo(() => items.find(item => salesOrderTaskKey(item) === selectedKey)
     ?? (linkedItem && salesOrderTaskKey(linkedItem) === selectedKey ? linkedItem : undefined), [items, linkedItem, selectedKey])
-  const selectedFinanceTask = selectedItem?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ? selectedItem.taskId : undefined
+  const selectedFinanceTask = isFinanceApprovalTask(selectedItem) ? selectedItem?.taskId : undefined
   const loadDetail = useCallback(async (id: number) => {
     const version = ++detailVersion.current
     setDetailLoading(true); setDetailError('')

@@ -13,16 +13,25 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/zsjos/gift-purchase/textbook-address")
+@RequestMapping({"/zsjos/textbook-shipping", "/zsjos/gift-purchase/textbook-address"})
 public class TextbookAddressController {
     @Resource private TextbookAddressService service;
 
     @GetMapping("/page")
-    @PreAuthorize("@ss.hasPermission('zsjos:gift-purchase:query') && @ss.hasPermission('zsjos:sales-order:query-management') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")
+    @PreAuthorize("@ss.hasPermission('zsjos:textbook-shipping:query')")
     @ApiAccessLog(requestEnable = false, responseEnable = false)
     public CommonResult<PageResult<TextbookAddressService.Row>> page(@Valid PageParam page,
             @RequestParam(required = false) String keyword, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
         return CommonResult.success(service.page(page.getPageNo(), page.getPageSize(), keyword, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PutMapping("/{orderId}/items/{itemId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:textbook-shipping:query') && @ss.hasPermission('zsjos:textbook-shipping:update')")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
+    public CommonResult<Boolean> save(@PathVariable Long orderId, @PathVariable Long itemId,
+            @Valid @RequestBody TextbookAddressService.ShippingInput input) {
+        service.saveShipping(orderId, itemId, input, WebFrameworkUtils.getLoginUserId());
+        return CommonResult.success(true);
     }
 }

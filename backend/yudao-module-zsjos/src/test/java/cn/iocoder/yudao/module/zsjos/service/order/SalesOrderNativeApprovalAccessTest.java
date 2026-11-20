@@ -37,10 +37,11 @@ class SalesOrderNativeApprovalAccessTest {
     @Mock private SalesOrderObjectPermissionService permissionService;
     @InjectMocks private SalesOrderServiceImpl service;
 
-    @Test
-    void businessReviewerCanApproveThroughBpmEngineWithoutBpmMenuPermission() {
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {FINANCE_PROCESS_DEFINITION_KEY, PROCESS_DEFINITION_KEY})
+    void businessReviewerCanApproveThroughBpmEngineWithoutBpmMenuPermission(String processKey) {
         grantBusinessAccess();
-        bindCurrentTask(43L);
+        bindTask(43L, false, 42L, processKey);
         when(processTaskApi.getCommittedNodeTasks("finance-process", TASK_FINANCE))
                 .thenReturn(List.of(new BpmLiveTaskState("finance-task", null, "20", null, 1)));
 
@@ -118,9 +119,13 @@ class SalesOrderNativeApprovalAccessTest {
     }
 
     private void bindTask(Long currentRoundId, boolean signChild, Long businessOrderId) {
+        bindTask(currentRoundId, signChild, businessOrderId, FINANCE_PROCESS_DEFINITION_KEY);
+    }
+
+    private void bindTask(Long currentRoundId, boolean signChild, Long businessOrderId, String processKey) {
         var task = new BpmTaskRespDTO();
         task.setId("finance-task");
-        task.setProcessDefinitionKey(FINANCE_PROCESS_DEFINITION_KEY);
+        task.setProcessDefinitionKey(processKey);
         task.setProcessInstanceId("finance-process");
         task.setBusinessKey(BUSINESS_KEY_PREFIX + businessOrderId);
         task.setSignTask(signChild);
@@ -131,7 +136,7 @@ class SalesOrderNativeApprovalAccessTest {
         var round = new SalesOrderApprovalRoundDO();
         round.setId(43L);
         round.setOrderId(42L);
-        round.setProcessDefinitionKey(FINANCE_PROCESS_DEFINITION_KEY);
+        round.setProcessDefinitionKey(processKey);
         round.setStatus(ROUND_PENDING);
         when(roundMapper.selectByProcessInstanceId("finance-process")).thenReturn(round);
         var order = new SalesOrderDO();

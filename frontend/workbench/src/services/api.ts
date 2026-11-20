@@ -6028,10 +6028,6 @@ export const api = {
       : unwrap<PageResult<RegistrationCase>>(
           await http.get("/zsjos/registration/pool-page", { params }),
         ),
-  registrationTransferCandidates: async (id: number) =>
-    unwrap<Array<{ id: number; nickname: string }>>(await http.get(`/zsjos/registration/${id}/transfer-candidates`)),
-  transferRegistration: async (id: number, data: { version: number; idempotencyKey: string; targetUserId: number; reason: string }) =>
-    unwrap<RegistrationCase>(await http.post(`/zsjos/registration/${id}/transfer`, data)),
   registrationCase: async (id: number) =>
     unwrap<RegistrationCase>(await http.get(`/zsjos/registration/${id}`)),
   registrationRouteCandidates: async (id: number, routeId: number) =>

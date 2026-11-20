@@ -22,9 +22,8 @@ class TextbookAddressPermissionTest {
         }
 
     }
-    @Test void allThreePermissionsRequiredBeforeReadingAddresses() {
-        var required = List.of("zsjos:gift-purchase:query", "zsjos:sales-order:query-management",
-                "zsjos:student-info-form:sensitive-read");
+    @Test void pageAndEditPermissionsAreIndependent() {
+
         SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("fixture", "", "ROLE_FIXTURE"));
         try (var context = new AnnotationConfigApplicationContext()) {
             context.getBeanFactory().registerSingleton("service", mock(TextbookAddressService.class));
@@ -33,14 +32,17 @@ class TextbookAddressPermissionTest {
             var gate = context.getBean(GiftPurchaseControllerPermissionTest.Gate.class);
             var controller = context.getBean(TextbookAddressController.class);
             var response = new MockHttpServletResponse();
-            for (var missing : required) {
-                gate.permissions.addAll(required);
-                gate.permissions.remove(missing);
-                assertThrows(AccessDeniedException.class, () -> controller.page(new PageParam(), "", response));
-            }
-            verifyNoInteractions(context.getBean(TextbookAddressService.class));
-            gate.permissions.addAll(required);
+            gate.permissions.add("zsjos:textbook-shipping:update");
+            assertThrows(AccessDeniedException.class, () -> controller.page(new PageParam(), "", response));
+            assertThrows(AccessDeniedException.class, () -> controller.save(11L, 1L, null));
+            gate.permissions.clear();
+            gate.permissions.add("zsjos:textbook-shipping:query");
             controller.page(new PageParam(), "", response);
+            gate.permissions.add("zsjos:textbook-shipping:view-all");
+            assertThrows(AccessDeniedException.class, () -> controller.save(11L, 1L, null));
+            gate.permissions.remove("zsjos:textbook-shipping:view-all");
+            gate.permissions.add("zsjos:textbook-shipping:update");
+            controller.save(11L, 1L, null);
             assertEquals("no-store", response.getHeader("Cache-Control"));
         } finally {
             SecurityContextHolder.clearContext();

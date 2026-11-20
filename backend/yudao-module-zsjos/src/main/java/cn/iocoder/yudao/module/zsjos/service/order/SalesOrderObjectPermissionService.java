@@ -50,7 +50,6 @@ public class SalesOrderObjectPermissionService {
             case "continue-revise" -> canContinue(order, userId);
             case "terminate" -> Objects.equals(order.getSubmitterUserId(), userId)
                     || Objects.equals(order.getFormalSalesUserId(), userId);
-            case "migrate-approval" -> canReadManagement(order, userId);
             case "review" -> isApprovalPoolMember(userId);
             default -> false;
         };

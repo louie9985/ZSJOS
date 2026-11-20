@@ -116,12 +116,6 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const [completing, setCompleting] = useState(false);
   const [closing, setClosing] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [transferSaving, setTransferSaving] = useState(false);
-  const [transferLoading, setTransferLoading] = useState(false);
-  const [transferError, setTransferError] = useState("");
-  const [transferCandidates, setTransferCandidates] = useState<Array<{ id: number; nickname: string }>>([]);
-  const [transferForm] = Form.useForm<{ targetUserId: number; reason: string }>();
   const [closeForm] = Form.useForm<{ reason: string }>();
   const [routeSaving, setRouteSaving] = useState(false);
   const [informationBusy, setInformationBusy] = useState(false);
@@ -136,7 +130,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const detailGeneration = useRef(0);
   const inflightLists = useRef(new Set<string>());
   const activeCaseId = useRef<number | undefined>(undefined);
-  const mutationBusy = transferOpen || transferSaving || informationBusy || routeSaving || completing || closing || savingItemIds.size > 0 || attachmentSavingIds.size > 0;
+  const mutationBusy = informationBusy || routeSaving || completing || closing || savingItemIds.size > 0 || attachmentSavingIds.size > 0;
   const terminal = Boolean(selected && ["completed", "cancelled", "ended"].includes(selected.status));
   const clearSelection = () => {
     ++listGeneration.current;
@@ -333,26 +327,6 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
     } catch (error) { if (current()) setItemErrors(errors => ({ ...errors, [itemId]: errorMessage(error) })); }
     finally { if (current()) setAttachmentSavingIds(new Set()); }
   };
-  const loadTransferCandidates = async (caseId: number) => {
-    setTransferLoading(true);
-    setTransferError("");
-    try { setTransferCandidates(await api.registrationTransferCandidates(caseId)); }
-    catch (error) { setTransferError(errorMessage(error)); }
-    finally { setTransferLoading(false); }
-  };
-  const transfer = async ({ targetUserId, reason }: { targetUserId: number; reason: string }) => {
-    if (!selected || transferSaving || !reason.trim()) return;
-    setTransferSaving(true);
-    setTransferError("");
-    try {
-      await api.transferRegistration(selected.id, { version: selected.version, idempotencyKey: key(), targetUserId, reason: reason.trim() });
-      setTransferOpen(false);
-      clearSelection();
-      await load(1);
-      message.success("履约任务已转交");
-    } catch (error) { setTransferError(errorMessage(error)); }
-    finally { setTransferSaving(false); }
-  };
   const complete = async () => {
     if (!selected?.completable || mutationBusy || !hasPermission(permissions, "zsjos:registration:complete")) return;
     const current = beginMutation();
@@ -458,13 +432,6 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
             loading={completing}
             onClick={() => void complete()}
           >完成报名履约</Button>
-          {selected.canTransfer && hasPermission(permissions, "zsjos:registration:transfer") &&
-            <Button disabled={mutationBusy} onClick={() => {
-              transferForm.resetFields();
-              setTransferCandidates([]);
-              setTransferOpen(true);
-              void loadTransferCandidates(selected.id);
-            }}>转交履约任务</Button>}
           {hasPermission(permissions, "zsjos:registration:close") && (
             <Button danger type="text" disabled={mutationBusy} onClick={() => { closeForm.setFieldsValue({ reason: selected.cancelReason || "" }); setCloseOpen(true); }}>{selected.orderItemId ? "结束本产品（无需交付）" : "关闭服务"}</Button>
           )}
@@ -580,21 +547,6 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   const displayRows=selected&&linkedCaseId===selected.id&&!rows.some(row=>row.id===selected.id)?[selected,...rows]:rows;
   return (
     <section className={"workspace-page registration-page" + (mobileDetailOpen ? " is-detail-open" : "")}>
-      <Modal title="转交履约任务" open={transferOpen} confirmLoading={transferSaving}
-        okText="确认转交" okButtonProps={{ disabled: transferLoading || transferCandidates.length === 0 }}
-        onOk={() => transferForm.submit()} onCancel={() => { if (!transferSaving && !transferLoading) setTransferOpen(false); }}>
-        {transferError && <Alert type="error" title={transferError} action={selected && !transferCandidates.length &&
-          <Button size="small" onClick={() => void loadTransferCandidates(selected.id)}>重试</Button>}/>}
-        <Form form={transferForm} layout="vertical" onFinish={transfer}>
-          <Form.Item name="targetUserId" label="接手人" rules={[{ required: true, message: "请选择接手人" }]}>
-            <Select showSearch optionFilterProp="label" loading={transferLoading} placeholder="选择接手人"
-              notFoundContent="暂无符合条件的接手人" options={transferCandidates.map(user => ({ value: user.id, label: user.nickname }))}/>
-          </Form.Item>
-          <Form.Item name="reason" label="转交原因" rules={[{ required: true, whitespace: true, message: "请输入转交原因" }]}>
-            <Input.TextArea maxLength={100} rows={3}/>
-          </Form.Item>
-        </Form>
-      </Modal>
       {invalidCaseLink&&<Alert type="error" title="报名履约任务跳转参数无效"/>}
       <div className="lead-filter-sections">
         <div className="lead-filter-row" role="group" aria-label="处理状态">

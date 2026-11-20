@@ -199,6 +199,7 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
     private static LambdaQueryWrapperX<BusinessTaskDO> buildReadQuery(Long assigneeId, String status,
                                                                      String bucket, LocalDateTime now) {
         LambdaQueryWrapperX<BusinessTaskDO> query = new LambdaQueryWrapperX<>();
+        query.ne(BusinessTaskDO::getTaskType, "EXAM_MATERIAL_COLLECTION");
         if (TASK_STATUS_PENDING.equals(status)) {
             String assignee = LeadFollowUpResponsibilitySql.taskAssignee("zsjos_business_task");
             query.apply(assignee + " IS NOT NULL");

@@ -147,3 +147,6 @@ export function validateSalesOrderDecisionReason(decision: 'approve' | 'reject',
 }
 
 export const FINANCE_ORDER_PROCESS_KEY = 'zsjos_sales_order_finance_approval'
+export const isFinanceApprovalTask = (task?: { processDefinitionKey?: string; taskDefinitionKey?: string } | null) =>
+  task?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ||
+  (task?.processDefinitionKey === 'zsjos_sales_order_dual_approval' && task.taskDefinitionKey === 'financeReview')

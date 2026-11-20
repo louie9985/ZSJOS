@@ -53,7 +53,7 @@ class StudentInfoOrderTerminationTest {
         assertEquals("合成学员",service.saveDraft(token,draft).getValues().get("name"));
         var submit=new Submit();submit.setRevision(0L);submit.setValues(Map.of("name","合成学员"));
         service.submit(token,submit);
-        verify(registrationNotifications).publishInformationSubmitted(eq(1L), eq("合成学员"), any(LocalDateTime.class));
+        org.mockito.Mockito.verifyNoInteractions(registrationNotifications);
         verify(values).insert(any(StudentInfoFormValueDO.class));
         verify(forms).update(isNull(),argThat((com.baomidou.mybatisplus.core.conditions.Wrapper<StudentInfoFormDO> wrapper)->((com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StudentInfoFormDO>)wrapper).getParamNameValuePairs().containsValue("SUBMITTED")));
         assertNull(form.getRevokedAt());assertEquals(StudentInfoFormService.hash(token),form.getTokenHash());

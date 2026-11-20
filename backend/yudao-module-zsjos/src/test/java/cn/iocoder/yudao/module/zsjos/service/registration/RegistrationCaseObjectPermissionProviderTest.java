@@ -21,17 +21,12 @@ class RegistrationCaseObjectPermissionProviderTest {
     @Mock private cn.iocoder.yudao.module.system.api.user.AdminUserApi users;
 
     @Test
-    void permitsTenantRecoveryOfDisabledOwnerWithDedicatedPermission() {
-        var registrationCase = new RegistrationCaseDO();
-        registrationCase.setStatus(RegistrationConstants.STATUS_PENDING);
-        registrationCase.setOwnerUserId(8L);
-        when(caseMapper.selectById(10L)).thenReturn(registrationCase);
-        when(permissions.hasAnyPermissions(7L, "zsjos:registration:transfer")).thenReturn(true);
-        when(permissions.hasTenantReadAllAccess(7L)).thenReturn(true);
-        when(users.getUser(8L)).thenReturn(new cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO()
-                .setId(8L).setStatus(1));
-        assertTrue(provider.hasPermission(10L, "transfer", 7L));
-        assertFalse(provider.hasPermission(10L, "update", 7L));
+    void poolAccessDoesNotAuthorizeTransfers() {
+        var item = new RegistrationCaseDO(); item.setStatus(RegistrationConstants.STATUS_PENDING);
+        when(caseMapper.selectById(10L)).thenReturn(item);
+        when(permissions.hasAnyPermissions(7L, "zsjos:registration:query-pool")).thenReturn(true);
+        assertFalse(provider.hasPermission(10L, "transfer", 7L));
+        assertTrue(provider.hasPermission(10L, "read", 7L));
     }
 
     @Test
@@ -42,6 +37,7 @@ class RegistrationCaseObjectPermissionProviderTest {
         registrationCase.setStatus(RegistrationConstants.STATUS_PENDING);
         when(caseMapper.selectById(10L)).thenReturn(registrationCase);
 
+        when(permissions.hasAnyPermissions(7L, "zsjos:registration:query-pool")).thenReturn(true);
         assertTrue(provider.hasPermission(10L, RegistrationConstants.COMMAND_CLOSE, 7L));
         assertFalse(provider.hasPermission(10L, RegistrationConstants.COMMAND_CLOSE, 9L));
         assertFalse(provider.hasPermission(10L, "read", 9L));

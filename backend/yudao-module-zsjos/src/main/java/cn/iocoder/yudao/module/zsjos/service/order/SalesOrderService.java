@@ -45,7 +45,6 @@ public interface SalesOrderService {
     SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId);
     void approve(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
     void reject(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
-    void migrateLegacyApproval(Long orderId, Long userId, SalesOrderLegacyApprovalMigrationReqVO reqVO);
     void terminate(Long orderId, Long userId, SalesOrderTerminateReqVO reqVO);
     java.util.List<SalesOrderListItemRespVO> getCustomerOrders(Long leadId, Long userId);
     SalesOrderRespVO getCustomerOrder(Long leadId, Long orderId, Long userId);

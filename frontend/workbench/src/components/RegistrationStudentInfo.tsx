@@ -35,7 +35,7 @@ export default function RegistrationStudentInfo({ item, permissions, disabled, o
   }
   const closeArchive=()=>{if(busy)return;archiveRun.current++;setArchiveOpen(false);setArchiveTask(undefined)}
   const permitted = (value: string) => hasPermission(permissions, value)
-  const canQuery = permitted('zsjos:registration:query-my')
+  const canQuery = permitted('zsjos:registration:query-pool')
   const load = async (isCurrent: () => boolean = () => true) => {
     setLoading(true)
     setError('')
@@ -115,14 +115,14 @@ export default function RegistrationStudentInfo({ item, permissions, disabled, o
     {selected&&linkMode==='view'&&<StudentInfoLinkModal caseId={selected.id} version={selected.version} mode={linkMode} client={linkClient} onClose={()=>setLinkMode(undefined)} onChanged={onChanged}/>}
     <Modal title="查看已有档案" open={archiveOpen} onCancel={closeArchive} width={1080} destroyOnHidden footer={<Space wrap>
       {archiveError && <Button disabled={busy||archiveLoading} onClick={()=>void viewArchive()}>重试</Button>}
-      {archiveSource&&archiveTask?.canProcess&&!['SUBMITTED','REUSED'].includes(archiveTask.status)&&permitted('zsjos:student-info-task:reuse')&&permitted('zsjos:student-info-form:sensitive-read')&&<Button type="primary" loading={busy} disabled={!archiveReady||archiveLoading||!!archiveError||archiveSource.missing.length>0} onClick={()=>archiveTask.formId?Modal.confirm({title:'复用已有档案',content:'将以已有档案替换本任务未提交的收集表，旧填写链接将失效，原草稿会保留为订单记录。请将新链接发给学员阅读协议并提交。',onOk:()=>command('reuse')}):void command('reuse')}>复用已有档案</Button>}
+      {archiveSource&&archiveTask?.canProcess&&!['SUBMITTED','REUSED'].includes(archiveTask.status)&&permitted('zsjos:student-info-task:reuse')&&permitted('zsjos:student-info-form:sensitive-read')&&<Button type="primary" loading={busy} disabled={!archiveReady||archiveLoading||!!archiveError||archiveSource.missing.length>0} onClick={()=>archiveTask.formId?Modal.confirm({title:'复用已有档案',content:'将以已有档案替换本任务未提交的收集表，旧填写链接将失效，原草稿会保留为订单记录。学员无需再次填写。',onOk:()=>command('reuse')}):void command('reuse')}>复用已有档案</Button>}
       {archiveSource&&archiveTask?.canProcess&&!archiveTask.formId&&permitted('zsjos:student-info-form:create')&&permitted('zsjos:student-info-form:sensitive-read')&&permitted('zsjos:student-info-form:link-read')&&<Button disabled={!archiveReady||busy||archiveLoading} onClick={()=>{setArchiveOpen(false);setLinkMode('generate')}}>带入已有内容生成新表</Button>}
       <Button disabled={busy} onClick={closeArchive}>关闭</Button>
     </Space>}>
       {archiveError&&<Alert type="error" title={archiveError}/>}{operationError&&<Alert type="error" title={operationError}/>}
       {archiveLoading?<Spin/>:archiveTask&&archiveSource&&archiveReader?<>
         {archiveSource.missing.length>0&&<Alert type="warning" title={`本次项目缺少：${archiveSource.missing.join('、')}`} description="不能直接复用，请生成新表带入已有内容后补充。"/>}
-        <RegistrationArchiveCard description="复用后资料会预填到新表，仍需学员阅读协议并提交。"><StudentInfoPanel key={`${archiveTask.id}:${archiveSource.formId}:${archiveSource.revision}`} caseId={archiveTask.id} reader={archiveReader}/></RegistrationArchiveCard>
+        <RegistrationArchiveCard description="复用将保存本次资料快照，无需学员再次填写。"><StudentInfoPanel key={`${archiveTask.id}:${archiveSource.formId}:${archiveSource.revision}`} caseId={archiveTask.id} reader={archiveReader}/></RegistrationArchiveCard>
       </>:!archiveError&&<Empty description="该客户暂无已填写档案"/>}
     </Modal>
   </section>

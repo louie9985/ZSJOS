@@ -110,6 +110,9 @@ class RegistrationAutoClassModeTest {
     }
 
     private void stubCompletable(RegistrationCaseDO registrationCase) {
+        var form = new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO();
+        form.setSubmitSource("reuse");
+        when(studentInfoTaskService.formForRegistration(registrationCase)).thenReturn(form);
         var order = new SalesOrderDO().setId(10L).setStatus(STATUS_EFFECTIVE).setPersonId(501L).setAgreedExamMonth("2027-03");
         var checklist = new RegistrationCaseChecklistItemDO(); checklist.setId(101L); checklist.setItemType("checkbox"); checklist.setChecked(true);
         when(caseMapper.selectById(1L)).thenReturn(registrationCase);

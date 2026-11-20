@@ -231,11 +231,11 @@ export default function MediaLeadAnalysisPage({ permissions }: { permissions: st
       {error && <Alert type="error" showIcon title={error} action={<Button size="small" onClick={() => void load(scope)}>重试</Button>} />}
       {loading ? <Card><Spin /></Card> : !data ? <Empty description="暂无数据" /> : <>
         <Card title="团队大盘" className="media-lead-overview"><MonthlySummary amount={data.periods.find(row => row.key === "month")?.performanceContribution} onContribution={canDetail ? () => openPeriod("month", "本月业绩贡献", "contribution") : undefined} target={data.target} onValid={canDetail ? () => openPeriod("month", "本月有效客资", "valid") : undefined} />
-          <details className="media-lead-methodology"><summary>按提交日期统计，判定与成交截至查询时更新 · 查看完整统计口径</summary><div>
+          <details className="media-lead-methodology"><summary>成交率按客资提交日期，业绩贡献按首单生效日期 · 查看完整统计口径</summary><div>
             <p>成交率 = 该期间提交的有效客资中，截至查询时已成交的客资数 ÷ 该期间提交的有效客资数 × 100%。有效客资按当前判定统计，包含已转化、已成交客资；无效、待判等不计入分母。无有效客资时显示“—”。</p>
             <p>成交须有关联的已生效首购订单，且单笔订单总金额≥1280元（含1280元）；复购不计，多笔小额订单不累加，同一客资只计一次。</p>
-            <p>期间按客资提交日期划分，成交可发生在后续期间，不限60天；历史成交率随当前状态和后续成交动态更新，不是期末冻结值。归属采用首次计数时冻结的引流贡献人和部门，日期按北京时间计算，周一为每周起点。</p>
-            <p>业绩贡献按该期间提交的有效客资汇总本人及所属兼职的生效首购订单总金额，不设金额门槛。每条客资取最早生效的一笔首购，复购不计，后续成交更新历史期间，归属沿用冻结贡献人和部门。</p>
+            <p>成交率按客资提交日期划分，成交可发生在后续期间，不限60天；历史成交率随当前状态和后续成交动态更新，不是期末冻结值。归属采用首次计数时冻结的引流贡献人和部门，日期按北京时间计算，周一为每周起点。</p>
+            <p>业绩贡献按有效客资最早一笔首购订单的生效日期汇总金额，包含本人及所属兼职在往期提交的客资。首购不设金额门槛，复购不计，归属沿用冻结贡献人和部门。</p>
           </div></details>
           <BusinessTable
             rowClassName={row => row.key === 'today' || row.key === 'month' ? 'media-lead-current-period' : ''}

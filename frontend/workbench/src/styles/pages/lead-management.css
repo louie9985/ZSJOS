@@ -652,28 +652,34 @@
 .inbox-avatar-layout .lead-inbox-item.has-pending-tasks.active {
   border-color: var(--crm-color-error);
 }
-.lead-task-border {
-  position: absolute;
-  inset: -1px;
-  padding: 2px;
-  border-radius: inherit;
-  pointer-events: none;
-  overflow: hidden;
-  container-type: size;
-  mask: linear-gradient(var(--crm-bg-container) 0 0) content-box, linear-gradient(var(--crm-bg-container) 0 0);
-  mask-composite: exclude;
-}
-/* Keep the mask stationary; only the rasterized highlight rotates, with identical loop endpoints. */
-.lead-task-border::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: calc(100cqw + 100cqh);
-  aspect-ratio: 1;
-  background: conic-gradient(transparent 0deg, var(--crm-color-error) 60deg, transparent 120deg, transparent 180deg, var(--crm-color-error) 240deg, transparent 300deg);
-  will-change: transform;
-  animation: lead-task-border-flow 3s linear infinite;
+.lead-task-border { display: none; }
+@supports (mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)) and (mask-composite: exclude) and (container-type: size) and (width: calc(100cqw + 100cqh)) {
+  @media (prefers-reduced-motion: no-preference) {
+    .lead-task-border {
+      display: block;
+      position: absolute;
+      inset: -1px;
+      padding: 2px;
+      border-radius: inherit;
+      pointer-events: none;
+      overflow: hidden;
+      container-type: size;
+      mask: linear-gradient(var(--crm-bg-container) 0 0) content-box, linear-gradient(var(--crm-bg-container) 0 0);
+      mask-composite: exclude;
+    }
+    /* Keep the mask stationary; only the rasterized highlight rotates, with identical loop endpoints. */
+    .lead-task-border::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: calc(100cqw + 100cqh);
+      aspect-ratio: 1;
+      background: conic-gradient(transparent 0deg, var(--crm-color-error) 60deg, transparent 120deg, transparent 180deg, var(--crm-color-error) 240deg, transparent 300deg);
+      will-change: transform;
+      animation: lead-task-border-flow 3s linear infinite;
+    }
+  }
 }
 .lead-task-indicator {
   display: inline-flex;
@@ -690,10 +696,6 @@
 @keyframes lead-task-border-flow {
   from { transform: translate(-50%, -50%) rotate(0turn); }
   to { transform: translate(-50%, -50%) rotate(1turn); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .lead-task-border { display: none; }
-  .lead-task-border::before { animation: none; will-change: auto; }
 }
 
 /* The employee detail pane supplies its own padding and scrolling. */

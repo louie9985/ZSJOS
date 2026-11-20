@@ -61,6 +61,13 @@ public class SalesOrderTaskActionValidator implements BpmTaskActionValidator {
             return;
         }
         lockLegacyRoundAgainstMigration(context);
+        if (TASK_FINANCE.equals(context.getTaskDefinitionKey()) && context.getProcessInstanceId() != null) {
+            var round = roundMapper.selectByProcessInstanceId(context.getProcessInstanceId());
+            if (round != null && Boolean.FALSE.equals(round.getSupervisorConfirmationEnabled())) {
+                validateFinanceAction(context);
+                return;
+            }
+        }
         if ((ACTION_REJECT.equals(context.getAction())
                     || (ACTION_APPROVE.equals(context.getAction()) && StrUtil.isNotBlank(context.getParentTaskId())))
                 && StrUtil.isBlank(context.getReason())) {

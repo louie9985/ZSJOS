@@ -1,5 +1,5 @@
 import FinanceOrderApprovalDetail from '../components/FinanceOrderApprovalDetail'
-import { FINANCE_ORDER_PROCESS_KEY } from '../services/salesOrder'
+import { isFinanceApprovalTask } from '../services/salesOrder'
 import { useMetricSourceApi } from '../services/metricPageScope'
 import { invalidateMenuTasks } from '../services/menuTaskRefresh'
 import { BUSINESS_APPROVAL_PROCESS_KEYS } from '../services/approvalNavigation'
@@ -434,7 +434,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView, metric
       heldRef.current = selectedTask; setHeldTask(selectedTask); setCompleted(true)
       void loadCounts(); void loadFirstPage(true)
     }}
-  /> : selectedTask?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY ? <FinanceOrderApprovalDetail
+  /> : selectedTask && isFinanceApprovalTask(selectedTask) ? <FinanceOrderApprovalDetail
     key={selectedTask.id + view} taskId={selectedTask.id} done={view === 'done' || completed} entry="bpm"
     canUpdate={canUpdate} refreshVersion={refreshVersion} onState={setDraftState}
     initialDraft={draftValues.current} onDraft={saveDraft}

@@ -20,7 +20,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class StudentInfoTaskController {
     @Resource private StudentInfoTaskService service;
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    @GetMapping("/by-registration/{caseId}") @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
+    @GetMapping("/by-registration/{caseId}") @PreAuthorize("@ss.hasPermission('zsjos:student-info-task:query')")
     public CommonResult<Row> byRegistration(@PathVariable Long caseId) { return success(service.byRegistration(caseId)); }
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @GetMapping("/{id}/archive") @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:read')")
@@ -46,10 +46,10 @@ public class StudentInfoTaskController {
     public CommonResult<Row> regenerate(@PathVariable Long id,@Valid @RequestBody Command command) { return success(service.regenerate(id,command)); }
     @ModelAttribute public void noCache(HttpServletResponse response) { response.setHeader("Cache-Control","no-store"); }
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    @GetMapping("/page") @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
+    @GetMapping("/page") @PreAuthorize("@ss.hasPermission('zsjos:student-info-task:query')")
     public CommonResult<PageResult<Row>> page(@Valid Query query) { return success(service.page(query)); }
     @ApiAccessLog(requestEnable=false,responseEnable=false)
-    @GetMapping("/{id}") @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
+    @GetMapping("/{id}") @PreAuthorize("@ss.hasPermission('zsjos:student-info-task:query')")
     public CommonResult<Row> detail(@PathVariable Long id) { return success(service.detail(id)); }
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     @GetMapping("/{id}/generation-config") @PreAuthorize("@ss.hasPermission('zsjos:student-info-form:create') && @ss.hasPermission('zsjos:student-info-form:sensitive-read')")

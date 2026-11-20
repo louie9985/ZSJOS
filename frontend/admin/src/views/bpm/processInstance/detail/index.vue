@@ -186,7 +186,8 @@ const processInstanceLoading = ref(false) // 流程实例的加载中
 const processInstance = ref<any>({}) // 流程实例
 const withdrawalRouter = useRouter()
 const processDefinition = ref<any>({}) // 流程定义
-const financeOrderTask = computed(() => !!props.taskId && processDefinition.value.key === FINANCE_ORDER_PROCESS_KEY)
+const selectedNodeKey = ref<string>()
+const financeOrderTask = computed(() => !!props.taskId && (processDefinition.value.key === FINANCE_ORDER_PROCESS_KEY || (processDefinition.value.key === 'zsjos_sales_order_dual_approval' && selectedNodeKey.value === 'financeReview')))
 const withdrawalId = computed(() => processDefinition.value.key === 'zsjos_partner_withdrawal'
   && /^withdrawal:[1-9]\d*$/.test(processInstance.value.businessKey || '')
   ? processInstance.value.businessKey.slice('withdrawal:'.length) : undefined)
@@ -240,6 +241,7 @@ const getApprovalDetail = async () => {
       return
     }
     processInstance.value = data.processInstance
+    selectedNodeKey.value = data.todoTask?.id === props.taskId ? data.todoTask.taskDefinitionKey : undefined
     processDefinition.value = data.processDefinition
 
     // 设置表单信息

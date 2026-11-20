@@ -83,7 +83,7 @@ let generation = 0
 let summaryGeneration = 0
 const loadTask = async () => {
   const current = ++generation
-  if (!permitted('zsjos:registration:query-my')) return
+  if (!permitted('zsjos:registration:query-pool')) return
   taskLoading.value = true
   taskError.value = ''
   try {

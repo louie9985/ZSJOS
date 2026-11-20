@@ -68,9 +68,6 @@ public class StudentInfoTaskService {
     public PageResult<Row> page(Query query) {
         if (!permission.canList(getLoginUserId())) throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED);
         var filter=new LambdaQueryWrapperX<StudentInfoTaskDO>().eqIfPresent(StudentInfoTaskDO::getPersonId,query.getPersonId());
-        filter.apply("EXISTS (SELECT 1 FROM zsjos_registration_case c WHERE c.order_item_id=zsjos_student_info_task.order_item_id "
-                + "AND c.order_id=zsjos_student_info_task.order_id AND c.tenant_id=zsjos_student_info_task.tenant_id "
-                + "AND c.deleted=0 AND c.owner_user_id={0})", getLoginUserId());
         if (query.getOrderStatus()!=null) filter.apply("EXISTS (SELECT 1 FROM zsjos_order o WHERE o.id=zsjos_student_info_task.order_id AND o.tenant_id=zsjos_student_info_task.tenant_id AND o.deleted=0 AND o.status={0})",query.getOrderStatus());
         String cancelledOrder = "EXISTS (SELECT 1 FROM zsjos_order o WHERE o.id=zsjos_student_info_task.order_id AND o.tenant_id=zsjos_student_info_task.tenant_id AND o.deleted=0 AND o.status IN ('revision_required','superseded','terminated'))";
         if ("CANCELLED".equals(query.getStatus())) filter.apply(cancelledOrder);
@@ -172,8 +169,7 @@ public class StudentInfoTaskService {
         var registration=registrationCases.selectByOrderItemId(task.getOrderItemId());
         if(registration!=null && Objects.equals(registration.getOrderId(),task.getOrderId())) row.setRegistrationCaseId(registration.getId());
         row.setOrderNo(order.getOrderNo()); row.setStudentName(order.getStudentName()); row.setOrderStatus(order.getStatus());
-        row.setCanProcess(open(order) && registration != null
-                && Set.of("pending", "processing").contains(registration.getStatus()));
+        row.setCanProcess(open(order));
         var form=task.getFormId()==null ? null : forms.selectById(task.getFormId());
         var target=form==null ? collection.prepareTaskForm(task) : form;
         row.setProductName(target.getProductName());
@@ -211,7 +207,6 @@ public class StudentInfoTaskService {
         var order=orders.selectByIdForUpdate(task.getOrderId(),TenantContextHolder.getRequiredTenantId());
         if (!open(order)) throw exception(LINK_EXPIRED);
         task=tasks.lock(id);
-        if (!permission.canAccess(task, "create", getLoginUserId())) throw exception(LINK_INVALID);
         if (!Objects.equals(task.getPersonId(),order.getPersonId())) throw exception(CONFIG_INVALID);
         return task;
     }
@@ -345,7 +340,16 @@ public class StudentInfoTaskService {
             images.copyForCollection(source,target,materials(source,revision),targetFields);
             task.setSourceFormId(source.getId()); task.setSourceRevision(revision==null ? 0 : revision.getRevision());
         }
-        // Reused answers prefill the new draft. Consent belongs to this form only.
+        if (reuse) {
+            var sourceFields=collection.definitions(source);
+            for (var value:content(source,revision)) {
+                if (targetFields.stream().noneMatch(f->Objects.equals(f.getKey(),value.getFieldKey())
+                        && sourceFields.stream().anyMatch(s->StudentInfoReusePolicy.compatible(f,s)))) continue;
+                var copy=JsonUtils.parseObject(JsonUtils.toJsonString(value),StudentInfoFormValueDO.class);
+                copy.setId(null); copy.setFormId(target.getId()); answers.insert(copy);
+            }
+            target.setStatus("SUBMITTED"); target.setSubmitSource("reuse"); target.setSubmittedAt(java.time.LocalDateTime.now()); forms.updateById(target);
+        }
         if(replaced!=null) forms.update(null,new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<StudentInfoFormDO>()
                 .eq(StudentInfoFormDO::getId,replaced.getId()).set(StudentInfoFormDO::getStatus,"REVOKED")
                 .set(StudentInfoFormDO::getRevokedAt,java.time.LocalDateTime.now()));

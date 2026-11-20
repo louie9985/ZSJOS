@@ -14,7 +14,7 @@ public class StudentInfoPermissionProvider implements ZsjosObjectPermissionProvi
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseMapper cases;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper services;
     @Resource private cn.iocoder.yudao.module.zsjos.service.registration.StudentServiceObjectPermissionProvider servicePermission;
-    @Resource private cn.iocoder.yudao.module.zsjos.service.registration.RegistrationCaseObjectPermissionProvider casePermissions;
+    @Resource private cn.iocoder.yudao.module.system.api.permission.PermissionApi permission;
     @Override public String getBizType() { return "student-info"; }
     @Override public boolean hasPermission(Long id,String action,Long userId) {
         var user=getLoginUser();
@@ -24,8 +24,8 @@ public class StudentInfoPermissionProvider implements ZsjosObjectPermissionProvi
         if (!Set.of("create","regenerate","revoke","sent","link-read","read","sensitive-read","export").contains(action)) return false;
         if (Set.of("create","regenerate","revoke","sent").contains(action))
             return Set.of("pending","processing").contains(item.getStatus())
-                    && casePermissions.isOwner(item, userId);
-        if (casePermissions.isOwner(item, userId)) return true;
+                    && permission.hasAnyPermissions(userId,"zsjos:registration:query-pool");
+        if (permission.hasAnyPermissions(userId,"zsjos:registration:query-pool")) return true;
         if (!Set.of("read","sensitive-read","export").contains(action)) return false;
         return services.selectList(new cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX<cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO>()
                 .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO::getRegistrationCaseId,id))

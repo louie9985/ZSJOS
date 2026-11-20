@@ -213,9 +213,3 @@ export const getMyStudentService = (id: number) => request.get<StudentServiceSub
 
 export const closeRegistration = (id: number, version: number, reason: string) =>
   request.post({ url: `/zsjos/registration/${id}/close`, data: { version, reason, idempotencyKey: crypto.randomUUID() } })
-
-export const getRegistrationTransferCandidates = (id: number) =>
-  request.get<Array<{ id: number; nickname: string }>>({ url: `/zsjos/registration/${id}/transfer-candidates`, preserveBusinessError: true })
-
-export const transferRegistration = (id: number, data: { version: number; idempotencyKey: string; targetUserId: number; reason: string }) =>
-  request.post<RegistrationCase>({ url: `/zsjos/registration/${id}/transfer`, data, preserveBusinessError: true })

@@ -268,41 +268,7 @@ public class SalesOrderController {
     public CommonResult<PageResult<SalesOrderListItemRespVO>> searchInboxPage(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
-    @PostMapping("/approval/search-cursor")
-    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
-    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchInboxCursor(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
-        return success(orderService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
-    }
 
-    @GetMapping("/approval/filter-profile")
-    @Operation(summary = "获得成交审批筛选方案")
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
-    public CommonResult<SalesOrderApprovalFilterProfileRespVO> getApprovalFilterProfile() {
-        return success(orderService.getApprovalFilterProfile(WebFrameworkUtils.getLoginUserId()));
-    }
-
-    @PutMapping("/{id}/approve")
-    @Operation(summary = "通过当前中心审批任务")
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
-    public CommonResult<Boolean> approve(@PathVariable Long id, @Valid @RequestBody SalesOrderDecisionReqVO reqVO) {
-        orderService.approve(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
-    }
-
-    @PutMapping("/{id}/reject")
-    @Operation(summary = "驳回当前审批轮次")
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
-    public CommonResult<Boolean> reject(@PathVariable Long id, @Valid @RequestBody SalesOrderDecisionReqVO reqVO) {
-        orderService.reject(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
-    }
-
-    @PutMapping("/{id}/approval/migrate-legacy")
-    @Operation(summary = "在原审批实例中跳过旧报名履约审批节点")
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:migrate-approval')")
-    public CommonResult<Boolean> migrateLegacyApproval(@PathVariable Long id, @Valid @RequestBody SalesOrderLegacyApprovalMigrationReqVO reqVO) {
-        orderService.migrateLegacyApproval(id, WebFrameworkUtils.getLoginUserId(), reqVO);
-        return success(true);
-    }
 
     @GetMapping("/approval/native-detail")
     @Operation(summary = "查询本人财务审批或加签任务的订单详情")

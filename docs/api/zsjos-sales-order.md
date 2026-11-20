@@ -2,11 +2,11 @@
 
 ## 财务审批与报名履约
 
-新提交、复购和补正重提统一启动 SIMPLE 流程 `zsjos_sales_order_finance_approval`。业务键为 `sales-order:{orderId}`，各入口在启动前按订单商品创建报名待办。审批仅包含配置财务部门的 `financeReview` 节点。BPM 最终通过事件使订单生效，随后根据订单考期自动建班或入班。明确驳回终止未完报名待办并创建补正任务，历史报名记录和材料继续保留。新轮次的 `supervisorConfirmationEnabled` 为 false。
+新提交、复购及补正重提启动 `zsjos_sales_order_dual_approval`，报名服务和财务并行审核；任一中心没有配置有效审核人则不启动。报名节点通过后产生公共池履约任务。已有财务单审实例不更改定义。
 
 财务审批人使用 BPM 待办和通用任务操作。加签通过 `PUT /bpm/task/create-sign`，参数为 `id`、`type`（`before` 或 `after`）、`userIds`、`reason`。加签人员需启用并拥有 BPM 任务查询及办理权限。财务普通通过意见选填，加签通过和所有驳回需填写意见。财务或签人驳回走同一最终结果事件。订单列表和详情提供 `processDefinitionKey`，通用 BPM 页面可通过 `GET /zsjos/sales-order/approval/native-detail?taskId=&view=todo|done` 查询本人待办或已办关联的只读订单详情。
 
-旧流程保留历史和已有加签。V375 定义 `zsjos:sales-order:migrate-approval` 按钮权限。由管理员授权后，通过 `PUT /zsjos/sales-order/{id}/approval/migrate-legacy` 逐单迁移，提交当前 `approvalRoundId`、`orderVersion`、`roundVersion`、`reason` 和 `idempotencyKey`。命令受订单管理可见范围约束。它在原实例记录报名节点跳过及操作人，保留原财务审批结果、待办、记录与快照。若报名节点有待处理加签，先由原办理人员完成加签，再用原参数重试。财务已通过且剩余报名节点跳过时，原流程发出最终通过事件。迁移命令不重启实例或补录历史审批。部署新后端前应发布仓库中的 3.0.0 SIMPLE 资产并配置 BPM 审批入口权限。
+已办理轮次和历史跳过节点原样显示；不再提供旧审批迁移命令。
 
 
 ## 权限与对象范围
@@ -68,7 +68,7 @@
 
 ## 财务审批双入口
 
-新成交订单使用 SIMPLE 模型 `zsjos_sales_order_finance_approval`，将财务中心当前启用人员交给 BPM 分派 `financeReview`。先发布 [3.0.0 模型](../../script/bpm/zsjos_sales_order_finance_approval/3.0.0/process-model.json) 再启用新提交代码。提交要求 `agreedExamMonth` 为 `YYYY-MM`，历史自由文本继续可读。运行依赖已批准的 V371 自动分班结构与 V374 履约归属结构，并要求已有发布的报名履约配置。订单提交起始创建报名履约与资料收集，履约按订单明细和成交负责人建档。订单最终通过时按已有规则自动分班，履约提交仍校验订单已生效。审批完成后由原有订单结果事务更新状态、机会和通知。最终驳回取消本单履约任务。
+新提交、复购及补正重提启动 `zsjos_sales_order_dual_approval`，报名服务和财务并行审核；任一中心没有配置有效审核人则不启动。报名节点通过后产生公共池履约任务。已有财务单审实例不更改定义。
 
 - `GET /zsjos/sales-order/approval/business-detail?taskId=&done=false` 供成交审批页使用，需要 `zsjos:sales-order:review`。财务父任务要求财务中心成员资格和本人任务关系，加签子任务要求本人的加签任务关系。等待前加签期间可通过本人任务 ID 读取详情。
 - `GET /zsjos/sales-order/approval/native-detail?taskId=&done=false` 供 BPM 使用，需要 `bpm:task:query` 与本人任务关系，支持父任务和原生加签子任务。历史 `view=done` 参数继续有效。

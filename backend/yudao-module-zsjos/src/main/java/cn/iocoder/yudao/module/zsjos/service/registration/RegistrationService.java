@@ -9,12 +9,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 public interface RegistrationService {
-    Long ensureCasesOnOrderSubmitted(Long orderId, LocalDateTime submittedAt);
-
-    List<StudyPlannerSimpleRespVO> getTransferCandidates(Long caseId, Long userId);
-
-    RegistrationCaseRespVO transfer(Long caseId, Long userId, RegistrationTransferReqVO request);
-
     Long ensureCaseAfterRegistrationApproval(Long orderId, LocalDateTime approvedAt);
     PageResult<RegistrationCaseRespVO> getPoolPage(RegistrationPoolPageReqVO reqVO);
     RegistrationCaseRespVO getCase(Long caseId);

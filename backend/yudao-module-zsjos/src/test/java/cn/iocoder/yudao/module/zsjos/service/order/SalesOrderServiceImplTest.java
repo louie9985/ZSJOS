@@ -92,6 +92,7 @@ class SalesOrderServiceImplTest {
     @InjectMocks private SalesOrderServiceImpl service;
     @Mock private RepurchaseDuplicateGuard repurchaseDuplicateGuard;
     @Mock private OrderContactCompletionService contactCompletionService;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoTaskService studentInfoTaskService;
     @Mock private RepurchaseCustomerService repurchaseCustomers;
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmissionIdentityService submissionIdentityService;
     @Mock private cn.iocoder.yudao.module.zsjos.service.performance.PerformanceSnapshotService performanceSnapshotService;
@@ -247,6 +248,7 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L, 302L));
         when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-1");
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(100L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
@@ -318,8 +320,7 @@ class SalesOrderServiceImplTest {
         assertFalse(roundCaptor.getValue().getOrderSnapshot().contains("submissionIdempotencyKey"));
 
         verify(processInstanceApi).createProcessInstance(eq(20L), argThat(processReq ->
-                FINANCE_PROCESS_DEFINITION_KEY.equals(processReq.getProcessDefinitionKey())
-                        && processReq.getStartUserSelectAssignees().keySet().equals(Set.of(TASK_FINANCE))
+                processReq.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
                         && processReq.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
                         && "KZ202608160000000001".equals(processReq.getVariables().get("leadNo"))));
     }
@@ -333,6 +334,7 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L, 302L));
         when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-1");
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(100L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
@@ -344,7 +346,7 @@ class SalesOrderServiceImplTest {
         assertEquals(100L, id);
         ArgumentCaptor<SalesOrderDO> orderCaptor = ArgumentCaptor.forClass(SalesOrderDO.class);
         verify(orderMapper).insert(orderCaptor.capture());
-        verify(registrationService).ensureCasesOnOrderSubmitted(eq(id), any());
+        verify(studentInfoTaskService).ensureForOrder(id);
         assertEquals("education", orderCaptor.getValue().getFormalOwnerIdentity());
         verify(contactCompletionService).complete(orderCaptor.getValue(), 1L, 20L);
         assertEquals(20L, orderCaptor.getValue().getFormalSalesUserId());
@@ -358,18 +360,18 @@ class SalesOrderServiceImplTest {
         assertEquals("key-1", roundCaptor.getValue().getSubmissionIdempotencyKey());
         verify(processInstanceApi).createProcessInstance(eq(20L), argThat(req ->
                 "education".equals(req.getVariables().get("formalOwnerIdentity"))
-                        && FINANCE_PROCESS_DEFINITION_KEY.equals(req.getProcessDefinitionKey())
-                        && req.getStartUserSelectAssignees().keySet().equals(Set.of(TASK_FINANCE))
+                        && req.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
                         && req.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
                         && "KZ202608160000000001".equals(req.getVariables().get("leadNo"))));
     }
 
     @Test
-    void createRejectsWhenFinanceHasNoEnabledUsers() {
+    void createRejectsWhenAnApprovalCenterHasNoEnabledUsers() {
         mockEligibleLeadAndOpportunity();
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
         when(permissionService.enabledUsers(1040L)).thenReturn(Set.of());
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(100L); return 1; })
@@ -1139,6 +1141,7 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
         when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-2");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
@@ -1194,6 +1197,7 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
         when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-2");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
@@ -1459,7 +1463,7 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void systemRepurchasePersistsCustomerOnlyAndStartsFinanceApproval() {
+    void systemRepurchasePersistsCustomerOnlyAndStartsDualApproval() {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus(STATUS_WON);
         when(leadMapper.selectOrderAssociationCandidates(10L, 1L)).thenReturn(List.of(lead));
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
@@ -1467,7 +1471,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.hasEffectiveOrder(10L)).thenReturn(true);
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L); when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-repurchase");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
         AreaRespDTO province = new AreaRespDTO(); province.setId(120000); province.setName("天津市");
@@ -1482,7 +1486,7 @@ class SalesOrderServiceImplTest {
                 assertThrows(ServiceException.class, () -> service.createSystemRepurchase(1L, 20L, req)).getCode());
         req.getOrder().setAssociatedLeadId(null);
         Long id = service.createSystemRepurchase(1L, 20L, req);
-        verify(registrationService).ensureCasesOnOrderSubmitted(eq(id), any());
+        verify(studentInfoTaskService).ensureForOrder(id);
 
         assertEquals(101L, id);
         verify(contactCompletionService).complete(argThat(order -> Objects.equals(order.getId(), 101L)), eq(1L), eq(20L));
@@ -1506,7 +1510,7 @@ class SalesOrderServiceImplTest {
         lenient().when(orderMapper.hasEffectiveOrder(10L)).thenReturn(effectiveOrder);
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L); when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-repurchase");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
         AreaRespDTO province = new AreaRespDTO(); province.setId(120000); province.setName("天津市");
@@ -1542,7 +1546,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.selectByIdempotencyKey(req.getOrder().getIdempotencyKey())).thenReturn(created.getValue());
         var replay = JsonUtils.parseObject(originalRequest, SalesOrderRepurchaseReqVO.class);
         assertEquals(id, service.createMatchedRepurchase(10L, 20L, replay));
-        verify(registrationService,times(1)).ensureCasesOnOrderSubmitted(eq(id), any());
+        verify(studentInfoTaskService,times(1)).ensureForOrder(id);
         verify(orderMapper, times(1)).insert(any(SalesOrderDO.class));
         req.setRepurchaseReason("不同成交内容");
         assertThrows(ServiceException.class, () -> service.createMatchedRepurchase(10L, 20L, req));

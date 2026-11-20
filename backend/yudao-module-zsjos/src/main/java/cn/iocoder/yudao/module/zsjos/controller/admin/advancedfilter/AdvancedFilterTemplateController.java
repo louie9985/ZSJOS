@@ -47,7 +47,7 @@ public class AdvancedFilterTemplateController {
             + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
             + "'zsjos:lead:appeal:review-chairman'))"
             + " || (#scene == 'duplicate_review' && @ss.hasPermission('zsjos:lead-duplicate-review:query'))"
-            + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-my'))"
+            + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-pool'))"
             + " || (#scene == 'media_student' && @ss.hasPermission('zsjos:media-student:query-my'))"
             + " || (#scene == 'student_service' && @ss.hasPermission('zsjos:student:query-my'))"
             + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
@@ -67,7 +67,7 @@ public class AdvancedFilterTemplateController {
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
-            + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-my','zsjos:student:query-my',"
+            + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my',"
             + "'zsjos:cashback:my-query','zsjos:cashback:finance-query','zsjos:withdrawal:my-query',"
             + "'zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query'))")
     public CommonResult<Long> createPersonal(@Valid @RequestBody AdvancedFilterTemplateSaveReqVO reqVO) {
@@ -81,7 +81,7 @@ public class AdvancedFilterTemplateController {
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
-            + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-my','zsjos:student:query-my',"
+            + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my',"
             + "'zsjos:cashback:my-query','zsjos:cashback:finance-query','zsjos:withdrawal:my-query',"
             + "'zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query'))")
     public CommonResult<Boolean> updatePersonal(@Valid @RequestBody AdvancedFilterTemplateSaveReqVO reqVO) {
@@ -95,7 +95,7 @@ public class AdvancedFilterTemplateController {
             + "'zsjos:lead:claim','zsjos:lead:claim-pool:query','zsjos:lead:query-all','zsjos:lead-public-sea-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query','zsjos:my-operations:query','zsjos:sales-order:query','zsjos:sales-order:query-own',"
             + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:lead:appeal:query',"
-            + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-my','zsjos:student:query-my','zsjos:media-student:query-my',"
+            + "'zsjos:lead-duplicate-review:query','zsjos:registration:query-pool','zsjos:student:query-my','zsjos:media-student:query-my',"
             + "'zsjos:cashback:my-query','zsjos:cashback:finance-query','zsjos:withdrawal:my-query',"
             + "'zsjos:withdrawal:finance-query','zsjos:withdrawal:admin-query')")
     public CommonResult<Boolean> deletePersonal(@RequestParam Long id) {

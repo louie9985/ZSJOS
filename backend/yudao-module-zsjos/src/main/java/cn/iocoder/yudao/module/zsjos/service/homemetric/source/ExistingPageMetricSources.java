@@ -33,7 +33,7 @@ public class ExistingPageMetricSources {
     private static final List<Entry> ENTRIES = List.of(
             new Entry("lead_appeal","个人待处理申诉","zsjos:lead:appeal:query"),
             new Entry("duplicate_review","客资查重审核记录","zsjos:lead-duplicate-review:query"),
-            new Entry("registration","报名履约记录","zsjos:registration:query-my"),
+            new Entry("registration","报名履约记录","zsjos:registration:query-pool"),
             new Entry("media_student","媒体学员人数","zsjos:media-student:query-my"),
             new Entry("subordinate_sales","下属销售人数","zsjos:subordinate-sales:query"));
 

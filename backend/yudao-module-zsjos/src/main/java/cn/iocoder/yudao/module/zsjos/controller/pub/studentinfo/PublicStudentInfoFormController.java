@@ -55,14 +55,6 @@ public class PublicStudentInfoFormController {
         response.setHeader("Cache-Control","no-store");
         return success(service.identityArea(token, code));
     }
-    @PostMapping("/agreement-read")
-    @ApiAccessLog(requestEnable=false,responseEnable=false)
-    public CommonResult<Boolean> readAgreement(@RequestHeader("X-Student-Info-Token") String token,
-            @RequestParam String digest) {
-        service.readAgreement(token, digest);
-        return success(true);
-    }
-
     @PostMapping("/submit")
     @ApiAccessLog(requestEnable=false,responseEnable=false)
     public CommonResult<Boolean> submit(@RequestHeader("X-Student-Info-Token") String token,

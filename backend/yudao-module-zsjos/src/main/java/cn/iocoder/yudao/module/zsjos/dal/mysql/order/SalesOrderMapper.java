@@ -26,6 +26,19 @@ import static cn.hutool.core.util.StrUtil.isNotBlank;
 
 @Mapper
 public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
+    default PageResult<SalesOrderDO> selectTextbookPage(SalesOrderMyPageReqVO page, Long actor, boolean viewAll) {
+        if (actor == null) return PageResult.empty();
+        var query = new LambdaQueryWrapperX<SalesOrderDO>();
+        query.eq(SalesOrderDO::getStatus, cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_EFFECTIVE)
+                .eq(!viewAll, SalesOrderDO::getFormalSalesUserId, actor);
+        if (isNotBlank(page.getKeyword())) {
+            String word = page.getKeyword().trim();
+            query.and(q -> q.like(SalesOrderDO::getOrderNo, word).or().like(SalesOrderDO::getStudentName, word)
+                    .or().like(SalesOrderDO::getStudentMobile, word).or().like(SalesOrderDO::getStudentWechatId, word));
+        }
+        return selectPage(page, query.orderByDesc(SalesOrderDO::getEffectiveAt).orderByDesc(SalesOrderDO::getId));
+    }
+
     default int releasePaymentForSuccessor(Long id, Long paymentId) {
         return update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<SalesOrderDO>()
                 .eq(SalesOrderDO::getId, id).eq(SalesOrderDO::getSourcePaymentOrderId, paymentId)

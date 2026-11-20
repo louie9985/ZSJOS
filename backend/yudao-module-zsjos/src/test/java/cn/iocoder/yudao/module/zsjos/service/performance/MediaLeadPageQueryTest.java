@@ -53,9 +53,18 @@ class MediaLeadPageQueryTest {
    try(var sql=session.getConnection().createStatement()) {
     sql.execute("INSERT INTO zsjos_order(tenant_id,deleted,lead_id,status,order_type,effective_at,total_amount) VALUES(9,0,1,'effective','first_purchase','2025-01-02',500)");
    }
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("UPDATE zsjos_lead SET submitted_at='2024-12-31' WHERE id=1");
+   }
    drill.setMetric("contribution");
+   assertEquals(0,mapper.countDrill(9L,"USER",1L,List.of(),start.minusMonths(1),start,now,drill));
+   assertEquals(1,mapper.countDrill(9L,"USER",1L,List.of(),start,start.plusMonths(1),now,drill));
+   assertEquals(0,mapper.countDrill(9L,"USER",1L,List.of(),start.plusDays(2),end,now,drill));
    var contribution=mapper.pageDrill(9L,"USER",1L,List.of(),start,end,now,drill,0,20).getFirst();
    assertEquals(new java.math.BigDecimal("500.00"),contribution.getOrderAmount());
+   try(var sql=session.getConnection().createStatement()) {
+    sql.execute("UPDATE zsjos_lead SET submitted_at='2025-01-02' WHERE id=1");
+   }
    drill.setMetric("converted");
    assertEquals(new java.math.BigDecimal("1280.00"),mapper.pageDrill(9L,"USER",1L,List.of(),start,end,now,drill,0,20).getFirst().getOrderAmount());
    assertEquals(0,mapper.countDrill(999L,"USER",1L,List.of(),start,end,now,drill));

@@ -127,6 +127,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private OrderContactCompletionService contactCompletionService;
     @Resource private OrderProfileService orderProfileService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoTaskService studentInfoTaskService;
     @Resource private SalesOrderCommandService commandService;
     @Resource private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
     @Resource private SalesOrderNumberService orderNumberService;
@@ -547,6 +548,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setApprovalTask(new SalesOrderRespVO.ApprovalTask(task.getId(), task.getName(),
                 task.getProcessInstanceId(), task.getTaskDefinitionKey(), task.getParentTaskId(), task.getStatus(),
                 task.getReasonRequire(), canAct, canSign));
+        result.setApprovalProgress(nativeApprovalProgressApi.getProgress(task.getProcessInstanceId(), userId));
         result.setApprovalComments(nativeApprovalProgressApi.getComments(task.getProcessInstanceId()));
         return result;
     }
@@ -603,13 +605,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         BpmTaskRespDTO task = done ? processTaskApi.getDoneTask(userId, taskId)
                 : processTaskApi.getParticipantTodoTask(userId, taskId);
-        if (task == null || !FINANCE_PROCESS_DEFINITION_KEY.equals(task.getProcessDefinitionKey())
+        if (task == null || !isFinanceWorkflow(task.getProcessDefinitionKey())
                 || !TASK_FINANCE.equals(task.getTaskDefinitionKey())
                 || businessEntry && !Boolean.TRUE.equals(task.getSignTask()) && !permissionService.isFinanceCenterMember(userId)) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
         }
         SalesOrderApprovalRoundDO round = roundMapper.selectByProcessInstanceId(task.getProcessInstanceId());
-        if (round == null || !FINANCE_PROCESS_DEFINITION_KEY.equals(round.getProcessDefinitionKey())
+        if (round == null || !Objects.equals(task.getProcessDefinitionKey(), round.getProcessDefinitionKey())
                 || !Objects.equals(task.getBusinessKey(), BUSINESS_KEY_PREFIX + round.getOrderId())) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
         }
@@ -1121,14 +1123,20 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 && (!loadApprovalTaskPage(userId, "todo", TASK_FINANCE, null, 1, true,
                         FINANCE_PROCESS_DEFINITION_KEY, true).isEmpty()
                     || !loadApprovalTaskPage(userId, "done", TASK_FINANCE, null, 1, false,
-                        FINANCE_PROCESS_DEFINITION_KEY, true).isEmpty())) {
+                        FINANCE_PROCESS_DEFINITION_KEY, true).isEmpty()
+                    || !loadApprovalTaskPage(userId, "todo", TASK_FINANCE, null, 1, true, PROCESS_DEFINITION_KEY, true).isEmpty()
+                    || !loadApprovalTaskPage(userId, "done", TASK_FINANCE, null, 1, false, PROCESS_DEFINITION_KEY, true).isEmpty())) {
             keys.add(TASK_FINANCE);
         }
         return keys;
     }
 
+    private boolean isFinanceWorkflow(String key) {
+        return PROCESS_DEFINITION_KEY.equals(key) || FINANCE_PROCESS_DEFINITION_KEY.equals(key);
+    }
+
     private boolean isNativeSignTask(BpmTaskRespDTO task) {
-        return FINANCE_PROCESS_DEFINITION_KEY.equals(task.getProcessDefinitionKey())
+        return isFinanceWorkflow(task.getProcessDefinitionKey())
                 && TASK_FINANCE.equals(task.getTaskDefinitionKey()) && Boolean.TRUE.equals(task.getSignTask());
     }
 
@@ -1163,6 +1171,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (!TASK_REGISTRATION.equals(taskKey) && nativeApprovalPermissionApi.hasAnyPermissions(userId, PERMISSION_REVIEW)) {
             tasks.addAll(loadApprovalTaskPage(userId, handledValue, TASK_FINANCE, processIds, limit, centerPending,
                     FINANCE_PROCESS_DEFINITION_KEY, true));
+            tasks.addAll(loadApprovalTaskPage(userId, handledValue, TASK_FINANCE, processIds, limit, centerPending, PROCESS_DEFINITION_KEY, true));
         }
         return new ArrayList<>(tasks.stream().collect(java.util.stream.Collectors.toMap(BpmTaskRespDTO::getId,
                 task -> task, (first, duplicate) -> first, LinkedHashMap::new)).values());
@@ -1201,7 +1210,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderApprovalRoundDO round = roundMapper.selectByProcessInstanceId(task.getProcessInstanceId());
         Long orderId = parseOrderId(task.getBusinessKey());
         if (round == null || orderId == null || !orderId.equals(round.getOrderId())
-                || !FINANCE_PROCESS_DEFINITION_KEY.equals(round.getProcessDefinitionKey())) return false;
+                || !Objects.equals(task.getProcessDefinitionKey(), round.getProcessDefinitionKey())) return false;
         SalesOrderDO order = orderMapper.selectById(orderId);
         return order != null && (done || Objects.equals(order.getCurrentApprovalRoundId(), round.getId()));
     }
@@ -1293,41 +1302,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         } else {
             processTaskApi.rejectTask(userId, decision);
         }
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "migrate-approval")
-    public void migrateLegacyApproval(Long orderId, Long userId, SalesOrderLegacyApprovalMigrationReqVO reqVO) {
-        String reason = StrUtil.trimToEmpty(reqVO.getReason());
-        if (reason.isEmpty()) throw exception(SALES_ORDER_REJECT_REASON_REQUIRED);
-        SalesOrderDO order = requireOrderForUpdate(orderId);
-        SalesOrderApprovalRoundDO round = roundMapper.selectByIdForUpdate(reqVO.getApprovalRoundId(),
-                TenantContextHolder.getRequiredTenantId());
-        if (round == null || !Objects.equals(round.getOrderId(), orderId)
-                || !PROCESS_DEFINITION_KEY.equals(round.getProcessDefinitionKey())) {
-            throw exception(SALES_ORDER_VERSION_CONFLICT);
-        }
-        String fingerprint = commandService.fingerprint(reason, reqVO.getOrderVersion(), reqVO.getRoundVersion());
-        SalesOrderCommandService.Command command = new SalesOrderCommandService.Command(orderId, round.getId(),
-                round.getProcessInstanceId(), COMMAND_MIGRATE_LEGACY_APPROVAL, TASK_REGISTRATION, null, userId, fingerprint);
-        if (commandService.replay(reqVO.getIdempotencyKey(), command)) return;
-        if (!Objects.equals(order.getCurrentApprovalRoundId(), round.getId())
-                || !Objects.equals(order.getVersion(), reqVO.getOrderVersion())
-                || !Objects.equals(round.getVersion(), reqVO.getRoundVersion())
-                || !STATUS_PENDING_APPROVAL.equals(order.getStatus()) || !ROUND_PENDING.equals(round.getStatus())) {
-            throw exception(SALES_ORDER_VERSION_CONFLICT);
-        }
-        if (commandService.hasCommand(round.getId(), COMMAND_MIGRATE_LEGACY_APPROVAL)) return;
-        commandService.register(reqVO.getIdempotencyKey(), command);
-        registrationService.ensureCasesOnOrderSubmitted(orderId, LocalDateTime.now());
-        // The original BPM join retains the recorded finance decision and any pending finance sign tasks.
-        order.setVersion(order.getVersion() + 1);
-        round.setVersion(round.getVersion() + 1);
-        orderMapper.updateById(order);
-        roundMapper.updateById(round);
-        processTaskApi.skipObsoleteNode(userId, round.getProcessInstanceId(), PROCESS_DEFINITION_KEY,
-                BUSINESS_KEY_PREFIX + orderId, TASK_REGISTRATION, reason);
     }
 
     @Override
@@ -1557,13 +1531,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,
                             ValidatedSubmission validated, int roundNo, LocalDateTime now, SalesOrderSnapshot association) {
         // Collection starts with the order's review round, independently of approval and fulfillment.
-        registrationService.ensureCasesOnOrderSubmitted(order.getId(), now);
+        studentInfoTaskService.ensureForOrder(order.getId());
         SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
         if (config == null) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
+        List<Long> registrationUsers = new ArrayList<>(permissionService.enabledUsers(config.getRegistrationDeptId()));
         List<Long> financeUsers = new ArrayList<>(permissionService.enabledUsers(config.getFinanceDeptId()));
-        if (financeUsers.isEmpty()) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
+        if (registrationUsers.isEmpty() || financeUsers.isEmpty()) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
         BpmProcessInstanceCreateReqDTO processReq = new BpmProcessInstanceCreateReqDTO();
-        processReq.setProcessDefinitionKey(FINANCE_PROCESS_DEFINITION_KEY);
+        processReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
         processReq.setBusinessKey(BUSINESS_KEY_PREFIX + order.getId());
         Map<String, Object> variables = new LinkedHashMap<>();
         LeadDO processLead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
@@ -1572,9 +1547,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         variables.put("formalOwnerIdentity", order.getFormalOwnerIdentity());
         variables.put("formalOwnerIdentityLabel", ownerIdentityLabel(order.getFormalOwnerIdentity()));
         variables.put("personId", order.getPersonId()); variables.put("roundNo", roundNo);
-        variables.put("financeUsers", financeUsers);
+        variables.put("registrationUsers", registrationUsers); variables.put("financeUsers", financeUsers);
         processReq.setVariables(variables);
-        processReq.setStartUserSelectAssignees(Map.of(TASK_FINANCE, financeUsers));
+        processReq.setStartUserSelectAssignees(Map.of(TASK_REGISTRATION, registrationUsers, TASK_FINANCE, financeUsers));
         String processInstanceId;
         try {
             processInstanceId = processInstanceApi.createProcessInstance(userId, processReq);
@@ -1591,14 +1566,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             orderSnapshot = JsonUtils.toJsonString(captured);
         }
         round.setOrderSnapshot(orderSnapshot); round.setProcessInstanceId(processInstanceId);
-        round.setProcessDefinitionKey(FINANCE_PROCESS_DEFINITION_KEY); round.setSubmittedByUserId(userId);
+        round.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); round.setSubmittedByUserId(userId);
         round.setSubmittedAt(now); round.setSubmissionIdempotencyKey(idempotencyKey);
         round.setSupervisorConfirmationEnabled(false); round.setVersion(0); roundMapper.insert(round);
         order.setCurrentApprovalRoundId(round.getId()); order.setSubmittedAt(now); orderMapper.updateById(order);
         if (opportunity != null) {
             opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL); opportunityMapper.updateById(opportunity);
         }
-        List<Long> reviewerUserIds = financeUsers;
+        List<Long> reviewerUserIds = java.util.stream.Stream.concat(
+                registrationUsers.stream(), financeUsers.stream()).distinct().toList();
         LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         Long leadSubmitterUserId = lead == null ? null : lead.getSourceUserId();
         Long partnerId = lead == null ? null : lead.getPartnerId();

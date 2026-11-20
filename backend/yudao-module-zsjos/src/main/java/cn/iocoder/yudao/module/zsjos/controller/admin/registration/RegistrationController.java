@@ -27,35 +27,22 @@ public class RegistrationController {
     @Resource private RegistrationService registrationService;
 
     @GetMapping("/pool-page")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
     public CommonResult<PageResult<RegistrationCaseRespVO>> getPoolPage(@Valid RegistrationPoolPageReqVO reqVO) {
         return success(registrationService.getPoolPage(reqVO));
     }
 
     @PostMapping("/pool/search-page")
     @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
     public CommonResult<PageResult<RegistrationCaseRespVO>> searchPoolPage(
             @Valid @RequestBody RegistrationPoolPageReqVO reqVO) {
         return success(registrationService.getPoolPage(reqVO));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-my')")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
     public CommonResult<RegistrationCaseRespVO> get(@PathVariable Long id) { return success(registrationService.getCase(id)); }
-
-    @GetMapping("/{id}/transfer-candidates")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:transfer')")
-    public CommonResult<List<StudyPlannerSimpleRespVO>> transferCandidates(@PathVariable Long id) {
-        return success(registrationService.getTransferCandidates(id, SecurityFrameworkUtils.getLoginUserId()));
-    }
-
-    @PostMapping("/{id}/transfer")
-    @PreAuthorize("@ss.hasPermission('zsjos:registration:transfer')")
-    public CommonResult<RegistrationCaseRespVO> transfer(@PathVariable Long id,
-                                                       @Valid @RequestBody RegistrationTransferReqVO request) {
-        return success(registrationService.transfer(id, SecurityFrameworkUtils.getLoginUserId(), request));
-    }
 
     @GetMapping("/{id}/routes/{routeId}/candidates")
     @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")

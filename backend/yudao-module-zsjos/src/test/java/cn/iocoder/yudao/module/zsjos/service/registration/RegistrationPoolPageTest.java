@@ -41,7 +41,7 @@ class RegistrationPoolPageTest {
             jdbc.execute("CREATE TABLE zsjos_registration_case(" + String.join(",", columns) + ")");
             String[] statuses = {"pending", "processing", "completed", "cancelled"};
             for (int id = 1; id <= 48; id++) {
-                jdbc.update("INSERT INTO zsjos_registration_case(id,order_id,status,tenant_id,deleted,update_time,owner_user_id) VALUES(?,?,?,1,0,CURRENT_TIMESTAMP,7)", id, id, statuses[(id - 1) % 4]);
+                jdbc.update("INSERT INTO zsjos_registration_case(id,order_id,status,tenant_id,deleted,update_time) VALUES(?,?,?,1,0,CURRENT_TIMESTAMP)", id, id, statuses[(id - 1) % 4]);
             }
             jdbc.update("INSERT INTO zsjos_registration_case(id,status,tenant_id,deleted) VALUES(99,'pending',1,1)");
             try (var session = factory.openSession()) {
@@ -50,27 +50,26 @@ class RegistrationPoolPageTest {
                 req.setPageSize(20);
                 req.setPageNo(2);
                 req.setStatusGroup("pending");
-                var pending = mapper.selectOwnedPage(req, null, null, 7L, null);
+                var pending = mapper.selectPoolPage(req, null, null);
                 assertEquals(24L, pending.getTotal());
                 assertEquals(4, pending.getList().size());
                 assertTrue(pending.getList().stream().allMatch(row -> Set.of("pending", "processing").contains(row.getStatus())));
                 req.setStatusGroup("processed");
-                var processed = mapper.selectOwnedPage(req, null, null, 7L, null);
+                var processed = mapper.selectPoolPage(req, null, null);
                 assertEquals(24L, processed.getTotal());
                 assertEquals(4, processed.getList().size());
                 assertTrue(processed.getList().stream().allMatch(row -> Set.of("completed", "cancelled").contains(row.getStatus())));
                 req.setPageNo(1);
-                assertEquals(1L, mapper.selectOwnedPage(req, List.of(1L, 3L, 4L), List.of(1L, 4L), 7L, null).getTotal());
-                assertEquals(0L, mapper.selectOwnedPage(req, List.of(), null, 7L, null).getTotal());
+                assertEquals(1L, mapper.selectPoolPage(req, List.of(1L, 3L, 4L), List.of(1L, 4L)).getTotal());
+                assertEquals(0L, mapper.selectPoolPage(req, List.of(), null).getTotal());
                 req.setStatus("pending");
-                assertEquals(0L, mapper.selectOwnedPage(req, null, null, 7L, null).getTotal());
+                assertEquals(0L, mapper.selectPoolPage(req, null, null).getTotal());
                 req.setStatusGroup(null);
-                assertEquals(12L, mapper.selectOwnedPage(req, null, null, 7L, null).getTotal());
+                assertEquals(12L, mapper.selectPoolPage(req, null, null).getTotal());
                 req.setStatus(null);
-                assertEquals(48L, mapper.selectOwnedPage(req, null, null, 7L, null).getTotal());
+                assertEquals(48L, mapper.selectPoolPage(req, null, null).getTotal());
                 req.setStatusGroup("all");
-                assertEquals(0L, mapper.selectOwnedPage(req, null, null, 8L, null).getTotal());
-                assertEquals(48L, mapper.selectOwnedPage(req, null, null, 7L, null).getTotal());
+                assertEquals(48L, mapper.selectPoolPage(req, null, null).getTotal());
             }
         }
     }

@@ -28,50 +28,6 @@ class StudentInfoFormServiceTest {
  @Mock StudentInfoConfigService configService; @Spy StudentInfoFields fields=new StudentInfoFields();
  @Mock RegistrationCaseMapper cases; @Mock SalesOrderMapper orders; @Mock RegistrationCommandMapper commands;
  @Mock StudentInfoImageService images; @Mock SecurityFrameworkService security; @Mock TenantFrameworkService tenants;
- @Mock EnrollmentAgreementService agreements;
- @Test void bothEmptySigningDatesFollowTheDayWithoutRewritingFixedDates() {
-  var template="<p>签订日期：</p><p>签订日期：2020-01-01</p><p>签订日期：</p>";
-  var date=java.time.LocalDate.of(2026,11,19);
-  assertEquals("<p>签订日期：2026-11-19</p><p>签订日期：2020-01-01</p><p>签订日期：2026-11-19</p>", EnrollmentAgreementService.fillSigningDates(template,date));
-  assertNotEquals(EnrollmentAgreementService.fillSigningDates(template,date), EnrollmentAgreementService.fillSigningDates(template,date.plusDays(1)));
- }
- @Test void acceptedFormArchivesRenderedBodyWithTheSubmission() {
-  context("processing");
-  var form=form("DRAFT");form.setAgreementVersion(1L);
-  when(forms.byToken(anyString())).thenReturn(form);when(forms.lock(12L)).thenReturn(form);
-  when(agreements.render(eq(form),any())).thenReturn("<p>合成协议</p>");
-  var digest=cn.hutool.crypto.digest.DigestUtil.sha256Hex("<p>合成协议</p>");
-  form.setAgreementReadHash(digest);form.setAgreementReadAt(LocalDateTime.now());
-  var request=new Submit();request.setRevision(0L);request.setAgreementHash(digest);
-  request.setAgreementAccepted(true);request.setValues(Map.of("name","合成学员"));
-  service.submit(token,request);
-  var archive=ArgumentCaptor.forClass(StudentInfoFormDO.class);
-  verify(forms).updateById(archive.capture());
-  assertEquals("<p>合成协议</p>",archive.getValue().getAgreementConfirmedBody());
-  assertEquals(EnrollmentAgreementService.CONSENT,archive.getValue().getAgreementConsent());
-  verify(registrationNotifications).publishInformationSubmitted(eq(12L),eq("合成学员"),any());
- }
- @Test void newFormRequiresReadOfCurrentTermsAndExplicitConsent() {
-  context("processing");
-  var form=form("DRAFT");
-  form.setAgreementVersion(1L);
-  when(forms.byToken(anyString())).thenReturn(form);
-  when(forms.lock(12L)).thenReturn(form);
-  when(agreements.render(eq(form),any())).thenReturn("正文");
-  var request=new Submit();
-  request.setRevision(0L);
-  request.setAgreementAccepted(true);
-  request.setAgreementHash(cn.hutool.crypto.digest.DigestUtil.sha256Hex("正文"));
-  assertThrows(ServiceException.class,()->service.submit(token,request));
-  form.setAgreementReadHash(request.getAgreementHash());
-  form.setAgreementReadAt(LocalDateTime.now());
-  request.setAgreementAccepted(false);
-  assertThrows(ServiceException.class,()->service.submit(token,request));
-  request.setAgreementAccepted(true);
-  when(agreements.render(eq(form),any())).thenReturn("更正后的正文");
-  assertThrows(ServiceException.class,()->service.submit(token,request));
-  verifyNoInteractions(values,images);
- }
  final String token="a".repeat(43);
  @Test void draftTypeHandlerEncryptsStorageAndRestoresText() throws Exception {
   var type=cn.iocoder.yudao.framework.mybatis.core.type.EncryptTypeHandler.class;
@@ -87,7 +43,7 @@ class StudentInfoFormServiceTest {
   } finally {ReflectionTestUtils.setField(type,"aes",old);}
  }
  @Test void draftSavesPartialTextWithoutSubmittingAndRejectsStaleRevision(){
-  context("processing");var f=form("DRAFT");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);
+  context("processing");var f=form("DRAFT");f.setAgreementVersion(1L);when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);
   var request=new DraftWrite();request.setRevision(0L);request.setValues(Map.of("name","未填完"));
   var saved=service.saveDraft(token,request);assertEquals(1,saved.getRevision());assertEquals("未填完",saved.getValues().get("name"));
   var capture=ArgumentCaptor.forClass(StudentInfoFormDO.class);verify(forms).updateById(capture.capture());
@@ -132,7 +88,7 @@ class StudentInfoFormServiceTest {
  @Test void terminalResponseOmitsAnswers(){when(forms.byToken(anyString())).thenReturn(form("SUBMITTED"));var r=service.publicDetail(token);assertEquals("SUBMITTED",r.getStatus());assertTrue(r.getFields().isEmpty());assertTrue(r.getImages().isEmpty());assertNull(r.getTenantId());assertEquals(1L,TenantContextHolder.getTenantId());assertFalse(TenantContextHolder.isIgnore());}
  @Test void lookupFailureRestoresContext(){assertThrows(ServiceException.class,()->service.publicDetail(token));assertFalse(TenantContextHolder.isIgnore());assertEquals(1L,TenantContextHolder.getTenantId());assertThrows(ServiceException.class,()->service.publicDetail("short"));}
  @Test void duplicateSubmitIsSuccessfulWithoutWrites(){context("completed");var f=form("SUBMITTED");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);service.submit(token,new Submit());verifyNoInteractions(values,images,registrationNotifications);}
- @Test void completedFulfillmentStillAcceptsSubmission(){context("completed");var f=form("DRAFT");when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);var req=new Submit();req.setRevision(0L);req.setValues(Map.of("name","合成测试"));service.submit(token,req);verify(registrationNotifications).publishInformationSubmitted(eq(12L),eq("合成测试"),any(LocalDateTime.class));verify(values).insert(any(StudentInfoFormValueDO.class));var order=inOrder(orders,cases,forms,values);order.verify(orders).selectByIdForUpdate(10L,1L);order.verify(cases).selectByIdForUpdate(5L,1L);order.verify(forms).lock(12L);assertEquals(1L,TenantContextHolder.getTenantId());}
+ @Test void completedFulfillmentStillAcceptsSubmission(){context("completed");var f=form("DRAFT");f.setAgreementVersion(1L);when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);var req=new Submit();req.setRevision(0L);req.setValues(Map.of("name","合成测试"));service.submit(token,req);verifyNoInteractions(registrationNotifications);verify(values).insert(any(StudentInfoFormValueDO.class));var order=inOrder(orders,cases,forms,values);order.verify(orders).selectByIdForUpdate(10L,1L);order.verify(cases).selectByIdForUpdate(5L,1L);order.verify(forms).lock(12L);assertEquals(1L,TenantContextHolder.getTenantId());}
  @Test void staleTabCannotSubmitOrClearNewerSavedDraft(){
   context("completed");var f=form("DRAFT");f.setDraftRevision(2L);
   when(forms.byToken(anyString())).thenReturn(f);when(forms.lock(12L)).thenReturn(f);

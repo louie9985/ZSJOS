@@ -110,15 +110,6 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long ensureCasesOnOrderSubmitted(Long orderId, LocalDateTime submittedAt) {
-        Long firstCase = ensureCaseAfterRegistrationApproval(orderId, submittedAt);
-        if (firstCase == null) throw exception(REGISTRATION_ORDER_INVALID);
-        studentInfoTaskService.ensureForOrder(orderId);
-        return firstCase;
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
     public Long ensureCaseAfterRegistrationApproval(Long orderId, LocalDateTime approvedAt) {
         SalesOrderDO order = orderMapper.selectByIdForUpdate(orderId, TenantContextHolder.getRequiredTenantId());
         if (order == null) throw exception(REGISTRATION_ORDER_INVALID);
@@ -131,7 +122,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         for (SalesOrderItemDO item : orderItems) {
             RegistrationCaseDO current = existing.stream()
                     .filter(row -> Objects.equals(row.getOrderItemId(), item.getId())).findFirst().orElse(null);
-            Long caseId = current == null ? createItemCase(orderId, item.getId(), order.getFormalSalesUserId(), approvedAt,
+            Long caseId = current == null ? createItemCase(orderId, item.getId(), null, approvedAt,
                     // Orders carrying an agreed exam month are enrolled automatically when they become effective.
                     order.getAgreedExamMonth() == null ? "sales_owner" : AutoClassEnrollmentService.ASSIGNMENT_MODE)
                     : current.getId();
@@ -194,13 +185,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     public PageResult<RegistrationCaseRespVO> getPoolPage(RegistrationPoolPageReqVO pageParam) {
         List<Long> matchedOrderIds = orderMapper.selectIdsByKeyword(pageParam.getKeyword());
         List<Long> matchedCaseIds = advancedFilterService.matchRegistrationCaseIds(pageParam.getAdvancedFilter());
-        Long userId = cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId();
-        Set<Long> activeUsers = casePermission.canRecover(userId)
-                ? adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
-                        .map(AdminUserRespDTO::getId).collect(Collectors.toSet())
-                : null;
-        PageResult<RegistrationCaseDO> page = caseMapper.selectOwnedPage(pageParam, matchedOrderIds, matchedCaseIds,
-                userId, activeUsers);
+        PageResult<RegistrationCaseDO> page = caseMapper.selectPoolPage(pageParam, matchedOrderIds, matchedCaseIds);
         return new PageResult<>(page.getList().stream().map(item -> convert(item, false)).toList(), page.getTotal());
     }
 
@@ -443,6 +428,11 @@ public class RegistrationServiceImpl implements RegistrationService {
                 && Boolean.TRUE.equals(item.getAttachmentRequired())
                 && attachments.getOrDefault(item.getId(), List.of()).isEmpty())) {
             throw exception(REGISTRATION_ATTACHMENT_REQUIRED);
+        }
+        var information = registrationInformation(registrationCase);
+        if (information == null || information.getSentAt() == null && !"SUBMITTED".equals(information.getStatus())
+                && !"reuse".equals(information.getSubmitSource())) {
+            throw exception(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.FIELD_INVALID, "请在报名资料收集任务中确认已发送或完成资料复用");
         }
         establishDelivery(registrationCase, order, userId);
         LocalDateTime now = LocalDateTime.now();
@@ -692,70 +682,9 @@ public class RegistrationServiceImpl implements RegistrationService {
         return registrationCase;
     }
 
-    @Override
-    @ZsjosPermission(bizType = "registration-case", bizId = "#caseId", action = "transfer")
-    public List<StudyPlannerSimpleRespVO> getTransferCandidates(Long caseId, Long userId) {
-        RegistrationCaseDO registrationCase = caseMapper.selectById(caseId);
-        return adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
-                .filter(user -> isTransferTarget(registrationCase, userId, user))
-                .map(user -> new StudyPlannerSimpleRespVO(user.getId(), user.getNickname())).toList();
-    }
-
-    @Override
-    @Transactional(rollbackFor = Exception.class)
-    @ZsjosPermission(bizType = "registration-case", bizId = "#caseId", action = "transfer-command")
-    public RegistrationCaseRespVO transfer(Long caseId, Long userId, RegistrationTransferReqVO request) {
-        if (!permissionApi.hasAnyPermissions(userId, "zsjos:registration:transfer")) {
-            throw exception(REGISTRATION_PERMISSION_DENIED);
-        }
-        RegistrationCaseDO registrationCase = lockCase(caseId);
-        String requestAudit = ":" + request.getTargetUserId() + ":" + request.getVersion() + ":" + request.getReason().trim();
-        RegistrationCommandDO previous = commandMapper.selectByIdempotencyKey(request.getIdempotencyKey());
-        if (previous != null) {
-            if (!Objects.equals(previous.getRegistrationCaseId(), caseId)
-                    || !Objects.equals(previous.getOperatorUserId(), userId)
-                    || !"transfer".equals(previous.getCommandType())
-                    || !matchesTransferAudit(previous.getRequestFingerprint(), requestAudit)) {
-                throw exception(REGISTRATION_IDEMPOTENCY_CONFLICT);
-            }
-            return transferResult(caseId, request.getTargetUserId(), request.getVersion() + 1);
-        }
-        casePermission.checkCase(registrationCase, "transfer", userId);
-        if (!Objects.equals(registrationCase.getVersion(), request.getVersion())) {
-            throw exception(REGISTRATION_VERSION_CONFLICT);
-        }
-        AdminUserRespDTO target = adminUserApi.getUser(request.getTargetUserId());
-        if (!isTransferTarget(registrationCase, userId, target)) throw exception(REGISTRATION_PERMISSION_DENIED);
-        String audit = registrationCase.getOwnerUserId() + requestAudit;
-        if (!beginCommand(caseId, userId, "transfer", request.getIdempotencyKey(), audit)) {
-            throw exception(REGISTRATION_IDEMPOTENCY_CONFLICT);
-        }
-        registrationCase.setOwnerUserId(target.getId());
-        registrationCase.setVersion(registrationCase.getVersion() + 1);
-        caseMapper.updateById(registrationCase);
-        registrationNotifyPublisher.publishTaskTransferred(registrationCase, orderMapper.selectById(registrationCase.getOrderId()));
-        return transferResult(caseId, target.getId(), registrationCase.getVersion());
-    }
-
     private boolean matchesTransferAudit(String storedAudit, String requestAudit) {
         int separator = storedAudit.indexOf(':');
         return separator >= 0 && storedAudit.substring(separator).equals(requestAudit);
-    }
-
-    private RegistrationCaseRespVO transferResult(Long caseId, Long ownerUserId, Integer version) {
-        RegistrationCaseRespVO result = new RegistrationCaseRespVO();
-        result.setId(caseId);
-        result.setOwnerUserId(ownerUserId);
-        result.setVersion(version);
-        return result;
-    }
-
-    private boolean isTransferTarget(RegistrationCaseDO registrationCase, Long actorId, AdminUserRespDTO target) {
-        return registrationCase != null && target != null
-                && !Objects.equals(registrationCase.getOwnerUserId(), target.getId())
-                && CommonStatusEnum.ENABLE.getStatus().equals(target.getStatus())
-                && permissionApi.hasAnyPermissions(target.getId(), "zsjos:registration:query-my")
-                && salesBoundary.canTransferTo(actorId, target.getId());
     }
 
     private void touch(RegistrationCaseDO registrationCase) {
@@ -886,8 +815,7 @@ public class RegistrationServiceImpl implements RegistrationService {
             AdminUserRespDTO owner = adminUserApi.getUser(registrationCase.getOwnerUserId());
             if (owner != null) result.setOwnerName(owner.getNickname());
         }
-        result.setCanTransfer(casePermission.canTransfer(registrationCase,
-                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()));
+        result.setCanTransfer(false);
         result.setOrderItemId(registrationCase.getOrderItemId());
         if (registrationCase.getOrderItemId() != null) {
             SalesOrderItemDO source = orderItemMapper.selectById(registrationCase.getOrderItemId());
@@ -1049,6 +977,8 @@ public class RegistrationServiceImpl implements RegistrationService {
             code = COMPLETION_BLOCK_FINANCE_REVISION_REQUIRED; reason = "财务审核未通过，订单补正并重新审核通过后才能完成报名履约";
         } else if (!STATUS_EFFECTIVE.equals(order.getStatus())) {
             code = COMPLETION_BLOCK_ORDER_NOT_EFFECTIVE; reason = "订单尚未生效，暂时无法完成报名履约";
+        } else if (!Boolean.TRUE.equals(result.getInformationSent()) && !"REUSED".equals(result.getInformationSubmissionStatus())) {
+            code = "information_not_sent"; reason = "请在报名资料收集任务中确认已发送或完成资料复用";
         } else if (result.getItems() == null || result.getItems().isEmpty()
                 || result.getItems().stream().anyMatch(item -> ITEM_TYPE_CHECKBOX.equals(item.getItemType())
                 && !Boolean.TRUE.equals(item.getChecked()))) {

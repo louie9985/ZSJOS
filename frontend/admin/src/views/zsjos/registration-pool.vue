@@ -99,7 +99,7 @@
           </el-descriptions-item>
         </el-descriptions>
 
-        <RegistrationStudentInfo :key="detail.id" :case-id="detail.id" :version="detail.version" :status="detail.status" :sent="detail.informationSent" :disabled="completing || closing || !!savingItemId || transferOpen" @busy="informationBusy = $event" @changed="refreshCollection" />
+        <RegistrationStudentInfo :key="detail.id" :case-id="detail.id" :version="detail.version" :status="detail.status" :sent="detail.informationSent" :disabled="completing || closing || !!savingItemId" @busy="informationBusy = $event" @changed="refreshCollection" />
 
         <el-alert
           v-if="detail.completionBlockReason"
@@ -221,7 +221,6 @@
     </div>
     <template #footer>
       <el-button @click="detailOpen = false">关闭</el-button>
-      <el-button v-if="canTransfer && detail?.canTransfer && isEditable(detail.status)" :disabled="informationBusy || routeSaving || completing || closing || !!savingItemId" @click="openTransfer">转交履约任务</el-button>
       <el-button v-if="canClose && detail && isEditable(detail.status)" :loading="closing" @click="closeService">{{ detail.orderItemId ? '结束本产品（无需交付）' : '关闭服务' }}</el-button>
       <el-button
         v-if="canComplete && detail && isEditable(detail.status)"
@@ -233,27 +232,6 @@
       >
     </template>
   </el-drawer>
-  <el-dialog v-model="transferOpen" title="转交履约任务" width="min(480px, 95vw)"
-    :close-on-click-modal="!transferSaving" :close-on-press-escape="!transferSaving" :show-close="!transferSaving">
-    <el-alert v-if="transferError" type="error" :title="transferError" :closable="false">
-      <el-button v-if="transferNeedsRefresh" link @click="refreshAfterTransferConflict">刷新任务</el-button>
-      <el-button v-else-if="!transferCandidates.length" link @click="loadTransferCandidates">重试</el-button>
-    </el-alert>
-    <el-form label-position="top" @submit.prevent="submitTransfer">
-      <el-form-item label="接手人" required>
-        <el-select v-model="targetUserId" filterable placeholder="选择接手人" :loading="transferLoading" no-data-text="暂无符合条件的接手人">
-          <el-option v-for="user in transferCandidates" :key="user.id" :label="user.nickname" :value="user.id" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="转交原因" required>
-        <el-input v-model="transferReason" type="textarea" :rows="3" :maxlength="100" />
-      </el-form-item>
-    </el-form>
-    <template #footer>
-      <el-button :disabled="transferSaving" @click="transferOpen = false">取消</el-button>
-      <el-button type="primary" :disabled="!targetUserId || !transferReason.trim() || transferNeedsRefresh" :loading="transferSaving" @click="submitTransfer">确认转交</el-button>
-    </template>
-  </el-dialog>
 </template>
 
 <script lang="ts" setup>
@@ -312,64 +290,6 @@ const hasPermission = (permission: string) =>
 const canUpdate = computed(() => hasPermission('zsjos:registration:update'))
 const closing = ref(false)
 const canClose = computed(() => hasPermission('zsjos:registration:close'))
-const canTransfer = computed(() => hasPermission('zsjos:registration:transfer'))
-const transferOpen = ref(false)
-const transferLoading = ref(false)
-const transferSaving = ref(false)
-const transferError = ref('')
-const transferNeedsRefresh = ref(false)
-const transferCandidates = ref<RegistrationApi.StudyPlanner[]>([])
-const targetUserId = ref<number>()
-const transferReason = ref('')
-const loadTransferCandidates = async () => {
-  if (!detail.value) return
-  transferLoading.value = true
-  transferError.value = ''
-  try {
-    transferCandidates.value = await RegistrationApi.getRegistrationTransferCandidates(detail.value.id)
-  } catch (error) {
-    transferError.value = error instanceof Error ? error.message : '接手人加载失败'
-  } finally {
-    transferLoading.value = false
-  }
-}
-const refreshAfterTransferConflict = async () => {
-  const id = detail.value?.id
-  transferOpen.value = false
-  if (id) await openDetail(id)
-  await load()
-}
-const openTransfer = () => {
-  transferNeedsRefresh.value = false
-  targetUserId.value = undefined
-  transferReason.value = ''
-  transferCandidates.value = []
-  transferOpen.value = true
-  void loadTransferCandidates()
-}
-const submitTransfer = async () => {
-  const current = detail.value
-  const reason = transferReason.value.trim()
-  if (!current || !targetUserId.value || !reason || transferSaving.value) return
-  transferSaving.value = true
-  transferError.value = ''
-  try {
-    await RegistrationApi.transferRegistration(current.id, {
-      version: current.version, idempotencyKey: crypto.randomUUID(), targetUserId: targetUserId.value, reason
-    })
-    transferOpen.value = false
-    detailOpen.value = false
-    detail.value = undefined
-    message.success('履约任务已转交')
-    await load()
-  } catch (error) {
-    const code = (error as { code?: number })?.code
-    transferNeedsRefresh.value = code === 1900010004 || code === 1900010005
-    transferError.value = error instanceof Error ? error.message : '转交失败，请重试'
-  } finally {
-    transferSaving.value = false
-  }
-}
 const canComplete = computed(() => hasPermission('zsjos:registration:complete'))
 const statusLabel = (status: string) =>
   statusOptions.find((item) => item.value === status)?.label || '未知状态'

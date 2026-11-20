@@ -18,24 +18,9 @@ public class RegistrationNotifyPublisher {
 
     @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
 
-    public void publishInformationSubmitted(Long formId, String studentName, java.time.LocalDateTime submittedAt) {
-        notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
-                .tenantId(TenantContextHolder.getRequiredTenantId())
-                .sceneCode(NOTIFY_SCENE_INFO_SUBMITTED)
-                .sourceEventKey("registration-info-submitted:" + formId)
-                .bizType("student_info_form").bizId(formId)
-                .occurredAt(submittedAt).payload(Map.of("studentName", studentName)).build());
-    }
-
     public void publishTaskCreated(RegistrationCaseDO registrationCase, SalesOrderDO order) {
         publishTaskAssignment(registrationCase, order, "registration-task-created:" + registrationCase.getId(),
                 registrationCase.getRegistrationApprovedAt());
-    }
-
-    public void publishTaskTransferred(RegistrationCaseDO registrationCase, SalesOrderDO order) {
-        publishTaskAssignment(registrationCase, order,
-                "registration-task-transferred:" + registrationCase.getId() + ":" + registrationCase.getVersion(),
-                java.time.LocalDateTime.now());
     }
 
     private void publishTaskAssignment(RegistrationCaseDO registrationCase, SalesOrderDO order, String eventKey,

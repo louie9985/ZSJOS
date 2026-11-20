@@ -27,7 +27,7 @@ import ApprovalHistory from './ApprovalHistory'
 import { useApprovalResource } from './useApprovalResource'
 import { approvalStatus } from './approvalHistoryModel'
 import BusinessContentCard from './BusinessContentCard'
-import { FINANCE_ORDER_PROCESS_KEY } from '../../services/salesOrder'
+import { isFinanceApprovalTask } from '../../services/salesOrder'
 import SalesOrderDetailCards from '../SalesOrderDetailCards'
 import FeedbackBusinessContent from '../FeedbackBusinessContent'
 import BpmDynamicForm, {
@@ -141,7 +141,7 @@ export default function BpmApprovalDetail({
   const identity = (taskId ?? '') + detailView
   const { data: detail, loading: detailLoading, error: detailError, reload: loadDetail } = useApprovalResource(identity, () => processInstanceId ? api.bpmApprovalDetail({ processInstanceId, taskId }) : Promise.resolve(undefined))
   const { data: businessCard, loading: businessCardLoading, error: businessCardError, reload: loadBusinessCard } = useApprovalResource(identity, () => taskId ? api.bpmApprovalBusinessDetail(taskId, detailView) : Promise.resolve(null))
-  const financeOrder = task?.processDefinitionKey === FINANCE_ORDER_PROCESS_KEY
+  const financeOrder = isFinanceApprovalTask(task)
   const { data: order, loading: orderLoading, error: orderError, reload: loadOrder } = useApprovalResource(identity, () =>
     financeOrder && taskId ? api.nativeFinanceOrderDetail(taskId, detailView) : Promise.resolve(undefined))
   const { data: records = [], loading: recordsLoading, error: recordsError, reload: loadRecords } = useApprovalResource(identity, () => processInstanceId ? api.bpmTaskListByProcessInstance(processInstanceId) : Promise.resolve([]))

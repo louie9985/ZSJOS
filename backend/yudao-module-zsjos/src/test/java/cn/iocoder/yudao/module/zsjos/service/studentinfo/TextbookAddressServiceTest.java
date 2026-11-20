@@ -5,7 +5,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.*;
-import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.*;
@@ -18,7 +18,10 @@ import static org.mockito.Mockito.*;
 class TextbookAddressServiceTest {
     @Mock SalesOrderMapper orders;
     @Mock SalesOrderItemMapper items;
-    @Mock SalesOrderObjectPermissionService permissions;
+    @Mock TextbookShippingPermission permissions;
+    @Mock TextbookShippingMapper shipping;
+    @org.junit.jupiter.api.BeforeEach void tenant() { TenantContextHolder.setTenantId(1L); }
+    @org.junit.jupiter.api.AfterEach void clearTenant() { TenantContextHolder.clear(); }
     @Mock StudentInfoTaskMapper tasks;
     @Mock StudentInfoFormMapper forms;
     @Mock StudentArchiveRevisionMapper revisions;
@@ -29,7 +32,7 @@ class TextbookAddressServiceTest {
         var order = new SalesOrderDO();
         order.setId(11L);
         order.setPersonId(22L);
-        when(orders.selectManagementPage(any(), any(), isNull())).thenReturn(new PageResult<>(List.of(order), 1L));
+        when(orders.selectTextbookPage(any(), eq(9L), eq(false))).thenReturn(new PageResult<>(List.of(order), 1L));
         var products = new ArrayList<SalesOrderItemDO>();
         for (long id = 1; id <= 6; id++) {
             var product = new SalesOrderItemDO();
@@ -56,6 +59,25 @@ class TextbookAddressServiceTest {
         assertEquals(List.of(2, 1, 1, 2), result.getList().stream().map(row -> row.products().size()).toList());
         assertNull(result.getList().getLast().destination());
         verify(answers, never()).byForm(6L);
+    }
+
+    @Test void viewAllAndEditAreIndependent() {
+        when(permissions.canViewAll(8L)).thenReturn(true);
+        when(orders.selectTextbookPage(any(), eq(8L), eq(true))).thenReturn(PageResult.empty());
+        service.page(1, 10, "", 8L);
+        verifyNoInteractions(shipping);
+    }
+
+    @Test void writeChecksLockedOrderAndConflicts() {
+        var input = new TextbookAddressService.ShippingInput("物流", "001", 0);
+        var order = new SalesOrderDO();
+        when(orders.selectByIdForUpdate(11L, 1L)).thenReturn(order);
+        assertThrows(RuntimeException.class, () -> service.saveShipping(11L, 32L, input, 9L));
+        verifyNoInteractions(shipping);
+        when(permissions.visible(order, 9L)).thenReturn(true);
+        when(shipping.save(1L,11L,32L,0,"物流","001",9L)).thenReturn(1,0);
+        service.saveShipping(11L,32L,input,9L);
+        assertThrows(RuntimeException.class, () -> service.saveShipping(11L,32L,input,9L));
     }
 
     private StudentInfoFormValueDO value(String key, String text) {

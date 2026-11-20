@@ -4,31 +4,35 @@ import cn.iocoder.yudao.module.system.api.notify.NotifyActionType;
 import cn.iocoder.yudao.module.system.api.notify.NotifySceneProvider;
 import cn.iocoder.yudao.module.system.api.notify.dto.*;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalConfigDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalConfigMapper;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.*;
 
 @Component
+@Slf4j
 public class RegistrationNotifySceneProvider implements NotifySceneProvider {
 
     @Resource private PermissionApi permissionApi;
+    @Resource private SalesOrderApprovalConfigMapper approvalConfigMapper;
+    @Resource private DeptApi deptApi;
     @Resource private AdminUserApi adminUserApi;
-    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseMapper cases;
-    @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper forms;
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
-        return List.of(new NotifySceneRespDTO(NOTIFY_SCENE_INFO_SUBMITTED, "报名信息收集表已填写", List.of(
-                new NotifySceneVariableRespDTO("student.name", "学员姓名", false)),
-                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_POOL_HANDLERS, "报名履约任务负责人")),
-                List.of(NotifyActionType.MESSAGE_DETAIL), false), new NotifySceneRespDTO(NOTIFY_SCENE_DELIVERY_CANCELLED, "提前交付已停止", List.of(
+        return List.of(new NotifySceneRespDTO(NOTIFY_SCENE_DELIVERY_CANCELLED, "提前交付已停止", List.of(
                 new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
                 new NotifySceneVariableRespDTO("reason", "停止原因", false)),
                 List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_HEAD_TEACHER, "班主任")),
@@ -36,9 +40,9 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
                 new NotifySceneVariableRespDTO("order.id", "订单编号", false),
                 new NotifySceneVariableRespDTO("order.no", "订单号", false)),
-                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_POOL_HANDLERS, "报名履约任务负责人")),
+                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_POOL_HANDLERS, "报名履约公共池处理人")),
                 List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false),
-                new NotifySceneRespDTO(NOTIFY_SCENE_PLANNER_ASSIGNED, "班主任分配", List.of(
+                new NotifySceneRespDTO(NOTIFY_SCENE_PLANNER_ASSIGNED, "学习规划师分配", List.of(
                         new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
                         new NotifySceneVariableRespDTO("order.no", "订单号", false),
                         new NotifySceneVariableRespDTO("student.name", "学员姓名", false),
@@ -67,18 +71,29 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
             return Set.of();
         }
         if (!roles.contains(NOTIFY_ROLE_POOL_HANDLERS)) return Set.of();
-        var item = cases.selectById(event.getBizId());
-        if (NOTIFY_SCENE_INFO_SUBMITTED.equals(event.getSceneCode())) {
-            var form = forms.selectById(event.getBizId());
-            item = form == null ? null : form.getRegistrationCaseId() != null
-                    ? cases.selectById(form.getRegistrationCaseId())
-                    : form.getOrderItemId() == null ? null : cases.selectByOrderItemId(form.getOrderItemId());
+        Set<Long> permissionUserIds = permissionApi.getEnabledUserIdsByPermission("zsjos:registration:query-pool");
+        SalesOrderApprovalConfigDO config = approvalConfigMapper.selectCurrent();
+        Long registrationDeptId = config == null ? null : config.getRegistrationDeptId();
+        if (registrationDeptId == null || permissionUserIds.isEmpty()) {
+            log.warn("[resolveRecipients][tenantId({}) registrationCaseId({}) has no registration department scope or permission user]",
+                    event.getTenantId(), event.getBizId());
+            return Set.of();
         }
-        if (item == null || item.getOwnerUserId() == null) return Set.of();
-        var owner = adminUserApi.getUser(item.getOwnerUserId());
-        return owner != null && Integer.valueOf(0).equals(owner.getStatus())
-                && permissionApi.hasAnyPermissions(owner.getId(), "zsjos:registration:query-my")
-                ? Set.of(NotifyRecipientDTO.admin(owner.getId())) : Set.of();
+        Set<Long> deptIds = new LinkedHashSet<>();
+        deptIds.add(registrationDeptId);
+        deptApi.getChildDeptList(registrationDeptId).stream().map(item -> item.getId())
+                .filter(java.util.Objects::nonNull).forEach(deptIds::add);
+        Set<Long> scopedUserIds = new LinkedHashSet<>();
+        adminUserApi.getUserListByDeptIds(deptIds).stream().map(user -> user.getId())
+                .filter(java.util.Objects::nonNull).forEach(scopedUserIds::add);
+        scopedUserIds.retainAll(permissionUserIds);
+        Set<Long> userIds = scopedUserIds;
+        if (userIds.isEmpty()) {
+            log.warn("[resolveRecipients][tenantId({}) registrationCaseId({}) has no enabled pool handler]",
+                    event.getTenantId(), event.getBizId());
+        }
+        return userIds.stream().map(NotifyRecipientDTO::admin)
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
     }
 
     @Override

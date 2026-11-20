@@ -48,6 +48,8 @@ version and never follow later edits.
 
 ## Public pool
 
+2026-11-20 本地代码：使用 `zsjos:registration:query-pool` 和对应操作权限办理，不按成交负责人过滤公共池，不提供履约转交命令。新任务不改变成交归属，自动分班仍由订单生效驱动。
+
 - `GET /zsjos/registration/pool-page?keyword=`：按订单号、学员姓名或手机号分页查询公共池。
 - `POST /zsjos/registration/pool/search-page`：在报名履约公共池固定权限范围内组合关键词与 `advancedFilter`，先筛选再分页。
 - 两种公共池查询均支持可选 `statusGroup`：`pending` 包含 `pending/processing`，`processed` 包含 `completed/cancelled/ended`，`all` 或省略参数不限制状态。非法值校验失败；分类与原 `status`、关键词、高级筛选取交集后分页，权限范围不变。
@@ -71,7 +73,7 @@ object authorization failures.
 
 新履约任务按 `orderItemId` 独立生成，返回 `orderItemId`、`productName` 和 `specs`。
 同一 Person 可拥有多个任务、课程服务主体和班级；同产品的不同订单明细不合并。审批仍按整单，
-完成要求订单生效并通过履约清单和必传附件校验，学员资料收集状态独立；新任务完成后按订单正式成交负责人建立其当前部门待分班服务。之后在班级管理中分班，负责人随班主任同步。历史未完成任务沿用冻结的班级选择或规划师模式，逐商品任务未选班的商品由成交负责人承接；已建立服务不重写。每个任务独立保存清单、附件和完成状态。
+完成要求订单生效、资料已确认发送或已实际提交或已直接复用，并通过履约清单和必传附件校验；新任务完成后按订单正式成交负责人建立其当前部门待分班服务。之后在班级管理中分班，负责人随班主任同步。历史未完成任务沿用冻结的班级选择或规划师模式，逐商品任务未选班的商品由成交负责人承接；已建立服务不重写。每个任务独立保存清单、附件和完成状态。
 
 `close` 在 pending/processing 的商品任务上表示“结束本产品，无需后续交付”，保存 `ended`、
 完成时间及操作人，原因沿用 `cancelReason`，操作时间兼容 `cancelledAt`。它不创建服务关系，

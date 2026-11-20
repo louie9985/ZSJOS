@@ -32,7 +32,6 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGIST
 
 @Service
 public class StudentInfoFormService {
-    @Resource private EnrollmentAgreementService agreements;
     @Resource private StudentInfoFormMapper forms;
     @Resource private StudentInfoFormValueMapper values;
     @Resource private StudentInfoFormConfigMapper configs;
@@ -49,7 +48,6 @@ public class StudentInfoFormService {
     @Resource private TenantFrameworkService tenants;
     @Resource private StudentInfoImageService images;
     @Resource private StudentInfoTaskMapper collectionTasks;
-    @Resource private cn.iocoder.yudao.module.zsjos.service.registration.RegistrationNotifyPublisher registrationNotifications;
     @Value("${zsjos.student-info.public-base-url:${zsjos.positioning.public-base-url:${ZSJOS_PUBLIC_H5_BASE_URL:}}}") private String publicBaseUrl;
     private static final SecureRandom RANDOM=new SecureRandom();
 
@@ -144,12 +142,6 @@ public class StudentInfoFormService {
         row.setExpiresAt(LocalDateTime.now().plusDays(30));
         if (row.getId()!=null) forms.update(null,new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,row.getId()).set(StudentInfoFormDO::getRevokedAt,null));
         row.setRevokedAt(null);
-        if (row.getId() != null && row.getAgreementVersion() != null) {
-            forms.update(null, new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,row.getId())
-                    .set(StudentInfoFormDO::getAgreementReadHash,null).set(StudentInfoFormDO::getAgreementReadAt,null));
-            row.setAgreementReadHash(null);
-            row.setAgreementReadAt(null);
-        }
     }
     @ZsjosPermission(bizType="student-info",bizId="#caseId",action="read")
     public Detail detail(Long caseId) { return project(caseId,false); }
@@ -184,20 +176,6 @@ public class StudentInfoFormService {
         var located=locate(token);
         return inTenant(located.getTenantId(),()->{
             var form=forms.byToken(hash(token)); var result=new Runtime(); result.setStatus(effectiveState(form));
-            if (form != null && form.getAgreementVersion() != null) {
-                String body = switch (result.getStatus()) {
-                    case "DRAFT" -> agreements.render(form, LocalDateTime.now().toLocalDate());
-                    case "SUBMITTED" -> form.getRevokedAt() == null && form.getExpiresAt() != null
-                            && form.getExpiresAt().isAfter(LocalDateTime.now()) ? form.getAgreementConfirmedBody() : null;
-                    default -> null;
-                };
-                if (body != null) {
-                    result.setAgreementBody(body);
-                    result.setAgreementHash(DigestUtil.sha256Hex(body));
-                    result.setAgreementConsent(form.getAgreementConsent() == null ? EnrollmentAgreementService.CONSENT : form.getAgreementConsent());
-                    result.setAgreementConfirmedDate(form.getSubmittedAt() == null ? null : form.getSubmittedAt().toLocalDate().toString());
-                }
-            }
             if (!"DRAFT".equals(result.getStatus())) return result;
             result.setTenantId(form.getTenantId()); result.setProductName(form.getProductName());
             result.setConfigVersion(configs.selectById(form.getConfigVersionId()).getVersionNo()); result.setFields(definitions(form));
@@ -277,7 +255,7 @@ public class StudentInfoFormService {
         row.setCategoryPathSnapshot(JsonUtils.toJsonString(path)); row.setDraftRevision(0L);
         return new TaskPreparation(row, education);
     }
-    void issueTaskForm(StudentInfoFormDO form) { agreements.bind(form); rotate(form); forms.insert(form); }
+    void issueTaskForm(StudentInfoFormDO form) { rotate(form); forms.insert(form); }
     void rotateTaskForm(StudentInfoFormDO form) {
         rotate(form); forms.updateById(form);
         forms.update(null,new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,form.getId())
@@ -293,36 +271,11 @@ public class StudentInfoFormService {
         return result;
     }
     @Transactional(rollbackFor=Exception.class)
-    public void readAgreement(String token, String digest) {
-        withLockedToken(token, form -> {
-            if (!"DRAFT".equals(effectiveState(form)) || form.getAgreementVersion() == null) throw exception(LINK_EXPIRED);
-            if (!DigestUtil.sha256Hex(agreements.render(form, LocalDateTime.now().toLocalDate())).equals(digest)) throw exception(AGREEMENT_CHANGED);
-            forms.update(null,new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,form.getId())
-                    .set(StudentInfoFormDO::getAgreementReadHash,digest).set(StudentInfoFormDO::getAgreementReadAt,LocalDateTime.now()));
-            return null;
-        });
-    }
-
-    @Transactional(rollbackFor=Exception.class)
     public void submit(String token,Submit request) {
         withLockedToken(token,form->{
             if ("SUBMITTED".equals(form.getStatus())) return null;
             if (!"DRAFT".equals(effectiveState(form))) throw exception(LINK_EXPIRED);
             if (!Objects.equals(request.getRevision(), form.getDraftRevision() == null ? 0L : form.getDraftRevision())) throw exception(DRAFT_CONFLICT);
-            var submittedAt = LocalDateTime.now();
-            if (form.getAgreementVersion() != null) {
-                String body = agreements.render(form, submittedAt.toLocalDate());
-                String digest = DigestUtil.sha256Hex(body);
-                if (!digest.equals(request.getAgreementHash())) throw exception(AGREEMENT_CHANGED);
-                if (!Boolean.TRUE.equals(request.getAgreementAccepted())
-                        || !digest.equals(form.getAgreementReadHash()) || form.getAgreementReadAt() == null)
-                    throw exception(AGREEMENT_REQUIRED);
-                var archive = new StudentInfoFormDO();
-                archive.setId(form.getId());
-                archive.setAgreementConsent(EnrollmentAgreementService.CONSENT);
-                archive.setAgreementConfirmedBody(body);
-                forms.updateById(archive);
-            }
             var definitions=definitions(form); images.validateSubmission(form,definitions,request.getValues());
             var draft = draft(form);
             var validated = request.getIdentityArea() == null ? fields.validateCollectionValues(definitions,request.getValues())
@@ -333,12 +286,10 @@ public class StudentInfoFormService {
                     answer.setValueLabelSnapshot(saved.getLabel());
                 answer.setFormId(form.getId()); answer.setTenantId(form.getTenantId()); values.insert(answer);
             }
+            var submittedAt = LocalDateTime.now();
             forms.update(null,new LambdaUpdateWrapper<StudentInfoFormDO>().eq(StudentInfoFormDO::getId,form.getId()).eq(StudentInfoFormDO::getStatus,"DRAFT")
                     .set(StudentInfoFormDO::getStatus,"SUBMITTED").set(StudentInfoFormDO::getSubmittedAt,submittedAt).set(StudentInfoFormDO::getSubmitSource,"public")
                     .set(StudentInfoFormDO::getDraftSnapshot,null).set(StudentInfoFormDO::getDraftSavedAt,null));
-            String studentName = validated.stream().filter(answer -> "name".equals(answer.getFieldKey()))
-                    .map(StudentInfoFormValueDO::getValueText).filter(Objects::nonNull).findFirst().orElse("");
-            registrationNotifications.publishInformationSubmitted(form.getId(), studentName, submittedAt);
             return null;
         });
     }
